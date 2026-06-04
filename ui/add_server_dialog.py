@@ -20,7 +20,7 @@ class AddServerDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # ---- Параметры подключения ----
-        conn_group = QGroupBox("Подключение (root@pam)")
+        conn_group = QGroupBox("Подключение")
         conn_grid = QGridLayout(conn_group)
 
         conn_grid.addWidget(QLabel("Хост:"), 0, 0)
@@ -28,18 +28,23 @@ class AddServerDialog(QDialog):
         self.host_input.setPlaceholderText("pve01.example.com")
         conn_grid.addWidget(self.host_input, 0, 1)
 
-        conn_grid.addWidget(QLabel("Пароль root:"), 1, 0)
+        conn_grid.addWidget(QLabel("Пользователь:"), 1, 0)
+        self.user_input = QLineEdit()
+        self.user_input.setPlaceholderText("username@realm (root@pam, user@ipa...)")
+        conn_grid.addWidget(self.user_input, 1, 1)
+
+        conn_grid.addWidget(QLabel("Пароль:"), 2, 0)
         self.pwd_input = QLineEdit()
         self.pwd_input.setEchoMode(QLineEdit.Password)
         self.pwd_input.setPlaceholderText("••••••••")
-        conn_grid.addWidget(self.pwd_input, 1, 1)
+        conn_grid.addWidget(self.pwd_input, 2, 1)
 
-        info_label = QLabel("Будет создан пользователь admin@pve с ролью Administrator на /")
+        info_label = QLabel("Будет создан пользователь pvecenter@pve с ролью Administrator на /")
         info_label.setStyleSheet("color: #6b7280; font-size: 11px;")
-        conn_grid.addWidget(info_label, 2, 0, 1, 2)
+        conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
         self.auth_btn = QPushButton("Получить токен")
-        conn_grid.addWidget(self.auth_btn, 3, 0, 1, 2)
+        conn_grid.addWidget(self.auth_btn, 4, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
         layout.addWidget(conn_group)
@@ -97,13 +102,17 @@ class AddServerDialog(QDialog):
 
     def _on_auth(self):
         host = self.host_input.text().strip()
+        user = self.user_input.text().strip()
         password = self.pwd_input.text()
 
         if not host:
             self._set_status("Введите хост", "#ef4444")
             return
+        if not user:
+            self._set_status("Введите пользователя", "#ef4444")
+            return
         if not password:
-            self._set_status("Введите пароль root", "#ef4444")
+            self._set_status("Введите пароль", "#ef4444")
             return
 
         self.auth_btn.setEnabled(False)
@@ -113,7 +122,7 @@ class AddServerDialog(QDialog):
         from PySide6.QtCore import QCoreApplication
         QCoreApplication.processEvents()
 
-        result = create_admin_token(host, password)
+        result = create_admin_token(host, user, password)
 
         if "error" in result:
             self._set_status(result["error"], "#ef4444")

@@ -9,73 +9,77 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ----------------------------------------------------------------------
-# Создание API токена с правами Administrator
+# Создание API токена для PVE Center
 # ----------------------------------------------------------------------
-def create_admin_token(host, root_password):
-    """Создаёт PVE-юзера `admin@pve` с ролью Administrator на `/`
-    и генерирует API-токен для него.
+def create_admin_token(host, user, password):
+    """Создаёт локального PVE-юзера `pvecenter@pve` с ролью Administrator
+    на `/` и генерирует API-токен для него.
 
     Аргументы:
         host: адрес PVE-хоста
-        root_password: пароль root@pam
+        user: существующий пользователь с правами на создание пользователей/ACL
+        password: его пароль
 
-    Возвращает dict с полями token_name, token_value, user
+    Возвращает dict с полями token_name, token_value, user, local_user
     или dict с полем error.
     """
+    service_user = "pvecenter@pve"
     try:
-        root = ProxmoxAPI(host, user="root@pam", password=root_password,
-                          verify_ssl=False, timeout=15)
-        root.version.get()
+        api = ProxmoxAPI(host, user=user, password=password,
+                         verify_ssl=False, timeout=15)
+        api.version.get()
 
-        admin_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24))
+        service_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24))
         existing = set()
         try:
-            users = root.access.users.get()
+            users = api.access.users.get()
             existing = {u.get("userid") for u in users}
         except Exception:
             pass
 
-        if "admin@pve" not in existing:
-            root.access.users.post(
-                userid="admin@pve",
-                password=admin_password,
-                comment="PVE Center admin user (auto-created)",
+        if service_user not in existing:
+            api.access.users.post(
+                userid=service_user,
+                password=service_password,
+                comment="PVE Center service user (auto-created)",
                 enable=1,
             )
 
         try:
-            acls = root.access.acl.get()
+            acls = api.access.acl.get()
             has_admin_acl = any(
                 a.get("path") == "/"
-                and "admin@pve" in (a.get("users") or a.get("ugid") or "")
+                and service_user in (a.get("users") or a.get("ugid") or "")
                 for a in acls
             )
         except Exception:
             has_admin_acl = False
 
         if not has_admin_acl:
-            root.access.acl.put(
+            api.access.acl.put(
                 path="/",
                 roles="Administrator",
-                users="admin@pve",
+                users=service_user,
             )
 
-        token_id = "dashboard-" + "".join(
+        token_id = "pvecenter-" + "".join(
             secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6)
         )
-        result = root.access.users("admin@pve").token(token_id).post(
+        result = api.access.users(service_user).token(token_id).post(
             comment="PVE Center dashboard",
             expire=0,
         )
         data = result.get("data", result)
         if isinstance(data, dict) and "value" in data:
-            return {"token_name": token_id, "token_value": data["value"], "user": "admin@pve"}
-        return {"token_name": token_id, "token_value": data.get("tokenid", ""), "user": "admin@pve"}
+            return {"token_name": token_id, "token_value": data["value"],
+                    "user": service_user}
+        return {"token_name": token_id, "token_value": data.get("tokenid", ""),
+                "user": service_user}
 
     except Exception as e:
         msg = str(e)
         if "authorization" in msg.lower() or "permission" in msg.lower() or "401" in msg:
-            return {"error": "Неверный пароль root@pam"}
+            return {"error": "Неверный логин или пароль"}
         if "connection" in msg.lower() or "timeout" in msg.lower() or "resolve" in msg.lower():
             return {"error": f"Не удалось подключиться к {host}"}
         return {"error": msg}
