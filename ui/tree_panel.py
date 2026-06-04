@@ -249,7 +249,7 @@ class TreePanel(QWidget):
                 for node in sorted(hosts_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                     node_name = node.get("node", "?")
                     display_name = node.get("_display_name") or node_name
-                    vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name]
+                    vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name and vm.get("host_name") == node.get("host_name")]
                     host_item = QTreeWidgetItem(cl_item)
                     host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
                     host_item.setIcon(0, get_icon("host", node.get("status")))
@@ -301,7 +301,10 @@ class TreePanel(QWidget):
             for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                 node_name = node.get("node", "?")
                 display_name = node.get("_display_name") or node_name
-                vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
+                host_name = node.get("host_name", "")
+                vms_on_host = [vm for vm in self.all_vms
+                               if vm.get("node") == node_name
+                               and vm.get("host_name") == host_name]
                 host_item = QTreeWidgetItem(st_folder)
                 host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
