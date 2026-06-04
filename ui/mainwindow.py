@@ -292,6 +292,8 @@ class MainWindow(QMainWindow):
         self.all_storages.clear()
         self._seen_storage_keys.clear()
 
+        self.tree_panel.start_loading()
+
         # Пул сам управляет потоками, просто запускаем задачи
         active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
         self.progress.setMaximum(len(active_cfgs))

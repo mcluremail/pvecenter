@@ -184,6 +184,11 @@ _ADD = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rend
 <line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
 </svg>"""
 
+_LOADING = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="8" cy="8" r="5" fill="none" stroke="#e5e7eb" stroke-width="2"/>
+<path d="M8 3 A5 5 0 0 1 13 8" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round"/>
+</svg>"""
+
 
 def _make_icon_with_dot(template, status):
     dot_color = _status_color(status)
@@ -192,6 +197,14 @@ def _make_icon_with_dot(template, status):
     svg = template.format(c=_C, c2=_C2).replace(
         "</svg>",
         f'<circle cx="12.5" cy="12.5" r="4" fill="{dot_color}" stroke="white" stroke-width="1.2"/></svg>'
+    )
+    return _make_icon(svg, 16)
+
+
+def _make_loading_icon(angle):
+    svg = _LOADING.format(c=_C, c2=_C2).replace(
+        '<path d="M8 3',
+        f'<path transform="rotate({angle} 8 8)" d="M8 3'
     )
     return _make_icon(svg, 16)
 

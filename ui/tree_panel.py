@@ -5,7 +5,7 @@ from PySide6.QtGui import QIcon
 from collections import defaultdict
 from datetime import timedelta
 
-from .icons import get_icon, init_icons
+from .icons import get_icon, init_icons, _make_loading_icon
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2
@@ -43,6 +43,12 @@ class TreePanel(QWidget):
         self._nav_timer.setSingleShot(True)
         self._nav_timer.setInterval(300)
         self._nav_timer.timeout.connect(self._flush_nav)
+
+        self._loading_hosts = set()
+        self._spinner_angle = 0
+        self._spin_timer = QTimer()
+        self._spin_timer.setInterval(150)
+        self._spin_timer.timeout.connect(self._tick_spinner)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -84,13 +90,92 @@ class TreePanel(QWidget):
     def _on_add_server(self):
         self.add_server_requested.emit()
 
+    def _tick_spinner(self):
+        self._spinner_angle = (self._spinner_angle + 45) % 360
+        icon = _make_loading_icon(self._spinner_angle)
+        for name in list(self._loading_hosts):
+            item = self._find_host_item(name)
+            if item:
+                item.setIcon(0, icon)
+
+    def _find_host_item(self, name):
+        def search(item):
+            key = item.data(0, ITEM_KEY_ROLE)
+            if key and isinstance(key, tuple) and key[0] == "host" and key[1] == name:
+                return item
+            for i in range(item.childCount()):
+                found = search(item.child(i))
+                if found:
+                    return found
+            return None
+        for i in range(self.tree.topLevelItemCount()):
+            found = search(self.tree.topLevelItem(i))
+            if found:
+                return found
+        return None
+
     def update_data(self, all_nodes, all_vms, all_storages=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
         self.all_storages = all_storages or []
+        self._loading_hosts.clear()
+        self._spin_timer.stop()
         self._build_tree()
         self._restore_expanded_state()
         self._sync_toggle_button()
+
+    def start_loading(self):
+        self.tree.clear()
+        self._building = True
+        self._loading_hosts.clear()
+
+        hosts_by_cluster = {}
+        standalone = []
+        for cfg in self.nodes_cfg:
+            if cfg.get("skip", False):
+                continue
+            name = cfg.get("name", "")
+            cluster = cfg.get("cluster")
+            if cluster and cluster not in (False, None, "Standalone"):
+                hosts_by_cluster.setdefault(cluster, []).append(name)
+            else:
+                standalone.append(name)
+
+        if hosts_by_cluster:
+            folder = QTreeWidgetItem(self.tree)
+            folder.setText(0, "Кластеры")
+            folder.setIcon(0, get_icon("folder"))
+            folder.setData(0, ITEM_KEY_ROLE, ("section", "Кластеры"))
+            folder.setExpanded(True)
+            for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
+                cl_item = QTreeWidgetItem(folder)
+                cl_item.setText(0, cl_name)
+                cl_item.setIcon(0, get_icon("cluster"))
+                cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
+                cl_item.setExpanded(True)
+                for hname in hosts_by_cluster[cl_name]:
+                    hi = QTreeWidgetItem(cl_item)
+                    hi.setText(0, hname)
+                    hi.setIcon(0, _make_loading_icon(0))
+                    hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
+                    self._loading_hosts.add(hname)
+
+        if standalone:
+            folder = QTreeWidgetItem(self.tree)
+            folder.setText(0, "Отдельные хосты")
+            folder.setIcon(0, get_icon("folder"))
+            folder.setData(0, ITEM_KEY_ROLE, ("section", "Отдельные хосты"))
+            folder.setExpanded(True)
+            for hname in sorted(standalone, key=str.lower):
+                hi = QTreeWidgetItem(folder)
+                hi.setText(0, hname)
+                hi.setIcon(0, _make_loading_icon(0))
+                hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
+                self._loading_hosts.add(hname)
+
+        self.tree.expandAll()
+        self._building = False
+        self._spin_timer.start()
 
     def _sync_toggle_button(self):
         if self.tree.topLevelItemCount() == 0:
@@ -328,6 +413,8 @@ class TreePanel(QWidget):
         self._building = False
 
     def update_node_statuses(self, all_nodes, all_vms):
+        self._loading_hosts.clear()
+        self._spin_timer.stop()
         def traverse(item):
             for i in range(item.childCount()):
                 child = item.child(i)
