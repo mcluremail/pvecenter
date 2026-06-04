@@ -1,7 +1,5 @@
 import urllib3
 import traceback
-import secrets
-import string
 from PySide6.QtCore import Signal, QRunnable, QObject
 from proxmoxer import ProxmoxAPI
 
@@ -11,65 +9,116 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ----------------------------------------------------------------------
 # Создание API токена для PVE Center
 # ----------------------------------------------------------------------
+PVE_PORT = 8006
+
+
+def _pve_api(path, host, method="GET", data=None, auth_token=None, timeout=15):
+    import requests as rq
+    url = f"https://{host}:{PVE_PORT}/api2/json{path}"
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = auth_token
+    kwargs = {"headers": headers, "verify": False, "timeout": timeout}
+    if data:
+        if method in ("POST", "PUT"):
+            kwargs["data"] = data
+        else:
+            kwargs["params"] = data
+    resp = rq.request(method, url, **kwargs)
+    resp.raise_for_status()
+    return resp.json().get("data", resp.json())
+
+
+def _pve_ticket_auth(host, user, password):
+    import requests as rq
+    url = f"https://{host}:{PVE_PORT}/api2/json/access/ticket"
+    resp = rq.post(url, data={"username": user, "password": password},
+                   verify=False, timeout=15)
+    resp.raise_for_status()
+    data = resp.json().get("data", {})
+    return {
+        "ticket": data.get("ticket"),
+        "csrf": data.get("CSRFPreventionToken"),
+    }
+
+
 def create_admin_token(host, user, password):
     """Создаёт локального PVE-юзера `pvecenter@pve` с ролью Administrator
     на `/` и генерирует API-токен для него.
+
+    Использует прямые HTTP-запросы (без Proxmoxer), чтобы избежать
+    проблем с маппингом HTTP-методов.
 
     Аргументы:
         host: адрес PVE-хоста
         user: существующий пользователь с правами на создание пользователей/ACL
         password: его пароль
 
-    Возвращает dict с полями token_name, token_value, user, local_user
+    Возвращает dict с полями token_name, token_value, user
     или dict с полем error.
     """
-    service_user = "pvecenter@pve"
-    try:
-        api = ProxmoxAPI(host, user=user, password=password,
-                         verify_ssl=False, timeout=15)
-        api.version.get()
+    import requests as rq
+    import secrets as sec
+    import string as str_mod
 
-        service_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24))
-        existing = set()
-        try:
-            users = api.access.users.get()
-            existing = {u.get("userid") for u in users}
-        except Exception:
-            pass
+    service_user = "pvecenter@pve"
+
+    try:
+        ticket_data = _pve_ticket_auth(host, user, password)
+        ticket = ticket_data["ticket"]
+        csrf = ticket_data["csrf"]
+        cookie_token = f"PVEAuthCookie={ticket}"
+        sess = rq.Session()
+        sess.verify = False
+        sess.headers.update({"Cookie": cookie_token, "CSRFPreventionToken": csrf})
+
+        users = sess.get(
+            f"https://{host}:{PVE_PORT}/api2/json/access/users",
+            timeout=15
+        ).json().get("data", [])
+        existing = {u.get("userid") for u in users}
 
         if service_user not in existing:
-            api.access.users.post(
-                userid=service_user,
-                password=service_password,
-                comment="PVE Center service user (auto-created)",
-                enable=1,
+            pwd = "".join(sec.choice(str_mod.ascii_letters + str_mod.digits) for _ in range(24))
+            r = sess.post(
+                f"https://{host}:{PVE_PORT}/api2/json/access/users",
+                data={"userid": service_user, "password": pwd,
+                       "comment": "PVE Center service user (auto-created)", "enable": 1},
+                timeout=15,
             )
+            if r.status_code >= 400:
+                print(f"[create_user] {r.status_code}: {r.text[:200]}")
 
-        try:
-            acls = api.access.acl.get()
-            has_admin_acl = any(
-                a.get("path") == "/"
-                and service_user in (a.get("users") or a.get("ugid") or "")
-                for a in acls
-            )
-        except Exception:
-            has_admin_acl = False
+        acls = sess.get(
+            f"https://{host}:{PVE_PORT}/api2/json/access/acl",
+            timeout=15
+        ).json().get("data", [])
+        has_admin_acl = any(
+            a.get("path") == "/"
+            and service_user in (a.get("users") or a.get("ugid") or "")
+            for a in acls
+        )
 
         if not has_admin_acl:
-            api.access.acl.put(
-                path="/",
-                roles="Administrator",
-                users=service_user,
+            r = sess.put(
+                f"https://{host}:{PVE_PORT}/api2/json/access/acl",
+                data={"path": "/", "roles": "Administrator", "users": service_user},
+                timeout=15,
             )
+            if r.status_code >= 400:
+                print(f"[acl_put] {r.status_code}: {r.text[:200]}")
+            else:
+                print(f"[acl_put] OK — Administrator granted to {service_user} on /")
 
         token_id = "pvecenter-" + "".join(
-            secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6)
+            sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
         )
-        result = api.access.users(service_user).token(token_id).post(
-            comment="PVE Center dashboard",
-            expire=0,
+        r = sess.post(
+            f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
+            data={"comment": "PVE Center dashboard", "expire": 0},
+            timeout=15,
         )
-        data = result.get("data", result)
+        data = r.json().get("data", r.json())
         if isinstance(data, dict) and "value" in data:
             return {"token_name": token_id, "token_value": data["value"],
                     "user": service_user}
