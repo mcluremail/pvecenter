@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         h_splitter = QSplitter(Qt.Horizontal)
         h_splitter.addWidget(self.tree_panel)
         h_splitter.addWidget(self.detail_panel)
-        h_splitter.setSizes([220, 1280])
+        h_splitter.setSizes([280, 1220])
 
         # Нижняя панель с задачами кластера
         self.tasks_widget = ClusterTasksWidget()
