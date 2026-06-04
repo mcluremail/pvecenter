@@ -43,9 +43,9 @@ pip install PySide6 proxmoxer requests pyqtgraph cryptography
 ```json
 [
   {
-    "name": "pve01",
-    "host": "pve01.local",
-    "cluster": "ROS",
+    "name": "pve-node-1",
+    "host": "pve-node-1.local",
+    "cluster": "Production",
     "cluster_rep": true,
     "user": "monitor@pve",
     "token_name": "dashboard",
