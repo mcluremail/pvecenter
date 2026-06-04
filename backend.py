@@ -63,7 +63,7 @@ def create_admin_token(host, user, password):
 
         if service_user not in existing:
             pwd = "".join(sec.choice(str_mod.ascii_letters + str_mod.digits) for _ in range(24))
-r = sess.put(
+            r = sess.put(
                 f"https://{host}:{PVE_PORT}/api2/json/access/users",
                 data={"userid": service_user, "password": pwd,
                        "comment": "PVE Center service user (auto-created)", "enable": 1},
@@ -83,7 +83,7 @@ r = sess.put(
         )
 
         if not has_admin_acl:
-r = sess.post(
+            r = sess.post(
                 f"https://{host}:{PVE_PORT}/api2/json/access/acl",
                 data={"path": "/", "roles": "Administrator", "users": service_user},
                 timeout=15,
@@ -225,7 +225,13 @@ class FetchWorker(QRunnable):
                     if not vm.get("pool"):
                         vm["pool"] = vmid_to_pool.get(vm["vmid"])
             else:
-                node_name = self.node_cfg["name"]
+                # Для standalone хоста получаем реальное короткое имя ноды с сервера
+                try:
+                    local_nodes = proxmox.nodes.get()
+                    real_node_name = local_nodes[0]["node"] if local_nodes else self.node_cfg["name"]
+                except Exception:
+                    real_node_name = self.node_cfg["name"]
+                node_name = real_node_name
                 node_status = proxmox.nodes(node_name).status.get()
                 nodes = [{**node_status, "node": node_name, "status": "online"}]
                 qemu_list = proxmox.nodes(node_name).qemu.get()
