@@ -788,9 +788,13 @@ class DetailPanel(QWidget):
         storage_name = self.current_obj_name
         data = self.current_obj_data or {}
         cluster = data.get("cluster")
+        host_name_filter = data.get("host_name")
         if cluster:
             filtered = [s for s in self.all_storages
                         if s.get("storage") == storage_name and s.get("cluster") == cluster]
+        elif host_name_filter:
+            filtered = [s for s in self.all_storages
+                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
         else:
             filtered = [s for s in self.all_storages if s.get("storage") == storage_name]
         if not filtered:
@@ -1082,7 +1086,13 @@ class DetailPanel(QWidget):
 
     def _show_storage_detail(self, storage_name, data):
         cluster = data.get("cluster")
-        title = f"{storage_name} @ {cluster}" if cluster else storage_name
+        host_name_filter = data.get("host_name")
+        if cluster:
+            title = f"{storage_name} @ {cluster}"
+        elif host_name_filter:
+            title = f"{storage_name} ({host_name_filter})"
+        else:
+            title = storage_name
         self.detail_label.setText(f"Хранилище: {title}")
         self.tabs.setTabVisible(0, False)
         self.tabs.setTabVisible(1, False)
@@ -1448,9 +1458,13 @@ class DetailPanel(QWidget):
             storage_name = self.current_obj_name
             data = self.current_obj_data or {}
             cluster = data.get("cluster")
+            host_name_filter = data.get("host_name")
             if cluster:
                 filtered = [s for s in self.all_storages
                             if s.get("storage") == storage_name and s.get("cluster") == cluster]
+            elif host_name_filter:
+                filtered = [s for s in self.all_storages
+                            if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
             else:
                 filtered = [s for s in self.all_storages if s.get("storage") == storage_name]
             if filtered:

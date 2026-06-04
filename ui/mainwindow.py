@@ -289,7 +289,7 @@ class MainWindow(QMainWindow):
                 self.all_vms.append(vm)
             for st in data.get("storages", []):
                 st["host_name"] = data["host"]
-                key = (st.get("storage"), st.get("node"))
+                key = (st.get("storage"), st.get("node"), data["host"])
                 if key not in self._seen_storage_keys:
                     self._seen_storage_keys.add(key)
                     self.all_storages.append(st)

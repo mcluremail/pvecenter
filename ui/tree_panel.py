@@ -377,7 +377,7 @@ class TreePanel(QWidget):
                     if sname not in seen_names:
                         seen_names.add(sname)
                         si = QTreeWidgetItem(cl_item)
-                        si.setText(0, sname)
+                        si.setText(0, f"{sname} (@{cluster_name})")
                         si.setIcon(0, get_icon("storage"))
                         si.setData(0, ITEM_KEY_ROLE, ("storage", sname, cluster_name))
 
@@ -388,15 +388,17 @@ class TreePanel(QWidget):
                 so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", "Отдельные"))
                 so_item.setExpanded(True)
 
-                seen_names = set()
+                seen_keys = set()
                 for st in standalone_storages:
                     sname = st.get("storage", "")
-                    if sname not in seen_names:
-                        seen_names.add(sname)
+                    shost = st.get("host_name", "")
+                    key = (sname, shost)
+                    if key not in seen_keys:
+                        seen_keys.add(key)
                         si = QTreeWidgetItem(so_item)
-                        si.setText(0, sname)
+                        si.setText(0, f"{sname} ({shost})")
                         si.setIcon(0, get_icon("storage"))
-                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname))
+                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname, shost))
 
         self.tree.expandAll()
         self._building = False
@@ -539,7 +541,12 @@ class TreePanel(QWidget):
         if item_type == "storage":
             data = {"storage_name": item_name}
             if len(key) >= 3:
-                data["cluster"] = key[2]
+                val = key[2]
+                # Если третий элемент похож на хост-имя (с точками или длинное) — это standalone
+                if val and (val.count(".") > 0 or "/" in val):
+                    data["host_name"] = val
+                else:
+                    data["cluster"] = val
             self.item_selected.emit("storage", item_name, data)
             return
 
