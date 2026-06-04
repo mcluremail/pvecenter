@@ -6,6 +6,9 @@ from collections import defaultdict
 from datetime import timedelta
 
 from .icons import get_icon, init_icons, _make_loading_icon
+from datetime import timedelta
+
+from .icons import get_icon, init_icons, _make_loading_icon
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2
@@ -17,7 +20,7 @@ def _vm_count_str(vms):
 
 class TreePanel(QWidget):
     item_selected = Signal(str, str, dict)
-    add_server_requested = Signal()
+    add_server_requested_context = Signal(str)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -53,16 +56,9 @@ class TreePanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Кнопка развернуть/свернуть + Добавить сверху
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(4, 2, 4, 0)
         init_icons()
-        self._add_btn = QPushButton()
-        self._add_btn.setIcon(get_icon("add"))
-        self._add_btn.setFixedSize(22, 22)
-        self._add_btn.setToolTip("Добавить сервер")
-        self._add_btn.clicked.connect(self._on_add_server)
-        btn_layout.addWidget(self._add_btn)
         self._toggle_btn = QPushButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
@@ -87,8 +83,38 @@ class TreePanel(QWidget):
             self._toggle_btn.setIcon(get_icon("expand"))
             self._toggle_btn.setToolTip("Развернуть всё")
 
-    def _on_add_server(self):
-        self.add_server_requested.emit()
+    def _make_section_item(self, parent, label):
+        item = QTreeWidgetItem(parent)
+        item.setData(0, ITEM_KEY_ROLE, ("section", label))
+        item.setText(0, label)
+        item.setIcon(0, get_icon("folder"))
+        item.setExpanded(True)
+
+        context_map = {"Кластеры": "cluster", "Отдельные хосты": "standalone"}
+        ctx = context_map.get(label, "")
+        if not ctx:
+            return item
+
+        w = QWidget()
+        w.setAttribute(Qt.WA_TranslucentBackground)
+        hbox = QHBoxLayout(w)
+        hbox.setContentsMargins(0, 0, 4, 0)
+        hbox.addStretch()
+        btn = QPushButton("+")
+        btn.setFixedSize(20, 20)
+        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setStyleSheet(
+            "QPushButton { border: 1px solid #d1d5db; border-radius: 3px; "
+            "background: transparent; font-size: 13px; font-weight: bold; "
+            "color: #6b7280; padding: 0; outline: none; }"
+            "QPushButton:hover { background: #d1d5db; color: #374151; }"
+        )
+        btn.setToolTip(f"Добавить хост в «{label}»")
+        btn.clicked.connect(lambda checked, c=ctx: self.add_server_requested_context.emit(c))
+        hbox.addWidget(btn)
+        self.tree.setItemWidget(item, 0, w)
+
+        return item
 
     def _tick_spinner(self):
         self._spinner_angle = (self._spinner_angle + 45) % 360
@@ -133,11 +159,7 @@ class TreePanel(QWidget):
                 standalone.append(name)
 
         if hosts_by_cluster:
-            folder = QTreeWidgetItem(self.tree)
-            folder.setText(0, "Кластеры")
-            folder.setIcon(0, get_icon("folder"))
-            folder.setData(0, ITEM_KEY_ROLE, ("section", "Кластеры"))
-            folder.setExpanded(True)
+            folder = self._make_section_item(self.tree, "Кластеры")
             for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(folder)
                 cl_item.setText(0, cl_name)
@@ -147,11 +169,7 @@ class TreePanel(QWidget):
                 self._loading_hosts.add(f"cluster:{cl_name}")
 
         if standalone:
-            folder = QTreeWidgetItem(self.tree)
-            folder.setText(0, "Отдельные хосты")
-            folder.setIcon(0, get_icon("folder"))
-            folder.setData(0, ITEM_KEY_ROLE, ("section", "Отдельные хосты"))
-            folder.setExpanded(True)
+            folder = self._make_section_item(self.tree, "Отдельные хосты")
             for hname in sorted(standalone, key=str.lower):
                 hi = QTreeWidgetItem(folder)
                 hi.setText(0, hname)
@@ -230,11 +248,7 @@ class TreePanel(QWidget):
                 standalone_nodes.append(node)
 
         if cluster_nodes:
-            cluster_folder = QTreeWidgetItem(self.tree)
-            cluster_folder.setText(0, "Кластеры")
-            cluster_folder.setIcon(0, get_icon("folder"))
-            cluster_folder.setData(0, ITEM_KEY_ROLE, ("section", "Кластеры"))
-            cluster_folder.setExpanded(True)
+            cluster_folder = self._make_section_item(self.tree, "Кластеры")
 
             for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(cluster_folder)
@@ -292,11 +306,7 @@ class TreePanel(QWidget):
                     self._add_vm_item(cl_item, vm)
 
         if standalone_nodes:
-            st_folder = QTreeWidgetItem(self.tree)
-            st_folder.setText(0, "Отдельные хосты")
-            st_folder.setIcon(0, get_icon("folder"))
-            st_folder.setData(0, ITEM_KEY_ROLE, ("section", "Отдельные хосты"))
-            st_folder.setExpanded(True)
+            st_folder = self._make_section_item(self.tree, "Отдельные хосты")
 
             for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                 node_name = node.get("node", "?")
@@ -347,11 +357,7 @@ class TreePanel(QWidget):
 
         # Хранилища
         if self.all_storages:
-            st_folder = QTreeWidgetItem(self.tree)
-            st_folder.setText(0, "Хранилища")
-            st_folder.setIcon(0, get_icon("folder"))
-            st_folder.setData(0, ITEM_KEY_ROLE, ("section", "Хранилища"))
-            st_folder.setExpanded(True)
+            st_folder = self._make_section_item(self.tree, "Хранилища")
 
             # Группируем storage по кластеру для дерева
             cluster_storages = defaultdict(list)
@@ -421,7 +427,7 @@ class TreePanel(QWidget):
                 key = child.data(0, ITEM_KEY_ROLE)
                 if key and isinstance(key, tuple) and key[0] == "host":
                     host_name = key[1]
-                    host = next((n for n in all_nodes if n.get("node") == host_name), None)
+                    host = next((n for n in all_nodes if n.get("node") == host_name or n.get("host_name") == host_name), None)
                     if host:
                         child.setIcon(0, get_icon("host", host.get("status")))
                     traverse(child)
@@ -430,11 +436,18 @@ class TreePanel(QWidget):
         for i in range(self.tree.topLevelItemCount()):
             traverse(self.tree.topLevelItem(i))
 
+    @staticmethod
+    def _strip_count(text):
+        """Убирает суффикс VM-счётчика вида '[3/5]' для стабильных путей."""
+        import re as _re
+        return _re.sub(r'\s+\[\d+/\d+\]$', '', text)
+
     def _save_expanded_state(self):
         key = "expandedTreePaths"
         paths = []
         def collect_paths(item, path=""):
-            current = path + "|" + item.text(0) if path else item.text(0)
+            label = self._strip_count(item.text(0))
+            current = path + "|" + label if path else label
             if item.isExpanded():
                 paths.append(current)
             for i in range(item.childCount()):
@@ -449,7 +462,8 @@ class TreePanel(QWidget):
         if not saved_paths:
             return
         def match_and_expand(item, path=""):
-            current = path + "|" + item.text(0) if path else item.text(0)
+            label = self._strip_count(item.text(0))
+            current = path + "|" + label if path else label
             if current in saved_paths:
                 item.setExpanded(True)
             else:

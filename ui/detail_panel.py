@@ -24,7 +24,7 @@ from .widgets.vm_task_history_widget import VmTaskHistoryWidget
 from .widgets.vm_pool_widget import VmPoolWidget
 
 # Максимум одновременно работающих воркеров в detail_panel
-MAX_WORKERS = 16
+
 
 class DetailPanel(QWidget):
     def __init__(self, nodes_cfg):
@@ -37,7 +37,6 @@ class DetailPanel(QWidget):
         self.config_cache = {}
         self.metrics_cache = {}
         self.task_history_cache = {}
-        self.storage_metrics_cache = {}
         self._storage_content_pending = {}
         self._workers = set()
         self.current_worker = None
@@ -530,7 +529,7 @@ class DetailPanel(QWidget):
     # Общие методы
     # ------------------------------------------------------------------
     def _run_worker(self, worker):
-        if len(self._workers) >= MAX_WORKERS:
+        if len(self._workers) >= 16:
             return
         self._workers.add(worker)
         cls_name = type(worker).__name__
@@ -555,6 +554,8 @@ class DetailPanel(QWidget):
             self.current_obj_data = data
             self._generation += 1
             gen = self._generation
+            self.metrics_widget.setVisible(True)
+            self.info_label.setStyleSheet("")
 
             self._cancel_detail_worker()
             self._cancel_config_worker()
@@ -856,8 +857,11 @@ class DetailPanel(QWidget):
         elif self.current_obj_type == "host":
             host_data = next((n for n in self.all_nodes if n.get("node") == self.current_obj_name), None)
             if host_data:
-                self._update_host_cells(host_data)
-                self._fetch_host_metrics(host_data)
+                if host_data.get("status") == "error":
+                    self._show_host_info(self.current_obj_name, host_data)
+                else:
+                    self._update_host_cells(host_data)
+                    self._fetch_host_metrics(host_data)
         elif self.current_obj_type == "pool":
             self._update_pool_cells()
         elif self.current_obj_type == "vm":
@@ -1660,7 +1664,7 @@ class DetailPanel(QWidget):
             self.host_snapshots_stack.widget(0).setText("Нет данных")
             self.host_snapshots_stack.setCurrentIndex(0)
             return
-        vms = [vm for vm in self.all_vms if vm.get("node") == host_name]
+        vms = [vm for vm in self.all_vms if vm.get("node") == host_name and vm.get("host_name") == host_cfg_name]
         from .api.metrics import HostSnapshotsWorker
         worker = HostSnapshotsWorker(cfg, node_name, vms)
         worker.signals.snapshots_ready.connect(
@@ -1744,6 +1748,37 @@ class DetailPanel(QWidget):
         node = next((n for n in self.all_nodes if n.get("node") == host_name), None)
         display_name = node.get("_display_name") if node else host_name
         self.detail_label.setText(f"Хост: {display_name}")
+
+        if host_data and host_data.get("status") == "error":
+            err = host_data.get("error", "")
+            err_lower = err.lower()
+            if "resolve" in err_lower or "dns" in err_lower or "name or service not known" in err_lower:
+                reason = "Не удаётся разрешить DNS-имя хоста"
+            elif "connection refused" in err_lower or "connection reset" in err_lower:
+                reason = "PVE API недоступен (соединение отклонено)"
+            elif "timeout" in err_lower:
+                reason = "Хост не отвечает (таймаут соединения)"
+            elif "unauthorized" in err_lower or "401" in err_lower or "permission denied" in err_lower:
+                reason = "Ошибка авторизации API-токена"
+            elif "403" in err_lower:
+                reason = "Недостаточно прав API-токена"
+            else:
+                reason = err
+            self.info_label.setStyleSheet("font-size: 13px; color: #ef4444; padding: 40px 16px;")
+            self.info_label.setText(
+                f"<div style='text-align: center;'>"
+                f"<span style='font-size: 22px; font-weight: 700;'>❌ {display_name} недоступен</span>"
+                f"<br><br>"
+                f"<span style='font-size: 14px; color: #dc2626;'>{reason}</span>"
+                f"</div>"
+            )
+            self.info_stack.setCurrentIndex(0)
+            self.metrics_widget.setVisible(False)
+            self.metrics_widget.clear_curves()
+            self.tabs.setCurrentIndex(0)
+            return
+
+        self.metrics_widget.setVisible(True)
         self.tabs.setTabVisible(0, True)
         self.tabs.setTabVisible(1, False)
         self.tabs.setTabVisible(4, True)
@@ -1794,12 +1829,10 @@ class DetailPanel(QWidget):
             table.resizeRowsToContents()
             self._compact_table(table, 22)
             self.info_stack.setCurrentIndex(1)
-        elif host_data:
-            self.info_label.setText(f"Ошибка: {host_data.get('error', '')}")
-            self.info_stack.setCurrentIndex(0)
         else:
             self.info_label.setText("Нет данных")
             self.info_stack.setCurrentIndex(0)
+            return
 
         vms_of_host = [vm for vm in self.all_vms
                        if vm.get("node") == host_name

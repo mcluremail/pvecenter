@@ -1,15 +1,18 @@
 import time
 import threading
 import traceback
+import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel)
 from PySide6.QtCore import Qt, Slot, QTimer
 
 from ..backend import FetchWorker, ClusterTasksWorker
-from ..config import save_config, cache_password
+from ..config import save_config
 from .notification import NotificationManager
 from .tree_panel import TreePanel
+
+logger = logging.getLogger(__name__)
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 from .icons import get_icon
@@ -143,7 +146,7 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
 
-        self.tree_panel.add_server_requested.connect(self._on_add_server)
+        self.tree_panel.add_server_requested_context.connect(self._on_add_server)
 
         self._notifications = NotificationManager(self)
 
@@ -232,9 +235,9 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------
     # Добавление сервера
     # ------------------------------------------------------------
-    def _on_add_server(self):
+    def _on_add_server(self, context=""):
         from .add_server_dialog import AddServerDialog
-        dialog = AddServerDialog(self)
+        dialog = AddServerDialog(self, context)
         if dialog.exec() != AddServerDialog.Accepted:
             return
         cfg = dialog.get_config()
@@ -298,7 +301,8 @@ class MainWindow(QMainWindow):
                 "node": data["host"],
                 "status": "error",
                 "error": data["error"],
-                "host_name": data["host"]
+                "host_name": data["host"],
+                "_display_name": data["host"]
             })
 
         self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
@@ -397,6 +401,13 @@ class MainWindow(QMainWindow):
                 self._soft_vms.append(vm)
         else:
             self._soft_had_errors = True
+            self._soft_nodes.append({
+                "node": data["host"],
+                "status": "error",
+                "error": data["error"],
+                "host_name": data["host"],
+                "_display_name": data["host"]
+            })
 
         self._soft_counter += 1
         active_count = len([cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)])
@@ -424,7 +435,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             cfg = self.nodes_cfg[0] if self.nodes_cfg else None
         if not cfg:
-            print("[Tasks] Нет узлов")
+            logger.warning("Нет узлов для загрузки задач кластера")
             return
         worker = ClusterTasksWorker(cfg)
         worker.signals.tasks_ready.connect(lambda t, w=worker: (self._on_cluster_tasks_loaded(t), self._workers.discard(w)))
@@ -435,7 +446,7 @@ class MainWindow(QMainWindow):
         try:
             self.tasks_widget.set_tasks(tasks)
         except Exception as e:
-            print(f"[Tasks] Ошибка при установке задач: {e}")
+            logger.error("Ошибка при установке задач: %s", e)
 
     # ------------------------------------------------------------
     # Строка состояния

@@ -7,6 +7,17 @@ from PySide6.QtCore import QRunnable, QObject, Signal
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+def _check_response(resp):
+    """Проверяет HTTP-ответ и достаёт тело ошибки из PVE JSON."""
+    if not resp.ok:
+        try:
+            body = resp.json()
+            msg = body.get('data', {}).get('message', '') or body.get('message', '')
+        except Exception:
+            msg = ''
+        raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])
+
 class MetricsSignals(QObject):
     # timeframe, vmid, metrics_dict
     data_fetched = Signal(str, int, dict)
@@ -27,8 +38,8 @@ class StorageMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -42,7 +53,7 @@ class StorageMetricsWorker(QRunnable):
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
             resp = session.get(url, headers=headers, params=params, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             rrd_response = resp.json()['data']
 
             metrics = {'usage': []}
@@ -61,6 +72,8 @@ class StorageMetricsWorker(QRunnable):
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class ContentListSignals(QObject):
@@ -77,8 +90,8 @@ class StorageContentListWorker(QRunnable):
         self.signals = ContentListSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
             headers = {"Authorization": auth_token}
@@ -86,7 +99,7 @@ class StorageContentListWorker(QRunnable):
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
             resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=False, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.result.emit(self.storage_name, self.content_type, data)
@@ -98,6 +111,8 @@ class StorageContentListWorker(QRunnable):
                 self.signals.error.emit(self.storage_name, self.content_type, str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class BackupSignals(QObject):
@@ -113,8 +128,8 @@ class StorageBackupWorker(QRunnable):
         self.signals = BackupSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
             headers = {"Authorization": auth_token}
@@ -122,7 +137,7 @@ class StorageBackupWorker(QRunnable):
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
             resp = session.get(url, headers=headers, params={"content": "backup"}, verify=False, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.backups_ready.emit(self.storage_name, data)
@@ -134,6 +149,8 @@ class StorageBackupWorker(QRunnable):
                 self.signals.backups_error.emit(self.storage_name, str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class NetworkSignals(QObject):
@@ -148,8 +165,8 @@ class HostNetworkWorker(QRunnable):
         self.signals = NetworkSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -159,7 +176,7 @@ class HostNetworkWorker(QRunnable):
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/network")
             resp = session.get(url, headers=headers, verify=False, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.network_ready.emit(self.node_name, data)
@@ -171,6 +188,8 @@ class HostNetworkWorker(QRunnable):
                 self.signals.network_error.emit(self.node_name, str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class ServicesSignals(QObject):
@@ -185,8 +204,8 @@ class HostServicesWorker(QRunnable):
         self.signals = ServicesSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -196,7 +215,7 @@ class HostServicesWorker(QRunnable):
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/services")
             resp = session.get(url, headers=headers, verify=False, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.services_ready.emit(self.node_name, data)
@@ -208,6 +227,8 @@ class HostServicesWorker(QRunnable):
                 self.signals.services_error.emit(self.node_name, str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class DisksSignals(QObject):
@@ -222,8 +243,8 @@ class HostDisksWorker(QRunnable):
         self.signals = DisksSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -233,7 +254,7 @@ class HostDisksWorker(QRunnable):
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/disks/list")
             resp = session.get(url, headers=headers, verify=False, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.disks_ready.emit(self.node_name, data)
@@ -245,6 +266,8 @@ class HostDisksWorker(QRunnable):
                 self.signals.disks_error.emit(self.node_name, str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class SnapshotSignals(QObject):
@@ -276,13 +299,13 @@ class HostSnapshotsWorker(QRunnable):
                 vm_name = vm.get("name", "")
                 if not vmid:
                     return
+                s = requests.Session()
                 try:
-                    s = requests.Session()
                     s.verify = False
                     enc_node = urllib.parse.quote(self.node_name, safe="")
                     url = f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/snapshot"
                     r = s.get(url, headers=headers, verify=False, timeout=10)
-                    r.raise_for_status()
+                    _check_response(r)
                     data = r.json().get("data", [])
                     for snap in data:
                         if snap.get("name") == "current":
@@ -293,6 +316,8 @@ class HostSnapshotsWorker(QRunnable):
                             all_snapshots.append(dict(snap))
                 except Exception:
                     pass
+                finally:
+                    s.close()
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 executor.map(fetch_vm_snapshots, self.vms)
@@ -341,8 +366,8 @@ class StorageDisksWorker(QRunnable):
                 vm_node = vm.get("node")
                 if not vmid or not vm_node:
                     return
+                s = requests.Session()
                 try:
-                    s = requests.Session()
                     s.verify = False
                     enc_node = urllib.parse.quote(vm_node, safe="")
                     vm_type = vm.get("type", "qemu")
@@ -350,7 +375,7 @@ class StorageDisksWorker(QRunnable):
                         f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/config",
                         headers=headers, verify=False, timeout=10
                     )
-                    r.raise_for_status()
+                    _check_response(r)
                     config = r.json().get("data", {})
                     vm_name = vm.get("name", "")
 
@@ -381,6 +406,8 @@ class StorageDisksWorker(QRunnable):
                                     })
                 except Exception:
                     pass
+                finally:
+                    s.close()
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 executor.map(fetch_vm_config, self.all_vms)
@@ -425,8 +452,8 @@ class HostMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -439,7 +466,7 @@ class HostMetricsWorker(QRunnable):
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
             resp = session.get(url, headers=headers, params=params, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             rrd_response = resp.json()['data']
 
             metrics = {
@@ -466,6 +493,8 @@ class HostMetricsWorker(QRunnable):
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()
 
 
 class MetricsWorker(QRunnable):
@@ -480,8 +509,8 @@ class MetricsWorker(QRunnable):
         self.signals = MetricsSignals()
 
     def run(self):
+        session = requests.Session()
         try:
-            session = requests.Session()
             session.verify = False
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
@@ -494,7 +523,7 @@ class MetricsWorker(QRunnable):
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
             resp = session.get(url, headers=headers, params=params, timeout=10)
-            resp.raise_for_status()
+            _check_response(resp)
             rrd_response = resp.json()['data']
 
             metrics = {
@@ -520,3 +549,5 @@ class MetricsWorker(QRunnable):
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:
                 pass
+        finally:
+            session.close()

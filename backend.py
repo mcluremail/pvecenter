@@ -1,15 +1,12 @@
 import urllib3
 import traceback
+import logging
 from PySide6.QtCore import Signal, QRunnable, QObject
 from proxmoxer import ProxmoxAPI
 
+logger = logging.getLogger(__name__)
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-
-def _domain_from_host(host):
-    """Возвращает домен из FQDN (pve01.ros.linru.grp → ros.linru.grp)."""
-    parts = host.split(".", 1)
-    return parts[1] if len(parts) > 1 else None
 
 
 # ----------------------------------------------------------------------
@@ -76,7 +73,7 @@ def create_admin_token(host, user, password):
                 timeout=15,
             )
             if r.status_code >= 400:
-                print(f"[create_user] {r.status_code}: {r.text[:200]}")
+                logger.warning("create_user HTTP %s: %s", r.status_code, r.text[:200])
 
         acls = sess.get(
             f"https://{host}:{PVE_PORT}/api2/json/access/acl",
@@ -95,9 +92,9 @@ def create_admin_token(host, user, password):
                 timeout=15,
             )
             if r.status_code >= 400:
-                print(f"[acl_put] {r.status_code}: {r.text[:200]}")
+                logger.warning("acl_put HTTP %s: %s", r.status_code, r.text[:200])
             else:
-                print(f"[acl_put] OK — Administrator granted to {service_user} on /")
+                logger.info("acl_put OK — Administrator granted to %s on /", service_user)
 
         token_id = "pvecenter-" + "".join(
             sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
@@ -108,14 +105,14 @@ def create_admin_token(host, user, password):
                 data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
                 timeout=15,
             )
-            print(f"[token_create] {method.upper()} HTTP {r.status_code}")
+            logger.info("token_create %s HTTP %s", method.upper(), r.status_code)
             if r.status_code < 400:
                 break
         if r.status_code >= 400:
-            print(f"[token_create] error: {r.text[:300]}")
+            logger.error("token_create error: %s", r.text[:300])
             return {"error": f"Ошибка создания токена: {r.status_code}"}
         data = r.json().get("data", r.json())
-        print(f"[token_create] response data: {data}")
+        logger.info("token_create response data: %s", data)
         token_value = ""
         if isinstance(data, dict) and "value" in data:
             token_value = data["value"]
@@ -134,14 +131,14 @@ def create_admin_token(host, user, password):
                 headers={"Authorization": auth_header},
                 verify=False, timeout=10,
             )
-            print(f"[verify] /cluster/resources HTTP {vr.status_code}")
+            logger.info("verify /cluster/resources HTTP %s", vr.status_code)
             if vr.status_code == 200:
-                print("[verify] OK — token works")
+                logger.info("verify OK — token works")
             else:
-                print(f"[verify] FAILED: {vr.text[:200]}")
+                logger.warning("verify FAILED: %s", vr.text[:200])
                 return {"error": f"Токен создан, но не работает: {vr.status_code}"}
         except Exception as ve:
-            print(f"[verify] exception: {ve}")
+            logger.warning("verify exception: %s", ve)
 
         return {"token_name": token_id, "token_value": token_value,
                 "user": service_user}
@@ -207,13 +204,9 @@ class FetchWorker(QRunnable):
                 vms = [r for r in resources if r["type"] in ("qemu", "lxc")]
                 storages = [r for r in resources if r.get("type") == "storage"]
                 cluster_name = self.node_cfg.get("cluster", "")
-                domain = _domain_from_host(self.node_cfg["host"])
                 for n in nodes:
                     short = n["node"]
-                    if domain:
-                        n["_display_name"] = f"{short}.{domain}"
-                    else:
-                        n["_display_name"] = short
+                    n["_display_name"] = f"{short}@{cluster_name}" if cluster_name else short
                 for s in storages:
                     s["host_name"] = self.node_cfg["name"]
                     s["cluster"] = cluster_name

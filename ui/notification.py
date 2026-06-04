@@ -103,4 +103,4 @@ class NotificationManager:
             existing.deleteLater()
         toast = FadeToast(self.parent, text, color)
         self._active[key] = toast
-        toast.destroyed.connect(lambda: self._active.pop(key, None))
+        toast.destroyed.connect(lambda k=key: self._active.pop(k, None))

@@ -6,20 +6,20 @@ from ..backend import create_admin_token
 
 
 class AddServerDialog(QDialog):
-    """Диалог добавления PVE-хоста с созданием админского API-токена."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, context=""):
         super().__init__(parent)
-        self.setWindowTitle("Добавить сервер")
+        self._context = context
+        title_suffix = {"cluster": " в кластер", "standalone": " как отдельный хост"}.get(context, "")
+        self.setWindowTitle(f"Добавить сервер{title_suffix}")
         self.setFixedSize(500, 420)
-
         self._token_data = None
         self._build_ui()
+        self._apply_context()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
 
-        # ---- Параметры подключения ----
         conn_group = QGroupBox("Подключение")
         conn_grid = QGridLayout(conn_group)
 
@@ -49,7 +49,6 @@ class AddServerDialog(QDialog):
 
         layout.addWidget(conn_group)
 
-        # ---- Результат токена ----
         token_group = QGroupBox("Токен")
         token_grid = QGridLayout(token_group)
 
@@ -69,7 +68,6 @@ class AddServerDialog(QDialog):
 
         layout.addWidget(token_group)
 
-        # ---- Параметры узла ----
         node_group = QGroupBox("Настройки узла")
         node_grid = QGridLayout(node_group)
 
@@ -88,7 +86,6 @@ class AddServerDialog(QDialog):
 
         layout.addWidget(node_group)
 
-        # ---- Кнопки ----
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton("Добавить")
         self.add_btn.setEnabled(False)
@@ -99,6 +96,15 @@ class AddServerDialog(QDialog):
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def _apply_context(self):
+        ctx = self._context
+        if ctx == "cluster":
+            self.cluster_input.setPlaceholderText("имя кластера (обязательно для кластеров)")
+            self.cluster_rep_cb.setChecked(True)
+        elif ctx == "standalone":
+            self.cluster_input.setPlaceholderText("оставьте пустым — отдельный хост")
+            self.cluster_rep_cb.setChecked(False)
 
     def _on_auth(self):
         host = self.host_input.text().strip()
