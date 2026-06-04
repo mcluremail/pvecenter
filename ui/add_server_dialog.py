@@ -141,7 +141,7 @@ class AddServerDialog(QDialog):
         self.add_btn.setEnabled(True)
 
         if not self.name_input.text().strip():
-            self.name_input.setText(host.split(".")[0])
+            self.name_input.setText(host)
 
     def _set_status(self, text, color="#6b7280"):
         self.status_label.setText(text)
@@ -149,7 +149,7 @@ class AddServerDialog(QDialog):
 
     def get_config(self):
         host = self.host_input.text().strip()
-        name = self.name_input.text().strip() or host.split(".")[0]
+        name = self.name_input.text().strip() or host
         cluster_text = self.cluster_input.text().strip()
 
         cfg = {
