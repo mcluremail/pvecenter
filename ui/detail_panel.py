@@ -629,6 +629,7 @@ class DetailPanel(QWidget):
         if not host_data:
             return
         host_name = host_data.get("node", "")
+        host_cfg_name = host_data.get("host_name", "")
         is_online = host_data.get("status") != "error"
 
         if is_online:
@@ -649,7 +650,9 @@ class DetailPanel(QWidget):
 
         WARN_ROLE = Qt.UserRole + 10
         vmid_role = Qt.UserRole + 30
-        vms_of_host = [vm for vm in self.all_vms if vm.get("node") == host_name]
+        vms_of_host = [vm for vm in self.all_vms
+                       if vm.get("node") == host_name
+                       and vm.get("host_name") == host_cfg_name]
         fresh_by_vmid = {vm.get("vmid"): vm for vm in vms_of_host}
 
         table = self.host_vm_table
@@ -1784,7 +1787,9 @@ class DetailPanel(QWidget):
             self.info_label.setText("Нет данных")
             self.info_stack.setCurrentIndex(0)
 
-        vms_of_host = [vm for vm in self.all_vms if vm.get("node") == host_name]
+        vms_of_host = [vm for vm in self.all_vms
+                       if vm.get("node") == host_name
+                       and vm.get("host_name") == (host_data.get("host_name") if host_data else host_name)]
         self.host_vm_table.setSortingEnabled(False)
         self.host_vm_table.setRowCount(len(vms_of_host))
         WARN_ROLE = Qt.UserRole + 10
@@ -1820,7 +1825,9 @@ class DetailPanel(QWidget):
         self.host_vm_table.setSortingEnabled(True)
 
         # Storage для хоста
-        host_storages = [s for s in self.all_storages if s.get("node") == host_name]
+        host_storages = [s for s in self.all_storages
+                         if s.get("node") == host_name
+                         and s.get("host_name") == (host_data.get("host_name") if host_data else host_name)]
         self._populate_host_storage_table(host_storages)
 
         self._fetch_host_network(host_name, host_data)

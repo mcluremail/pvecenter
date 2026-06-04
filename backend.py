@@ -102,12 +102,15 @@ def create_admin_token(host, user, password):
         token_id = "pvecenter-" + "".join(
             sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
         )
-        r = sess.put(
-            f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
-            data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
-            timeout=15,
-        )
-        print(f"[token_create] HTTP {r.status_code}")
+        for method in ("post", "put"):
+            r = getattr(sess, method)(
+                f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
+                data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
+                timeout=15,
+            )
+            print(f"[token_create] {method.upper()} HTTP {r.status_code}")
+            if r.status_code < 400:
+                break
         if r.status_code >= 400:
             print(f"[token_create] error: {r.text[:300]}")
             return {"error": f"Ошибка создания токена: {r.status_code}"}
