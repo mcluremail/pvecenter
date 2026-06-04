@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QMainWindow, QSplitter, QPushButton,
 from PySide6.QtCore import Qt, Slot, QTimer
 
 from ..backend import FetchWorker, ClusterTasksWorker
+from ..config import save_config, cache_password
 from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
@@ -137,6 +138,8 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
 
+        self.tree_panel.add_server_requested.connect(self._on_add_server)
+
         # Горизонтальный сплиттер (дерево + детали)
         h_splitter = QSplitter(Qt.Horizontal)
         h_splitter.addWidget(self.tree_panel)
@@ -250,6 +253,19 @@ class MainWindow(QMainWindow):
         cls_name = type(worker).__name__
         t = threading.Thread(target=worker.run, daemon=True, name=f"wkr-{cls_name}-{id(worker)}")
         t.start()
+
+    # ------------------------------------------------------------
+    # Добавление сервера
+    # ------------------------------------------------------------
+    def _on_add_server(self):
+        from .add_server_dialog import AddServerDialog
+        dialog = AddServerDialog(self)
+        if dialog.exec() != AddServerDialog.Accepted:
+            return
+        cfg = dialog.get_config()
+        self.nodes_cfg.append(cfg)
+        save_config(self.nodes_cfg)
+        self.refresh_data()
 
     # ------------------------------------------------------------
     # Ручное обновление (кнопка "Обновить")

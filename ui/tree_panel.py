@@ -17,6 +17,7 @@ def _vm_count_str(vms):
 
 class TreePanel(QWidget):
     item_selected = Signal(str, str, dict)
+    add_server_requested = Signal()
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -48,10 +49,16 @@ class TreePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
-        # Кнопка развернуть/свернуть
+        # Кнопка развернуть/свернуть + Добавить
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(4, 0, 4, 0)
         init_icons()
+        self._add_btn = QPushButton()
+        self._add_btn.setText("+")
+        self._add_btn.setFixedSize(22, 22)
+        self._add_btn.setToolTip("Добавить сервер")
+        self._add_btn.clicked.connect(self._on_add_server)
+        btn_layout.addWidget(self._add_btn)
         self._toggle_btn = QPushButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
@@ -73,12 +80,38 @@ class TreePanel(QWidget):
             self._toggle_btn.setIcon(get_icon("expand"))
             self._toggle_btn.setToolTip("Развернуть всё")
 
+    def _on_add_server(self):
+        self.add_server_requested.emit()
+
     def update_data(self, all_nodes, all_vms, all_storages=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
         self.all_storages = all_storages or []
         self._build_tree()
         self._restore_expanded_state()
+        self._sync_toggle_button()
+
+    def _sync_toggle_button(self):
+        if self.tree.topLevelItemCount() == 0:
+            return
+        expanded = all(self._subtree_expanded(self.tree.topLevelItem(i))
+                       for i in range(self.tree.topLevelItemCount()))
+        self._toggled = expanded
+        if expanded:
+            self._toggle_btn.setIcon(get_icon("collapse"))
+            self._toggle_btn.setToolTip("Свернуть всё")
+        else:
+            self._toggle_btn.setIcon(get_icon("expand"))
+            self._toggle_btn.setToolTip("Развернуть всё")
+
+    @staticmethod
+    def _subtree_expanded(item):
+        if not item.isExpanded() and item.childCount() > 0:
+            return False
+        for i in range(item.childCount()):
+            if not TreePanel._subtree_expanded(item.child(i)):
+                return False
+        return True
 
     def _on_current_item_changed(self, current, previous):
         if self._building or not current:

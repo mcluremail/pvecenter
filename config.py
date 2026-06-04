@@ -103,12 +103,37 @@ def _ask_password(mode="enter"):
         return result[0]
     return None
 
+_password = None  # кешированный мастер-пароль
+
+
+def cache_password(pwd):
+    global _password
+    _password = pwd
+
+
+def save_config(config_list):
+    """Сохраняет конфигурацию, используя кешированный мастер-пароль (если есть)."""
+    global _password
+    base = _base_dir()
+    enc_path = os.path.join(base, ENC_FILE)
+    json_path = os.path.join(base, CONFIG_JSON)
+
+    if _password:
+        _encrypt_to_file(config_list, _password, enc_path)
+        if os.path.exists(json_path):
+            os.remove(json_path)
+    else:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(config_list, f, ensure_ascii=False, indent=2)
+
+
 # ------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------
 def load_config():
     """Загружает конфигурацию. При необходимости показывает диалог пароля.
     Возвращает список узлов или None (отмена)."""
+    global _password
     base = _base_dir()
     enc_path = os.path.join(base, ENC_FILE)
 
@@ -116,6 +141,7 @@ def load_config():
         password = _ask_password("enter")
         if password is None:
             return None
+        cache_password(password)
         try:
             return _decrypt_from_file(enc_path, password)
         except Exception:
@@ -135,6 +161,7 @@ def load_config():
             password = _ask_password("set")
             if password is None:
                 return config
+            cache_password(password)
             from PySide6.QtWidgets import QMessageBox
             _encrypt_to_file(config, password, enc_path)
             reply = QMessageBox.question(
