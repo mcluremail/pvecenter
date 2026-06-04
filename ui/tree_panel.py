@@ -45,13 +45,11 @@ class TreePanel(QWidget):
         self._nav_timer.timeout.connect(self._flush_nav)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.tree)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
 
-        # Кнопка развернуть/свернуть + Добавить
+        # Кнопка развернуть/свернуть + Добавить сверху
         btn_layout = QHBoxLayout()
-        btn_layout.setContentsMargins(4, 0, 4, 0)
+        btn_layout.setContentsMargins(4, 2, 4, 0)
         init_icons()
         self._add_btn = QPushButton()
         self._add_btn.setIcon(get_icon("add"))
@@ -68,6 +66,9 @@ class TreePanel(QWidget):
         btn_layout.addStretch()
         btn_layout.addWidget(self._toggle_btn)
         layout.addLayout(btn_layout)
+
+        layout.addWidget(self.tree)
+        self.setLayout(layout)
 
     def _toggle_expand(self):
         self._toggled = not self._toggled
