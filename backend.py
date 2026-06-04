@@ -63,7 +63,7 @@ def create_admin_token(host, user, password):
 
         if service_user not in existing:
             pwd = "".join(sec.choice(str_mod.ascii_letters + str_mod.digits) for _ in range(24))
-            r = sess.post(
+r = sess.put(
                 f"https://{host}:{PVE_PORT}/api2/json/access/users",
                 data={"userid": service_user, "password": pwd,
                        "comment": "PVE Center service user (auto-created)", "enable": 1},
@@ -83,7 +83,7 @@ def create_admin_token(host, user, password):
         )
 
         if not has_admin_acl:
-            r = sess.put(
+r = sess.post(
                 f"https://{host}:{PVE_PORT}/api2/json/access/acl",
                 data={"path": "/", "roles": "Administrator", "users": service_user},
                 timeout=15,
@@ -96,16 +96,45 @@ def create_admin_token(host, user, password):
         token_id = "pvecenter-" + "".join(
             sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
         )
-        r = sess.post(
+        r = sess.put(
             f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
             data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
             timeout=15,
         )
+        print(f"[token_create] HTTP {r.status_code}")
+        if r.status_code >= 400:
+            print(f"[token_create] error: {r.text[:300]}")
+            return {"error": f"Ошибка создания токена: {r.status_code}"}
         data = r.json().get("data", r.json())
+        print(f"[token_create] response data: {data}")
+        token_value = ""
         if isinstance(data, dict) and "value" in data:
-            return {"token_name": token_id, "token_value": data["value"],
-                    "user": service_user}
-        return {"token_name": token_id, "token_value": data.get("tokenid", ""),
+            token_value = data["value"]
+        elif isinstance(data, dict) and data.get("tokenid"):
+            token_value = data.get("tokenid", "")
+
+        if not token_value:
+            return {"error": "Пустое значение токена в ответе сервера"}
+
+        auth_header = f"PVEAPIToken={service_user}!{token_id}={token_value}"
+
+        # Верификация: пробуем получить список нод этим токеном
+        try:
+            vr = rq.get(
+                f"https://{host}:{PVE_PORT}/api2/json/cluster/resources",
+                headers={"Authorization": auth_header},
+                verify=False, timeout=10,
+            )
+            print(f"[verify] /cluster/resources HTTP {vr.status_code}")
+            if vr.status_code == 200:
+                print("[verify] OK — token works")
+            else:
+                print(f"[verify] FAILED: {vr.text[:200]}")
+                return {"error": f"Токен создан, но не работает: {vr.status_code}"}
+        except Exception as ve:
+            print(f"[verify] exception: {ve}")
+
+        return {"token_name": token_id, "token_value": token_value,
                 "user": service_user}
 
     except Exception as e:
