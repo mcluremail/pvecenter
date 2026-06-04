@@ -1078,7 +1078,7 @@ class DetailPanel(QWidget):
             if cluster:
                 key = (st.get("storage"), cluster)
             else:
-                key = (st.get("storage"), st.get("node"))
+                key = (st.get("storage"), st.get("host_name"))
             if key not in seen:
                 seen.add(key)
                 deduped.append(st)
@@ -1536,7 +1536,7 @@ class DetailPanel(QWidget):
             table.setItem(i, 0, QTableWidgetItem(f"VM {b.get('vmid', '')}"))
             table.setItem(i, 1, QTableWidgetItem(b.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
-            size = b.get("size", 0)
+            size = b.get("size", 0) or 0
             table.setItem(i, 3, QTableWidgetItem(self._format_volsize(size) if size else "0"))
             ctime = b.get("ctime")
             if ctime:

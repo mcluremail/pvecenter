@@ -357,6 +357,9 @@ class StorageDisksWorker(QRunnable):
                     for key, val in config.items():
                         val_str = str(val)
                         if ":" in val_str and val_str.startswith(prefix):
+                            # Пропускаем CDROM (ISO образы)
+                            if "media=cdrom" in val_str:
+                                continue
                             volpath = val_str.split(",")[0]
                             volparts = volpath.split(":", 1)
                             if len(volparts) == 2:
