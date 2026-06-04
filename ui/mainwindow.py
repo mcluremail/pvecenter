@@ -280,10 +280,7 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.start_loading()
 
-        # Пул сам управляет потоками, просто запускаем задачи
         active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
-        self.progress.setMaximum(len(active_cfgs))
-        self.progress.setValue(0)
 
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
