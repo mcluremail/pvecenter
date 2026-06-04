@@ -2,11 +2,11 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
                                QLabel, QLineEdit, QPushButton, QCheckBox,
                                QMessageBox, QGroupBox)
 from PySide6.QtCore import Qt
-from ..backend import create_pve_token
+from ..backend import create_admin_token
 
 
 class AddServerDialog(QDialog):
-    """Диалог добавления PVE-хоста с созданием API-токена."""
+    """Диалог добавления PVE-хоста с созданием админского API-токена."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -20,7 +20,7 @@ class AddServerDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # ---- Параметры подключения ----
-        conn_group = QGroupBox("Подключение")
+        conn_group = QGroupBox("Подключение (root@pam)")
         conn_grid = QGridLayout(conn_group)
 
         conn_grid.addWidget(QLabel("Хост:"), 0, 0)
@@ -28,16 +28,15 @@ class AddServerDialog(QDialog):
         self.host_input.setPlaceholderText("pve01.example.com")
         conn_grid.addWidget(self.host_input, 0, 1)
 
-        conn_grid.addWidget(QLabel("Пользователь:"), 1, 0)
-        self.user_input = QLineEdit()
-        self.user_input.setPlaceholderText("monitor@pve")
-        conn_grid.addWidget(self.user_input, 1, 1)
-
-        conn_grid.addWidget(QLabel("Пароль:"), 2, 0)
+        conn_grid.addWidget(QLabel("Пароль root:"), 1, 0)
         self.pwd_input = QLineEdit()
         self.pwd_input.setEchoMode(QLineEdit.Password)
         self.pwd_input.setPlaceholderText("••••••••")
-        conn_grid.addWidget(self.pwd_input, 2, 1)
+        conn_grid.addWidget(self.pwd_input, 1, 1)
+
+        info_label = QLabel("Будет создан пользователь admin@pve с ролью Administrator на /")
+        info_label.setStyleSheet("color: #6b7280; font-size: 11px;")
+        conn_grid.addWidget(info_label, 2, 0, 1, 2)
 
         self.auth_btn = QPushButton("Получить токен")
         conn_grid.addWidget(self.auth_btn, 3, 0, 1, 2)
@@ -98,29 +97,23 @@ class AddServerDialog(QDialog):
 
     def _on_auth(self):
         host = self.host_input.text().strip()
-        user = self.user_input.text().strip()
         password = self.pwd_input.text()
 
         if not host:
             self._set_status("Введите хост", "#ef4444")
             return
-        if not user:
-            self._set_status("Введите пользователя", "#ef4444")
-            return
         if not password:
-            self._set_status("Введите пароль", "#ef4444")
+            self._set_status("Введите пароль root", "#ef4444")
             return
 
         self.auth_btn.setEnabled(False)
         self.auth_btn.setText("Подключение...")
-        self._set_status("Проверка и создание токена...", "#6b7280")
+        self._set_status("Создание пользователя и токена...", "#6b7280")
 
-        # Вызываем синхронно — диалог модальный, UI не блокирует главный поток
-        # (PySide6 в этом месте всё равно в цикле событий, но для краткости — синхронно)
         from PySide6.QtCore import QCoreApplication
         QCoreApplication.processEvents()
 
-        result = create_pve_token(host, user, password)
+        result = create_admin_token(host, password)
 
         if "error" in result:
             self._set_status(result["error"], "#ef4444")
@@ -138,7 +131,6 @@ class AddServerDialog(QDialog):
         self.auth_btn.setText("Обновить токен")
         self.add_btn.setEnabled(True)
 
-        # Автозаполнение имени, если пусто
         if not self.name_input.text().strip():
             self.name_input.setText(host.split(".")[0])
 
@@ -147,16 +139,14 @@ class AddServerDialog(QDialog):
         self.status_label.setStyleSheet(f"color: {color};")
 
     def get_config(self):
-        """Возвращает конфиг-словарь для сохранения."""
         host = self.host_input.text().strip()
         name = self.name_input.text().strip() or host.split(".")[0]
-        user = self.user_input.text().strip()
         cluster_text = self.cluster_input.text().strip()
 
         cfg = {
             "name": name,
             "host": host,
-            "user": user,
+            "user": self._token_data["user"],
             "token_name": self._token_data["token_name"],
             "token_value": self._token_data["token_value"],
         }

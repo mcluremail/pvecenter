@@ -9,43 +9,76 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ----------------------------------------------------------------------
-# Создание API токена через парольную аутентификацию
+# Создание API токена с правами Administrator
 # ----------------------------------------------------------------------
-def create_pve_token(host, user, password):
-    """Создаёт API-токен на PVE-хосте.
+def create_admin_token(host, root_password):
+    """Создаёт PVE-юзера `admin@pve` с ролью Administrator на `/`
+    и генерирует API-токен для него.
 
-    Возвращает dict с полями token_name, token_value или dict с полем error.
+    Аргументы:
+        host: адрес PVE-хоста
+        root_password: пароль root@pam
+
+    Возвращает dict с полями token_name, token_value, user
+    или dict с полем error.
     """
     try:
-        proxmox = ProxmoxAPI(host, user=user, password=password, verify_ssl=False, timeout=15)
-        token_id = "dashboard-" + "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
-        result = proxmox.access.users(user).token(token_id).post(
+        root = ProxmoxAPI(host, user="root@pam", password=root_password,
+                          verify_ssl=False, timeout=15)
+        root.version.get()
+
+        admin_password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24))
+        existing = set()
+        try:
+            users = root.access.users.get()
+            existing = {u.get("userid") for u in users}
+        except Exception:
+            pass
+
+        if "admin@pve" not in existing:
+            root.access.users.post(
+                userid="admin@pve",
+                password=admin_password,
+                comment="PVE Center admin user (auto-created)",
+                enable=1,
+            )
+
+        try:
+            acls = root.access.acl.get()
+            has_admin_acl = any(
+                a.get("path") == "/"
+                and "admin@pve" in (a.get("users") or a.get("ugid") or "")
+                for a in acls
+            )
+        except Exception:
+            has_admin_acl = False
+
+        if not has_admin_acl:
+            root.access.acl.put(
+                path="/",
+                roles="Administrator",
+                users="admin@pve",
+            )
+
+        token_id = "dashboard-" + "".join(
+            secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6)
+        )
+        result = root.access.users("admin@pve").token(token_id).post(
             comment="PVE Center dashboard",
             expire=0,
         )
-        # proxmoxer возвращает dict с value внутри data
         data = result.get("data", result)
         if isinstance(data, dict) and "value" in data:
-            return {"token_name": token_id, "token_value": data["value"]}
-        # fallback — если результат пришёл иначе
-        return {"token_name": token_id, "token_value": data.get("tokenid", "")}
+            return {"token_name": token_id, "token_value": data["value"], "user": "admin@pve"}
+        return {"token_name": token_id, "token_value": data.get("tokenid", ""), "user": "admin@pve"}
+
     except Exception as e:
         msg = str(e)
         if "authorization" in msg.lower() or "permission" in msg.lower() or "401" in msg:
-            return {"error": "Неверный логин или пароль"}
+            return {"error": "Неверный пароль root@pam"}
         if "connection" in msg.lower() or "timeout" in msg.lower() or "resolve" in msg.lower():
             return {"error": f"Не удалось подключиться к {host}"}
         return {"error": msg}
-
-
-def test_ticket_auth(host, user, password):
-    """Проверяет парольную аутентификацию. Возвращает True/False + сообщение."""
-    try:
-        proxmox = ProxmoxAPI(host, user=user, password=password, verify_ssl=False, timeout=10)
-        proxmox.version.get()
-        return True, ""
-    except Exception as e:
-        return False, str(e)
 
 
 # ----------------------------------------------------------------------
