@@ -54,7 +54,7 @@ class TreePanel(QWidget):
         btn_layout.setContentsMargins(4, 0, 4, 0)
         init_icons()
         self._add_btn = QPushButton()
-        self._add_btn.setText("+")
+        self._add_btn.setIcon(get_icon("add"))
         self._add_btn.setFixedSize(22, 22)
         self._add_btn.setToolTip("Добавить сервер")
         self._add_btn.clicked.connect(self._on_add_server)

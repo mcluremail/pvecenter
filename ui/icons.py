@@ -179,6 +179,11 @@ _COLLAPSE = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape
 <line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
 </svg>"""
 
+_ADD = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<line x1="6" y1="2" x2="6" y2="10" stroke="{c}" stroke-width="1.5"/>
+<line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
+</svg>"""
+
 
 def _make_icon_with_dot(template, status):
     dot_color = _status_color(status)
@@ -225,4 +230,5 @@ def init_icons():
         "snapshot": _make_icon(_SNAPSHOT.format(c=_C, c2=_C2)),
         "expand": _make_icon(_EXPAND.format(c=_C, c2=_C2), 12),
         "collapse": _make_icon(_COLLAPSE.format(c=_C, c2=_C2), 12),
+        "add": _make_icon(_ADD.format(c=_C, c2=_C2), 12),
     }

@@ -11,7 +11,7 @@ class AddServerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Добавить сервер")
-        self.setFixedSize(480, 320)
+        self.setFixedSize(500, 420)
 
         self._token_data = None
         self._build_ui()
