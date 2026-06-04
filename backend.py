@@ -12,23 +12,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 PVE_PORT = 8006
 
 
-def _pve_api(path, host, method="GET", data=None, auth_token=None, timeout=15):
-    import requests as rq
-    url = f"https://{host}:{PVE_PORT}/api2/json{path}"
-    headers = {}
-    if auth_token:
-        headers["Authorization"] = auth_token
-    kwargs = {"headers": headers, "verify": False, "timeout": timeout}
-    if data:
-        if method in ("POST", "PUT"):
-            kwargs["data"] = data
-        else:
-            kwargs["params"] = data
-    resp = rq.request(method, url, **kwargs)
-    resp.raise_for_status()
-    return resp.json().get("data", resp.json())
-
-
 def _pve_ticket_auth(host, user, password):
     import requests as rq
     url = f"https://{host}:{PVE_PORT}/api2/json/access/ticket"
