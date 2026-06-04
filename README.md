@@ -19,7 +19,28 @@
 
 - Python 3.12+
 - Proxmox VE кластер (или отдельный хост)
-- API-токен PVE (read-only, достаточно роли PVEAuditor)
+- API-токен PVE
+
+## Получение API-токена PVE
+
+На любой ноде кластера (или на отдельном хосте) выполните в shell:
+
+```bash
+# Создать пользователя с ролью PVEAuditor (только чтение)
+pveum user add monitor@pve
+
+# Назначить роль на весь /
+pveum acl modify / -user monitor@pve -role PVEAuditor
+
+# Создать токен
+pveum user token add monitor@pve dashboard --privsep 0
+
+# Вывод покажет token value — скопируйте его
+```
+
+Или через веб-интерфейс: Datacenter → Permissions → API Tokens → Create.
+
+Минимальная роль — **PVEAuditor** (можно создать свою с правами только на нужные эндпоинты).
 
 ## Установка
 
@@ -88,4 +109,4 @@ python -m pve_center.main
 
 ## Лицензия
 
-MIT
+GNU General Public License v3.0
