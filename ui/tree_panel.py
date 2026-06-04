@@ -175,11 +175,12 @@ class TreePanel(QWidget):
                 cl_item.setExpanded(True)
 
                 hosts_in_cl = cluster_nodes[cluster_name]
-                for node in sorted(hosts_in_cl, key=lambda n: n.get("node", "").lower()):
+                for node in sorted(hosts_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                     node_name = node.get("node", "?")
+                    display_name = node.get("_display_name") or node_name
                     vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name]
                     host_item = QTreeWidgetItem(cl_item)
-                    host_item.setText(0, f"{node_name}  {_vm_count_str(vms_on_node)}")
+                    host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
                     host_item.setIcon(0, get_icon("host", node.get("status")))
                     host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
                     cpu = node.get("cpu", 0)

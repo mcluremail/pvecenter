@@ -918,7 +918,7 @@ class DetailPanel(QWidget):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
-            node_name = node.get("node", "?")
+            node_name = node.get("_display_name") or node.get("node", "?")
             table.setItem(i, 0, QTableWidgetItem(node_name))
 
             status = node.get("status", "unknown")
@@ -1724,7 +1724,9 @@ class DetailPanel(QWidget):
         self._populate_host_summary(hosts)
 
     def _show_host_info(self, host_name, host_data):
-        self.detail_label.setText(f"Хост: {host_name}")
+        node = next((n for n in self.all_nodes if n.get("node") == host_name), None)
+        display_name = node.get("_display_name") if node else host_name
+        self.detail_label.setText(f"Хост: {display_name}")
         self.tabs.setTabVisible(0, True)
         self.tabs.setTabVisible(1, False)
         self.tabs.setTabVisible(4, True)

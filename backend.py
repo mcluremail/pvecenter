@@ -6,6 +6,12 @@ from proxmoxer import ProxmoxAPI
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
+def _domain_from_host(host):
+    """Возвращает домен из FQDN (pve01.ros.linru.grp → ros.linru.grp)."""
+    parts = host.split(".", 1)
+    return parts[1] if len(parts) > 1 else None
+
+
 # ----------------------------------------------------------------------
 # Создание API токена для PVE Center
 # ----------------------------------------------------------------------
@@ -198,6 +204,13 @@ class FetchWorker(QRunnable):
                 vms = [r for r in resources if r["type"] in ("qemu", "lxc")]
                 storages = [r for r in resources if r.get("type") == "storage"]
                 cluster_name = self.node_cfg.get("cluster", "")
+                domain = _domain_from_host(self.node_cfg["host"])
+                for n in nodes:
+                    short = n["node"]
+                    if domain:
+                        n["_display_name"] = f"{short}.{domain}"
+                    else:
+                        n["_display_name"] = short
                 for s in storages:
                     s["host_name"] = self.node_cfg["name"]
                     s["cluster"] = cluster_name
