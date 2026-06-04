@@ -3,7 +3,7 @@ import threading
 import traceback
 from PySide6.QtWidgets import (QMainWindow, QSplitter, QPushButton,
                                QHBoxLayout, QVBoxLayout, QWidget,
-                               QProgressBar, QMessageBox, QLabel, QStackedWidget)
+                               QMessageBox, QLabel)
 from PySide6.QtCore import Qt, Slot, QTimer
 
 from ..backend import FetchWorker, ClusterTasksWorker
@@ -131,7 +131,9 @@ class MainWindow(QMainWindow):
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
+
         self._seen_storage_keys = set()
+        self._first_data_ready = False
 
         self.tree_panel = TreePanel(self.nodes_cfg)
         self.detail_panel = DetailPanel(self.nodes_cfg)
@@ -162,21 +164,7 @@ class MainWindow(QMainWindow):
         self.refresh_btn.setToolTip("Обновить")
         self.refresh_btn.clicked.connect(self.refresh_data)
 
-        loading_label = QLabel("Загрузка данных...")
-        loading_label.setAlignment(Qt.AlignCenter)
-        loading_label.setStyleSheet("font-size: 16px; color: #6b7280;")
-
-        loading_widget = QWidget()
-        loading_layout = QVBoxLayout(loading_widget)
-        loading_layout.addStretch()
-        loading_layout.addWidget(loading_label, 0, Qt.AlignCenter)
-        loading_layout.addStretch()
-
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-
         controls = QHBoxLayout()
-        controls.addWidget(self.progress)
         controls.addStretch()
         controls.addWidget(self.refresh_btn)
 
@@ -186,11 +174,7 @@ class MainWindow(QMainWindow):
 
         container = QWidget()
         container.setLayout(main_layout)
-
-        self._stack = QStackedWidget()
-        self._stack.addWidget(loading_widget)
-        self._stack.addWidget(container)
-        self.setCentralWidget(self._stack)
+        self.setCentralWidget(container)
 
         self.status_bar = self.statusBar()
         self.status_label = QLabel("")
@@ -212,9 +196,6 @@ class MainWindow(QMainWindow):
 
         self.show()
         self.refresh_data()
-
-        # Первый показ — loading экран; переключим на контент когда данные придут
-        self._initial_load = True
 
         # Таймер автообновления основных данных
         self.refresh_timer = QTimer(self)
@@ -286,11 +267,11 @@ class MainWindow(QMainWindow):
         self._saved_obj_type = self.detail_panel.current_obj_type
 
         self.refresh_btn.setEnabled(False)
-        self.progress.setVisible(True)
         self.all_nodes.clear()
         self.all_vms.clear()
         self.all_storages.clear()
         self._seen_storage_keys.clear()
+        self._first_selection_done = False
 
         self.tree_panel.start_loading()
 
@@ -309,7 +290,6 @@ class MainWindow(QMainWindow):
     @Slot(dict)
     def on_worker_finished(self, data, worker=None):
         self._workers.discard(worker)
-        self.progress.setValue(self.progress.value() + 1)
         if data["status"] == "ok":
             for node in data["nodes"]:
                 node["host_name"] = data["host"]
@@ -331,29 +311,27 @@ class MainWindow(QMainWindow):
                 "host_name": data["host"]
             })
 
-        if self.progress.value() == self.progress.maximum():
-            if getattr(self, '_initial_load', False):
-                self._initial_load = False
-                QTimer.singleShot(100, lambda: self._stack.setCurrentIndex(1))
-            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
-            self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+        self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
+        self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
 
-            saved_key = getattr(self, '_saved_key', None)
-            if saved_key:
-                item = self.tree_panel.find_item_by_key(saved_key)
-                if item:
-                    self.tree_panel.tree.setCurrentItem(item)
-                    self.tree_panel._on_item_clicked(item, 0)
-                    saved_tab = getattr(self, '_saved_tab', 0)
-                    saved_type = getattr(self, '_saved_obj_type', None)
-                    if saved_type and saved_type == self.detail_panel.current_obj_type:
-                        QTimer.singleShot(100, lambda: self.detail_panel.tabs.setCurrentIndex(saved_tab))
+        fetch_workers = [w for w in self._workers if isinstance(w, FetchWorker)]
+        if not fetch_workers:
+            if not getattr(self, '_first_selection_done', False):
+                self._first_selection_done = True
+                saved_key = getattr(self, '_saved_key', None)
+                if saved_key:
+                    item = self.tree_panel.find_item_by_key(saved_key)
+                    if item:
+                        self.tree_panel.tree.setCurrentItem(item)
+                        self.tree_panel._on_item_clicked(item, 0)
+                        saved_tab = getattr(self, '_saved_tab', 0)
+                        saved_type = getattr(self, '_saved_obj_type', None)
+                        if saved_type and saved_type == self.detail_panel.current_obj_type:
+                            QTimer.singleShot(100, lambda: self.detail_panel.tabs.setCurrentIndex(saved_tab))
+                    else:
+                        self.tree_panel.select_first_item()
                 else:
                     self.tree_panel.select_first_item()
-            else:
-                self.tree_panel.select_first_item()
-
-            self.progress.setVisible(False)
             self.refresh_btn.setEnabled(True)
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()

@@ -174,7 +174,7 @@ class FetchWorker(QRunnable):
                 token_name=self.node_cfg["token_name"],
                 token_value=self.node_cfg["token_value"],
                 verify_ssl=False,
-                timeout=5
+                timeout=15
             )
 
             vmid_to_pool = {}
