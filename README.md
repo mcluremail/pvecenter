@@ -45,16 +45,16 @@ pip install PySide6 proxmoxer requests pyqtgraph cryptography
 ```json
 [
   {
-    "name": "pve01.ros.linru.grp",
-    "host": "pve01.ros.linru.grp",
-    "cluster": "ros",
+    "name": "pve01.example.local",
+    "host": "pve01.example.local",
+    "cluster": "production",
     "user": "pvecenter@pve",
     "token_name": "pvecenter-abc123",
     "token_value": "секретный-токен"
   },
   {
-    "name": "hv01.tolg.ltn.linru.grp",
-    "host": "hv01.tolg.ltn.linru.grp",
+    "name": "hv01.example.local",
+    "host": "hv01.example.local",
     "user": "pvecenter@pve",
     "token_name": "pvecenter-def456",
     "token_value": "секретный-токен"
@@ -78,7 +78,7 @@ pip install PySide6 proxmoxer requests pyqtgraph cryptography
 
 ### Кластеры
 
-Для кластера достаточно **одной записи** — главной ноды с `cluster`. Остальные ноды подтягиваются динамически через `/cluster/resources`. Ноды кластера отображаются как `short@cluster` (например `pve02@ros`).
+Для кластера достаточно **одной записи** — главной ноды с `cluster`. Остальные ноды подтягиваются динамически через `/cluster/resources`. Ноды кластера отображаются как `short@cluster` (например `pve02@production`).
 
 ### Шифрование
 
