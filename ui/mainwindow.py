@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, Slot, QTimer
 
 from ..backend import FetchWorker, ClusterTasksWorker
 from ..config import save_config, cache_password
+from .notification import NotificationManager
 from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
@@ -134,6 +135,8 @@ class MainWindow(QMainWindow):
 
         self._seen_storage_keys = set()
         self._first_data_ready = False
+        self._last_host_statuses = {}
+        self._last_vm_statuses = {}
 
         self.tree_panel = TreePanel(self.nodes_cfg)
         self.detail_panel = DetailPanel(self.nodes_cfg)
@@ -141,6 +144,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
 
         self.tree_panel.add_server_requested.connect(self._on_add_server)
+
+        self._notifications = NotificationManager(self)
 
         # Горизонтальный сплиттер (дерево + детали)
         h_splitter = QSplitter(Qt.Horizontal)
@@ -313,6 +318,7 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
         self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+        self._detect_status_changes()
 
         fetch_workers = [w for w in self._workers if isinstance(w, FetchWorker)]
         if not fetch_workers:
@@ -336,6 +342,25 @@ class MainWindow(QMainWindow):
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
+
+    def _detect_status_changes(self):
+        for node in self.all_nodes:
+            name = node.get("node", "")
+            status = node.get("status", "unknown")
+            old = self._last_host_statuses.get(name)
+            if old is not None and old != status:
+                display = node.get("_display_name") or name
+                self._notifications.host_status_changed(display, old, status)
+            self._last_host_statuses[name] = status
+
+        for vm in self.all_vms:
+            key = (vm.get("host_name", ""), vm.get("vmid", 0))
+            status = vm.get("status", "unknown")
+            old = self._last_vm_statuses.get(key)
+            if old is not None and old != status:
+                vm_name = vm.get("name") or f"VM {vm['vmid']}"
+                self._notifications.vm_status_changed(vm_name, vm.get("host_name", ""), old, status)
+            self._last_vm_statuses[key] = status
 
     # ------------------------------------------------------------
     # Фоновое (мягкое) обновление
@@ -399,6 +424,7 @@ class MainWindow(QMainWindow):
                     self.detail_panel.all_nodes = list(self._soft_nodes)
                     self.detail_panel.all_vms = list(self._soft_vms)
                     self.detail_panel.refresh_current_view()
+                    self._detect_status_changes()
                 except Exception:
                     traceback.print_exc()
             self._soft_nodes.clear()
