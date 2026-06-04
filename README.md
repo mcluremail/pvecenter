@@ -50,14 +50,23 @@ pip install PySide6 proxmoxer requests pyqtgraph cryptography
     "user": "monitor@pve",
     "token_name": "dashboard",
     "token_value": "ваш-токен"
+  },
+  {
+    "name": "hv01",
+    "host": "hv01.local",
+    "cluster_rep": false,
+    "user": "monitor@pve",
+    "token_name": "dashboard",
+    "token_value": "ваш-токен"
   }
 ]
 ```
 
 Параметры:
 - `cluster_rep: true` — узел-представитель кластера (сканирует весь кластер через `cluster.resources`)
+- `cluster_rep: false` или не указан — отдельностоящий хост (подключается напрямую)
 - `skip: true` — пропустить узел при загрузке (если токен кластера уже обслуживает его)
-- `cluster` — имя кластера для группировки в дереве
+- `cluster` — имя кластера для группировки в дереве. Если не указан — хост попадает в "Отдельные хосты"
 
 Если токены не вписаны в `nodes.json`, при запуске будет запрошен master-пароль для расшифровки `nodes.enc`.
 
