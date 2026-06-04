@@ -410,8 +410,6 @@ class StorageDisksWorker(QRunnable):
                 return int(float(size_str))
             except ValueError:
                 return 0
-            except RuntimeError:
-                pass
 
 
 class HostMetricsWorker(QRunnable):

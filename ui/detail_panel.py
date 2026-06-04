@@ -602,43 +602,269 @@ class DetailPanel(QWidget):
             self.info_label.setText("Произошла ошибка при загрузке информации")
             self.info_stack.setCurrentIndex(0)
 
-    def refresh_current_view(self):
-        """Обновление данных без смены активной вкладки."""
-        if self.current_obj_type is None:
+    @staticmethod
+    def _set_cell_text(table, row, col, text, fg_color=None):
+        item = table.item(row, col)
+        if item is None:
+            item = QTableWidgetItem(text)
+            table.setItem(row, col, item)
+        else:
+            item.setText(text)
+        if fg_color:
+            item.setForeground(QBrush(QColor(fg_color)))
+
+    @staticmethod
+    def _update_progress_bar(bar, value, fmt):
+        bar.setValue(value)
+        bar.setFormat(fmt)
+
+    def _update_vm_summary_cell(self, label, value, fg_color=None):
+        table = self.vm_summary_table
+        for r in range(table.rowCount()):
+            if table.item(r, 0) and table.item(r, 0).text() == label:
+                self._set_cell_text(table, r, 1, str(value), fg_color)
+                break
+
+    def _update_host_cells(self, host_data):
+        if not host_data:
+            return
+        host_name = host_data.get("node", "")
+        is_online = host_data.get("status") != "error"
+
+        if is_online:
+            cpu_frac = host_data.get("cpu", 0)
+            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
+            mem_bytes = host_data.get("mem", 0)
+            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
+            maxmem_bytes = host_data.get("maxmem", 0)
+            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
+            uptime = host_data.get("uptime", 0)
+            status = host_data.get("status", "")
+
+            self._update_vm_summary_cell("Статус", status,
+                "#22c55e" if status == "online" else "#ef4444" if status == "offline" else "#f59e0b")
+            self._update_vm_summary_cell("ЦП", f"{cpu_pct}%")
+            self._update_vm_summary_cell("RAM (GiB)", f"{mem_gb} / {maxmem_gb}")
+            self._update_vm_summary_cell("Аптайм", self._format_uptime(uptime))
+
+        WARN_ROLE = Qt.UserRole + 10
+        vmid_role = Qt.UserRole + 30
+        vms_of_host = [vm for vm in self.all_vms if vm.get("node") == host_name]
+        fresh_by_vmid = {vm.get("vmid"): vm for vm in vms_of_host}
+
+        table = self.host_vm_table
+        for r in range(table.rowCount()):
+            name_item = table.item(r, 0)
+            if name_item is None:
+                continue
+            vmid = name_item.data(vmid_role)
+            if vmid is None:
+                continue
+            new_vm = fresh_by_vmid.get(vmid)
+            if new_vm is None:
+                continue
+
+            name_item.setText(str(new_vm.get("name", "")))
+            self._set_cell_text(table, r, 1, str(new_vm.get("type", "")))
+            self._set_cell_text(table, r, 2, str(new_vm.get("node", new_vm.get("host_name", ""))))
+
+            vm_status = str(new_vm.get("status", ""))
+            status_color = "#22c55e" if vm_status == "running" else "#ef4444" if vm_status == "stopped" else "#f59e0b"
+            self._set_cell_text(table, r, 3, vm_status, status_color)
+
+            cpu_val = new_vm.get("cpu", 0)
+            if isinstance(cpu_val, float):
+                cpu_str = str(round(cpu_val * 100, 1))
+            else:
+                cpu_str = str(cpu_val)
+            self._set_cell_text(table, r, 4, cpu_str)
+
+            warning = (isinstance(cpu_val, float) and cpu_val >= 0.9) or vm_status == "stopped"
+            for c in range(5):
+                it = table.item(r, c)
+                if it:
+                    if warning:
+                        it.setBackground(QColor("#fef3c7"))
+                        it.setData(WARN_ROLE, True)
+                    else:
+                        was_warn = it.data(WARN_ROLE)
+                        if was_warn:
+                            it.setData(WARN_ROLE, None)
+                            it.setBackground(QColor("#f3f4f6") if r % 2 == 1 else QBrush())
+
+    def _update_cluster_summary_cells(self, hosts):
+        table = self.datacenter_summary
+        node_by_name = {n.get("node", ""): n for n in hosts}
+
+        for r in range(table.rowCount()):
+            name_item = table.item(r, 0)
+            if name_item is None:
+                continue
+            node_name = name_item.text()
+            node = node_by_name.get(node_name)
+            if node is None:
+                continue
+
+            status = node.get("status", "unknown")
+            status_color = "#22c55e" if status == "online" else "#ef4444" if status == "offline" else "#f59e0b"
+            self._set_cell_text(table, r, 1, f"● {status}", status_color)
+
+            cpu_frac = node.get("cpu", 0)
+            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
+            old_bar = table.cellWidget(r, 3)
+            if isinstance(old_bar, QProgressBar):
+                self._update_progress_bar(old_bar, int(cpu_pct), f"{cpu_pct}%")
+
+            mem_bytes = node.get("mem", 0)
+            maxmem_bytes = node.get("maxmem", 1) or 1
+            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
+            maxmem_gb = round(maxmem_bytes / (1024**3), 2)
+            mem_pct = int((mem_bytes / maxmem_bytes) * 100) if maxmem_bytes else 0
+            old_ram = table.cellWidget(r, 4)
+            if isinstance(old_ram, QProgressBar):
+                self._update_progress_bar(old_ram, mem_pct, f"{mem_gb}/{maxmem_gb} GiB")
+
+            uptime_sec = node.get("uptime", 0)
+            uptime_str = self._format_uptime(uptime_sec) if uptime_sec else ''
+            self._set_cell_text(table, r, 5, uptime_str)
+
+    def _update_vm_cells(self, vm_data):
+        if not vm_data:
+            return
+        detail_key = (vm_data.get("vmid"), vm_data.get("host_name") or vm_data.get("node"))
+        detail = self.details_cache.get(detail_key)
+        if not detail:
             return
 
+        status = vm_data.get("status") or detail.get("status", "")
+        status_color = "#22c55e" if status == "running" else "#ef4444" if status == "stopped" else "#f59e0b"
+        self._update_vm_summary_cell("Статус", status, status_color)
+
+        cpu_usage = vm_data.get("cpu") or detail.get("cpu", 0)
+        if isinstance(cpu_usage, float):
+            cpu_usage = round(cpu_usage * 100, 1)
+        self._update_vm_summary_cell("Использование ЦП (%)", f"{cpu_usage}%")
+
+        def safe_int(val): return int(val) if isinstance(val, (int, float)) else 0
+
+        maxmem_bytes = safe_int(detail.get("maxmem") or vm_data.get("maxmem"))
+        mem_used_bytes = safe_int(detail.get("mem"))
+        maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
+        mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
+        self._update_vm_summary_cell("RAM (GiB)", f"{mem_used_gb} / {maxmem_gb}")
+
+        maxdisk_bytes = safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
+        disk_used_bytes = safe_int(detail.get("disk"))
+        maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
+        disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
+        self._update_vm_summary_cell("Диск (GiB)", f"{disk_used_gb} / {maxdisk_gb}")
+
+        netin = detail.get("netin", 0)
+        netout = detail.get("netout", 0)
+        netin_mb = round(netin / (1024*1024), 2) if netin else 0
+        netout_mb = round(netout / (1024*1024), 2) if netout else 0
+        self._update_vm_summary_cell("Сеть вх (MB)", str(netin_mb))
+        self._update_vm_summary_cell("Сеть исх (MB)", str(netout_mb))
+
+        uptime = detail.get("uptime") or vm_data.get("uptime", "")
+        self._update_vm_summary_cell("Аптайм", self._format_uptime(uptime) if uptime else '')
+
+    def _update_pool_cells(self):
+        pool_name = self.current_obj_name
+        vms = [vm for vm in self.all_vms if vm.get("pool") == pool_name]
+        self.pool_widget.set_pool_vms(vms)
+
+    def _set_storage_param(self, label, value):
+        table = self.storage_detail_params
+        for r in range(table.rowCount()):
+            if table.item(r, 0) and table.item(r, 0).text() == label:
+                self._set_cell_text(table, r, 1, str(value))
+                break
+
+    def _update_storage_cells(self):
+        storage_name = self.current_obj_name
+        data = self.current_obj_data or {}
+        cluster = data.get("cluster")
+        if cluster:
+            filtered = [s for s in self.all_storages
+                        if s.get("storage") == storage_name and s.get("cluster") == cluster]
+        else:
+            filtered = [s for s in self.all_storages if s.get("storage") == storage_name]
+        if not filtered:
+            return
+        total_used = sum(s.get("used", 0) or 0 for s in filtered)
+        total_total = sum(s.get("total", 0) or 0 for s in filtered)
+        total_pct = int((total_used / total_total) * 100) if total_total else 0
+        used_gb = round(total_used / (1024**3), 1)
+        total_gb = round(total_total / (1024**3), 1)
+
+        self._set_storage_param("Занято", f"{used_gb} GiB")
+        self._set_storage_param("Всего", f"{total_gb} GiB")
+        self._set_storage_param("Использование", f"{total_pct}%")
+        self.storage_detail_bar.setValue(total_pct)
+        self.storage_detail_bar.setFormat(f"{total_pct}%  ({used_gb}/{total_gb} GiB)")
+
+        node_table = self.storage_detail_nodes_table
+        node_by_storage = {}
+        for st in filtered:
+            node_by_storage[st.get("node", "")] = st
+        for r in range(node_table.rowCount()):
+            name_item = node_table.item(r, 0)
+            if name_item is None:
+                continue
+            st = node_by_storage.get(name_item.text())
+            if st is None:
+                continue
+            used = st.get("used", 0) or 0
+            total = st.get("total", 0) or 1
+            u_gb = round(used / (1024**3), 1)
+            t_gb = round(total / (1024**3), 1)
+            pct = int((used / total) * 100) if total else 0
+            self._set_cell_text(node_table, r, 3, f"{u_gb} GiB")
+            self._set_cell_text(node_table, r, 4, f"{t_gb} GiB")
+            old_bar = node_table.cellWidget(r, 5)
+            if isinstance(old_bar, QProgressBar):
+                self._update_progress_bar(old_bar, pct, f"{pct}%")
+
+    def refresh_current_view(self):
+        if self.current_obj_type is None:
+            return
         saved_tab = self.tabs.currentIndex()
 
-        if self.current_obj_type == "standalone_folder":
-            self._show_standalone_folder("")
-        elif self.current_obj_type == "cluster_folder":
-            self._show_cluster_folder("")
-        elif self.current_obj_type == "storage_folder":
-            self._show_storage_folder()
+        if self.current_obj_type in ("standalone_folder", "cluster_folder", "storage_folder"):
+            if self.current_obj_type == "standalone_folder":
+                self._show_standalone_folder("")
+            elif self.current_obj_type == "cluster_folder":
+                self._show_cluster_folder("")
+            elif self.current_obj_type == "storage_folder":
+                self._show_storage_folder()
         elif self.current_obj_type == "cluster":
-            self._show_cluster(self.current_obj_name)
+            hosts = []
+            for node in self.all_nodes:
+                host_name = node.get("host_name", "")
+                cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+                if cfg and cfg.get("cluster") == self.current_obj_name:
+                    hosts.append(node)
+            self._update_cluster_summary_cells(hosts)
         elif self.current_obj_type == "host":
-            host_name = self.current_obj_name
-            host_data = next((n for n in self.all_nodes if n.get("node") == host_name), None)
+            host_data = next((n for n in self.all_nodes if n.get("node") == self.current_obj_name), None)
             if host_data:
-                self._show_host_info(host_name, host_data)
+                self._update_host_cells(host_data)
+                self._fetch_host_metrics(host_data)
         elif self.current_obj_type == "pool":
-            vms = [vm for vm in self.all_vms if vm.get("pool") == self.current_obj_name]
-            self.pool_widget.set_pool_vms(vms)
+            self._update_pool_cells()
         elif self.current_obj_type == "vm":
             vm_data = self.current_obj_data
-            vmid = vm_data.get("vmid") if vm_data else None
-            host_name = vm_data.get("host_name") or (vm_data.get("node") if vm_data else None)
-            if vmid is not None:
-                fresh = next((v for v in self.all_vms if v.get("vmid") == vmid and v.get("host_name") == host_name), None)
+            if vm_data:
+                fresh = next((v for v in self.all_vms
+                              if v.get("vmid") == vm_data.get("vmid")
+                              and v.get("host_name") == (vm_data.get("host_name") or vm_data.get("node"))), None)
                 if fresh:
                     self.current_obj_data = fresh
-                host_name = (fresh or vm_data).get("host_name") or (fresh or vm_data).get("node")
-                detail_key = (vmid, host_name)
-                if detail_key in self.details_cache:
-                    self._display_full_vm_info(fresh or vm_data, self.details_cache[detail_key])
+                self._update_vm_cells(fresh or vm_data)
+                self._show_vm_metrics(fresh or vm_data)
         elif self.current_obj_type == "storage":
-            self._show_storage_detail(self.current_obj_name, self.current_obj_data or {})
+            self._update_storage_cells()
 
         self.tabs.setCurrentIndex(saved_tab)
 
@@ -1347,18 +1573,6 @@ class DetailPanel(QWidget):
         for r in range(table.rowCount()):
             if table.rowHeight(r) > 24:
                 table.setRowHeight(r, 24)
-        table = self.host_services_table
-        table.setRowCount(len(services))
-        for i, svc in enumerate(services):
-            table.setItem(i, 0, QTableWidgetItem(svc.get("name", "")))
-            state = svc.get("state", "")
-            table.setItem(i, 1, QTableWidgetItem(state))
-            table.setItem(i, 2, QTableWidgetItem(svc.get("desc", "")))
-        table.resizeRowsToContents()
-        for r in range(table.rowCount()):
-            if table.rowHeight(r) > 24:
-                table.setRowHeight(r, 24)
-        table.setSortingEnabled(True)
 
     def _fetch_host_disks(self, host_name, host_data):
         node_name = host_data.get("node", "")
@@ -1573,7 +1787,9 @@ class DetailPanel(QWidget):
         self.host_vm_table.setRowCount(len(vms_of_host))
         WARN_ROLE = Qt.UserRole + 10
         for i, vm in enumerate(vms_of_host):
-            self.host_vm_table.setItem(i, 0, QTableWidgetItem(str(vm.get("name", ""))))
+            name_item = QTableWidgetItem(str(vm.get("name", "")))
+            name_item.setData(Qt.UserRole + 30, vm.get("vmid"))  # store vmid for matching
+            self.host_vm_table.setItem(i, 0, name_item)
             self.host_vm_table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
             self.host_vm_table.setItem(i, 2, QTableWidgetItem(str(vm.get("node", vm.get("host_name", "")))))
             vm_status = str(vm.get("status", ""))
@@ -1610,6 +1826,9 @@ class DetailPanel(QWidget):
         self._fetch_host_disks(host_name, host_data)
         self._fetch_host_snapshots(host_name, host_data)
 
+        self._fetch_host_metrics(host_data)
+
+    def _fetch_host_metrics(self, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
         cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)

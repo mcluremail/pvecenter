@@ -18,7 +18,7 @@ MAX_WORKERS = 16
 class MainWindow(QMainWindow):
     def __init__(self, nodes_cfg=None):
         super().__init__()
-        self.setWindowTitle("PVE Dashboard")
+        self.setWindowTitle("PVE Center")
         from .icons import init_icons
         init_icons()
         self.setWindowIcon(get_icon("app"))

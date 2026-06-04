@@ -295,7 +295,6 @@ class TreePanel(QWidget):
         def traverse(item):
             for i in range(item.childCount()):
                 child = item.child(i)
-                name = child.text(0)
                 vm_key = child.data(0, VM_KEY_ROLE)
                 if vm_key is not None:
                     host_name, vmid = vm_key
@@ -304,10 +303,15 @@ class TreePanel(QWidget):
                     if vm:
                         child.setIcon(0, get_icon("vm", vm.get("status")))
                     continue
-                if child.childCount() > 0:
-                    host = next((n for n in all_nodes if n.get("node") == name), None)
+
+                key = child.data(0, ITEM_KEY_ROLE)
+                if key and isinstance(key, tuple) and key[0] == "host":
+                    host_name = key[1]
+                    host = next((n for n in all_nodes if n.get("node") == host_name), None)
                     if host:
                         child.setIcon(0, get_icon("host", host.get("status")))
+                    traverse(child)
+                else:
                     traverse(child)
         for i in range(self.tree.topLevelItemCount()):
             traverse(self.tree.topLevelItem(i))
@@ -376,92 +380,59 @@ class TreePanel(QWidget):
             return vm_key
         return item.data(0, ITEM_KEY_ROLE)
 
-    def _find_ancestor_with_name(self, item, name):
-        while item is not None:
-            if item.text(0) == name:
-                return item
-            item = item.parent()
-        return None
-
     def _on_item_clicked(self, item, column):
         self._nav_timer.stop()
-        obj_name = item.text(0)
-        parent = item.parent()
+
         vm_key = item.data(0, VM_KEY_ROLE)
         if vm_key is not None:
             host_name, vmid = vm_key
             vm = next((v for v in self.all_vms
                        if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
             if vm is not None:
-                self.item_selected.emit("vm", obj_name, vm)
+                self.item_selected.emit("vm", vm.get("name") or f"VM {vmid}", vm)
                 return
-            self.item_selected.emit("unknown", obj_name, {})
+            self.item_selected.emit("unknown", str(vmid), {})
             return
 
-        if parent is None:
-            if obj_name == "Кластеры":
-                self.item_selected.emit("cluster_folder", obj_name, {})
-            elif obj_name == "Отдельные хосты":
-                self.item_selected.emit("standalone_folder", obj_name, {})
-            elif obj_name == "Хранилища":
-                self.item_selected.emit("storage_folder", obj_name, {})
+        key = item.data(0, ITEM_KEY_ROLE)
+        if key is None or not isinstance(key, tuple):
+            self.item_selected.emit("unknown", "", {})
             return
 
-        container = self._find_ancestor_with_name(item, "Кластеры") or \
-                    self._find_ancestor_with_name(item, "Отдельные хосты") or \
-                    self._find_ancestor_with_name(item, "Хранилища")
+        item_type = key[0]
+        item_name = key[1] if len(key) > 1 else ""
 
-        if container is None:
-            self.item_selected.emit("unknown", obj_name, {})
+        if item_type == "section":
+            if item_name == "Кластеры":
+                self.item_selected.emit("cluster_folder", item_name, {})
+            elif item_name == "Отдельные хосты":
+                self.item_selected.emit("standalone_folder", item_name, {})
+            elif item_name == "Хранилища":
+                self.item_selected.emit("storage_folder", item_name, {})
             return
 
-        container_name = container.text(0)
-
-        if container_name == "Хранилища":
-            key = item.data(0, ITEM_KEY_ROLE)
-            if key and isinstance(key, tuple) and key[0] == "storage":
-                # ("storage", name) or ("storage", name, cluster_name)
-                data = {"storage_name": key[1]}
-                if len(key) >= 3:
-                    data["cluster"] = key[2]
-                self.item_selected.emit("storage", key[1], data)
-            elif key and isinstance(key, tuple) and key[0] == "storage_section":
-                self.item_selected.emit("storage_section", key[1], {})
+        if item_type == "cluster":
+            self.item_selected.emit("cluster", item_name, {})
             return
 
-        if container_name == "Кластеры":
-            if parent.text(0) == "Кластеры":
-                self.item_selected.emit("cluster", obj_name, {})
-                return
-
-            if item.childCount() > 0:
-                cluster_item = item
-                while cluster_item.parent() is not None and cluster_item.parent().text(0) != "Кластеры":
-                    cluster_item = cluster_item.parent()
-                cluster_name = cluster_item.text(0)
-                self.item_selected.emit("pool", obj_name, {"cluster": cluster_name})
-                return
-
-            host_data = next((n for n in self.all_nodes if n.get("node") == obj_name), None)
-            if host_data:
-                self.item_selected.emit("host", obj_name, host_data)
-                return
-
-            self.item_selected.emit("unknown", obj_name, {})
+        if item_type == "host":
+            host_data = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+            self.item_selected.emit("host", item_name, host_data or {})
             return
 
-        if container_name == "Отдельные хосты":
-            if parent.text(0) == "Отдельные хосты":
-                host_data = next((n for n in self.all_nodes
-                                  if n.get("node") == obj_name or n.get("host_name") == obj_name), None)
-                self.item_selected.emit("host", obj_name, host_data or {})
-                return
-
-            if item.childCount() > 0:
-                self.item_selected.emit("pool", obj_name, {})
-                return
-
-            self.item_selected.emit("unknown", obj_name, {})
+        if item_type == "pool":
+            self.item_selected.emit("pool", item_name, {})
             return
 
-        self.item_selected.emit("unknown", obj_name, {})
+        if item_type == "storage":
+            data = {"storage_name": item_name}
+            if len(key) >= 3:
+                data["cluster"] = key[2]
+            self.item_selected.emit("storage", item_name, data)
+            return
+
+        if item_type == "storage_section":
+            self.item_selected.emit("storage_section", item_name, {})
+            return
+
+        self.item_selected.emit("unknown", item_name, {})
