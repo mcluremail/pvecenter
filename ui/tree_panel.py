@@ -226,11 +226,12 @@ class TreePanel(QWidget):
             st_folder.setData(0, ITEM_KEY_ROLE, ("section", "Отдельные хосты"))
             st_folder.setExpanded(True)
 
-            for node in sorted(standalone_nodes, key=lambda n: n.get("node", "").lower()):
+            for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                 node_name = node.get("node", "?")
+                display_name = node.get("_display_name") or node_name
                 vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
                 host_item = QTreeWidgetItem(st_folder)
-                host_item.setText(0, f"{node_name}  {_vm_count_str(vms_on_host)}")
+                host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
                 host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
                 host_item.setExpanded(True)

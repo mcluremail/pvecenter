@@ -225,7 +225,8 @@ class FetchWorker(QRunnable):
                     if not vm.get("pool"):
                         vm["pool"] = vmid_to_pool.get(vm["vmid"])
             else:
-                # Для standalone хоста получаем реальное короткое имя ноды с сервера
+                # Получаем реальное короткое имя ноды с сервера (для API-запросов,
+                # чтобы избежать proxy loop в pveproxy)
                 try:
                     local_nodes = proxmox.nodes.get()
                     real_node_name = local_nodes[0]["node"] if local_nodes else self.node_cfg["name"]
@@ -233,7 +234,9 @@ class FetchWorker(QRunnable):
                     real_node_name = self.node_cfg["name"]
                 node_name = real_node_name
                 node_status = proxmox.nodes(node_name).status.get()
-                nodes = [{**node_status, "node": node_name, "status": "online"}]
+                nodes = [{**node_status, "node": node_name,
+                          "_display_name": self.node_cfg["name"],
+                          "status": "online"}]
                 qemu_list = proxmox.nodes(node_name).qemu.get()
                 lxc_list = proxmox.nodes(node_name).lxc.get()
                 vms = []
