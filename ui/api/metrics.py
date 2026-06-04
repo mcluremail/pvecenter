@@ -120,8 +120,8 @@ class StorageBackupWorker(QRunnable):
             headers = {"Authorization": auth_token}
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
-                   f"nodes/{self.node_name}/storage/{encoded_name}/prunebackups")
-            resp = session.get(url, headers=headers, verify=False, timeout=10)
+                   f"nodes/{self.node_name}/storage/{encoded_name}/content")
+            resp = session.get(url, headers=headers, params={"content": "backup"}, verify=False, timeout=10)
             resp.raise_for_status()
             data = resp.json().get('data', [])
             try:

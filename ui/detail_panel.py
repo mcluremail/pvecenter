@@ -1534,9 +1534,9 @@ class DetailPanel(QWidget):
         table.setRowCount(len(backups))
         for i, b in enumerate(backups):
             table.setItem(i, 0, QTableWidgetItem(f"VM {b.get('vmid', '')}"))
-            table.setItem(i, 1, QTableWidgetItem(b.get("type", "")))
+            table.setItem(i, 1, QTableWidgetItem(b.get("subtype") or b.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
-            size = b.get("filesize", 0) or b.get("size", 0) or 0
+            size = b.get("size", 0) or 0
             table.setItem(i, 3, QTableWidgetItem(self._format_volsize(size) if size else "0"))
             ctime = b.get("ctime")
             if ctime:
