@@ -93,26 +93,17 @@ class TreePanel(QWidget):
     def _tick_spinner(self):
         self._spinner_angle = (self._spinner_angle + 45) % 360
         icon = _make_loading_icon(self._spinner_angle)
-        for name in list(self._loading_hosts):
-            item = self._find_host_item(name)
-            if item:
-                item.setIcon(0, icon)
-
-    def _find_host_item(self, name):
-        def search(item):
+        def spin(item):
             key = item.data(0, ITEM_KEY_ROLE)
-            if key and isinstance(key, tuple) and key[0] == "host" and key[1] == name:
-                return item
+            if key and isinstance(key, tuple):
+                if key[0] == "host" and key[1] in self._loading_hosts:
+                    item.setIcon(0, icon)
+                elif key[0] == "cluster" and f"cluster:{key[1]}" in self._loading_hosts:
+                    item.setIcon(0, icon)
             for i in range(item.childCount()):
-                found = search(item.child(i))
-                if found:
-                    return found
-            return None
+                spin(item.child(i))
         for i in range(self.tree.topLevelItemCount()):
-            found = search(self.tree.topLevelItem(i))
-            if found:
-                return found
-        return None
+            spin(self.tree.topLevelItem(i))
 
     def update_data(self, all_nodes, all_vms, all_storages=None):
         self.all_nodes = all_nodes
@@ -150,15 +141,10 @@ class TreePanel(QWidget):
             for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(folder)
                 cl_item.setText(0, cl_name)
-                cl_item.setIcon(0, get_icon("cluster"))
+                cl_item.setIcon(0, _make_loading_icon(0))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
                 cl_item.setExpanded(True)
-                for hname in hosts_by_cluster[cl_name]:
-                    hi = QTreeWidgetItem(cl_item)
-                    hi.setText(0, hname)
-                    hi.setIcon(0, _make_loading_icon(0))
-                    hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
-                    self._loading_hosts.add(hname)
+                self._loading_hosts.add(f"cluster:{cl_name}")
 
         if standalone:
             folder = QTreeWidgetItem(self.tree)
