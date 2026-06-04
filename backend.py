@@ -98,7 +98,7 @@ def create_admin_token(host, user, password):
         )
         r = sess.post(
             f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
-            data={"comment": "PVE Center dashboard", "expire": 0},
+            data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
             timeout=15,
         )
         data = r.json().get("data", r.json())
