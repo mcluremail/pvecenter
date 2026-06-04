@@ -1,0 +1,467 @@
+from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
+                               QWidget, QAbstractItemView, QPushButton)
+from PySide6.QtCore import Signal, QSettings, Qt, QSize, QTimer
+from PySide6.QtGui import QIcon
+from collections import defaultdict
+from datetime import timedelta
+
+from .icons import get_icon, init_icons
+
+VM_KEY_ROLE = Qt.UserRole + 1
+ITEM_KEY_ROLE = Qt.UserRole + 2
+
+def _vm_count_str(vms):
+    total = len(vms)
+    running = sum(1 for v in vms if v.get("status") == "running")
+    return f"[{running}/{total}]"
+
+class TreePanel(QWidget):
+    item_selected = Signal(str, str, dict)
+
+    def __init__(self, nodes_cfg):
+        super().__init__()
+        self.nodes_cfg = nodes_cfg
+        self.all_nodes = []
+        self.all_vms = []
+
+        self.settings = QSettings("PVECenter", "Dashboard")
+
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(1)
+        self.tree.setHeaderHidden(True)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.setIndentation(20)
+        self.tree.setIconSize(QSize(22, 22))
+        self.tree.setRootIsDecorated(True)
+        self.tree.setAnimated(True)
+        self.tree.itemClicked.connect(self._on_item_clicked)
+        self.tree.currentItemChanged.connect(self._on_current_item_changed)
+        self._building = False
+        self._nav_timer = QTimer()
+        self._nav_timer.setSingleShot(True)
+        self._nav_timer.setInterval(300)
+        self._nav_timer.timeout.connect(self._flush_nav)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.tree)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        # Кнопка развернуть/свернуть
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(4, 0, 4, 0)
+        init_icons()
+        self._toggle_btn = QPushButton()
+        self._toggle_btn.setIcon(get_icon("expand"))
+        self._toggle_btn.setFixedSize(22, 22)
+        self._toggle_btn.setToolTip("Развернуть всё")
+        self._toggled = False
+        self._toggle_btn.clicked.connect(self._toggle_expand)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._toggle_btn)
+        layout.addLayout(btn_layout)
+
+    def _toggle_expand(self):
+        self._toggled = not self._toggled
+        if self._toggled:
+            self.tree.expandAll()
+            self._toggle_btn.setIcon(get_icon("collapse"))
+            self._toggle_btn.setToolTip("Свернуть всё")
+        else:
+            self.tree.collapseAll()
+            self._toggle_btn.setIcon(get_icon("expand"))
+            self._toggle_btn.setToolTip("Развернуть всё")
+
+    def update_data(self, all_nodes, all_vms, all_storages=None):
+        self.all_nodes = all_nodes
+        self.all_vms = all_vms
+        self.all_storages = all_storages or []
+        self._build_tree()
+        self._restore_expanded_state()
+
+    def _on_current_item_changed(self, current, previous):
+        if self._building or not current:
+            return
+        self._nav_timer.start()
+
+    def _flush_nav(self):
+        item = self.tree.currentItem()
+        if item:
+            self._on_item_clicked(item, 0)
+
+    def _add_vm_item(self, parent, vm):
+        vm_item = QTreeWidgetItem(parent)
+        vm_name = vm.get("name") or f"VM {vm.get('vmid')}"
+        vm_item.setText(0, vm_name)
+        vm_item.setIcon(0, get_icon("vm", vm.get("status")))
+        vm_item.setData(0, VM_KEY_ROLE, (vm.get("host_name", ""), vm.get("vmid", 0)))
+        cpu = vm.get("cpu", 0)
+        if isinstance(cpu, float):
+            cpu_pct = round(cpu * 100, 1)
+        else:
+            cpu_pct = cpu
+        mem = vm.get("mem", 0) or 0
+        maxmem = vm.get("maxmem", 1) or 1
+        mem_pct = int((mem / maxmem) * 100) if maxmem else 0
+        status = vm.get("status", "")
+        vm_item.setToolTip(0, f"Статус: {status}\nЦП: {cpu_pct}%\nRAM: {mem_pct}%")
+        return vm_item
+
+    def _build_tree(self):
+        self._building = True
+        self.tree.clear()
+
+        cluster_nodes = defaultdict(list)
+        standalone_nodes = []
+
+        for node in self.all_nodes:
+            host_name = node.get("host_name", "")
+            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cluster_name = cfg.get("cluster") if cfg else None
+            if cluster_name and cluster_name not in (False, None, "Standalone"):
+                cluster_nodes[cluster_name].append(node)
+            else:
+                standalone_nodes.append(node)
+
+        if cluster_nodes:
+            cluster_folder = QTreeWidgetItem(self.tree)
+            cluster_folder.setText(0, "Кластеры")
+            cluster_folder.setIcon(0, get_icon("folder"))
+            cluster_folder.setData(0, ITEM_KEY_ROLE, ("section", "Кластеры"))
+            cluster_folder.setExpanded(True)
+
+            for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
+                cl_item = QTreeWidgetItem(cluster_folder)
+                vms_in_cl = [vm for vm in self.all_vms
+                             if any(vm.get("node") == n.get("node") for n in cluster_nodes[cluster_name])]
+                cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
+                cl_item.setIcon(0, get_icon("cluster"))
+                cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+                cl_item.setExpanded(True)
+
+                hosts_in_cl = cluster_nodes[cluster_name]
+                for node in sorted(hosts_in_cl, key=lambda n: n.get("node", "").lower()):
+                    node_name = node.get("node", "?")
+                    vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name]
+                    host_item = QTreeWidgetItem(cl_item)
+                    host_item.setText(0, f"{node_name}  {_vm_count_str(vms_on_node)}")
+                    host_item.setIcon(0, get_icon("host", node.get("status")))
+                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
+                    cpu = node.get("cpu", 0)
+                    if isinstance(cpu, float):
+                        cpu = round(cpu * 100, 1)
+                    mem = node.get("mem", 0) or 0
+                    maxmem = node.get("maxmem", 1) or 1
+                    mem_pct = int((mem / maxmem) * 100) if maxmem else 0
+                    uptime = node.get("uptime", 0)
+                    uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
+                    host_item.setToolTip(0,
+                        f"ЦП: {cpu}%\nRAM: {mem_pct}%\n"
+                        f"Аптайм: {uptime_str}"
+                    )
+
+
+                pool_groups = defaultdict(list)
+                no_pool_vms = []
+                for vm in vms_in_cl:
+                    pool = vm.get("pool")
+                    if pool and pool not in ("", "No pool"):
+                        pool_groups[pool].append(vm)
+                    else:
+                        no_pool_vms.append(vm)
+
+                for pool_name in sorted(pool_groups.keys(), key=str.lower):
+                    vms_list = pool_groups[pool_name]
+                    pool_item = QTreeWidgetItem(cl_item)
+                    pool_item.setText(0, f"{pool_name}  {_vm_count_str(vms_list)}")
+                    pool_item.setIcon(0, get_icon("pool"))
+                    pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
+                    pool_item.setExpanded(True)
+
+                    for vm in sorted(vms_list, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                        self._add_vm_item(pool_item, vm)
+
+                for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                    self._add_vm_item(cl_item, vm)
+
+        if standalone_nodes:
+            st_folder = QTreeWidgetItem(self.tree)
+            st_folder.setText(0, "Отдельные хосты")
+            st_folder.setIcon(0, get_icon("folder"))
+            st_folder.setData(0, ITEM_KEY_ROLE, ("section", "Отдельные хосты"))
+            st_folder.setExpanded(True)
+
+            for node in sorted(standalone_nodes, key=lambda n: n.get("node", "").lower()):
+                node_name = node.get("node", "?")
+                vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
+                host_item = QTreeWidgetItem(st_folder)
+                host_item.setText(0, f"{node_name}  {_vm_count_str(vms_on_host)}")
+                host_item.setIcon(0, get_icon("host", node.get("status")))
+                host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
+                host_item.setExpanded(True)
+                cpu = node.get("cpu", 0)
+                if isinstance(cpu, float):
+                    cpu = round(cpu * 100, 1)
+                mem = node.get("mem", 0) or 0
+                maxmem = node.get("maxmem", 1) or 1
+                mem_pct = int((mem / maxmem) * 100) if maxmem else 0
+                uptime = node.get("uptime", 0)
+                uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
+                host_item.setToolTip(0,
+                    f"ЦП: {cpu}%\nRAM: {mem_pct}%\nАптайм: {uptime_str}"
+                )
+
+                vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
+                pool_groups = defaultdict(list)
+                no_pool_vms = []
+                for vm in vms_on_host:
+                    pool = vm.get("pool")
+                    if pool and pool not in ("", "No pool"):
+                        pool_groups[pool].append(vm)
+                    else:
+                        no_pool_vms.append(vm)
+
+                for pool_name in sorted(pool_groups.keys(), key=str.lower):
+                    pool_item = QTreeWidgetItem(host_item)
+                    pool_item.setText(0, f"{pool_name}  {_vm_count_str(pool_groups[pool_name])}")
+                    pool_item.setIcon(0, get_icon("pool"))
+                    pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
+                    pool_item.setExpanded(True)
+
+                    for vm in sorted(pool_groups[pool_name], key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                        self._add_vm_item(pool_item, vm)
+
+                for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                    self._add_vm_item(host_item, vm)
+
+        # Хранилища
+        if self.all_storages:
+            st_folder = QTreeWidgetItem(self.tree)
+            st_folder.setText(0, "Хранилища")
+            st_folder.setIcon(0, get_icon("folder"))
+            st_folder.setData(0, ITEM_KEY_ROLE, ("section", "Хранилища"))
+            st_folder.setExpanded(True)
+
+            # Группируем storage по кластеру для дерева
+            cluster_storages = defaultdict(list)
+            standalone_storages = []
+            for st in self.all_storages:
+                cluster = st.get("cluster")
+                if cluster:
+                    cluster_storages[cluster].append(st)
+                else:
+                    standalone_storages.append(st)
+
+            seen_standalone_keys = set()
+            for cluster_name in sorted(cluster_storages.keys(), key=str.lower):
+                cl_item = QTreeWidgetItem(st_folder)
+                cl_item.setText(0, cluster_name)
+                cl_item.setIcon(0, get_icon("cluster"))
+                cl_item.setData(0, ITEM_KEY_ROLE, ("storage_section", cluster_name))
+                cl_item.setExpanded(True)
+
+                seen_names = set()
+                for st in cluster_storages[cluster_name]:
+                    sname = st.get("storage", "")
+                    if sname not in seen_names:
+                        seen_names.add(sname)
+                        si = QTreeWidgetItem(cl_item)
+                        si.setText(0, sname)
+                        si.setIcon(0, get_icon("storage"))
+                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname, cluster_name))
+
+            if standalone_storages:
+                so_item = QTreeWidgetItem(st_folder)
+                so_item.setText(0, "Отдельные")
+                so_item.setIcon(0, get_icon("folder"))
+                so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", "Отдельные"))
+                so_item.setExpanded(True)
+
+                seen_names = set()
+                for st in standalone_storages:
+                    sname = st.get("storage", "")
+                    if sname not in seen_names:
+                        seen_names.add(sname)
+                        si = QTreeWidgetItem(so_item)
+                        si.setText(0, sname)
+                        si.setIcon(0, get_icon("storage"))
+                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname))
+
+        self.tree.expandAll()
+        self._building = False
+
+    def update_node_statuses(self, all_nodes, all_vms):
+        def traverse(item):
+            for i in range(item.childCount()):
+                child = item.child(i)
+                name = child.text(0)
+                vm_key = child.data(0, VM_KEY_ROLE)
+                if vm_key is not None:
+                    host_name, vmid = vm_key
+                    vm = next((v for v in all_vms
+                               if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+                    if vm:
+                        child.setIcon(0, get_icon("vm", vm.get("status")))
+                    continue
+                if child.childCount() > 0:
+                    host = next((n for n in all_nodes if n.get("node") == name), None)
+                    if host:
+                        child.setIcon(0, get_icon("host", host.get("status")))
+                    traverse(child)
+        for i in range(self.tree.topLevelItemCount()):
+            traverse(self.tree.topLevelItem(i))
+
+    def _save_expanded_state(self):
+        key = "expandedTreePaths"
+        paths = []
+        def collect_paths(item, path=""):
+            current = path + "|" + item.text(0) if path else item.text(0)
+            if item.isExpanded():
+                paths.append(current)
+            for i in range(item.childCount()):
+                collect_paths(item.child(i), current)
+        for i in range(self.tree.topLevelItemCount()):
+            collect_paths(self.tree.topLevelItem(i))
+        self.settings.setValue(key, paths)
+
+    def _restore_expanded_state(self):
+        key = "expandedTreePaths"
+        saved_paths = self.settings.value(key, [])
+        if not saved_paths:
+            return
+        def match_and_expand(item, path=""):
+            current = path + "|" + item.text(0) if path else item.text(0)
+            if current in saved_paths:
+                item.setExpanded(True)
+            else:
+                item.setExpanded(False)
+            for i in range(item.childCount()):
+                match_and_expand(item.child(i), current)
+        for i in range(self.tree.topLevelItemCount()):
+            match_and_expand(self.tree.topLevelItem(i))
+
+    def save_state(self):
+        self._save_expanded_state()
+
+    def select_first_item(self):
+        if self.tree.topLevelItemCount() > 0:
+            item = self.tree.topLevelItem(0)
+            self.tree.setCurrentItem(item)
+            self._on_item_clicked(item, 0)
+
+    def find_item_by_key(self, key_data):
+        def search(item):
+            if item.data(0, VM_KEY_ROLE) == key_data:
+                return item
+            if item.data(0, ITEM_KEY_ROLE) == key_data:
+                return item
+            for i in range(item.childCount()):
+                found = search(item.child(i))
+                if found:
+                    return found
+            return None
+        for i in range(self.tree.topLevelItemCount()):
+            found = search(self.tree.topLevelItem(i))
+            if found:
+                return found
+        return None
+
+    def get_current_item_key(self):
+        item = self.tree.currentItem()
+        if not item:
+            return None
+        vm_key = item.data(0, VM_KEY_ROLE)
+        if vm_key is not None:
+            return vm_key
+        return item.data(0, ITEM_KEY_ROLE)
+
+    def _find_ancestor_with_name(self, item, name):
+        while item is not None:
+            if item.text(0) == name:
+                return item
+            item = item.parent()
+        return None
+
+    def _on_item_clicked(self, item, column):
+        self._nav_timer.stop()
+        obj_name = item.text(0)
+        parent = item.parent()
+        vm_key = item.data(0, VM_KEY_ROLE)
+        if vm_key is not None:
+            host_name, vmid = vm_key
+            vm = next((v for v in self.all_vms
+                       if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+            if vm is not None:
+                self.item_selected.emit("vm", obj_name, vm)
+                return
+            self.item_selected.emit("unknown", obj_name, {})
+            return
+
+        if parent is None:
+            if obj_name == "Кластеры":
+                self.item_selected.emit("cluster_folder", obj_name, {})
+            elif obj_name == "Отдельные хосты":
+                self.item_selected.emit("standalone_folder", obj_name, {})
+            elif obj_name == "Хранилища":
+                self.item_selected.emit("storage_folder", obj_name, {})
+            return
+
+        container = self._find_ancestor_with_name(item, "Кластеры") or \
+                    self._find_ancestor_with_name(item, "Отдельные хосты") or \
+                    self._find_ancestor_with_name(item, "Хранилища")
+
+        if container is None:
+            self.item_selected.emit("unknown", obj_name, {})
+            return
+
+        container_name = container.text(0)
+
+        if container_name == "Хранилища":
+            key = item.data(0, ITEM_KEY_ROLE)
+            if key and isinstance(key, tuple) and key[0] == "storage":
+                # ("storage", name) or ("storage", name, cluster_name)
+                data = {"storage_name": key[1]}
+                if len(key) >= 3:
+                    data["cluster"] = key[2]
+                self.item_selected.emit("storage", key[1], data)
+            elif key and isinstance(key, tuple) and key[0] == "storage_section":
+                self.item_selected.emit("storage_section", key[1], {})
+            return
+
+        if container_name == "Кластеры":
+            if parent.text(0) == "Кластеры":
+                self.item_selected.emit("cluster", obj_name, {})
+                return
+
+            if item.childCount() > 0:
+                cluster_item = item
+                while cluster_item.parent() is not None and cluster_item.parent().text(0) != "Кластеры":
+                    cluster_item = cluster_item.parent()
+                cluster_name = cluster_item.text(0)
+                self.item_selected.emit("pool", obj_name, {"cluster": cluster_name})
+                return
+
+            host_data = next((n for n in self.all_nodes if n.get("node") == obj_name), None)
+            if host_data:
+                self.item_selected.emit("host", obj_name, host_data)
+                return
+
+            self.item_selected.emit("unknown", obj_name, {})
+            return
+
+        if container_name == "Отдельные хосты":
+            if parent.text(0) == "Отдельные хосты":
+                host_data = next((n for n in self.all_nodes
+                                  if n.get("node") == obj_name or n.get("host_name") == obj_name), None)
+                self.item_selected.emit("host", obj_name, host_data or {})
+                return
+
+            if item.childCount() > 0:
+                self.item_selected.emit("pool", obj_name, {})
+                return
+
+            self.item_selected.emit("unknown", obj_name, {})
+            return
+
+        self.item_selected.emit("unknown", obj_name, {})
