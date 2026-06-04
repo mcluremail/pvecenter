@@ -1,7 +1,7 @@
 import time
 import threading
 import traceback
-from PySide6.QtWidgets import (QMainWindow, QSplitter, QPushButton,
+from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel)
 from PySide6.QtCore import Qt, Slot, QTimer
@@ -163,18 +163,7 @@ class MainWindow(QMainWindow):
         v_splitter.addWidget(self.tasks_widget)
         v_splitter.setSizes([550, 150])
 
-        self.refresh_btn = QPushButton()
-        self.refresh_btn.setObjectName("refreshBtn")
-        self.refresh_btn.setIcon(get_icon("refresh"))
-        self.refresh_btn.setToolTip("Обновить")
-        self.refresh_btn.clicked.connect(self.refresh_data)
-
-        controls = QHBoxLayout()
-        controls.addStretch()
-        controls.addWidget(self.refresh_btn)
-
         main_layout = QVBoxLayout()
-        main_layout.addLayout(controls)
         main_layout.addWidget(v_splitter)
 
         container = QWidget()
@@ -271,7 +260,6 @@ class MainWindow(QMainWindow):
         self._saved_tab = self.detail_panel.tabs.currentIndex()
         self._saved_obj_type = self.detail_panel.current_obj_type
 
-        self.refresh_btn.setEnabled(False)
         self.all_nodes.clear()
         self.all_vms.clear()
         self.all_storages.clear()
@@ -335,7 +323,6 @@ class MainWindow(QMainWindow):
                         self.tree_panel.select_first_item()
                 else:
                     self.tree_panel.select_first_item()
-            self.refresh_btn.setEnabled(True)
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
