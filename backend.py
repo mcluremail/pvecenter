@@ -89,7 +89,7 @@ def create_admin_token(host, user, password):
         )
 
         if not has_admin_acl:
-            r = sess.post(
+            r = sess.put(
                 f"https://{host}:{PVE_PORT}/api2/json/access/acl",
                 data={"path": "/", "roles": "Administrator", "users": service_user},
                 timeout=15,
