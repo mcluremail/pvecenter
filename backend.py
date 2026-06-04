@@ -69,7 +69,7 @@ def create_admin_token(host, user, password):
 
         if service_user not in existing:
             pwd = "".join(sec.choice(str_mod.ascii_letters + str_mod.digits) for _ in range(24))
-            r = sess.put(
+            r = sess.post(
                 f"https://{host}:{PVE_PORT}/api2/json/access/users",
                 data={"userid": service_user, "password": pwd,
                        "comment": "PVE Center service user (auto-created)", "enable": 1},
