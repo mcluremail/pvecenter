@@ -3,7 +3,8 @@ import traceback
 from collections import defaultdict
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget, QTabWidget,
                                QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QSizePolicy, QProgressBar, QHBoxLayout, QComboBox, QPushButton)
+                               QSizePolicy, QProgressBar, QHBoxLayout, QComboBox, QPushButton,
+                               QMenu)
 from PySide6.QtCore import Qt
 from .hover import enable_row_hover
 from .icons import get_icon
@@ -89,9 +90,13 @@ class DetailPanel(QWidget):
             "border-radius: 3px; background: #eff6ff; color: #1d4ed8; font-weight: 600; }"
             "QPushButton:hover { background: #dbeafe; }"
             "QPushButton:disabled { color: #9ca3af; background: #f3f4f6; border-color: #d1d5db; }"
+            "QPushButton::menu-indicator { image: none; padding-left: 4px; }"
         )
-        self._console_btn.clicked.connect(self._on_vm_console)
-        action_layout.addWidget(self._console_btn)
+
+        self._console_menu = QMenu(self)
+        self._console_menu.addAction("SPICE", self._on_vm_console)
+        self._console_menu.addAction("noVNC (браузер)", self._on_vm_console_browser)
+        self._console_btn.setMenu(self._console_menu)
 
         self.tabs = QTabWidget()
 
@@ -664,7 +669,7 @@ class DetailPanel(QWidget):
         node_name = self._last_vm_data.get("node") or host_name
         self._console_btn.setEnabled(False)
         self.detail_label.setText(f"ВМ {vmid}: открытие SPICE консоли...")
-        from ..backend import VmConsoleWorker
+        from ..backend import VmConsoleWorker, open_browser_console
         worker = VmConsoleWorker(cfg, node_name, vmid)
         worker.signals.console_ready.connect(lambda msg: (
             self.detail_label.setText(msg),
@@ -677,6 +682,23 @@ class DetailPanel(QWidget):
             self._workers.discard(worker)
         ))
         self._run_worker(worker)
+
+    def _on_vm_console_browser(self):
+        if not self._last_vm_data:
+            return
+        vm_type = self._last_vm_data.get("type", "qemu")
+        if vm_type != "qemu":
+            return
+        vmid = self._last_vm_data.get("vmid")
+        host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        node_name = self._last_vm_data.get("node") or host_name
+        vmname = self._last_vm_data.get("name", "")
+        from ..backend import open_browser_console
+        open_browser_console(cfg["host"], node_name, vmid, vmname)
+        self.detail_label.setText(f"ВМ {vmid}: noVNC консоль открыта в браузере")
 
     def _refresh_after_action(self):
         if not self._last_vm_data:

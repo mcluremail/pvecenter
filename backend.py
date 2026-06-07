@@ -515,7 +515,7 @@ class ClusterTasksWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
-# VmConsoleWorker
+# VmConsoleWorker (SPICE)
 # ----------------------------------------------------------------------
 class VmConsoleSignals(QObject):
     console_ready = Signal(str)
@@ -617,3 +617,20 @@ class VmConsoleWorker(QRunnable):
             self.signals.console_ready.emit("🖥 SPICE консоль запущена")
         except RuntimeError:
             pass
+
+
+# ----------------------------------------------------------------------
+# VNC browser console (noVNC)
+# ----------------------------------------------------------------------
+def open_browser_console(host, node, vmid, vmname=""):
+    """Открывает noVNC консоль ВМ в браузере через PVE web UI.
+
+    Пользователь должен быть авторизован в PVE web UI в браузере.
+    """
+    import webbrowser
+    params = f"console=kvm&novnc=1&vmid={vmid}&node={node}&resize=off&cmd="
+    if vmname:
+        params += f"&vmname={vmname}"
+    url = f"https://{host}:8006/?{params}"
+    log.info("noVNC: %s", url)
+    webbrowser.open(url)
