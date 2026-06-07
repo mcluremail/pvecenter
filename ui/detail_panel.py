@@ -519,6 +519,8 @@ class DetailPanel(QWidget):
         self.tabs.addTab(self.host_snapshots_tab, get_icon("snapshot"), "Снапшоты")
         self.tabs.setTabVisible(17, False)
 
+        self.tabs.hide()
+
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.detail_label)
         main_layout.addWidget(self.tabs)
@@ -548,6 +550,7 @@ class DetailPanel(QWidget):
                 table.setRowHeight(r, max_height)
 
     def show_details(self, obj_type, obj_name, data):
+        self.tabs.show()
         try:
             self.current_obj_type = obj_type
             self.current_obj_name = obj_name
