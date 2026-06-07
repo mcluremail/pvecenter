@@ -148,6 +148,9 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.add_server_requested_context.connect(self._on_add_server)
 
+        self.tree_panel.host_remove_requested.connect(self._on_host_remove)
+        self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
+
         self._notifications = NotificationManager(self)
 
         # Горизонтальный сплиттер (дерево + детали)
@@ -242,6 +245,42 @@ class MainWindow(QMainWindow):
             return
         cfg = dialog.get_config()
         self.nodes_cfg.append(cfg)
+        save_config(self.nodes_cfg)
+        self.refresh_data()
+
+    def _on_host_remove(self, host_name):
+        reply = QMessageBox.question(
+            self, "Удаление хоста",
+            f"Удалить хост «{host_name}» из конфигурации?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+        self.nodes_cfg = [c for c in self.nodes_cfg if c.get("name") != host_name]
+        save_config(self.nodes_cfg)
+        self.refresh_data()
+
+    def _on_host_token_refresh(self, host_name):
+        cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+        if not cfg:
+            return
+        from .add_server_dialog import AddServerDialog
+        dialog = AddServerDialog(self, "reconnect")
+        dialog.setWindowTitle(f"Обновить токен — {host_name}")
+        dialog.host_input.setText(cfg.get("host", ""))
+        dialog.host_input.setEnabled(False)
+        dialog.user_input.setText(cfg.get("user", "root@pam"))
+        if dialog.exec() != AddServerDialog.Accepted:
+            return
+        new_cfg = dialog.get_config()
+        idx = next((i for i, c in enumerate(self.nodes_cfg) if c.get("name") == host_name), None)
+        if idx is not None:
+            new_cfg["name"] = host_name
+            new_cfg["host"] = cfg["host"]
+            new_cfg["cluster"] = cfg.get("cluster", False)
+            if cfg.get("cluster_rep"):
+                new_cfg["cluster_rep"] = True
+            self.nodes_cfg[idx] = new_cfg
         save_config(self.nodes_cfg)
         self.refresh_data()
 

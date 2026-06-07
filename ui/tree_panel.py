@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
-                               QWidget, QAbstractItemView, QPushButton)
+                               QWidget, QAbstractItemView, QPushButton, QMenu)
 from PySide6.QtCore import Signal, QSettings, Qt, QSize, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
 from datetime import timedelta
 
@@ -21,6 +21,8 @@ def _vm_count_str(vms):
 class TreePanel(QWidget):
     item_selected = Signal(str, str, dict)
     add_server_requested_context = Signal(str)
+    host_remove_requested = Signal(str)      # host_name
+    host_token_refresh_requested = Signal(str)  # host_name
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -41,6 +43,8 @@ class TreePanel(QWidget):
         self.tree.setAnimated(True)
         self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.currentItemChanged.connect(self._on_current_item_changed)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_context_menu)
         self._building = False
         self._nav_timer = QTimer()
         self._nav_timer.setSingleShot(True)
@@ -82,6 +86,35 @@ class TreePanel(QWidget):
             self.tree.collapseAll()
             self._toggle_btn.setIcon(get_icon("expand"))
             self._toggle_btn.setToolTip("Развернуть всё")
+
+    def _on_context_menu(self, pos):
+        item = self.tree.itemAt(pos)
+        if not item:
+            return
+        key = item.data(0, ITEM_KEY_ROLE)
+        if not key or not isinstance(key, tuple) or key[0] != "host":
+            return
+        node_name = key[1]
+        host = next((n for n in self.all_nodes if n.get("node") == node_name), None)
+        if not host:
+            return
+        host_name = host.get("host_name", "")
+        if not host_name:
+            return
+        menu = QMenu(self.tree)
+        menu.setStyleSheet(
+            "QMenu { font-size: 12px; padding: 2px; }"
+            "QMenu::item { padding: 4px 12px; }"
+            "QMenu::item:selected { background: #e5e7eb; }"
+        )
+        delete_action = QAction("Удалить хост", self.tree)
+        delete_action.triggered.connect(lambda: self.host_remove_requested.emit(host_name))
+        menu.addAction(delete_action)
+        refresh_action = QAction("Создать токен заново", self.tree)
+        refresh_action.setIcon(get_icon("refresh"))
+        refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
+        menu.addAction(refresh_action)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
 
     def _make_section_item(self, parent, label):
         item = QTreeWidgetItem(parent)
