@@ -565,24 +565,26 @@ class VmConsoleWorker(QRunnable):
                     "toggle-fullscreen", "release-cursor")
             lines = ["[virt-viewer]", "type=spice"]
 
-            proxy_url = config.get("proxy", "")
-            if proxy_url:
-                parsed = urlparse(proxy_url)
-                host = self.host_cfg["host"]
-                port = parsed.port or 3128
-                log.info("SPICE proxy: FQDN=%s port=%s → используем host=%s port=%s",
-                         parsed.hostname, port, host, port)
-                lines.append(f"host={host}")
-                lines.append(f"port={port}")
+            tls_port = config.get("tls-port")
+            if tls_port is not None:
+                # Прямое подключение по TLS — без SPICE proxy
+                lines.append(f"host={self.host_cfg['host']}")
+                lines.append(f"tls-port={tls_port}")
+                log.info("SPICE: host=%s tls-port=%s (прямое подключение)",
+                         self.host_cfg["host"], tls_port)
             else:
-                host = config.get("host")
-                if host:
-                    lines.append(f"host={host}")
-                tls_port = config.get("tls-port")
-                if tls_port is not None:
-                    lines.append(f"port={tls_port}")
-                elif config.get("port") is not None:
-                    lines.append(f"port={config['port']}")
+                proxy_url = config.get("proxy", "")
+                if proxy_url:
+                    parsed = urlparse(proxy_url)
+                    lines.append(f"host={parsed.hostname}")
+                    lines.append(f"port={parsed.port or 3128}")
+                    log.info("SPICE proxy: host=%s port=%s", parsed.hostname, parsed.port or 3128)
+                else:
+                    host = config.get("host")
+                    if host:
+                        lines.append(f"host={host}")
+                    if config.get("port") is not None:
+                        lines.append(f"port={config['port']}")
 
             for key in keys:
                 val = config.get(key)
