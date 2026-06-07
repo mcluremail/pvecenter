@@ -560,15 +560,20 @@ class VmConsoleWorker(QRunnable):
 
         try:
             from urllib.parse import urlparse
-            keys = ("password", "subject", "cipher", "secure-attention",
-                    "delete-this-file", "full-screen", "title")
+            keys = ("password", "host-subject", "secure-attention",
+                    "delete-this-file", "full-screen", "title",
+                    "toggle-fullscreen", "release-cursor")
             lines = ["[virt-viewer]", "type=spice"]
 
             proxy_url = config.get("proxy", "")
             if proxy_url:
                 parsed = urlparse(proxy_url)
-                lines.append(f"host={parsed.hostname}")
-                lines.append(f"port={parsed.port or 3128}")
+                host = self.host_cfg["host"]
+                port = parsed.port or 3128
+                log.info("SPICE proxy: FQDN=%s port=%s → используем host=%s port=%s",
+                         parsed.hostname, port, host, port)
+                lines.append(f"host={host}")
+                lines.append(f"port={port}")
             else:
                 host = config.get("host")
                 if host:
