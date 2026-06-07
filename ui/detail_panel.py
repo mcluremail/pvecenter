@@ -95,7 +95,7 @@ class DetailPanel(QWidget):
 
         self._console_menu = QMenu(self)
         self._console_menu.addAction("SPICE", self._on_vm_console)
-        self._console_menu.addAction("noVNC (браузер)", self._on_vm_console_browser)
+        self._console_menu.addAction("noVNC (окно)", self._on_vm_console_browser)
         self._console_btn.setMenu(self._console_menu)
         action_layout.addWidget(self._console_btn)
 
@@ -697,9 +697,30 @@ class DetailPanel(QWidget):
             return
         node_name = self._last_vm_data.get("node") or host_name
         vmname = self._last_vm_data.get("name", "")
-        from ..backend import open_browser_console
-        open_browser_console(cfg["host"], node_name, vmid, vmname)
-        self.detail_label.setText(f"ВМ {vmid}: noVNC консоль открыта в браузере")
+
+        from PySide6.QtWidgets import QDialog, QVBoxLayout
+        from PySide6.QtWebEngineWidgets import QWebEngineView
+
+        host = cfg["host"]
+        url = f"https://{host}:8006/#v1:z0:vnc:{node_name}:{vmid}"
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"ВМ {vmid} ({vmname}) — {host}")
+        dialog.resize(960, 720)
+
+        view = QWebEngineView()
+        # игнорируем ошибки SSL (самоподписанные сертификаты PVE)
+        from PySide6.QtWebEngineCore import QWebEngineCertificateError
+        def on_cert_error(err):
+            err.acceptCertificate()
+            return True
+        view.page().certificateError.connect(on_cert_error)
+        view.load(url)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view)
+        dialog.exec()
 
     def _refresh_after_action(self):
         if not self._last_vm_data:
