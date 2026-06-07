@@ -559,41 +559,28 @@ class VmConsoleWorker(QRunnable):
             return
 
         try:
-            from urllib.parse import urlparse
-            keys = ("password", "host-subject", "secure-attention",
-                    "delete-this-file", "full-screen", "title",
-                    "toggle-fullscreen", "release-cursor")
-            lines = ["[virt-viewer]", "type=spice"]
-
-            tls_port = config.get("tls-port")
-            proxy_url = config.get("proxy", "")
-            if tls_port is not None and proxy_url:
-                parsed = urlparse(proxy_url)
-                lines.append(f"host={parsed.hostname}")
-                lines.append(f"tls-port={tls_port}")
-                log.info("SPICE: host=%s tls-port=%s (напрямую к ноде по TLS)",
-                         parsed.hostname, tls_port)
-            elif proxy_url:
-                parsed = urlparse(proxy_url)
-                lines.append(f"host={parsed.hostname}")
-                lines.append(f"port={parsed.port or 3128}")
-                log.info("SPICE proxy: host=%s port=%s", parsed.hostname, parsed.port or 3128)
-            else:
-                host = config.get("host")
-                if host:
-                    lines.append(f"host={host}")
-                if tls_port is not None:
-                    lines.append(f"tls-port={tls_port}")
-                elif config.get("port") is not None:
-                    lines.append(f"port={config['port']}")
-
-            for key in keys:
+            lines = ["[virt-viewer]"]
+            # host — сессионный токен pvespiceproxy:..., не hostname
+            host_raw = config.get("host", "")
+            if host_raw:
+                lines.append(f"host={host_raw}")
+            # поля в порядке, совпадающем с .vv от PVE web UI
+            for key in ("password", "proxy", "secure-attention",
+                        "tls-port", "type", "delete-this-file",
+                        "host-subject", "toggle-fullscreen", "release-cursor"):
                 val = config.get(key)
                 if val is not None:
                     lines.append(f"{key}={val}")
+            title = config.get("title")
+            if title:
+                lines.append(f"title={title}")
             ca = config.get("ca", "")
             if ca:
                 lines.append("ca=" + ca.replace("\n", "\\n"))
+            log.info("SPICE .vv: host=%s proxy=%s tls-port=%s",
+                     (host_raw[:30] + "...") if len(host_raw) > 30 else host_raw,
+                     config.get("proxy", "-"),
+                     config.get("tls-port", "-"))
 
             fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
