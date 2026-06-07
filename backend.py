@@ -414,6 +414,66 @@ class VmTaskHistoryWorker(QRunnable):
                 pass
 
 
+class VmActionSignals(QObject):
+    action_result = Signal(str)
+    action_error = Signal(str)
+
+
+class VmActionWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, vm_type, action):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.action = action
+        self.signals = VmActionSignals()
+        self.ACTION_NAMES = {
+            "start": "Запуск",
+            "shutdown": "Выключение",
+            "stop": "Принудительное выключение",
+            "reboot": "Перезагрузка",
+            "reset": "Сброс",
+        }
+
+    def run(self):
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=False,
+                timeout=10,
+            )
+            if self.vm_type == "qemu":
+                call = getattr(
+                    proxmox.nodes(self.node_name).qemu(self.vmid).status,
+                    self.action,
+                )
+            else:
+                call = getattr(
+                    proxmox.nodes(self.node_name).lxc(self.vmid).status,
+                    self.action,
+                )
+            call.post()
+            try:
+                action_name = self.ACTION_NAMES.get(
+                    self.action, self.action
+                )
+                self.signals.action_result.emit(
+                    f"VM {self.vmid}: {action_name} выполнена"
+                )
+            except RuntimeError:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self.signals.action_error.emit(str(e))
+            except RuntimeError:
+                pass
+
+
 # ----------------------------------------------------------------------
 # ClusterTasksWorker
 # ----------------------------------------------------------------------

@@ -3,7 +3,7 @@ import traceback
 from collections import defaultdict
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget, QTabWidget,
                                QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QSizePolicy, QProgressBar, QHBoxLayout, QComboBox)
+                               QSizePolicy, QProgressBar, QHBoxLayout, QComboBox, QPushButton)
 from PySide6.QtCore import Qt
 from .hover import enable_row_hover
 from .icons import get_icon
@@ -51,6 +51,35 @@ class DetailPanel(QWidget):
         self.detail_label = QLabel("Выберите объект в дереве")
         self.detail_label.setAlignment(Qt.AlignTop)
         self.detail_label.setContentsMargins(8, 2, 0, 2)
+
+        self.vm_action_bar = QWidget()
+        self.vm_action_bar.setFixedHeight(32)
+        self.vm_action_bar.setVisible(False)
+        action_layout = QHBoxLayout(self.vm_action_bar)
+        action_layout.setContentsMargins(4, 2, 4, 2)
+        action_layout.setSpacing(4)
+
+        self._vm_actions = {
+            "start": "▶ Старт",
+            "shutdown": "⏻ Выкл",
+            "reboot": "⟳ Перезагр",
+            "reset": "↺ Сброс",
+            "stop": "⏹ Стоп",
+        }
+        self._action_buttons = {}
+        for action_key, label in self._vm_actions.items():
+            btn = QPushButton(label)
+            btn.setFixedHeight(24)
+            btn.setStyleSheet(
+                "QPushButton { font-size: 11px; padding: 0 8px; border: 1px solid #d1d5db; "
+                "border-radius: 3px; background: #f9fafb; color: #374151; }"
+                "QPushButton:hover { background: #e5e7eb; }"
+                "QPushButton:disabled { color: #9ca3af; background: #f3f4f6; }"
+            )
+            btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
+            action_layout.addWidget(btn)
+            self._action_buttons[action_key] = btn
+        action_layout.addStretch()
 
         self.tabs = QTabWidget()
 
@@ -523,6 +552,7 @@ class DetailPanel(QWidget):
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.detail_label)
+        main_layout.addWidget(self.vm_action_bar)
         main_layout.addWidget(self.tabs)
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(main_layout)
@@ -543,6 +573,67 @@ class DetailPanel(QWidget):
         self.all_vms = all_vms
         self.all_storages = all_storages or []
 
+    def _on_vm_action(self, action):
+        if not self._last_vm_data:
+            return
+        vmid = self._last_vm_data.get("vmid")
+        host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        node_name = self._last_vm_data.get("node") or host_name
+        vm_type = self._last_vm_data.get("type", "qemu")
+        from ..backend import VmActionWorker
+        worker = VmActionWorker(cfg, node_name, vmid, vm_type, action)
+        for btn in self._action_buttons.values():
+            btn.setEnabled(False)
+        action_names = {
+            "start": "Запуск", "shutdown": "Выключение", "stop": "Принудительное выключение",
+            "reboot": "Перезагрузка", "reset": "Сброс"
+        }
+        self.detail_label.setText(f"ВМ/CT: {vmid} — {action_names.get(action, action)}...")
+        worker.signals.action_result.connect(lambda msg: (
+            self._on_action_finished(msg),
+            self._refresh_after_action(),
+            self._workers.discard(worker)
+        ))
+        worker.signals.action_error.connect(lambda err: (
+            self._on_action_error(err),
+            self._workers.discard(worker)
+        ))
+        self._run_worker(worker)
+
+    def _on_action_finished(self, msg):
+        for btn in self._action_buttons.values():
+            btn.setEnabled(True)
+        self.detail_label.setText(f"ВМ/CT: {self._last_vm_data.get('name', self._last_vm_data.get('vmid', ''))} — {msg}")
+
+    def _on_action_error(self, err):
+        for btn in self._action_buttons.values():
+            btn.setEnabled(True)
+        self.detail_label.setText(f"Ошибка: {err}")
+
+    def _refresh_after_action(self):
+        if not self._last_vm_data:
+            return
+        host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
+        vmid = self._last_vm_data.get("vmid")
+        vm_type = self._last_vm_data.get("type", "qemu")
+        node_name = self._last_vm_data.get("node") or host_name
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        gen = self._generation
+        self._cancel_detail_worker()
+        from ..backend import VmDetailWorker
+        worker = VmDetailWorker(cfg, node_name, vmid, vm_type)
+        worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (
+            self._on_detail_loaded(d, g, h),
+            self._workers.discard(w)
+        ))
+        self.current_worker = worker
+        self._run_worker(worker)
+
     @staticmethod
     def _compact_table(table, max_height=22):
         for r in range(table.rowCount()):
@@ -551,6 +642,19 @@ class DetailPanel(QWidget):
 
     def show_details(self, obj_type, obj_name, data):
         self.tabs.show()
+        if obj_type == "vm":
+            self.vm_action_bar.setVisible(True)
+            status = data.get("status", "") if data else ""
+            for key, btn in self._action_buttons.items():
+                btn.setEnabled(True)
+                if key == "start":
+                    btn.setEnabled(status != "running")
+                elif key in ("shutdown", "stop"):
+                    btn.setEnabled(status == "running")
+                elif key in ("reboot", "reset"):
+                    btn.setEnabled(status == "running")
+        else:
+            self.vm_action_bar.setVisible(False)
         try:
             self.current_obj_type = obj_type
             self.current_obj_name = obj_name
