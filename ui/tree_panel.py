@@ -104,10 +104,10 @@ class TreePanel(QWidget):
         btn.setFixedSize(20, 20)
         btn.setFocusPolicy(Qt.NoFocus)
         btn.setStyleSheet(
-            "QPushButton { border: 1px solid #d1d5db; border-radius: 3px; "
-            "background: transparent; font-size: 13px; font-weight: bold; "
-            "color: #6b7280; padding: 0; outline: none; }"
-            "QPushButton:hover { background: #d1d5db; color: #374151; }"
+            "QPushButton { border: 1px solid #cbd5e1; border-radius: 3px; "
+            "background: #f1f5f9; font-size: 13px; font-weight: bold; "
+            "color: #475569; padding: 0; outline: none; }"
+            "QPushButton:hover { background: #e2e8f0; border-color: #94a3b8; color: #334155; }"
         )
         btn.setToolTip(f"Добавить хост в «{label}»")
         btn.clicked.connect(lambda checked, c=ctx: self.add_server_requested_context.emit(c))
