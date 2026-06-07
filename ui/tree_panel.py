@@ -21,7 +21,7 @@ def _vm_count_str(vms):
 class TreePanel(QWidget):
     item_selected = Signal(str, str, dict)
     add_server_requested_context = Signal(str)
-    host_remove_requested = Signal(str)      # host_name
+    host_remove_requested = Signal(str, str)  # type ("host"/"cluster"/"section"), name
     host_token_refresh_requested = Signal(str)  # host_name
 
     def __init__(self, nodes_cfg):
@@ -92,28 +92,42 @@ class TreePanel(QWidget):
         if not item:
             return
         key = item.data(0, ITEM_KEY_ROLE)
-        if not key or not isinstance(key, tuple) or key[0] != "host":
+        if not key or not isinstance(key, tuple):
             return
-        node_name = key[1]
-        host = next((n for n in self.all_nodes if n.get("node") == node_name), None)
-        if not host:
-            return
-        host_name = host.get("host_name", "")
-        if not host_name:
-            return
+        item_type = key[0]
+        item_name = key[1] if len(key) > 1 else ""
+
         menu = QMenu(self.tree)
         menu.setStyleSheet(
             "QMenu { font-size: 12px; padding: 2px; }"
             "QMenu::item { padding: 4px 12px; }"
             "QMenu::item:selected { background: #e5e7eb; }"
         )
-        delete_action = QAction("Удалить хост", self.tree)
-        delete_action.triggered.connect(lambda: self.host_remove_requested.emit(host_name))
-        menu.addAction(delete_action)
-        refresh_action = QAction("Создать токен заново", self.tree)
-        refresh_action.setIcon(get_icon("refresh"))
-        refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
-        menu.addAction(refresh_action)
+
+        if item_type == "host":
+            host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+            host_name = host.get("host_name", "") if host else ""
+            if host_name:
+                delete_action = QAction("Удалить хост", self.tree)
+                delete_action.triggered.connect(lambda: self.host_remove_requested.emit("host", host_name))
+                menu.addAction(delete_action)
+                refresh_action = QAction("Создать токен заново", self.tree)
+                refresh_action.setIcon(get_icon("refresh"))
+                refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
+                menu.addAction(refresh_action)
+
+        elif item_type == "cluster":
+            delete_action = QAction("Удалить кластер", self.tree)
+            delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
+            menu.addAction(delete_action)
+
+        elif item_type == "section" and item_name in ("Кластеры", "Отдельные хосты"):
+            delete_action = QAction(f"Удалить все хосты из «{item_name}»", self.tree)
+            delete_action.triggered.connect(lambda: self.host_remove_requested.emit("section", item_name))
+            menu.addAction(delete_action)
+
+        if not menu.actions():
+            return
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
     def _make_section_item(self, parent, label):

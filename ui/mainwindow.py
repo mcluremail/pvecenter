@@ -248,15 +248,35 @@ class MainWindow(QMainWindow):
         save_config(self.nodes_cfg)
         self.refresh_data()
 
-    def _on_host_remove(self, host_name):
+    def _on_host_remove(self, item_type, item_name):
+        if item_type == "host":
+            text = f"Удалить хост «{item_name}» из конфигурации?"
+            self.nodes_cfg = [c for c in self.nodes_cfg if c.get("name") != item_name]
+        elif item_type == "cluster":
+            if not item_name:
+                return
+            count = sum(1 for c in self.nodes_cfg if c.get("cluster") == item_name)
+            text = f"Удалить кластер «{item_name}» ({count} записей) из конфигурации?"
+            self.nodes_cfg = [c for c in self.nodes_cfg if c.get("cluster") != item_name]
+        elif item_type == "section":
+            if item_name == "Кластеры":
+                count = sum(1 for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone"))
+                text = f"Удалить все {count} кластерных записей из конфигурации?"
+                self.nodes_cfg = [c for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone")]
+            elif item_name == "Отдельные хосты":
+                count = sum(1 for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone"))
+                text = f"Удалить все {count} записи отдельных хостов из конфигурации?"
+                self.nodes_cfg = [c for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone")]
+            else:
+                return
+        else:
+            return
         reply = QMessageBox.question(
-            self, "Удаление хоста",
-            f"Удалить хост «{host_name}» из конфигурации?",
+            self, "Удаление", text,
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if reply != QMessageBox.Yes:
             return
-        self.nodes_cfg = [c for c in self.nodes_cfg if c.get("name") != host_name]
         save_config(self.nodes_cfg)
         self.refresh_data()
 
