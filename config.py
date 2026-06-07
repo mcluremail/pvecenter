@@ -162,14 +162,26 @@ def load_config():
             if password is None:
                 return config
             cache_password(password)
-            from PySide6.QtWidgets import QMessageBox
             _encrypt_to_file(config, password, enc_path)
-            reply = QMessageBox.question(
-                None, "Безопасность",
-                "Токены зашифрованы в nodes.enc. Удалить nodes.json "
-                "(исходный файл с токенами в открытом виде)?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-            )
-            if reply == QMessageBox.Yes:
+            from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                           QLabel, QPushButton)
+            dlg = QDialog()
+            dlg.setWindowTitle("Безопасность")
+            dlg.setFixedSize(480, 140)
+            l = QVBoxLayout(dlg)
+            l.addWidget(QLabel("Токены зашифрованы в nodes.enc. Удалить nodes.json "
+                               "(исходный файл с токенами в открытом виде)?"))
+            l.addStretch()
+            bl = QHBoxLayout()
+            bl.addStretch()
+            yes_b = QPushButton("Да")
+            no_b = QPushButton("Нет")
+            no_b.setDefault(True)
+            bl.addWidget(yes_b)
+            bl.addWidget(no_b)
+            l.addLayout(bl)
+            yes_b.clicked.connect(dlg.accept)
+            no_b.clicked.connect(dlg.reject)
+            if dlg.exec() == QDialog.Accepted:
                 os.remove(json_path)
         return config

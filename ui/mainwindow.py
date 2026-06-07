@@ -4,7 +4,7 @@ import traceback
 import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
-                               QMessageBox, QLabel)
+                               QMessageBox, QLabel, QDialog, QPushButton)
 from PySide6.QtCore import Qt, Slot, QTimer
 
 from ..backend import FetchWorker, ClusterTasksWorker, delete_host_token
@@ -249,15 +249,27 @@ class MainWindow(QMainWindow):
         self.refresh_data()
 
     def _confirm_delete(self, text):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Удаление")
-        msg.setText(text)
-        msg.setIcon(QMessageBox.Question)
-        yes_btn = msg.addButton("Да", QMessageBox.YesRole)
-        no_btn = msg.addButton("Нет", QMessageBox.NoRole)
-        msg.setDefaultButton(no_btn)
-        msg.exec()
-        return msg.clickedButton() == yes_btn
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Удаление")
+        dlg.setFixedSize(420, 130)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(text))
+        layout.addStretch()
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        yes_btn = QPushButton("Да")
+        yes_btn.setFixedWidth(80)
+        no_btn = QPushButton("Нет")
+        no_btn.setFixedWidth(80)
+        no_btn.setDefault(True)
+        btn_layout.addWidget(yes_btn)
+        btn_layout.addWidget(no_btn)
+        layout.addLayout(btn_layout)
+        result = [False]
+        yes_btn.clicked.connect(lambda: (result.__setitem__(0, True), dlg.accept()))
+        no_btn.clicked.connect(dlg.reject)
+        dlg.exec()
+        return result[0]
 
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":
