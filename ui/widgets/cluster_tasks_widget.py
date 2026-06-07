@@ -198,7 +198,7 @@ class ClusterTasksWidget(QWidget):
             vm_name = task.get('_vm_name', '')
             label = TASK_TYPE_LABELS.get(task_type, task_type)
             if vmid and vm_name:
-                desc = f"{label} {vmid} ({vm_name})"
+                desc = f"{label} {vm_name} ({vmid})"
             elif vmid:
                 desc = f"{label} {vmid}"
             else:
