@@ -560,10 +560,26 @@ class VmConsoleWorker(QRunnable):
             return
 
         try:
-            keys = ("host", "port", "tls-port", "password", "subject",
-                    "cipher", "secure-attention", "delete-this-file",
-                    "full-screen", "title")
+            from urllib.parse import urlparse
+            keys = ("password", "subject", "cipher", "secure-attention",
+                    "delete-this-file", "full-screen", "title")
             lines = ["[virt-viewer]", "type=spice"]
+
+            proxy_url = config.get("proxy", "")
+            if proxy_url:
+                parsed = urlparse(proxy_url)
+                lines.append(f"host={parsed.hostname}")
+                lines.append(f"port={parsed.port or 3128}")
+            else:
+                host = config.get("host")
+                if host:
+                    lines.append(f"host={host}")
+                tls_port = config.get("tls-port")
+                if tls_port is not None:
+                    lines.append(f"port={tls_port}")
+                elif config.get("port") is not None:
+                    lines.append(f"port={config['port']}")
+
             for key in keys:
                 val = config.get(key)
                 if val is not None:
