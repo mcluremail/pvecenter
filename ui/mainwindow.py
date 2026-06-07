@@ -554,10 +554,6 @@ class MainWindow(QMainWindow):
 
     def _on_cluster_tasks_loaded(self, tasks):
         try:
-            if tasks:
-                sample = tasks[0]
-                logger.info("Sample cluster task keys=%s vmid=%r upid=%r",
-                            list(sample.keys()), sample.get("vmid"), sample.get("upid"))
             node_map = {}
             for n in self.all_nodes:
                 node_map[n.get("node")] = n.get("_display_name") or n.get("node")
