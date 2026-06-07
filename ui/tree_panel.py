@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
-                               QWidget, QAbstractItemView, QPushButton, QMenu)
+                               QWidget, QAbstractItemView, QPushButton, QMenu, QToolButton)
 from PySide6.QtCore import Signal, QSettings, Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
@@ -63,10 +63,11 @@ class TreePanel(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(4, 2, 4, 0)
         init_icons()
-        self._toggle_btn = QPushButton()
+        self._toggle_btn = QToolButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
         self._toggle_btn.setToolTip("Развернуть всё")
+        self._toggle_btn.setAutoRaise(True)
         self._toggled = False
         self._toggle_btn.clicked.connect(self._toggle_expand)
         btn_layout.addStretch()
