@@ -207,20 +207,19 @@ class TreePanel(QWidget):
             else:
                 standalone.append(name)
 
-        if hosts_by_cluster:
-            folder = self._make_section_item(self.tree, "Кластеры")
-            for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
-                cl_item = QTreeWidgetItem(folder)
-                cl_item.setText(0, cl_name)
-                cl_item.setIcon(0, _make_loading_icon(0))
-                cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
-                cl_item.setExpanded(True)
-                self._loading_hosts.add(f"cluster:{cl_name}")
+        folder = self._make_section_item(self.tree, "Кластеры")
+        for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
+            cl_item = QTreeWidgetItem(folder)
+            cl_item.setText(0, cl_name)
+            cl_item.setIcon(0, _make_loading_icon(0))
+            cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
+            cl_item.setExpanded(True)
+            self._loading_hosts.add(f"cluster:{cl_name}")
 
+        folder_standalone = self._make_section_item(self.tree, "Отдельные хосты")
         if standalone:
-            folder = self._make_section_item(self.tree, "Отдельные хосты")
             for hname in sorted(standalone, key=str.lower):
-                hi = QTreeWidgetItem(folder)
+                hi = QTreeWidgetItem(folder_standalone)
                 hi.setText(0, hname)
                 hi.setIcon(0, _make_loading_icon(0))
                 hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
@@ -296,9 +295,10 @@ class TreePanel(QWidget):
             else:
                 standalone_nodes.append(node)
 
-        if cluster_nodes:
-            cluster_folder = self._make_section_item(self.tree, "Кластеры")
+        cluster_folder = self._make_section_item(self.tree, "Кластеры")
+        standalone_folder = self._make_section_item(self.tree, "Отдельные хосты")
 
+        if cluster_nodes:
             for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(cluster_folder)
                 vms_in_cl = [vm for vm in self.all_vms
@@ -355,8 +355,6 @@ class TreePanel(QWidget):
                     self._add_vm_item(cl_item, vm)
 
         if standalone_nodes:
-            st_folder = self._make_section_item(self.tree, "Отдельные хосты")
-
             for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
                 node_name = node.get("node", "?")
                 display_name = node.get("_display_name") or node_name
@@ -364,7 +362,7 @@ class TreePanel(QWidget):
                 vms_on_host = [vm for vm in self.all_vms
                                if vm.get("node") == node_name
                                and vm.get("host_name") == host_name]
-                host_item = QTreeWidgetItem(st_folder)
+                host_item = QTreeWidgetItem(standalone_folder)
                 host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
                 host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
