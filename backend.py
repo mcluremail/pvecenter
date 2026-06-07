@@ -616,16 +616,15 @@ class VmConsoleWorker(QRunnable):
 # VNC browser console (noVNC)
 # ----------------------------------------------------------------------
 def open_browser_console(host, node, vmid, vmname=""):
-    """Открывает noVNC консоль ВМ в браузере через PVE web UI.
+    """Открывает консоль ВМ в браузере через PVE web UI.
 
-    Пользователь должен быть авторизован в PVE web UI в браузере.
+    Если пользователь не авторизован в PVE web UI — покажет страницу логина,
+    после входа откроется консоль ВМ.
     """
     import subprocess, logging
     log = logging.getLogger(__name__)
-    params = f"console=kvm&novnc=1&vmid={vmid}&node={node}&resize=off&cmd="
-    if vmname:
-        params += f"&vmname={vmname}"
-    url = f"https://{host}:8006/?{params}"
+    # hash-формат PVE web UI: редиректит на логин при необходимости
+    url = f"https://{host}:8006/#v1:z0:vnc:{node}:{vmid}"
     log.info("noVNC: %s", url)
     try:
         subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
