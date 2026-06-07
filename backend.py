@@ -620,11 +620,16 @@ def open_browser_console(host, node, vmid, vmname=""):
 
     Пользователь должен быть авторизован в PVE web UI в браузере.
     """
-    import webbrowser, logging
+    import subprocess, logging
     log = logging.getLogger(__name__)
     params = f"console=kvm&novnc=1&vmid={vmid}&node={node}&resize=off&cmd="
     if vmname:
         params += f"&vmname={vmname}"
     url = f"https://{host}:8006/?{params}"
     log.info("noVNC: %s", url)
-    webbrowser.open(url)
+    try:
+        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        log.warning("xdg-open not found, trying webbrowser")
+        import webbrowser
+        webbrowser.open(url)
