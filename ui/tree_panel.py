@@ -105,8 +105,10 @@ class TreePanel(QWidget):
         )
 
         if item_type == "host":
-            host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
-            host_name = host.get("host_name", "") if host else ""
+            host_name = key[2] if len(key) > 2 else ""
+            if not host_name:
+                host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+                host_name = host.get("host_name", "") if host else ""
             if host_name:
                 delete_action = QAction("Удалить хост", self.tree)
                 delete_action.triggered.connect(lambda: self.host_remove_requested.emit("host", host_name))
@@ -314,7 +316,7 @@ class TreePanel(QWidget):
                     host_item = QTreeWidgetItem(cl_item)
                     host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
                     host_item.setIcon(0, get_icon("host", node.get("status")))
-                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
+                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.get("host_name", "")))
                     cpu = node.get("cpu", 0)
                     if isinstance(cpu, float):
                         cpu = round(cpu * 100, 1)
@@ -365,7 +367,7 @@ class TreePanel(QWidget):
                 host_item = QTreeWidgetItem(st_folder)
                 host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
-                host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name))
+                host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
                 host_item.setExpanded(True)
                 cpu = node.get("cpu", 0)
                 if isinstance(cpu, float):
@@ -473,8 +475,11 @@ class TreePanel(QWidget):
 
                 key = child.data(0, ITEM_KEY_ROLE)
                 if key and isinstance(key, tuple) and key[0] == "host":
-                    host_name = key[1]
-                    host = next((n for n in all_nodes if n.get("node") == host_name or n.get("host_name") == host_name), None)
+                    hn = key[2] if len(key) > 2 else None
+                    if hn:
+                        host = next((n for n in all_nodes if n.get("host_name") == hn), None)
+                    else:
+                        host = next((n for n in all_nodes if n.get("node") == key[1] or n.get("host_name") == key[1]), None)
                     if host:
                         child.setIcon(0, get_icon("host", host.get("status")))
                     traverse(child)
@@ -591,7 +596,12 @@ class TreePanel(QWidget):
             return
 
         if item_type == "host":
-            host_data = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+            host_name_key = key[2] if len(key) > 2 else None
+            if host_name_key:
+                host_data = next((n for n in self.all_nodes
+                                  if n.get("host_name") == host_name_key), None)
+            else:
+                host_data = next((n for n in self.all_nodes if n.get("node") == item_name), None)
             self.item_selected.emit("host", item_name, host_data or {})
             return
 
