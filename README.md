@@ -4,6 +4,16 @@
 
 Мониторинг кластеров и хостов, управление виртуальными машинами и контейнерами, лента задач — всё в одном окне без браузера.
 
+## Скачать
+
+| Платформа | Формат | Ссылка |
+|-----------|--------|--------|
+| Linux (любой) | pip | `pip install pvecenter` |
+| Debian / Ubuntu | .deb | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Любой | Исходники | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
+
+Последний релиз: [v0.1.1](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.1)
+
 ## Возможности
 
 **Мониторинг**
@@ -64,13 +74,11 @@ pip install PySide6 proxmoxer requests pyqtgraph cryptography
 
 ### .deb пакет (Debian / Ubuntu)
 
-Сборка из исходников:
+Скачайте `.deb` из [GitHub Releases](https://github.com/mcluremail/pvecenter/releases):
 
 ```bash
-sudo apt install devscripts debhelper dh-python python3-all python3-setuptools
-cd pvecenter
-dpkg-buildpackage -b
-sudo dpkg -i ../pve-center_0.1.0-1_all.deb
+# скачать .deb с релизной страницы
+sudo dpkg -i pve-center_*.deb
 # доставить proxmoxer (нет в репозиториях)
 pip install proxmoxer
 # установить virt-viewer (если нужна SPICE консоль)
@@ -78,6 +86,15 @@ sudo apt install virt-viewer
 ```
 
 После установки `.deb` — запуск через меню или командой `pvecenter`.
+
+Сборка из исходников (если нужна своя версия):
+
+```bash
+sudo apt install devscripts debhelper dh-python python3-all python3-setuptools
+cd pvecenter
+dpkg-buildpackage -b
+sudo dpkg -i ../pve-center_*.deb
+```
 
 ### virt-viewer (для SPICE консоли)
 
