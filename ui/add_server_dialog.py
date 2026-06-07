@@ -164,6 +164,7 @@ class AddServerDialog(QDialog):
             "user": self._token_data["user"],
             "token_name": self._token_data["token_name"],
             "token_value": self._token_data["token_value"],
+            "_managed_user": True,
         }
 
         if self.cluster_rep_cb.isChecked():

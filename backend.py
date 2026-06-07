@@ -398,7 +398,7 @@ def delete_host_token(host_cfg):
         token_id = host_cfg["token_name"]
         proxmox.access.users(userid).token(token_id).delete()
         logger.info("Token %s deleted from %s", token_id, host_cfg["host"])
-        if userid == "pvecenter@pve":
+        if host_cfg.get("_managed_user") and userid == "pvecenter@pve":
             remaining = proxmox.access.users(userid).token.get()
             if not remaining:
                 proxmox.access.users(userid).delete()
