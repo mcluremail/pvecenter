@@ -359,6 +359,14 @@ class MainWindow(QMainWindow):
             )
             self._run_worker(worker)
 
+        if not active_cfgs:
+            self.all_nodes.clear()
+            self.all_vms.clear()
+            self.all_storages.clear()
+            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
+            self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+            self._update_status_bar()
+
     @Slot(dict)
     def on_worker_finished(self, data, worker=None):
         self._workers.discard(worker)
@@ -459,6 +467,9 @@ class MainWindow(QMainWindow):
         self._soft_had_errors = False
 
         active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
+        if not active_cfgs:
+            self._soft_refresh_running = False
+            return
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(
