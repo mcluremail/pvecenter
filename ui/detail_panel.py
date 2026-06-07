@@ -702,7 +702,7 @@ class DetailPanel(QWidget):
         from PySide6.QtWebEngineWidgets import QWebEngineView
 
         host = cfg["host"]
-        url = f"https://{host}:8006/#v1:z0:vnc:{node_name}:{vmid}"
+        url = f"https://{host}:8006/#v1:z0:vnc/{node_name}/{vmid}"
 
         dialog = QDialog(self)
         dialog.setWindowTitle(f"ВМ {vmid} ({vmname}) — {host}")
