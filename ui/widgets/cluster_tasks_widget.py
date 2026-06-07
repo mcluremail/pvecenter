@@ -83,6 +83,20 @@ TASK_TYPE_LABELS = {
 
 TIMESTAMP_FMT = "%d.%m.%y %H:%M"
 
+
+def _vmid_from_upid(upid):
+    if not upid or not upid.startswith("UPID:"):
+        return ""
+    parts = upid.split(":")
+    if len(parts) < 8:
+        return ""
+    ext = parts[7]
+    if ext.isdigit():
+        return ext
+    m = __import__("re").search(r"(\d{3,})", ext)
+    return m.group(1) if m else ""
+
+
 class NumericTableItem(QTableWidgetItem):
     def __lt__(self, other):
         if not isinstance(other, QTableWidgetItem):
@@ -179,6 +193,8 @@ class ClusterTasksWidget(QWidget):
 
             task_type = task.get('type', '')
             vmid = task.get('vmid') or ''
+            if not vmid:
+                vmid = _vmid_from_upid(task.get('upid', ''))
             vm_name = task.get('_vm_name', '')
             label = TASK_TYPE_LABELS.get(task_type, task_type)
             if vmid and vm_name:
