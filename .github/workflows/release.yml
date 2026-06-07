@@ -46,9 +46,45 @@ jobs:
           name: deb-package
           path: artifacts/*.deb
 
+  build-rpm:
+    name: Build .rpm package
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          dnf install -y -q rpm-build python3-devel python3-setuptools \
+            python3-pyside6 python3-requests python3-pyqtgraph python3-cryptography
+      - name: Build .rpm
+        run: |
+          mkdir -p /tmp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          version="${GITHUB_REF_NAME#v}"
+          sed -i "s/Version:.*/Version: ${version}/" pve-center.spec
+          # create source tarball from checkout
+          tar czf /tmp/rpmbuild/SOURCES/pvecenter-${version}.tar.gz \
+            --transform="s,^,pvecenter-${version}/," \
+            --exclude=.git \
+            --exclude=venv \
+            --exclude=__pycache__ \
+            --exclude='*.pyc' \
+            --exclude='nodes.*' \
+            .
+          cp pve-center.spec /tmp/rpmbuild/SPECS/
+          rpmbuild -bb --define "_topdir /tmp/rpmbuild" /tmp/rpmbuild/SPECS/pve-center.spec
+      - name: Copy .rpm
+        run: |
+          mkdir -p artifacts
+          cp /tmp/rpmbuild/RPMS/noarch/*.rpm artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: artifacts/*.rpm
+
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-deb]
+    needs: [build-python, build-deb, build-rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -69,13 +105,20 @@ jobs:
           body: |
             ## PVE Center ${{ github.ref_name }}
 
-            Скачать: `.deb` для Debian/Ubuntu, `.tar.gz` / `.whl` для pip.
+            Скачать: `.deb` для Debian/Ubuntu, `.rpm` для Fedora/RHEL, `.tar.gz` / `.whl` для pip.
 
             Установка .deb:
             ```
             sudo dpkg -i pve-center_*.deb
             pip install proxmoxer
             sudo apt install virt-viewer
+            ```
+
+            Установка .rpm:
+            ```
+            sudo dnf install pve-center-*.rpm
+            pip install proxmoxer
+            sudo dnf install virt-viewer
             ```
 
             Установка через pip:
