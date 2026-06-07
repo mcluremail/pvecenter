@@ -544,9 +544,8 @@ class VmConsoleWorker(QRunnable):
                 timeout=10
             )
             config = proxmox.nodes(self.node_name).qemu(self.vmid).spiceproxy.post()
-            log.info("SPICE config for VM %s: host=%s port=%s tls-port=%s proxy=%s",
-                     self.vmid, config.get("host"), config.get("port"),
-                     config.get("tls-port"), config.get("proxy"))
+            log.info("SPICE config for VM %s: %s", self.vmid, dict(config))
+            log.info("SPICE config keys=%s", list(config.keys()))
         except Exception as e:
             msg = str(e).lower()
             if "not supported" in msg or "spice" in msg:
@@ -591,7 +590,7 @@ class VmConsoleWorker(QRunnable):
             fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
-            log.info("vv файл записан: %s (%d строк)", path, len(lines))
+            log.info("vv файл: %s (%d строк)", path, len(lines))
         except Exception as e:
             try:
                 self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
