@@ -512,3 +512,88 @@ class ClusterTasksWorker(QRunnable):
             self.signals.tasks_ready.emit(merged)
         except RuntimeError:
             pass
+
+
+# ----------------------------------------------------------------------
+# VmConsoleWorker
+# ----------------------------------------------------------------------
+class VmConsoleSignals(QObject):
+    console_ready = Signal(str)
+    console_error = Signal(str)
+
+
+class VmConsoleWorker(QRunnable):
+    """Запрашивает SPICE proxy у PVE, пишет .vv файл и запускает remote-viewer."""
+    def __init__(self, host_cfg, node_name, vmid):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.signals = VmConsoleSignals()
+
+    def run(self):
+        import os, tempfile, subprocess, json
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=False,
+                timeout=10
+            )
+            config = proxmox.nodes(self.node_name).qemu(self.vmid).spiceproxy.post()
+        except Exception as e:
+            msg = str(e).lower()
+            if "not supported" in msg or "spice" in msg:
+                err = "SPICE не поддерживается для этой ВМ"
+            else:
+                err = f"Ошибка SPICE proxy: {e}"
+            try:
+                self.signals.console_error.emit(err)
+            except RuntimeError:
+                pass
+            return
+
+        try:
+            lines = ["[virt-viewer]"]
+            lines.append("type=spice")
+            for key in ("host", "port", "tls-port", "password", "subject",
+                        "cipher", "secure-attention", "delete-this-file",
+                        "full-screen", "title", "proxy"):
+                val = config.get(key)
+                if val is not None:
+                    lines.append(f"{key}={val}")
+            ca = config.get("ca", "")
+            if ca:
+                lines.append("ca=" + ca.replace("\n", "\\n"))
+
+            fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+        except Exception as e:
+            try:
+                self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
+            except RuntimeError:
+                pass
+            return
+
+        try:
+            subprocess.Popen(
+                ["remote-viewer", path],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except FileNotFoundError:
+            try:
+                self.signals.console_error.emit(
+                    "remote-viewer не найден. Установите пакет virt-viewer:\n"
+                    "  apt install virt-viewer"
+                )
+            except RuntimeError:
+                pass
+            return
+
+        try:
+            self.signals.console_ready.emit("🖥 SPICE консоль запущена")
+        except RuntimeError:
+            pass

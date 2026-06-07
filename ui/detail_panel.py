@@ -81,6 +81,18 @@ class DetailPanel(QWidget):
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
 
+        action_layout.addSpacing(12)
+        self._console_btn = QPushButton("🖥 Консоль")
+        self._console_btn.setFixedHeight(24)
+        self._console_btn.setStyleSheet(
+            "QPushButton { font-size: 11px; padding: 0 10px; border: 1px solid #2563eb; "
+            "border-radius: 3px; background: #eff6ff; color: #1d4ed8; font-weight: 600; }"
+            "QPushButton:hover { background: #dbeafe; }"
+            "QPushButton:disabled { color: #9ca3af; background: #f3f4f6; border-color: #d1d5db; }"
+        )
+        self._console_btn.clicked.connect(self._on_vm_console)
+        action_layout.addWidget(self._console_btn)
+
         self.tabs = QTabWidget()
 
         # --- Вкладка 0: Мониторинг ---
@@ -637,6 +649,35 @@ class DetailPanel(QWidget):
             btn.setEnabled(True)
         self.detail_label.setText(self._parse_pve_error(err))
 
+    def _on_vm_console(self):
+        if not self._last_vm_data:
+            return
+        vm_type = self._last_vm_data.get("type", "qemu")
+        if vm_type != "qemu":
+            self.detail_label.setText("SPICE консоль доступна только для QEMU ВМ")
+            return
+        vmid = self._last_vm_data.get("vmid")
+        host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        node_name = self._last_vm_data.get("node") or host_name
+        self._console_btn.setEnabled(False)
+        self.detail_label.setText(f"ВМ {vmid}: открытие SPICE консоли...")
+        from ..backend import VmConsoleWorker
+        worker = VmConsoleWorker(cfg, node_name, vmid)
+        worker.signals.console_ready.connect(lambda msg: (
+            self.detail_label.setText(msg),
+            self._console_btn.setEnabled(True),
+            self._workers.discard(worker)
+        ))
+        worker.signals.console_error.connect(lambda err: (
+            self.detail_label.setText(err),
+            self._console_btn.setEnabled(True),
+            self._workers.discard(worker)
+        ))
+        self._run_worker(worker)
+
     def _refresh_after_action(self):
         if not self._last_vm_data:
             return
@@ -677,6 +718,10 @@ class DetailPanel(QWidget):
                     btn.setEnabled(status == "running")
                 elif key in ("reboot", "reset"):
                     btn.setEnabled(status == "running")
+            vm_type = data.get("type", "qemu") if data else "qemu"
+            self._console_btn.setEnabled(
+                vm_type == "qemu" and status == "running"
+            )
         else:
             self.vm_action_bar.setVisible(False)
         try:
