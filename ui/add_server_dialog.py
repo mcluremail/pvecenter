@@ -39,7 +39,7 @@ class AddServerDialog(QDialog):
         self.pwd_input.setPlaceholderText("••••••••")
         conn_grid.addWidget(self.pwd_input, 2, 1)
 
-        info_label = QLabel("Будет создан пользователь pvecenter@pve с ролью Administrator на /")
+        info_label = QLabel("Будет создан API-токен для указанного пользователя")
         info_label.setStyleSheet("color: #6b7280; font-size: 11px;")
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
@@ -164,7 +164,6 @@ class AddServerDialog(QDialog):
             "user": self._token_data["user"],
             "token_name": self._token_data["token_name"],
             "token_value": self._token_data["token_value"],
-            "_managed_user": True,
         }
 
         if self.cluster_rep_cb.isChecked():

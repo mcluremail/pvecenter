@@ -29,15 +29,13 @@ def _pve_ticket_auth(host, user, password):
 
 
 def create_admin_token(host, user, password):
-    """Создаёт локального PVE-юзера `pvecenter@pve` с ролью Administrator
-    на `/` и генерирует API-токен для него.
-
-    Использует прямые HTTP-запросы (без Proxmoxer), чтобы избежать
-    проблем с маппингом HTTP-методов.
+    """Создаёт API-токен для указанного пользователя PVE.
+    Токен создаётся от имени самого пользователя — аудит в PVE показывает
+    реального оператора, а права соответствуют его ролям.
 
     Аргументы:
         host: адрес PVE-хоста
-        user: существующий пользователь с правами на создание пользователей/ACL
+        user: существующий пользователь PVE (root@pam, user@ipa, ...)
         password: его пароль
 
     Возвращает dict с полями token_name, token_value, user
@@ -47,72 +45,34 @@ def create_admin_token(host, user, password):
     import secrets as sec
     import string as str_mod
 
-    service_user = "pvecenter@pve"
-
     try:
         ticket_data = _pve_ticket_auth(host, user, password)
         ticket = ticket_data["ticket"]
         csrf = ticket_data["csrf"]
-        cookie_token = f"PVEAuthCookie={ticket}"
         sess = rq.Session()
         sess.verify = False
-        sess.headers.update({"Cookie": cookie_token, "CSRFPreventionToken": csrf})
-
-        users = sess.get(
-            f"https://{host}:{PVE_PORT}/api2/json/access/users",
-            timeout=15
-        ).json().get("data", [])
-        existing = {u.get("userid") for u in users}
-
-        if service_user not in existing:
-            pwd = "".join(sec.choice(str_mod.ascii_letters + str_mod.digits) for _ in range(24))
-            r = sess.post(
-                f"https://{host}:{PVE_PORT}/api2/json/access/users",
-                data={"userid": service_user, "password": pwd,
-                       "comment": "PVE Center service user (auto-created)", "enable": 1},
-                timeout=15,
-            )
-            if r.status_code >= 400:
-                logger.warning("create_user HTTP %s: %s", r.status_code, r.text[:200])
-
-        acls = sess.get(
-            f"https://{host}:{PVE_PORT}/api2/json/access/acl",
-            timeout=15
-        ).json().get("data", [])
-        has_admin_acl = any(
-            a.get("path") == "/"
-            and service_user in (a.get("users") or a.get("ugid") or "")
-            for a in acls
-        )
-
-        if not has_admin_acl:
-            r = sess.put(
-                f"https://{host}:{PVE_PORT}/api2/json/access/acl",
-                data={"path": "/", "roles": "Administrator", "users": service_user},
-                timeout=15,
-            )
-            if r.status_code >= 400:
-                logger.warning("acl_put HTTP %s: %s", r.status_code, r.text[:200])
-            else:
-                logger.info("acl_put OK — Administrator granted to %s on /", service_user)
+        sess.headers.update({
+            "Cookie": f"PVEAuthCookie={ticket}",
+            "CSRFPreventionToken": csrf,
+        })
 
         token_id = "pvecenter-" + "".join(
             sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
         )
         for method in ("post", "put"):
             r = getattr(sess, method)(
-                f"https://{host}:{PVE_PORT}/api2/json/access/users/{service_user}/token/{token_id}",
+                f"https://{host}:{PVE_PORT}/api2/json/access/users/{user}/token/{token_id}",
                 data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
                 timeout=15,
             )
-            logger.info("token_create %s HTTP %s", method.upper(), r.status_code)
+            logger.info("token_create %s %s HTTP %s", method, token_id, r.status_code)
             if r.status_code < 400:
                 break
         if r.status_code >= 400:
             logger.error("token_create error: %s", r.text[:300])
             return {"error": f"Ошибка создания токена: {r.status_code}"}
+
         data = r.json().get("data", r.json())
-        logger.info("token_create response data: %s", data)
         token_value = ""
         if isinstance(data, dict) and "value" in data:
             token_value = data["value"]
@@ -122,26 +82,20 @@ def create_admin_token(host, user, password):
         if not token_value:
             return {"error": "Пустое значение токена в ответе сервера"}
 
-        auth_header = f"PVEAPIToken={service_user}!{token_id}={token_value}"
-
-        # Верификация: пробуем получить список нод этим токеном
+        auth_header = f"PVEAPIToken={user}!{token_id}={token_value}"
         try:
             vr = rq.get(
                 f"https://{host}:{PVE_PORT}/api2/json/cluster/resources",
                 headers={"Authorization": auth_header},
                 verify=False, timeout=10,
             )
-            logger.info("verify /cluster/resources HTTP %s", vr.status_code)
-            if vr.status_code == 200:
-                logger.info("verify OK — token works")
-            else:
+            if vr.status_code != 200:
                 logger.warning("verify FAILED: %s", vr.text[:200])
                 return {"error": f"Токен создан, но не работает: {vr.status_code}"}
         except Exception as ve:
             logger.warning("verify exception: %s", ve)
 
-        return {"token_name": token_id, "token_value": token_value,
-                "user": service_user}
+        return {"token_name": token_id, "token_value": token_value, "user": user}
 
     except Exception as e:
         msg = str(e)
@@ -385,6 +339,8 @@ class VmTaskHistorySignals(QObject):
 # Удаление токена с сервера
 # ----------------------------------------------------------------------
 def delete_host_token(host_cfg):
+    """Удаляет API-токен с PVE-сервера через Proxmoxer.
+       Не выбрасывает исключения — ошибки только в лог."""
     try:
         proxmox = ProxmoxAPI(
             host_cfg["host"],
@@ -397,12 +353,7 @@ def delete_host_token(host_cfg):
         userid = host_cfg["user"]
         token_id = host_cfg["token_name"]
         proxmox.access.users(userid).token(token_id).delete()
-        logger.info("Token %s deleted from %s", token_id, host_cfg["host"])
-        if host_cfg.get("_managed_user") and userid == "pvecenter@pve":
-            remaining = proxmox.access.users(userid).token.get()
-            if not remaining:
-                proxmox.access.users(userid).delete()
-                logger.info("User %s deleted from %s (no tokens left)", userid, host_cfg["host"])
+        logger.info("Token %s for user %s deleted from %s", token_id, userid, host_cfg["host"])
     except Exception as e:
         logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
 
