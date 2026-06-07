@@ -416,6 +416,7 @@ class MainWindow(QMainWindow):
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
+            QTimer.singleShot(0, self.refresh_cluster_tasks)
 
     def _detect_status_changes(self):
         for node in self.all_nodes:
