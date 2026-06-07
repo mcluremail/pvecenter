@@ -385,8 +385,6 @@ class VmTaskHistorySignals(QObject):
 # Удаление токена с сервера
 # ----------------------------------------------------------------------
 def delete_host_token(host_cfg):
-    """Удаляет API-токен pvecenter@pve с PVE-сервера через Proxmoxer.
-       Не выбрасывает исключения — ошибки только в лог."""
     try:
         proxmox = ProxmoxAPI(
             host_cfg["host"],
@@ -396,9 +394,15 @@ def delete_host_token(host_cfg):
             verify_ssl=False,
             timeout=10,
         )
+        userid = host_cfg["user"]
         token_id = host_cfg["token_name"]
-        proxmox.access.users(host_cfg["user"]).token(token_id).delete()
+        proxmox.access.users(userid).token(token_id).delete()
         logger.info("Token %s deleted from %s", token_id, host_cfg["host"])
+        if userid == "pvecenter@pve":
+            remaining = proxmox.access.users(userid).token.get()
+            if not remaining:
+                proxmox.access.users(userid).delete()
+                logger.info("User %s deleted from %s (no tokens left)", userid, host_cfg["host"])
     except Exception as e:
         logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
 
