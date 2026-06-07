@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=pve-center
+export PYBUILD_SYSTEM=setuptools
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_test:
+	# tests not yet available
+
+override_dh_install:
+	dh_install
+	# install desktop file
+	install -D -m 644 debian/pve-center.desktop \
+		$(CURDIR)/debian/pve-center/usr/share/applications/pve-center.desktop

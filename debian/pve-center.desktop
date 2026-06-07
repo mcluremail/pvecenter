@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PVE Center
+Comment=Панель управления Proxmox VE
+Exec=pvecenter
+Icon=pve-center
+Categories=System;Administration;Monitorization;
+Terminal=false

@@ -1,0 +1,28 @@
+Source: pve-center
+Section: admin
+Priority: optional
+Maintainer: Taurus McLure <taurus@mclure.ru>
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-setuptools
+Standards-Version: 4.6.2
+Homepage: https://github.com/mcluremail/pvecenter
+Vcs-Git: https://github.com/mcluremail/pvecenter.git
+Vcs-Browser: https://github.com/mcluremail/pvecenter
+Rules-Requires-Root: no
+
+Package: pve-center
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends},
+         python3-pyside6,
+         python3-requests,
+         python3-pyqtgraph,
+         python3-cryptography,
+Recommends: virt-viewer
+Description: Десктопная панель управления Proxmox VE
+ PVE Center — десктопный инструмент для мониторинга и управления
+ кластерами Proxmox VE. Работает через официальный API PVE.
+ .
+ Возможности:
+  * Мониторинг: статус нод, ВМ/контейнеров, ЦП, память, диски, сеть
+  * Управление: power actions, SPICE консоль
+  * Аудит: лента задач с читаемыми описаниями
+  * Безопасность: user-bound API-токены, шифрование конфига
