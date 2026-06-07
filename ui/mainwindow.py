@@ -248,6 +248,17 @@ class MainWindow(QMainWindow):
         save_config(self.nodes_cfg)
         self.refresh_data()
 
+    def _confirm_delete(self, text):
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Удаление")
+        msg.setText(text)
+        msg.setIcon(QMessageBox.Question)
+        yes_btn = msg.addButton("Да", QMessageBox.YesRole)
+        no_btn = msg.addButton("Нет", QMessageBox.NoRole)
+        msg.setDefaultButton(no_btn)
+        msg.exec()
+        return msg.clickedButton() == yes_btn
+
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":
             text = f"Удалить хост «{item_name}» из конфигурации?"
@@ -269,11 +280,7 @@ class MainWindow(QMainWindow):
                 return
         else:
             return
-        reply = QMessageBox.question(
-            self, "Удаление", text,
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-        if reply != QMessageBox.Yes:
+        if not self._confirm_delete(text):
             return
         for cfg in matched:
             delete_host_token(cfg)
