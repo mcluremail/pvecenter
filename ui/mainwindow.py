@@ -538,14 +538,19 @@ class MainWindow(QMainWindow):
                 node_map[n.get("node")] = n.get("_display_name") or n.get("node")
             vm_map = {}
             for vm in self.all_vms:
-                vm_map[vm.get("vmid")] = vm.get("name")
+                vm_vmid = vm.get("vmid")
+                if vm_vmid is not None:
+                    vm_map[int(vm_vmid)] = vm.get("name")
             for task in tasks:
                 node = task.get("node", "")
                 if node in node_map:
                     task["_display_name"] = node_map[node]
                 vmid = task.get("vmid")
-                if vmid is not None and vmid in vm_map:
-                    task["_vm_name"] = vm_map[vmid]
+                if vmid is not None:
+                    try:
+                        task["_vm_name"] = vm_map.get(int(vmid), "")
+                    except (ValueError, TypeError):
+                        pass
         except Exception as e:
             logger.error("Ошибка при обогащении задач: %s", e)
         try:
