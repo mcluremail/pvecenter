@@ -66,6 +66,7 @@ class DetailPanel(QWidget):
             "reset": "↺ Сброс",
             "stop": "⏹ Стоп",
         }
+        action_layout.addStretch()
         self._action_buttons = {}
         for action_key, label in self._vm_actions.items():
             btn = QPushButton(label)
@@ -79,7 +80,6 @@ class DetailPanel(QWidget):
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
-        action_layout.addStretch()
 
         self.tabs = QTabWidget()
 
