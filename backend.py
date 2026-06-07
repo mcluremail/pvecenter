@@ -544,8 +544,6 @@ class VmConsoleWorker(QRunnable):
                 timeout=10
             )
             config = proxmox.nodes(self.node_name).qemu(self.vmid).spiceproxy.post()
-            log.info("SPICE config for VM %s: %s", self.vmid, dict(config))
-            log.info("SPICE config keys=%s", list(config.keys()))
         except Exception as e:
             msg = str(e).lower()
             if "not supported" in msg or "spice" in msg:
@@ -560,11 +558,9 @@ class VmConsoleWorker(QRunnable):
 
         try:
             lines = ["[virt-viewer]"]
-            # host — сессионный токен pvespiceproxy:..., не hostname
             host_raw = config.get("host", "")
             if host_raw:
                 lines.append(f"host={host_raw}")
-            # поля в порядке, совпадающем с .vv от PVE web UI
             for key in ("password", "proxy", "secure-attention",
                         "tls-port", "type", "delete-this-file",
                         "host-subject", "toggle-fullscreen", "release-cursor"):
@@ -577,15 +573,10 @@ class VmConsoleWorker(QRunnable):
             ca = config.get("ca", "")
             if ca:
                 lines.append("ca=" + ca.replace("\n", "\\n"))
-            log.info("SPICE .vv: host=%s proxy=%s tls-port=%s",
-                     (host_raw[:30] + "...") if len(host_raw) > 30 else host_raw,
-                     config.get("proxy", "-"),
-                     config.get("tls-port", "-"))
 
             fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
-            log.info("vv файл: %s (%d строк)", path, len(lines))
         except Exception as e:
             try:
                 self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
