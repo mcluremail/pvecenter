@@ -532,7 +532,8 @@ class VmConsoleWorker(QRunnable):
         self.signals = VmConsoleSignals()
 
     def run(self):
-        import os, tempfile, subprocess, json
+        import os, tempfile, subprocess
+        log = logging.getLogger(__name__)
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -543,6 +544,9 @@ class VmConsoleWorker(QRunnable):
                 timeout=10
             )
             config = proxmox.nodes(self.node_name).qemu(self.vmid).spiceproxy.post()
+            log.info("SPICE config for VM %s: host=%s port=%s tls-port=%s proxy=%s",
+                     self.vmid, config.get("host"), config.get("port"),
+                     config.get("tls-port"), config.get("proxy"))
         except Exception as e:
             msg = str(e).lower()
             if "not supported" in msg or "spice" in msg:
@@ -556,11 +560,11 @@ class VmConsoleWorker(QRunnable):
             return
 
         try:
-            lines = ["[virt-viewer]"]
-            lines.append("type=spice")
-            for key in ("host", "port", "tls-port", "password", "subject",
-                        "cipher", "secure-attention", "delete-this-file",
-                        "full-screen", "title", "proxy"):
+            keys = ("host", "port", "tls-port", "password", "subject",
+                    "cipher", "secure-attention", "delete-this-file",
+                    "full-screen", "title")
+            lines = ["[virt-viewer]", "type=spice"]
+            for key in keys:
                 val = config.get(key)
                 if val is not None:
                     lines.append(f"{key}={val}")
@@ -571,6 +575,7 @@ class VmConsoleWorker(QRunnable):
             fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
+            log.info("vv файл записан: %s (%d строк)", path, len(lines))
         except Exception as e:
             try:
                 self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
@@ -579,10 +584,24 @@ class VmConsoleWorker(QRunnable):
             return
 
         try:
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 ["remote-viewer", path],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
             )
+            try:
+                _, stderr = proc.communicate(timeout=5)
+                if proc.returncode != 0:
+                    err_text = stderr.decode("utf-8", errors="replace").strip()
+                    log.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
+                    try:
+                        self.signals.console_error.emit(
+                            f"remote-viewer: {err_text or 'код ' + str(proc.returncode)}"
+                        )
+                    except RuntimeError:
+                        pass
+                    return
+            except subprocess.TimeoutExpired:
+                log.info("remote-viewer запущен (pid=%d)", proc.pid)
         except FileNotFoundError:
             try:
                 self.signals.console_error.emit(
