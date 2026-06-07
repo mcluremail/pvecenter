@@ -38,12 +38,21 @@
 
 - Python 3.10+
 - PySide6
-- proxmoxer
+- proxmoxer (нет в репозиториях Debian/Ubuntu — ставится через pip)
 - Proxmox VE (кластер или отдельный хост)
 - Доступ по API к PVE-хосту (порт 8006)
 - virt-viewer (для SPICE консоли)
 
 ## Установка
+
+### Через pip (PyPI)
+
+```bash
+pip install pvecenter
+pvecenter
+```
+
+### В изолированное окружение
 
 ```bash
 git clone https://github.com/mcluremail/pvecenter.git
@@ -53,7 +62,24 @@ source venv/bin/activate
 pip install PySide6 proxmoxer requests pyqtgraph cryptography
 ```
 
-Установите virt-viewer для SPICE консоли:
+### .deb пакет (Debian / Ubuntu)
+
+Сборка из исходников:
+
+```bash
+sudo apt install devscripts debhelper dh-python python3-all python3-setuptools
+cd pvecenter
+dpkg-buildpackage -b
+sudo dpkg -i ../pve-center_0.1.0-1_all.deb
+# доставить proxmoxer (нет в репозиториях)
+pip install proxmoxer
+# установить virt-viewer (если нужна SPICE консоль)
+sudo apt install virt-viewer
+```
+
+После установки `.deb` — запуск через меню или командой `pvecenter`.
+
+### virt-viewer (для SPICE консоли)
 
 ```bash
 # Debian / Ubuntu
@@ -69,12 +95,12 @@ sudo dnf install virt-viewer
 ## Использование
 
 ```bash
+# Если установлено через pip или .deb:
+pvecenter
+
+# Из локального репозитория:
 ./run.py
-```
-
-Или:
-
-```bash
+# или
 python -m pve_center.main
 ```
 
@@ -100,6 +126,8 @@ python -m pve_center.main
 | requests | HTTP-запросы |
 | pyqtgraph | Графики |
 | cryptography | PBKDF2 + Fernet шифрование |
+
+Для `.deb` пакета: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` ставятся из репозитория Debian/Ubuntu. `proxmoxer` доставляется через pip (в репозиториях отсутствует).
 
 ### Структура проекта
 
