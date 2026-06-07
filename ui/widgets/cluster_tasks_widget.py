@@ -88,13 +88,13 @@ def _vmid_from_upid(upid):
     if not upid or not upid.startswith("UPID:"):
         return ""
     parts = upid.split(":")
-    if len(parts) < 8:
+    # UPID:node:pid:pstart:starttime:type:vmid:user:extinfo
+    if len(parts) < 7:
         return ""
-    ext = parts[7]
-    if ext.isdigit():
-        return ext
-    m = __import__("re").search(r"(\d{3,})", ext)
-    return m.group(1) if m else ""
+    candidate = parts[6]
+    if candidate.isdigit():
+        return candidate
+    return ""
 
 
 class NumericTableItem(QTableWidgetItem):
@@ -192,7 +192,7 @@ class ClusterTasksWidget(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(user))
 
             task_type = task.get('type', '')
-            vmid = task.get('vmid') or ''
+            vmid = task.get('vmid') or task.get('_vmid') or ''
             if not vmid:
                 vmid = _vmid_from_upid(task.get('upid', ''))
             vm_name = task.get('_vm_name', '')
@@ -206,9 +206,8 @@ class ClusterTasksWidget(QWidget):
             if i == 0:
                 import logging
                 logging.getLogger(__name__).info(
-                    "desc: type=%s vmid_task=%r vmid_upid=%r vm_name=%r => %s",
-                    task_type, task.get("vmid"), _vmid_from_upid(task.get("upid", "")),
-                    vm_name, desc)
+                    "desc: type=%s vmid=%r vm_name=%r => %s",
+                    task_type, vmid, vm_name, desc)
             self.table.setItem(i, 4, QTableWidgetItem(desc))
 
             status = task.get('status', '')

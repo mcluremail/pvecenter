@@ -577,8 +577,15 @@ class MainWindow(QMainWindow):
                 if node in node_map:
                     task["_display_name"] = node_map[node]
                 vmid = task.get("vmid")
+                if vmid is None:
+                    upid = task.get("upid", "")
+                    if upid.startswith("UPID:"):
+                        parts = upid.split(":")
+                        if len(parts) >= 7 and parts[6].isdigit():
+                            vmid = parts[6]
                 if vmid is not None:
                     try:
+                        task["_vmid"] = str(vmid)
                         task["_vm_name"] = vm_map.get(int(vmid), "")
                     except (ValueError, TypeError):
                         pass
