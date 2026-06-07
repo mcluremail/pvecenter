@@ -414,6 +414,7 @@ class VmActionWorker(QRunnable):
             "stop": "Принудительное выключение",
             "reboot": "Перезагрузка",
             "reset": "Сброс",
+            "resume": "Возобновление",
         }
 
     def run(self):
@@ -613,22 +614,48 @@ class VmConsoleWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
-# VNC browser console (noVNC)
+# CreateVmWorker — создание VM
 # ----------------------------------------------------------------------
-def open_browser_console(host, node, vmid, vmname=""):
-    """Открывает консоль ВМ в браузере через PVE web UI.
+class CreateVmSignals(QObject):
+    vm_created = Signal(str)  # success message
+    vm_error = Signal(str)    # error message
 
-    Если пользователь не авторизован в PVE web UI — покажет страницу логина,
-    после входа откроется консоль ВМ.
-    """
-    import subprocess, logging
-    log = logging.getLogger(__name__)
-    # hash-формат PVE web UI: редиректит на логин при необходимости
-    url = f"https://{host}:8006/#v1:z0:vnc:{node}:{vmid}"
-    log.info("noVNC: %s", url)
-    try:
-        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        log.warning("xdg-open not found, trying webbrowser")
-        import webbrowser
-        webbrowser.open(url)
+
+class CreateVmWorker(QRunnable):
+    """Создаёт QEMU VM через POST /nodes/{node}/qemu."""
+    def __init__(self, host_cfg, node_name, params):
+        """
+        params: dict с параметрами VM (name, cores, memory, sockets, ostype, etc.)
+        """
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.params = params
+        self.signals = CreateVmSignals()
+
+    def run(self):
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=False,
+                timeout=30,
+            )
+            result = proxmox.nodes(self.node_name).qemu.post(**self.params)
+            vmid = result.get("data", result).get("vmid", "?")
+            try:
+                self.signals.vm_created.emit(
+                    f"VM {vmid} создана на {self.node_name}"
+                )
+            except RuntimeError:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self.signals.vm_error.emit(str(e))
+            except RuntimeError:
+                pass
+
+

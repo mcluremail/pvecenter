@@ -23,6 +23,7 @@ class TreePanel(QWidget):
     add_server_requested_context = Signal(str)
     host_remove_requested = Signal(str, str)  # type ("host"/"cluster"/"section"), name
     host_token_refresh_requested = Signal(str)  # host_name
+    vm_create_requested = Signal(str, str)  # node_name, host_name
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -114,6 +115,13 @@ class TreePanel(QWidget):
                 host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
                 host_name = host.get("host_name", "") if host else ""
             if host_name:
+                create_vm_action = QAction("Создать ВМ", self.tree)
+                create_vm_action.setIcon(get_icon("vm"))
+                create_vm_action.triggered.connect(
+                    lambda checked, nn=item_name, hn=host_name: self.vm_create_requested.emit(nn, hn)
+                )
+                menu.addAction(create_vm_action)
+                menu.addSeparator()
                 delete_action = QAction("Удалить хост", self.tree)
                 delete_action.triggered.connect(lambda: self.host_remove_requested.emit("host", host_name))
                 menu.addAction(delete_action)
@@ -426,6 +434,7 @@ class TreePanel(QWidget):
                 cl_item.setText(0, cluster_name)
                 cl_item.setIcon(0, get_icon("cluster"))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("storage_section", cluster_name))
+                cl_item.setFlags(cl_item.flags() & ~Qt.ItemIsSelectable)
                 cl_item.setExpanded(True)
 
                 seen_names = set()
@@ -443,6 +452,7 @@ class TreePanel(QWidget):
                 so_item.setText(0, "Отдельные")
                 so_item.setIcon(0, get_icon("folder"))
                 so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", "Отдельные"))
+                so_item.setFlags(so_item.flags() & ~Qt.ItemIsSelectable)
                 so_item.setExpanded(True)
 
                 seen_keys = set()
@@ -621,10 +631,6 @@ class TreePanel(QWidget):
                 else:
                     data["cluster"] = val
             self.item_selected.emit("storage", item_name, data)
-            return
-
-        if item_type == "storage_section":
-            self.item_selected.emit("storage_section", item_name, {})
             return
 
         self.item_selected.emit("unknown", item_name, {})

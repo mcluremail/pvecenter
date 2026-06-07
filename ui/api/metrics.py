@@ -98,11 +98,16 @@ class StorageContentListWorker(QRunnable):
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:8006/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
-            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=False, timeout=10)
+            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=False, timeout=60)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
                 self.signals.result.emit(self.storage_name, self.content_type, data)
+            except RuntimeError:
+                pass
+        except requests.exceptions.ReadTimeout:
+            try:
+                self.signals.error.emit(self.storage_name, self.content_type, "Таймаут PVE при загрузке содержимого хранилища")
             except RuntimeError:
                 pass
         except Exception as e:

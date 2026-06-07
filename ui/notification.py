@@ -104,3 +104,7 @@ class NotificationManager:
         toast = FadeToast(self.parent, text, color)
         self._active[key] = toast
         toast.destroyed.connect(lambda k=key: self._active.pop(k, None))
+
+    def show(self, text, error=False):
+        color = "#dc2626" if error else "#1f2937"
+        self._show(str(id(text)), text, color)

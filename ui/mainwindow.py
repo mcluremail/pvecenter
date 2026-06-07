@@ -150,6 +150,7 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.host_remove_requested.connect(self._on_host_remove)
         self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
+        self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
 
         self._notifications = NotificationManager(self)
 
@@ -246,6 +247,36 @@ class MainWindow(QMainWindow):
         self.nodes_cfg.append(cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
+
+    # ------------------------------------------------------------
+    # Создание ВМ
+    # ------------------------------------------------------------
+    def _on_vm_create_requested(self, node_name, host_name):
+        from .create_vm_dialog import CreateVmDialog
+        dialog = CreateVmDialog(self, nodes=self.all_nodes, storages=self.all_storages)
+        if dialog.exec() != CreateVmDialog.Accepted:
+            return
+        params = dialog.get_params()
+        sel_node = dialog.get_node()
+
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            self.status_label.setText(f"Конфиг не найден для {host_name}")
+            return
+
+        from ..backend import CreateVmWorker
+        worker = CreateVmWorker(cfg, sel_node, params)
+        worker.signals.vm_created.connect(lambda msg: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            QTimer.singleShot(1500, self.refresh_data)
+        ))
+        worker.signals.vm_error.connect(lambda err: (
+            self._notifications.show(f"Ошибка создания ВМ: {err}", error=True),
+            self.status_label.setText(f"Ошибка: {err}")
+        ))
+        self._run_worker(worker)
+        self.status_label.setText("Создание ВМ...")
 
     def _confirm_delete(self, text):
         dlg = QDialog(self)

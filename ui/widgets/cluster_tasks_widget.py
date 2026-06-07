@@ -153,6 +153,7 @@ class ClusterTasksWidget(QWidget):
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
 
+        self.table.setUpdatesEnabled(False)
         self.table.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
             start_ts = task.get('starttime')
@@ -225,6 +226,8 @@ class ClusterTasksWidget(QWidget):
         for r in range(self.table.rowCount()):
             if self.table.rowHeight(r) > 22:
                 self.table.setRowHeight(r, 22)
+
+        self.table.setUpdatesEnabled(True)
 
         if was_sorted:
             self.table.setSortingEnabled(True)

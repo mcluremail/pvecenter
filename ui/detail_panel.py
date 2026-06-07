@@ -66,6 +66,7 @@ class DetailPanel(QWidget):
             "reboot": "⟳ Перезагр",
             "reset": "↺ Сброс",
             "stop": "⏹ Стоп",
+            "resume": "▶ Возобн",
         }
         action_layout.addStretch()
         self._action_buttons = {}
@@ -95,7 +96,6 @@ class DetailPanel(QWidget):
 
         self._console_menu = QMenu(self)
         self._console_menu.addAction("SPICE", self._on_vm_console)
-        self._console_menu.addAction("noVNC (окно)", self._on_vm_console_browser)
         self._console_btn.setMenu(self._console_menu)
         action_layout.addWidget(self._console_btn)
 
@@ -335,6 +335,7 @@ class DetailPanel(QWidget):
         ])
         self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.storage_detail_nodes_table.setAlternatingRowColors(True)
+        self.storage_detail_nodes_table.setSortingEnabled(True)
         enable_row_hover(self.storage_detail_nodes_table)
         self.storage_detail_layout.addWidget(self.storage_detail_nodes_table)
 
@@ -352,13 +353,14 @@ class DetailPanel(QWidget):
         ])
         self.storage_backups_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.storage_backups_table.setAlternatingRowColors(True)
+        self.storage_backups_table.setSortingEnabled(True)
         enable_row_hover(self.storage_backups_table)
         self.storage_backups_stack = QStackedWidget()
         self.storage_backups_loading = QLabel("Загрузка...")
         self.storage_backups_loading.setAlignment(Qt.AlignCenter)
         self.storage_backups_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
         self.storage_backups_stack.addWidget(self.storage_backups_loading)
-        self.storage_backups_stack.addWidget(self.storage_backups_table)
+        self.storage_backups_stack.addWidget(self._make_filterable_table(self.storage_backups_table))
         self.storage_backups_stack.setCurrentIndex(0)
         self.storage_backups_tab = QScrollArea()
         self.storage_backups_tab.setWidgetResizable(True)
@@ -380,13 +382,14 @@ class DetailPanel(QWidget):
         ])
         self.storage_disks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.storage_disks_table.setAlternatingRowColors(True)
+        self.storage_disks_table.setSortingEnabled(True)
         enable_row_hover(self.storage_disks_table)
         self.storage_disks_stack = QStackedWidget()
         self.storage_disks_loading = QLabel("Загрузка...")
         self.storage_disks_loading.setAlignment(Qt.AlignCenter)
         self.storage_disks_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
         self.storage_disks_stack.addWidget(self.storage_disks_loading)
-        self.storage_disks_stack.addWidget(self.storage_disks_table)
+        self.storage_disks_stack.addWidget(self._make_filterable_table(self.storage_disks_table))
         self.storage_disks_stack.setCurrentIndex(0)
         self.storage_disks_tab = QScrollArea()
         self.storage_disks_tab.setWidgetResizable(True)
@@ -408,13 +411,14 @@ class DetailPanel(QWidget):
         ])
         self.storage_iso_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.storage_iso_table.setAlternatingRowColors(True)
+        self.storage_iso_table.setSortingEnabled(True)
         enable_row_hover(self.storage_iso_table)
         self.storage_iso_stack = QStackedWidget()
         self.storage_iso_loading = QLabel("Загрузка...")
         self.storage_iso_loading.setAlignment(Qt.AlignCenter)
         self.storage_iso_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
         self.storage_iso_stack.addWidget(self.storage_iso_loading)
-        self.storage_iso_stack.addWidget(self.storage_iso_table)
+        self.storage_iso_stack.addWidget(self._make_filterable_table(self.storage_iso_table))
         self.storage_iso_stack.setCurrentIndex(0)
         self.storage_iso_tab = QScrollArea()
         self.storage_iso_tab.setWidgetResizable(True)
@@ -436,13 +440,14 @@ class DetailPanel(QWidget):
         ])
         self.storage_tpl_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.storage_tpl_table.setAlternatingRowColors(True)
+        self.storage_tpl_table.setSortingEnabled(True)
         enable_row_hover(self.storage_tpl_table)
         self.storage_tpl_stack = QStackedWidget()
         self.storage_tpl_loading = QLabel("Загрузка...")
         self.storage_tpl_loading.setAlignment(Qt.AlignCenter)
         self.storage_tpl_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
         self.storage_tpl_stack.addWidget(self.storage_tpl_loading)
-        self.storage_tpl_stack.addWidget(self.storage_tpl_table)
+        self.storage_tpl_stack.addWidget(self._make_filterable_table(self.storage_tpl_table))
         self.storage_tpl_stack.setCurrentIndex(0)
         self.storage_tpl_tab = QScrollArea()
         self.storage_tpl_tab.setWidgetResizable(True)
@@ -551,6 +556,7 @@ class DetailPanel(QWidget):
         ])
         self.host_snapshots_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.host_snapshots_table.setAlternatingRowColors(True)
+        self.host_snapshots_table.setSortingEnabled(True)
         enable_row_hover(self.host_snapshots_table)
         self.host_snapshots_stack = QStackedWidget()
         self.host_snapshots_stack.addWidget(self.host_snapshots_loading)
@@ -631,7 +637,7 @@ class DetailPanel(QWidget):
             btn.setEnabled(False)
         action_names = {
             "start": "Запуск", "shutdown": "Выключение", "stop": "Принудительное выключение",
-            "reboot": "Перезагрузка", "reset": "Сброс"
+            "reboot": "Перезагрузка", "reset": "Сброс", "resume": "Возобновление"
         }
         self.detail_label.setText(f"ВМ/CT: {vmid} — {action_names.get(action, action)}...")
         worker.signals.action_result.connect(lambda msg: (
@@ -670,7 +676,7 @@ class DetailPanel(QWidget):
         node_name = self._last_vm_data.get("node") or host_name
         self._console_btn.setEnabled(False)
         self.detail_label.setText(f"ВМ {vmid}: открытие SPICE консоли...")
-        from ..backend import VmConsoleWorker, open_browser_console
+        from ..backend import VmConsoleWorker
         worker = VmConsoleWorker(cfg, node_name, vmid)
         worker.signals.console_ready.connect(lambda msg: (
             self.detail_label.setText(msg),
@@ -684,43 +690,7 @@ class DetailPanel(QWidget):
         ))
         self._run_worker(worker)
 
-    def _on_vm_console_browser(self):
-        if not self._last_vm_data:
-            return
-        vm_type = self._last_vm_data.get("type", "qemu")
-        if vm_type != "qemu":
-            return
-        vmid = self._last_vm_data.get("vmid")
-        host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
-        if not cfg:
-            return
-        node_name = self._last_vm_data.get("node") or host_name
-        vmname = self._last_vm_data.get("name", "")
 
-        from PySide6.QtWidgets import QDialog, QVBoxLayout
-        from PySide6.QtWebEngineWidgets import QWebEngineView
-
-        host = cfg["host"]
-        url = f"https://{host}:8006/#v1:z0:vnc/{node_name}/{vmid}"
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"ВМ {vmid} ({vmname}) — {host}")
-        dialog.resize(960, 720)
-
-        view = QWebEngineView()
-        # игнорируем ошибки SSL (самоподписанные сертификаты PVE)
-        from PySide6.QtWebEngineCore import QWebEngineCertificateError
-        def on_cert_error(err):
-            err.acceptCertificate()
-            return True
-        view.page().certificateError.connect(on_cert_error)
-        view.load(url)
-
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view)
-        dialog.exec()
 
     def _refresh_after_action(self):
         if not self._last_vm_data:
@@ -749,6 +719,34 @@ class DetailPanel(QWidget):
             if table.rowHeight(r) > max_height:
                 table.setRowHeight(r, max_height)
 
+    @staticmethod
+    def _filter_table(table, text):
+        for row in range(table.rowCount()):
+            visible = False
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item and text.lower() in item.text().lower():
+                    visible = True
+                    break
+            table.setRowHidden(row, not visible)
+
+    def _make_filterable_table(self, table):
+        from PySide6.QtWidgets import QLineEdit
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        search = QLineEdit()
+        search.setPlaceholderText("Поиск...")
+        search.setStyleSheet(
+            "QLineEdit { font-size: 12px; padding: 4px 8px; border: 1px solid #d1d5db; "
+            "border-radius: 3px; margin: 4px 4px 0 4px; }"
+        )
+        search.textChanged.connect(lambda text: DetailPanel._filter_table(table, text))
+        layout.addWidget(search)
+        layout.addWidget(table)
+        return container
+
     def show_details(self, obj_type, obj_name, data):
         self.tabs.show()
         if obj_type == "vm":
@@ -762,6 +760,8 @@ class DetailPanel(QWidget):
                     btn.setEnabled(status == "running")
                 elif key in ("reboot", "reset"):
                     btn.setEnabled(status == "running")
+                elif key == "resume":
+                    btn.setEnabled(status == "paused")
             vm_type = data.get("type", "qemu") if data else "qemu"
             self._console_btn.setEnabled(
                 vm_type == "qemu" and status == "running"
@@ -815,8 +815,7 @@ class DetailPanel(QWidget):
                 self._show_vm_info_init(obj_name, data, gen)
             elif obj_type == "storage":
                 self._show_storage_detail(obj_name, data)
-            elif obj_type == "storage_section":
-                pass
+
         except Exception:
             traceback.print_exc()
             self.detail_label.setText(f"Ошибка: {obj_name}")
