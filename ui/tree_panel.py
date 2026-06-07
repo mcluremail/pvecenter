@@ -60,21 +60,24 @@ class TreePanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        btn_layout = QHBoxLayout()
-        btn_layout.setContentsMargins(4, 2, 4, 0)
         init_icons()
         self._toggle_btn = QToolButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
+        self._toggle_btn.setIconSize(QSize(14, 14))
         self._toggle_btn.setToolTip("Развернуть всё")
         self._toggle_btn.setAutoRaise(True)
         self._toggled = False
         self._toggle_btn.clicked.connect(self._toggle_expand)
-        btn_layout.addStretch()
-        btn_layout.addWidget(self._toggle_btn)
-        layout.addLayout(btn_layout)
 
         layout.addWidget(self.tree)
+
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setContentsMargins(4, 2, 4, 2)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self._toggle_btn)
+        layout.addLayout(bottom_layout)
+
         self.setLayout(layout)
 
     def _toggle_expand(self):
