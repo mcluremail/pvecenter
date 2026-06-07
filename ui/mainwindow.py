@@ -527,26 +527,27 @@ class MainWindow(QMainWindow):
         node_requests = []
         seen_nodes = set()
 
-        # Карта: host_cfg → PVE-нода (по short name из cfg.name)
         def _short_name(cfg):
             return cfg["name"].split("@")[0]
 
-        # Сначала кластерный репрезентатив — он видит все ноды кластера
-        rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
-        for n in self.all_nodes:
-            pve_node = n.get("node", "")
-            if not pve_node or pve_node in seen_nodes:
-                continue
-            display = n.get("_display_name", "")
-            # Определяем, какой host_cfg может опрашивать эту ноду
-            if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
-                cfg = rep_cfg
-            else:
-                # standalone: ищем по short name
-                cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
-            if cfg:
-                node_requests.append((cfg, pve_node))
-                seen_nodes.add(pve_node)
+        if self.all_nodes:
+            rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
+            for n in self.all_nodes:
+                pve_node = n.get("node", "")
+                if not pve_node or pve_node in seen_nodes:
+                    continue
+                display = n.get("_display_name", "")
+                if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
+                    cfg = rep_cfg
+                else:
+                    cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
+                if cfg:
+                    node_requests.append((cfg, pve_node))
+                    seen_nodes.add(pve_node)
+        else:
+            # Первый запуск — all_nodes ещё пуст, строим из конфига
+            for cfg in self.nodes_cfg:
+                node_requests.append((cfg, cfg.get("node") or _short_name(cfg)))
 
         if not node_requests:
             logger.warning("Нет узлов для загрузки задач кластера")
