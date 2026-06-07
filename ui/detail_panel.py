@@ -560,6 +560,30 @@ class DetailPanel(QWidget):
     # ------------------------------------------------------------------
     # Общие методы
     # ------------------------------------------------------------------
+    @staticmethod
+    def _parse_pve_error(err):
+        if not err:
+            return ""
+        err_lower = err.lower()
+        if "permission check failed" in err_lower:
+            import re
+            m = re.search(r"Permission check failed\s*\(([^)]+)\)", err)
+            if m:
+                path = m.group(1)
+                return f"Недостаточно прав PVE: {path}"
+            return "Недостаточно прав PVE"
+        if "403" in err_lower:
+            return "Недостаточно прав PVE (403)"
+        if "unauthorized" in err_lower or "401" in err_lower:
+            return "Ошибка авторизации API-токена (401)"
+        if "resolve" in err_lower or "dns" in err_lower or "name or service not known" in err_lower:
+            return "Не удаётся разрешить DNS-имя хоста"
+        if "connection refused" in err_lower or "connection reset" in err_lower:
+            return "PVE API недоступен (соединение отклонено)"
+        if "timeout" in err_lower:
+            return "Хост не отвечает (таймаут соединения)"
+        return err
+
     def _run_worker(self, worker):
         if len(self._workers) >= 16:
             return
@@ -611,7 +635,7 @@ class DetailPanel(QWidget):
     def _on_action_error(self, err):
         for btn in self._action_buttons.values():
             btn.setEnabled(True)
-        self.detail_label.setText(f"Ошибка: {err}")
+        self.detail_label.setText(self._parse_pve_error(err))
 
     def _refresh_after_action(self):
         if not self._last_vm_data:
@@ -1858,19 +1882,7 @@ class DetailPanel(QWidget):
 
         if host_data and host_data.get("status") == "error":
             err = host_data.get("error", "")
-            err_lower = err.lower()
-            if "resolve" in err_lower or "dns" in err_lower or "name or service not known" in err_lower:
-                reason = "Не удаётся разрешить DNS-имя хоста"
-            elif "connection refused" in err_lower or "connection reset" in err_lower:
-                reason = "PVE API недоступен (соединение отклонено)"
-            elif "timeout" in err_lower:
-                reason = "Хост не отвечает (таймаут соединения)"
-            elif "unauthorized" in err_lower or "401" in err_lower or "permission denied" in err_lower:
-                reason = "Ошибка авторизации API-токена"
-            elif "403" in err_lower:
-                reason = "Недостаточно прав API-токена"
-            else:
-                reason = err
+            reason = self._parse_pve_error(err)
             self.info_label.setStyleSheet("font-size: 13px; color: #ef4444; padding: 40px 16px;")
             self.info_label.setText(
                 f"<div style='text-align: center;'>"
@@ -2158,7 +2170,7 @@ class DetailPanel(QWidget):
             if detail_key in self.config_cache:
                 self.hardware_widget.set_hardware_data(self.config_cache[detail_key], detail["data"])
         else:
-            self.info_label.setText(f"Ошибка загрузки деталей: {detail['error']}")
+            self.info_label.setText(self._parse_pve_error(detail.get("error", "")))
             self.info_stack.setCurrentIndex(0)
 
     def _on_config_loaded(self, vmid, config, gen, host_name):
