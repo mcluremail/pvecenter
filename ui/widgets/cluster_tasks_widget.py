@@ -203,6 +203,12 @@ class ClusterTasksWidget(QWidget):
                 desc = f"{label} {vmid}"
             else:
                 desc = label
+            if i == 0:
+                import logging
+                logging.getLogger(__name__).info(
+                    "desc: type=%s vmid_task=%r vmid_upid=%r vm_name=%r => %s",
+                    task_type, task.get("vmid"), _vmid_from_upid(task.get("upid", "")),
+                    vm_name, desc)
             self.table.setItem(i, 4, QTableWidgetItem(desc))
 
             status = task.get('status', '')

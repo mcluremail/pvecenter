@@ -472,6 +472,8 @@ class ClusterTasksWorker(QRunnable):
         self.signals = ClusterTasksSignals()
 
     def run(self):
+        import logging
+        log = logging.getLogger(__name__)
         all_by_upid = {}
         errors = []
         for host_cfg, node_name in self.node_requests:
@@ -485,6 +487,9 @@ class ClusterTasksWorker(QRunnable):
                     timeout=10
                 )
                 tasks = proxmox.nodes(node_name).tasks.get(limit=100)
+                log.info("node=%s host=%s tasks=%d sample_vmid=%r",
+                         node_name, host_cfg["host"], len(tasks),
+                         tasks[0].get("vmid") if tasks else None)
                 for t in tasks:
                     upid = t.get("upid")
                     if upid:
@@ -497,9 +502,12 @@ class ClusterTasksWorker(QRunnable):
         merged = sorted(all_by_upid.values(),
                         key=lambda x: float(x.get("starttime", 0) or 0),
                         reverse=True)
+        log.info("merged_tasks=%d sample_vmid=%r sample_keys=%s",
+                 len(merged),
+                 merged[0].get("vmid") if merged else None,
+                 list(merged[0].keys()) if merged else [])
         if errors:
-            import logging
-            logging.getLogger(__name__).warning("Ошибки при сборе задач: %s", "; ".join(errors))
+            log.warning("Ошибки при сборе задач: %s", "; ".join(errors))
         try:
             self.signals.tasks_ready.emit(merged)
         except RuntimeError:
