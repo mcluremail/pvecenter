@@ -1,6 +1,13 @@
 import sys
+import logging
 from PySide6.QtWidgets import QApplication, QMessageBox
 from .config import load_config
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s: %(message)s",
+    force=True
+)
 
 def main():
     app = QApplication(sys.argv)
