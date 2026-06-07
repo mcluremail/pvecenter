@@ -487,9 +487,6 @@ class ClusterTasksWorker(QRunnable):
                     timeout=10
                 )
                 tasks = proxmox.nodes(node_name).tasks.get(limit=100)
-                log.info("node=%s host=%s tasks=%d sample_vmid=%r",
-                         node_name, host_cfg["host"], len(tasks),
-                         tasks[0].get("vmid") if tasks else None)
                 for t in tasks:
                     upid = t.get("upid")
                     if upid:
@@ -502,10 +499,6 @@ class ClusterTasksWorker(QRunnable):
         merged = sorted(all_by_upid.values(),
                         key=lambda x: float(x.get("starttime", 0) or 0),
                         reverse=True)
-        log.info("merged_tasks=%d sample_vmid=%r sample_keys=%s",
-                 len(merged),
-                 merged[0].get("vmid") if merged else None,
-                 list(merged[0].keys()) if merged else [])
         if errors:
             log.warning("Ошибки при сборе задач: %s", "; ".join(errors))
         try:

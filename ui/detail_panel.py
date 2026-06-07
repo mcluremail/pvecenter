@@ -97,6 +97,7 @@ class DetailPanel(QWidget):
         self._console_menu.addAction("SPICE", self._on_vm_console)
         self._console_menu.addAction("noVNC (браузер)", self._on_vm_console_browser)
         self._console_btn.setMenu(self._console_menu)
+        action_layout.addWidget(self._console_btn)
 
         self.tabs = QTabWidget()
 
