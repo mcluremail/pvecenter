@@ -179,9 +179,12 @@ class ClusterTasksWidget(QWidget):
 
             task_type = task.get('type', '')
             vmid = task.get('vmid') or ''
+            vm_name = task.get('_vm_name', '')
             label = TASK_TYPE_LABELS.get(task_type, task_type)
-            if vmid:
-                desc = f"{label} VM {vmid}"
+            if vmid and vm_name:
+                desc = f"{label} {vmid} ({vm_name})"
+            elif vmid:
+                desc = f"{label} {vmid}"
             else:
                 desc = label
             self.table.setItem(i, 4, QTableWidgetItem(desc))

@@ -536,10 +536,19 @@ class MainWindow(QMainWindow):
             node_map = {}
             for n in self.all_nodes:
                 node_map[n.get("node")] = n.get("_display_name") or n.get("node")
+            vm_map = {}
+            for vm in self.all_vms:
+                vm_map[vm.get("vmid")] = vm.get("name")
             for task in tasks:
                 node = task.get("node", "")
                 if node in node_map:
                     task["_display_name"] = node_map[node]
+                vmid = task.get("vmid")
+                if vmid is not None and vmid in vm_map:
+                    task["_vm_name"] = vm_map[vmid]
+        except Exception as e:
+            logger.error("Ошибка при обогащении задач: %s", e)
+        try:
             self.tasks_widget.set_tasks(tasks)
         except Exception as e:
             logger.error("Ошибка при установке задач: %s", e)
