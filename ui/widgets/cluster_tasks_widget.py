@@ -122,6 +122,8 @@ class ClusterTasksWidget(QWidget):
         ])
 
         h = self.table.horizontalHeader()
+        h.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        h.setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         h.setSectionResizeMode(QHeaderView.Interactive)
         h.setSectionResizeMode(0, QHeaderView.Interactive)
         h.setSectionResizeMode(1, QHeaderView.Interactive)
