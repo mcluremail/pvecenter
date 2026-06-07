@@ -463,30 +463,44 @@ class ClusterTasksSignals(QObject):
 
 
 class ClusterTasksWorker(QRunnable):
-    """Загружает последние задачи кластера через QThreadPool."""
-    def __init__(self, host_cfg):
+    """Загружает задачи со всех нод через QThreadPool.
+    Принимает список (host_cfg, node_name) — для каждой ноды
+    вызывается /nodes/{node}/tasks, результаты мержатся по UPID."""
+    def __init__(self, node_requests):
         super().__init__()
-        self.host_cfg = host_cfg
+        self.node_requests = node_requests  # list of (host_cfg, node_name)
         self.signals = ClusterTasksSignals()
 
     def run(self):
+        all_by_upid = {}
+        errors = []
+        for host_cfg, node_name in self.node_requests:
+            try:
+                proxmox = ProxmoxAPI(
+                    host_cfg["host"],
+                    user=host_cfg["user"],
+                    token_name=host_cfg["token_name"],
+                    token_value=host_cfg["token_value"],
+                    verify_ssl=False,
+                    timeout=10
+                )
+                tasks = proxmox.nodes(node_name).tasks.get(limit=100)
+                for t in tasks:
+                    upid = t.get("upid")
+                    if upid:
+                        all_by_upid[upid] = t
+                    else:
+                        all_by_upid[id(t)] = t
+            except Exception as e:
+                errors.append(f"{node_name}: {e}")
+                continue
+        merged = sorted(all_by_upid.values(),
+                        key=lambda x: float(x.get("starttime", 0) or 0),
+                        reverse=True)
+        if errors:
+            import logging
+            logging.getLogger(__name__).warning("Ошибки при сборе задач: %s", "; ".join(errors))
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
-                timeout=10
-            )
-            tasks = proxmox.cluster.tasks.get()
-            try:
-                self.signals.tasks_ready.emit(tasks)
-            except RuntimeError:
-                pass
-        except Exception as e:
-            traceback.print_exc()
-            try:
-                self.signals.tasks_error.emit(str(e))
-            except RuntimeError:
-                pass
+            self.signals.tasks_ready.emit(merged)
+        except RuntimeError:
+            pass

@@ -520,19 +520,49 @@ class MainWindow(QMainWindow):
     # Обновление задач кластера
     # ------------------------------------------------------------
     def refresh_cluster_tasks(self):
-        cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
-        if not cfg:
-            cfg = self.nodes_cfg[0] if self.nodes_cfg else None
-        if not cfg:
+        if not self.nodes_cfg:
+            return
+
+        # Собираем node_requests: (host_cfg, pve_node_name)
+        node_requests = []
+        seen_nodes = set()
+
+        # Карта: host_cfg → PVE-нода (по short name из cfg.name)
+        def _short_name(cfg):
+            return cfg["name"].split("@")[0]
+
+        # Сначала кластерный репрезентатив — он видит все ноды кластера
+        rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
+        for n in self.all_nodes:
+            pve_node = n.get("node", "")
+            if not pve_node or pve_node in seen_nodes:
+                continue
+            display = n.get("_display_name", "")
+            # Определяем, какой host_cfg может опрашивать эту ноду
+            if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
+                cfg = rep_cfg
+            else:
+                # standalone: ищем по short name
+                cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
+            if cfg:
+                node_requests.append((cfg, pve_node))
+                seen_nodes.add(pve_node)
+
+        if not node_requests:
             logger.warning("Нет узлов для загрузки задач кластера")
             return
-        worker = ClusterTasksWorker(cfg)
+
+        worker = ClusterTasksWorker(node_requests)
         worker.signals.tasks_ready.connect(lambda t, w=worker: (self._on_cluster_tasks_loaded(t), self._workers.discard(w)))
         worker.signals.tasks_error.connect(lambda err, w=worker: self._workers.discard(w))
         self._run_worker(worker)
 
     def _on_cluster_tasks_loaded(self, tasks):
         try:
+            if tasks:
+                sample = tasks[0]
+                logger.info("Sample cluster task keys=%s vmid=%r upid=%r",
+                            list(sample.keys()), sample.get("vmid"), sample.get("upid"))
             node_map = {}
             for n in self.all_nodes:
                 node_map[n.get("node")] = n.get("_display_name") or n.get("node")
