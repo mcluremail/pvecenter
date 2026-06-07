@@ -620,7 +620,8 @@ def open_browser_console(host, node, vmid, vmname=""):
 
     Пользователь должен быть авторизован в PVE web UI в браузере.
     """
-    import webbrowser
+    import webbrowser, logging
+    log = logging.getLogger(__name__)
     params = f"console=kvm&novnc=1&vmid={vmid}&node={node}&resize=off&cmd="
     if vmname:
         params += f"&vmname={vmname}"
