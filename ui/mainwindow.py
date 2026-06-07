@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QMessageBox, QLabel)
 from PySide6.QtCore import Qt, Slot, QTimer
 
-from ..backend import FetchWorker, ClusterTasksWorker
+from ..backend import FetchWorker, ClusterTasksWorker, delete_host_token
 from ..config import save_config
 from .notification import NotificationManager
 from .tree_panel import TreePanel
@@ -251,22 +251,20 @@ class MainWindow(QMainWindow):
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":
             text = f"Удалить хост «{item_name}» из конфигурации?"
-            self.nodes_cfg = [c for c in self.nodes_cfg if c.get("name") != item_name]
+            matched = [c for c in self.nodes_cfg if c.get("name") == item_name]
         elif item_type == "cluster":
             if not item_name:
                 return
             count = sum(1 for c in self.nodes_cfg if c.get("cluster") == item_name)
             text = f"Удалить кластер «{item_name}» ({count} записей) из конфигурации?"
-            self.nodes_cfg = [c for c in self.nodes_cfg if c.get("cluster") != item_name]
+            matched = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
         elif item_type == "section":
             if item_name == "Кластеры":
-                count = sum(1 for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone"))
-                text = f"Удалить все {count} кластерных записей из конфигурации?"
-                self.nodes_cfg = [c for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone")]
+                matched = [c for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone")]
+                text = f"Удалить все {len(matched)} кластерных записей из конфигурации?"
             elif item_name == "Отдельные хосты":
-                count = sum(1 for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone"))
-                text = f"Удалить все {count} записи отдельных хостов из конфигурации?"
-                self.nodes_cfg = [c for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone")]
+                matched = [c for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone")]
+                text = f"Удалить все {len(matched)} записей отдельных хостов из конфигурации?"
             else:
                 return
         else:
@@ -277,6 +275,9 @@ class MainWindow(QMainWindow):
         )
         if reply != QMessageBox.Yes:
             return
+        for cfg in matched:
+            delete_host_token(cfg)
+        self.nodes_cfg = [c for c in self.nodes_cfg if c not in matched]
         save_config(self.nodes_cfg)
         self.refresh_data()
 

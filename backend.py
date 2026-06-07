@@ -381,6 +381,31 @@ class VmTaskHistorySignals(QObject):
     tasks_error = Signal(int, str)
 
 
+# ----------------------------------------------------------------------
+# Удаление токена с сервера
+# ----------------------------------------------------------------------
+def delete_host_token(host_cfg):
+    """Удаляет API-токен pvecenter@pve с PVE-сервера через Proxmoxer.
+       Не выбрасывает исключения — ошибки только в лог."""
+    try:
+        proxmox = ProxmoxAPI(
+            host_cfg["host"],
+            user=host_cfg["user"],
+            token_name=host_cfg["token_name"],
+            token_value=host_cfg["token_value"],
+            verify_ssl=False,
+            timeout=10,
+        )
+        token_id = host_cfg["token_name"]
+        proxmox.access.users(host_cfg["user"]).token(token_id).delete()
+        logger.info("Token %s deleted from %s", token_id, host_cfg["host"])
+    except Exception as e:
+        logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
+
+
+# ----------------------------------------------------------------------
+# VmTaskHistoryWorker
+# ----------------------------------------------------------------------
 class VmTaskHistoryWorker(QRunnable):
     """Загружает историю задач для конкретной ВМ."""
     def __init__(self, host_cfg, node_name, vmid, limit=50):
