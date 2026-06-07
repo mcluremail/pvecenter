@@ -161,7 +161,6 @@ class MainWindow(QMainWindow):
 
         # Нижняя панель с задачами кластера
         self.tasks_widget = ClusterTasksWidget()
-        self.tasks_widget.setMaximumHeight(150)
 
         # Вертикальный сплиттер
         v_splitter = QSplitter(Qt.Vertical)
@@ -534,6 +533,13 @@ class MainWindow(QMainWindow):
 
     def _on_cluster_tasks_loaded(self, tasks):
         try:
+            node_map = {}
+            for n in self.all_nodes:
+                node_map[n.get("node")] = n.get("_display_name") or n.get("node")
+            for task in tasks:
+                node = task.get("node", "")
+                if node in node_map:
+                    task["_display_name"] = node_map[node]
             self.tasks_widget.set_tasks(tasks)
         except Exception as e:
             logger.error("Ошибка при установке задач: %s", e)
