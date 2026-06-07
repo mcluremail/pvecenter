@@ -51,5 +51,8 @@ install -m 644 %{_builddir}/%{pypi_name}-%{version}/debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Sun Jun 07 2026 Taurus McLure <taurus@mclure.ru> - 0.1.2-1
+- Clean release without diagnostic logging.
+
 * Sun Jun 07 2026 Taurus McLure <taurus@mclure.ru> - 0.1.1-1
 - Первый публичный релиз.

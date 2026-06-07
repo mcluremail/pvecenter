@@ -1,3 +1,10 @@
+pve-center (0.1.2-1) unstable; urgency=medium
+
+  * Удалена диагностическая печать из SPICE-консоли.
+  * Первый публичный релиз (v0.1.1 пропущен из-за диагностики).
+
+ -- Taurus McLure <taurus@mclure.ru>  Sun, 07 Jun 2026 20:10:00 +0300
+
 pve-center (0.1.0-1) unstable; urgency=medium
 
   * Первый публичный релиз.

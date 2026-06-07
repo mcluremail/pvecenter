@@ -12,7 +12,7 @@
 | Debian / Ubuntu | .deb | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Любой | Исходники | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Последний релиз: [v0.1.1](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.1)
+Последний релиз: [v0.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.2)
 
 ## Возможности
 
