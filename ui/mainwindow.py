@@ -520,37 +520,30 @@ class MainWindow(QMainWindow):
     # Обновление задач кластера
     # ------------------------------------------------------------
     def refresh_cluster_tasks(self):
-        if not self.nodes_cfg:
+        if not self.nodes_cfg or not self.all_nodes:
             return
 
-        # Собираем node_requests: (host_cfg, pve_node_name)
         node_requests = []
         seen_nodes = set()
 
         def _short_name(cfg):
             return cfg["name"].split("@")[0]
 
-        if self.all_nodes:
-            rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
-            for n in self.all_nodes:
-                pve_node = n.get("node", "")
-                if not pve_node or pve_node in seen_nodes:
-                    continue
-                display = n.get("_display_name", "")
-                if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
-                    cfg = rep_cfg
-                else:
-                    cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
-                if cfg:
-                    node_requests.append((cfg, pve_node))
-                    seen_nodes.add(pve_node)
-        else:
-            # Первый запуск — all_nodes ещё пуст, строим из конфига
-            for cfg in self.nodes_cfg:
-                node_requests.append((cfg, cfg.get("node") or _short_name(cfg)))
+        rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
+        for n in self.all_nodes:
+            pve_node = n.get("node", "")
+            if not pve_node or pve_node in seen_nodes:
+                continue
+            display = n.get("_display_name", "")
+            if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
+                cfg = rep_cfg
+            else:
+                cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
+            if cfg:
+                node_requests.append((cfg, pve_node))
+                seen_nodes.add(pve_node)
 
         if not node_requests:
-            logger.warning("Нет узлов для загрузки задач кластера")
             return
 
         worker = ClusterTasksWorker(node_requests)
