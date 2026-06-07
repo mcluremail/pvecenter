@@ -5,6 +5,84 @@ from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
 
 
+TASK_TYPE_LABELS = {
+    # ВМ
+    "qemstart": "Запуск ВМ",
+    "qmstart": "Запуск ВМ",
+    "qemstop": "Остановка ВМ",
+    "qmstop": "Остановка ВМ",
+    "qemshutdown": "Выключение ВМ",
+    "qmshutdown": "Выключение ВМ",
+    "qemreboot": "Перезагрузка ВМ",
+    "qmreboot": "Перезагрузка ВМ",
+    "qemreset": "Сброс ВМ",
+    "qmreset": "Сброс ВМ",
+    "qemsuspend": "Приостановка ВМ",
+    "qmgestsuspend": "Приостановка ВМ",
+    "qmresume": "Возобновление ВМ",
+    "qmgestscreenshot": "Скриншот ВМ",
+    "qmgstdstva": "Задача ВМ",
+    "spiceproxy": "SPICE-консоль",
+    "vncproxy": "VNC-консоль",
+    "console": "Консоль",
+    # LXC
+    "lxc-start": "Запуск контейнера",
+    "lxc-stop": "Остановка контейнера",
+    "lxc-shutdown": "Выключение контейнера",
+    "lxc-reboot": "Перезагрузка контейнера",
+    "lxc-suspend": "Приостановка контейнера",
+    "lxc-resume": "Возобновление контейнера",
+    "vzstart": "Запуск контейнера",
+    "vzstop": "Остановка контейнера",
+    "vzreboot": "Перезагрузка контейнера",
+    # Управление ВМ/контейнерами
+    "create": "Создание",
+    "destroy": "Удаление",
+    "clone": "Клонирование",
+    "qmigrate": "Миграция",
+    "resize": "Изменение диска",
+    "qmmove": "Перемещение диска",
+    "move": "Перемещение",
+    "diskread": "Чтение с диска",
+    "diskwrite": "Запись на диск",
+    "imgdel": "Удаление образа",
+    "imgcopy": "Копирование образа",
+    # Снапшоты
+    "snapshot": "Создание снапшота",
+    "snapdestroy": "Удаление снапшота",
+    "snaprollback": "Откат к снапшоту",
+    "snapremove": "Удаление снапшота",
+    # Бэкапы и восстановление
+    "vzdump": "Резервное копирование",
+    "restore": "Восстановление",
+    "verify": "Проверка бэкапов",
+    "pull": "Импорт бэкапа",
+    # Хранилище
+    "dfs-migrate": "Миграция хранилища",
+    "dfs-del": "Удаление с хранилища",
+    # Сеть
+    "sdn-apply": "Применение SDN",
+    # Обновления
+    "pveupdate": "Обновление PVE",
+    "pveproxy": "Обновление прокси",
+    "apt": "APT-операция",
+    # HA
+    "ha-manager": "Менеджер HA",
+    "ha-crm": "HA CRM",
+    # Безопасность и ACME
+    "acmedns": "ACME DNS-вызов",
+    "pvefw-logger": "Файрвол PVE",
+    # Репликация
+    "repl": "Репликация",
+    # Ceph
+    "ceph-apply": "Применение Ceph",
+    "ceph-destroy": "Удаление Ceph",
+    "ceph-create-fs": "Создание FS Ceph",
+    "ceph-install": "Установка Ceph",
+}
+
+TIMESTAMP_FMT = "%d.%m.%y %H:%M"
+
 class NumericTableItem(QTableWidgetItem):
     def __lt__(self, other):
         if not isinstance(other, QTableWidgetItem):
@@ -65,7 +143,7 @@ class ClusterTasksWidget(QWidget):
             if start_ts:
                 try:
                     start_dt = datetime.fromtimestamp(float(start_ts), tz=timezone.utc)
-                    start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    start_str = start_dt.strftime(TIMESTAMP_FMT)
                 except (ValueError, TypeError):
                     start_str = str(start_ts)
             else:
@@ -79,7 +157,7 @@ class ClusterTasksWidget(QWidget):
             if end_ts:
                 try:
                     end_dt = datetime.fromtimestamp(float(end_ts), tz=timezone.utc)
-                    end_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    end_str = end_dt.strftime(TIMESTAMP_FMT)
                 except (ValueError, TypeError):
                     end_str = str(end_ts)
             else:
@@ -101,13 +179,11 @@ class ClusterTasksWidget(QWidget):
 
             task_type = task.get('type', '')
             vmid = task.get('vmid') or ''
-            upid = task.get('upid', '')
+            label = TASK_TYPE_LABELS.get(task_type, task_type)
             if vmid:
-                desc = f"{task_type}: VM {vmid}"
-            elif upid:
-                desc = f"{task_type} ({upid})"
+                desc = f"{label} VM {vmid}"
             else:
-                desc = task_type
+                desc = label
             self.table.setItem(i, 4, QTableWidgetItem(desc))
 
             status = task.get('status', '')
