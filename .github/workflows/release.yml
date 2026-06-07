@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-python:
+    name: Build Python package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  build-deb:
+    name: Build .deb package
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq devscripts debhelper dh-python \
+            python3-all python3-setuptools python3-pyside6 \
+            python3-requests python3-pyqtgraph python3-cryptography
+      - name: Build .deb
+        run: dpkg-buildpackage -b --no-sign
+      - name: Copy .deb
+        run: |
+          mkdir -p artifacts
+          cp ../*.deb artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: artifacts/*.deb
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-python, build-deb]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+          path: artifacts/
+      - name: Generate checksums
+        working-directory: artifacts
+        run: sha256sum * > checksums.txt
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: PVE Center ${{ github.ref_name }}
+          body: |
+            ## PVE Center ${{ github.ref_name }}
+
+            Скачать: `.deb` для Debian/Ubuntu, `.tar.gz` / `.whl` для pip.
+
+            Установка .deb:
+            ```
+            sudo dpkg -i pve-center_*.deb
+            pip install proxmoxer
+            sudo apt install virt-viewer
+            ```
+
+            Установка через pip:
+            ```
+            pip install pvecenter
+            ```
+          files: artifacts/*

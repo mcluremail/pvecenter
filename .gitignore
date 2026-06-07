@@ -4,3 +4,13 @@ __pycache__/
 .DS_Store
 nodes.json
 nodes.enc
+# debian build artifacts
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/pve-center/
+debian/tmp/
+*.deb
+*.buildinfo
+*.changes
+*.ddeb
