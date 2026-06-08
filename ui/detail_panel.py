@@ -159,6 +159,10 @@ class DetailPanel(QWidget):
         self.vm_summary_table.setColumnCount(2)
         self.vm_summary_table.setHorizontalHeaderLabels(["Параметр", "Значение"])
         self.vm_summary_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.vm_summary_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.vm_summary_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.vm_summary_table.setWordWrap(True)
         self.vm_summary_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.vm_summary_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -169,6 +173,8 @@ class DetailPanel(QWidget):
         self.info_stack.setFixedWidth(320)
         self.info_stack.setMinimumHeight(260)
         self.info_stack.setMaximumHeight(340)
+        # Растягиваем таблицу на всю область QStackedWidget
+        self.vm_summary_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.metrics_widget = VmMetricsWidget()
         self.metrics_widget.setMinimumHeight(260)
@@ -215,6 +221,10 @@ class DetailPanel(QWidget):
             ["Имя", "Тип", "Узел", "Статус", "ЦП %"]
         )
         self.host_vm_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_vm_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_vm_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_vm_table.setAlternatingRowColors(True)
         enable_row_hover(self.host_vm_table)
         self.host_tab = QScrollArea()
@@ -244,6 +254,10 @@ class DetailPanel(QWidget):
             "Хост", "Статус", "Адрес", "ЦП %", "RAM (GiB)", "Аптайм"
         ])
         self.datacenter_summary.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.datacenter_summary.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.datacenter_summary.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.datacenter_summary.setAlternatingRowColors(True)
         enable_row_hover(self.datacenter_summary)
         self.summary_tab = QScrollArea()
@@ -265,6 +279,10 @@ class DetailPanel(QWidget):
             "Имя", "Тип", "Содержимое", "Кластер/Узел", "Занято", "Всего", "Использование"
         ])
         self.storage_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_table.setAlternatingRowColors(True)
         enable_row_hover(self.storage_table)
         self.storage_tab = QScrollArea()
@@ -286,6 +304,10 @@ class DetailPanel(QWidget):
             "Имя", "Тип", "Содержимое", "Занято", "Всего", "Использование"
         ])
         self.host_storage_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_storage_table.setAlternatingRowColors(True)
         enable_row_hover(self.host_storage_table)
         self.host_storage_tab_widget = QWidget()
@@ -310,6 +332,10 @@ class DetailPanel(QWidget):
         self.storage_detail_params.setColumnCount(2)
         self.storage_detail_params.setHorizontalHeaderLabels(["Параметр", "Значение"])
         self.storage_detail_params.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_detail_params.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_detail_params.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_detail_params.setAlternatingRowColors(True)
         enable_row_hover(self.storage_detail_params)
         self.storage_detail_layout.addWidget(self.storage_detail_params)
@@ -372,6 +398,10 @@ class DetailPanel(QWidget):
             "Узел", "Тип", "Содержимое", "Занято", "Всего", "Использование"
         ])
         self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_detail_nodes_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_detail_nodes_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_detail_nodes_table.setAlternatingRowColors(True)
         self.storage_detail_nodes_table.setSortingEnabled(True)
         enable_row_hover(self.storage_detail_nodes_table)
@@ -390,6 +420,10 @@ class DetailPanel(QWidget):
             "ВМ", "Тип", "Формат", "Размер", "Создан"
         ])
         self.storage_backups_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_backups_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_backups_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_backups_table.setAlternatingRowColors(True)
         self.storage_backups_table.setSortingEnabled(True)
         enable_row_hover(self.storage_backups_table)
@@ -419,6 +453,10 @@ class DetailPanel(QWidget):
             "ВМ", "Имя", "Том", "Шина", "Размер"
         ])
         self.storage_disks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_disks_table.setAlternatingRowColors(True)
         self.storage_disks_table.setSortingEnabled(True)
         enable_row_hover(self.storage_disks_table)
@@ -448,6 +486,10 @@ class DetailPanel(QWidget):
             "Том", "Формат", "Размер", "Изменён"
         ])
         self.storage_iso_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_iso_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_iso_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_iso_table.setAlternatingRowColors(True)
         self.storage_iso_table.setSortingEnabled(True)
         enable_row_hover(self.storage_iso_table)
@@ -477,6 +519,10 @@ class DetailPanel(QWidget):
             "Том", "Формат", "Размер", "Изменён"
         ])
         self.storage_tpl_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.storage_tpl_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.storage_tpl_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.storage_tpl_table.setAlternatingRowColors(True)
         self.storage_tpl_table.setSortingEnabled(True)
         enable_row_hover(self.storage_tpl_table)
@@ -509,6 +555,10 @@ class DetailPanel(QWidget):
             "Интерфейс", "Тип", "Состояние", "Method", "CIDR"
         ])
         self.host_network_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_network_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_network_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_network_table.setAlternatingRowColors(True)
         enable_row_hover(self.host_network_table)
         self.host_network_stack = QStackedWidget()
@@ -537,6 +587,10 @@ class DetailPanel(QWidget):
             "Сервис", "Состояние", "Описание"
         ])
         self.host_services_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_services_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_services_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_services_table.setAlternatingRowColors(True)
         enable_row_hover(self.host_services_table)
         self.host_services_stack = QStackedWidget()
@@ -565,6 +619,10 @@ class DetailPanel(QWidget):
             "Устройство", "Тип", "Модель", "Размер", "Серийный"
         ])
         self.host_disks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_disks_table.setAlternatingRowColors(True)
         enable_row_hover(self.host_disks_table)
         self.host_disks_stack = QStackedWidget()
@@ -593,6 +651,10 @@ class DetailPanel(QWidget):
             "ВМ", "Снапшот", "Описание", "Создан", "Текущий"
         ])
         self.host_snapshots_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.host_snapshots_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.host_snapshots_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.host_snapshots_table.setAlternatingRowColors(True)
         self.host_snapshots_table.setSortingEnabled(True)
         enable_row_hover(self.host_snapshots_table)
@@ -1188,6 +1250,10 @@ class DetailPanel(QWidget):
             "Хост", "Статус", "Адрес", "ЦП %", "RAM (GiB)", "Аптайм"
         ])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
             node_name = node.get("_display_name") or node.get("node", "?")
@@ -1264,6 +1330,10 @@ class DetailPanel(QWidget):
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels(["Кластер", "Хосты", "ВМ", "ЦП %", "RAM (GiB)"])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         table.setRowCount(len(clusters))
         for i, (cl_name, cl_data) in enumerate(sorted(clusters.items(), key=lambda x: x[0].lower())):
             table.setItem(i, 0, QTableWidgetItem(cl_name))

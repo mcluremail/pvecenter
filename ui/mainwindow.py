@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self.v_splitter.splitterMoved.connect(_save_splitter)
 
         main_layout = QVBoxLayout()
-        main_layout.addWidget(v_splitter)
+        main_layout.addWidget(self.v_splitter)
 
         container = QWidget()
         container.setLayout(main_layout)
@@ -749,7 +749,14 @@ class MainWindow(QMainWindow):
             self.showMaximized()
         raw = load_ui_state("saved_key")
         if raw:
-            self._saved_key = raw
+            try:
+                val = _json.loads(raw)
+                if isinstance(val, list):
+                    self._saved_key = tuple(val)
+                else:
+                    self._saved_key = val
+            except (TypeError, ValueError, _json.JSONDecodeError):
+                pass
         raw = load_ui_state("saved_tab")
         if raw:
             try:
@@ -860,7 +867,7 @@ class MainWindow(QMainWindow):
         save_ui_state("window_maximized", "1" if self.isMaximized() else "0")
         key = self.tree_panel.get_current_item_key()
         if key:
-            save_ui_state("saved_key", key)
+            save_ui_state("saved_key", _json.dumps(key))
         save_ui_state("saved_tab", str(self.detail_panel.tabs.currentIndex()))
         save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
         save_ui_state("splitter_h", _json.dumps(self.h_splitter.sizes()))

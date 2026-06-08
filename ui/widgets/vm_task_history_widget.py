@@ -15,11 +15,17 @@ class VmTaskHistoryWidget(QWidget):
         ])
         # Все колонки по умолчанию Stretch
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         # Первые четыре — по содержимому
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.table.setWordWrap(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)

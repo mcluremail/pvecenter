@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
 
 class VmHardwareWidget(QWidget):
@@ -10,6 +11,8 @@ class VmHardwareWidget(QWidget):
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Параметр", "Значение"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
         layout = QVBoxLayout(self)
