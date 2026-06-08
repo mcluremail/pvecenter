@@ -6,10 +6,11 @@ import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel, QDialog, QPushButton, QCheckBox)
-from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSettings
+from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
-from ..config import save_config, save_tasks_cache, load_tasks_cache
+from ..config import save_config, save_tasks_cache, load_tasks_cache, save_ui_state, load_ui_state
+import json as _json
 from . import theme
 from .notification import NotificationManager
 from .tree_panel import TreePanel
@@ -59,37 +60,25 @@ class MainWindow(QMainWindow):
 
         self._notifications = NotificationManager(self)
 
-        self._settings = QSettings("PVECenter", "Dashboard")
+        self.h_splitter = QSplitter(Qt.Horizontal)
+        self.h_splitter.addWidget(self.tree_panel)
+        self.h_splitter.addWidget(self.detail_panel)
 
-        # Горизонтальный сплиттер (дерево + детали)
-        h_splitter = QSplitter(Qt.Horizontal)
-        h_splitter.addWidget(self.tree_panel)
-        h_splitter.addWidget(self.detail_panel)
-        saved_h = self._settings.value("splitter_horizontal")
-        if saved_h is not None:
-            h_splitter.setSizes([int(x) for x in saved_h])
-        else:
-            h_splitter.setSizes([360, 1140])
-
-        # Нижняя панель с задачами кластера
         self.tasks_widget = ClusterTasksWidget()
 
-        # Вертикальный сплиттер
-        v_splitter = QSplitter(Qt.Vertical)
-        v_splitter.addWidget(h_splitter)
-        v_splitter.addWidget(self.tasks_widget)
-        saved_v = self._settings.value("splitter_vertical")
-        if saved_v is not None:
-            v_splitter.setSizes([int(x) for x in saved_v])
-        else:
-            v_splitter.setSizes([550, 150])
+        self.v_splitter = QSplitter(Qt.Vertical)
+        self.v_splitter.addWidget(self.h_splitter)
+        self.v_splitter.addWidget(self.tasks_widget)
+
+        # Восстанавливаем положение сплиттеров из SQLite
+        self._restore_splitter_state()
 
         # Сохраняем позиции сплиттера при изменении
         def _save_splitter():
-            self._settings.setValue("splitter_horizontal", h_splitter.sizes())
-            self._settings.setValue("splitter_vertical", v_splitter.sizes())
-        h_splitter.splitterMoved.connect(_save_splitter)
-        v_splitter.splitterMoved.connect(_save_splitter)
+            save_ui_state("splitter_h", _json.dumps(self.h_splitter.sizes()))
+            save_ui_state("splitter_v", _json.dumps(self.v_splitter.sizes()))
+        self.h_splitter.splitterMoved.connect(_save_splitter)
+        self.v_splitter.splitterMoved.connect(_save_splitter)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(v_splitter)
@@ -128,6 +117,9 @@ class MainWindow(QMainWindow):
         self._soft_vms = []
         self._soft_storages = []
         self._soft_had_errors = False
+
+        # Восстанавливаем состояние окна: геометрия, maximized, последний выбранный элемент
+        self._restore_window_state()
 
         self.show()
         self.refresh_data()
@@ -394,10 +386,16 @@ class MainWindow(QMainWindow):
         self._soft_vms.clear()
         self._soft_storages.clear()
 
-        # Сохраняем выделение и вкладку
-        self._saved_key = self.tree_panel.get_current_item_key()
-        self._saved_tab = self.detail_panel.tabs.currentIndex()
-        self._saved_obj_type = self.detail_panel.current_obj_type
+        # Сохраняем выделение и вкладку (для послед. восстановления после refresh)
+        current_key = self.tree_panel.get_current_item_key()
+        if current_key is not None:
+            self._saved_key = current_key
+        current_tab = self.detail_panel.tabs.currentIndex()
+        if current_tab is not None:
+            self._saved_tab = current_tab
+        current_type = self.detail_panel.current_obj_type
+        if current_type is not None:
+            self._saved_obj_type = current_type
 
         self.all_nodes.clear()
         self.all_vms.clear()
@@ -729,6 +727,63 @@ class MainWindow(QMainWindow):
             logger.error("Ошибка при установке задач: %s", e)
 
     # ------------------------------------------------------------
+    # Сохранение/восстановление состояния окна (SQLite)
+    # ------------------------------------------------------------
+    def _restore_window_state(self):
+        """Восстанавливает геометрию, maximized, splitter-ы и последний выбранный элемент.
+        Вызывается до show(), чтобы окно появилось в правильном положении.
+        Используем SQLite (ui_state), а не QSettings, потому что:
+          - Единое хранилище: задачи и UI-состояние в одном файле
+          - Прозрачность: файл в ~/.config/pve-center/, можно глянуть руками
+          - QSettings размазывает данные по platform-specific местам (реестр/dconf/INI)"""
+        raw = load_ui_state("window_geometry")
+        if raw:
+            try:
+                geo = _json.loads(raw)
+                if isinstance(geo, list) and len(geo) == 4:
+                    self.setGeometry(*geo)
+            except (TypeError, ValueError):
+                pass
+        raw = load_ui_state("window_maximized")
+        if raw == "1":
+            self.showMaximized()
+        raw = load_ui_state("saved_key")
+        if raw:
+            self._saved_key = raw
+        raw = load_ui_state("saved_tab")
+        if raw:
+            try:
+                self._saved_tab = int(raw)
+            except (TypeError, ValueError):
+                pass
+        raw = load_ui_state("saved_obj_type")
+        if raw:
+            self._saved_obj_type = raw
+
+    def _restore_splitter_state(self):
+        """Восстанавливает позиции сплиттеров из SQLite."""
+        raw = load_ui_state("splitter_h")
+        if raw:
+            try:
+                vals = _json.loads(raw)
+                if isinstance(vals, list):
+                    self.h_splitter.setSizes([int(x) for x in vals])
+            except (TypeError, ValueError):
+                pass
+        else:
+            self.h_splitter.setSizes([360, 1140])
+        raw = load_ui_state("splitter_v")
+        if raw:
+            try:
+                vals = _json.loads(raw)
+                if isinstance(vals, list):
+                    self.v_splitter.setSizes([int(x) for x in vals])
+            except (TypeError, ValueError):
+                pass
+        else:
+            self.v_splitter.setSizes([550, 150])
+
+    # ------------------------------------------------------------
     # Строка состояния
     # ------------------------------------------------------------
     def _update_status_bar(self):
@@ -799,4 +854,15 @@ class MainWindow(QMainWindow):
         self.refresh_timer.stop()
         self.tasks_timer.stop()
         self.tree_panel.save_state()
+        # Сохраняем состояние окна
+        geo = self.geometry()
+        save_ui_state("window_geometry", _json.dumps([geo.x(), geo.y(), geo.width(), geo.height()]))
+        save_ui_state("window_maximized", "1" if self.isMaximized() else "0")
+        key = self.tree_panel.get_current_item_key()
+        if key:
+            save_ui_state("saved_key", key)
+        save_ui_state("saved_tab", str(self.detail_panel.tabs.currentIndex()))
+        save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
+        save_ui_state("splitter_h", _json.dumps(self.h_splitter.sizes()))
+        save_ui_state("splitter_v", _json.dumps(self.v_splitter.sizes()))
         super().closeEvent(event)

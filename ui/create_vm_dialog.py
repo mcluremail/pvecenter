@@ -4,6 +4,10 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
                                QWidget, QFrame)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
+from ..config import save_ui_state, load_ui_state
+import json as _json
+
+VM_SETTINGS_KEY = "create_vm_settings"
 
 # ── Статические константы ─────────────────────────────────────────
 
@@ -117,6 +121,66 @@ class CreateVmDialog(QDialog):
         self._iso_images = iso_images or {}
         self._ha_groups = ha_groups or {}
         self._build_ui()
+        self._restore_settings()
+
+    def _save_settings(self):
+        data = {
+            "cores": self.cores_spin.value(),
+            "sockets": self.sockets_spin.value(),
+            "memory": self.memory_spin.value(),
+            "ostype": self.ostype_combo.currentIndex(),
+            "cpu": self.cpu_combo.currentIndex(),
+            "vga": self.vga_combo.currentIndex(),
+            "chipset": self.chipset_combo.currentIndex(),
+            "bios": self.bios_combo.currentIndex(),
+            "scsi": self.scsi_combo.currentIndex(),
+            "bus": self.bus_combo.currentIndex(),
+            "cache": self.cache_combo.currentIndex(),
+            "disk_size": self.disk_size_spin.value(),
+            "model": self.model_combo.currentIndex(),
+            "queues": self.queues_spin.value(),
+            "start": int(self.start_check.isChecked()),
+        }
+        save_ui_state(VM_SETTINGS_KEY, _json.dumps(data))
+
+    def _restore_settings(self):
+        raw = load_ui_state(VM_SETTINGS_KEY)
+        if not raw:
+            return
+        try:
+            data = _json.loads(raw)
+        except (TypeError, ValueError):
+            return
+        if data.get("cores"):
+            self.cores_spin.setValue(data["cores"])
+        if data.get("sockets"):
+            self.sockets_spin.setValue(data["sockets"])
+        if data.get("memory"):
+            self.memory_spin.setValue(data["memory"])
+        if data.get("ostype"):
+            self.ostype_combo.setCurrentIndex(data["ostype"])
+        if data.get("cpu"):
+            self.cpu_combo.setCurrentIndex(data["cpu"])
+        if data.get("vga"):
+            self.vga_combo.setCurrentIndex(data["vga"])
+        if data.get("chipset"):
+            self.chipset_combo.setCurrentIndex(data["chipset"])
+        if data.get("bios"):
+            self.bios_combo.setCurrentIndex(data["bios"])
+        if data.get("scsi"):
+            self.scsi_combo.setCurrentIndex(data["scsi"])
+        if data.get("bus"):
+            self.bus_combo.setCurrentIndex(data["bus"])
+        if data.get("cache"):
+            self.cache_combo.setCurrentIndex(data["cache"])
+        if data.get("disk_size"):
+            self.disk_size_spin.setValue(data["disk_size"])
+        if data.get("model"):
+            self.model_combo.setCurrentIndex(data["model"])
+        if data.get("queues"):
+            self.queues_spin.setValue(data["queues"])
+        if data.get("start") is not None:
+            self.start_check.setChecked(bool(data["start"]))
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -488,6 +552,7 @@ class CreateVmDialog(QDialog):
             self.ha_combo.addItem(g, g)
 
     def _on_create(self):
+        self._save_settings()
         name = self.name_input.text().strip()
         if not name:
             self.name_input.setFocus()

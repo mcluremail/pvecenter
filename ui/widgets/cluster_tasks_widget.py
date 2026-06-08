@@ -3,6 +3,10 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
+from ...config import save_ui_state, load_ui_state
+import json as _json
+
+TASK_COL_WIDTHS_KEY = "task_col_widths"
 
 
 TASK_TYPE_LABELS = {
@@ -143,6 +147,10 @@ class ClusterTasksWidget(QWidget):
         self.table.setColumnWidth(0, 155)
         self.table.setColumnWidth(1, 155)
 
+        # Восстанавливаем ширину колонок (изменения сохраняем через sectionResized)
+        self._restore_column_widths()
+        h.sectionResized.connect(self._save_column_widths)
+
         self.table.setWordWrap(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -264,3 +272,19 @@ class ClusterTasksWidget(QWidget):
         self.table.setUpdatesEnabled(True)
         if was_sorted:
             self.table.setSortingEnabled(True)
+
+    def _save_column_widths(self):
+        widths = [self.table.columnWidth(c) for c in range(self.table.columnCount())]
+        save_ui_state(TASK_COL_WIDTHS_KEY, _json.dumps(widths))
+
+    def _restore_column_widths(self):
+        raw = load_ui_state(TASK_COL_WIDTHS_KEY)
+        if not raw:
+            return
+        try:
+            widths = _json.loads(raw)
+            if isinstance(widths, list) and len(widths) == self.table.columnCount():
+                for c, w in enumerate(widths):
+                    self.table.setColumnWidth(c, w)
+        except (TypeError, ValueError):
+            pass

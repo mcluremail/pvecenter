@@ -266,3 +266,71 @@ def load_tasks_cache() -> list[dict]:
         import logging
         logging.getLogger(__name__).warning("load_tasks_cache: %s", e)
     return []
+
+
+# ------------------------------------------------------------
+# UI State — key-value store для сохранения состояния интерфейса
+# ------------------------------------------------------------
+
+_ui_state_lock = threading.Lock()
+
+
+def _init_ui_db():
+    path = _tasks_db_path()  # один файл, вторая таблица
+    conn = sqlite3.connect(path, timeout=5)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
+    conn.commit()
+    return conn
+
+
+def save_ui_state(key: str, value: str):
+    try:
+        with _ui_state_lock:
+            conn = _init_ui_db()
+            conn.execute("INSERT OR REPLACE INTO ui_state (key, value) VALUES (?, ?)", (key, value))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("save_ui_state(%s): %s", key, e)
+
+
+def load_ui_state(key: str) -> str | None:
+    try:
+        with _ui_state_lock:
+            conn = _init_ui_db()
+            cur = conn.execute("SELECT value FROM ui_state WHERE key = ?", (key,))
+            row = cur.fetchone()
+            conn.close()
+            return row[0] if row else None
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("load_ui_state(%s): %s", key, e)
+        return None
+
+
+def load_all_ui_state() -> dict[str, str]:
+    try:
+        with _ui_state_lock:
+            conn = _init_ui_db()
+            cur = conn.execute("SELECT key, value FROM ui_state")
+            rows = cur.fetchall()
+            conn.close()
+            return {k: v for k, v in rows}
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("load_all_ui_state: %s", e)
+        return {}
+
+
+def delete_ui_state(key: str):
+    try:
+        with _ui_state_lock:
+            conn = _init_ui_db()
+            conn.execute("DELETE FROM ui_state WHERE key = ?", (key,))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("delete_ui_state(%s): %s", key, e)

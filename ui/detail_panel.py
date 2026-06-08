@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, QThreadPool
 from .hover import enable_row_hover
 from .icons import get_icon
 from .utils import STATUS_RU, ru_status as _ru_status, format_uptime as _format_uptime
+from ..config import save_ui_state, load_ui_state
+import json as _json
 from PySide6.QtGui import QColor, QBrush
 
 

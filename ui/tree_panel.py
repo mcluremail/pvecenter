@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
                                QWidget, QAbstractItemView, QPushButton, QMenu, QToolButton,
                                QLabel)
-from PySide6.QtCore import Signal, QSettings, Qt, QSize, QTimer
+from PySide6.QtCore import Signal, Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
 from datetime import timedelta
@@ -9,6 +9,7 @@ from datetime import timedelta
 import re as _re
 
 from .icons import get_icon, init_icons, _make_loading_icon
+from ..config import save_ui_state, load_ui_state
 from .utils import STATUS_RU, format_uptime as _format_uptime
 
 VM_KEY_ROLE = Qt.UserRole + 1
@@ -32,8 +33,6 @@ class TreePanel(QWidget):
         self.nodes_cfg = nodes_cfg
         self.all_nodes = []
         self.all_vms = []
-
-        self.settings = QSettings("PVECenter", "Dashboard")
 
         self._building = False
         self._nav_timer = QTimer()
@@ -628,7 +627,6 @@ class TreePanel(QWidget):
         return _re.sub(r'\s+\[\d+/\d+\]$', '', text)
 
     def _save_expanded_state(self):
-        key = "expandedTreePaths"
         paths = []
         def collect_paths(item, path=""):
             label = self._strip_count(item.text(0))
@@ -639,11 +637,18 @@ class TreePanel(QWidget):
                 collect_paths(item.child(i), current)
         for i in range(self.tree.topLevelItemCount()):
             collect_paths(self.tree.topLevelItem(i))
-        self.settings.setValue(key, paths)
+        import json
+        save_ui_state("expandedTreePaths", json.dumps(paths))
 
     def _restore_expanded_state(self):
-        key = "expandedTreePaths"
-        saved_paths = self.settings.value(key, [])
+        import json
+        raw = load_ui_state("expandedTreePaths")
+        if not raw:
+            return
+        try:
+            saved_paths = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return
         if not saved_paths:
             return
         def match_and_expand(item, path=""):
