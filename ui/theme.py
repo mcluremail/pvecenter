@@ -327,8 +327,9 @@ QSS = f"""
         width: 20px;
     }}
     QComboBox::down-arrow {{
-        image: none;
-        width: 0;
+        image: url({_CHECK_DIR}/arrow-down.svg);
+        width: 10px;
+        height: 8px;
     }}
 
     /* ── Скроллбар (тонкий, закруглённый) ── */

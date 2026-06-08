@@ -6,17 +6,16 @@ import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel, QDialog, QPushButton, QCheckBox)
-from PySide6.QtCore import Qt, Slot, QTimer
+from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSettings
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
-from ..config import save_config
+from ..config import save_config, save_tasks_cache, load_tasks_cache
 from . import theme
 from .notification import NotificationManager
 from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 from .icons import get_icon
-
 logger = logging.getLogger(__name__)
 
 # Максимум одновременно работающих воркеров
@@ -60,11 +59,17 @@ class MainWindow(QMainWindow):
 
         self._notifications = NotificationManager(self)
 
+        self._settings = QSettings("PVECenter", "Dashboard")
+
         # Горизонтальный сплиттер (дерево + детали)
         h_splitter = QSplitter(Qt.Horizontal)
         h_splitter.addWidget(self.tree_panel)
         h_splitter.addWidget(self.detail_panel)
-        h_splitter.setSizes([280, 1220])
+        saved_h = self._settings.value("splitter_horizontal")
+        if saved_h is not None:
+            h_splitter.setSizes([int(x) for x in saved_h])
+        else:
+            h_splitter.setSizes([360, 1140])
 
         # Нижняя панель с задачами кластера
         self.tasks_widget = ClusterTasksWidget()
@@ -73,7 +78,18 @@ class MainWindow(QMainWindow):
         v_splitter = QSplitter(Qt.Vertical)
         v_splitter.addWidget(h_splitter)
         v_splitter.addWidget(self.tasks_widget)
-        v_splitter.setSizes([550, 150])
+        saved_v = self._settings.value("splitter_vertical")
+        if saved_v is not None:
+            v_splitter.setSizes([int(x) for x in saved_v])
+        else:
+            v_splitter.setSizes([550, 150])
+
+        # Сохраняем позиции сплиттера при изменении
+        def _save_splitter():
+            self._settings.setValue("splitter_horizontal", h_splitter.sizes())
+            self._settings.setValue("splitter_vertical", v_splitter.sizes())
+        h_splitter.splitterMoved.connect(_save_splitter)
+        v_splitter.splitterMoved.connect(_save_splitter)
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(v_splitter)
@@ -86,8 +102,19 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("")
         self.status_bar.addPermanentWidget(self.status_label)
 
+        self._refresh_spinner = QLabel("")
+        self._refresh_spinner.setStyleSheet("color: #6b7280; padding-right: 8px;")
+        self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
+        self._spin_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self._spin_idx = 0
+        self._spin_timer = QTimer(self)
+        self._spin_timer.setInterval(100)
+        self._spin_timer.timeout.connect(self._tick_spinner)
+        self._soft_refresh_active = False
+
         self._workers = set()
         self._tasks_gen = 0
+        self._tasks_started = False
 
         # Переменные для мягкого обновления
         self.last_refresh_ts = 0
@@ -128,20 +155,20 @@ class MainWindow(QMainWindow):
 
         # Таймер обновления задач кластера
         self.tasks_timer = QTimer(self)
-        self.tasks_timer.setInterval(30000)            # 30 секунд
+        self.tasks_timer.setInterval(60000)            # 60 секунд
         self.tasks_timer.timeout.connect(self.refresh_cluster_tasks)
         self.tasks_timer.start()
 
-        # Первая загрузка задач
-        QTimer.singleShot(1000, self.refresh_cluster_tasks)
+        # Первая загрузка задач — стартует из on_worker_finished, когда all_nodes заполнен
+        self._cached_tasks = load_tasks_cache()
 
     def _run_worker(self, worker):
         if len(self._workers) >= MAX_WORKERS:
             return
         self._workers.add(worker)
-        cls_name = type(worker).__name__
-        t = threading.Thread(target=worker.run, daemon=True, name=f"wkr-{cls_name}-{id(worker)}")
-        t.start()
+        if hasattr(worker.signals, "finished"):
+            worker.signals.finished.connect(lambda w=worker: self._discard_worker(w))
+        QThreadPool.globalInstance().start(worker)
 
     def _discard_worker(self, worker):
         """Безопасно удаляет воркер из _workers.
@@ -401,9 +428,6 @@ class MainWindow(QMainWindow):
 
     @Slot(dict)
     def on_worker_finished(self, data, worker=None):
-        self._workers.discard(worker)
-        if not hasattr(self, 'all_pools'):
-            self.all_pools = []
         if data["status"] == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
             for node in data["nodes"]:
@@ -445,35 +469,41 @@ class MainWindow(QMainWindow):
                 "_is_cluster": is_cluster_err
             })
 
-        self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
-        self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
         self._detect_status_changes()
+
+        # Обновляем статус-бар сразу — частичные данные лучше, чем пустота
+        self._update_status_bar()
+
+        # Промежуточное обновление дерева — без очистки спиннеров.
+        # Не загрузившиеся кластеры остаются в дереве как заглушки со спиннерами.
+        self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=False)
+        self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+
+        # Выбираем первый элемент в дереве при первой же возможности.
+        if not getattr(self, '_first_selection_done', False) and self.tree_panel.tree.topLevelItemCount() > 0:
+            self._do_first_selection()
+
+        # Загрузка задач стартует при первом же воркере — не ждём все данные
+        if not self._tasks_started:
+            self._tasks_started = True
+            QTimer.singleShot(0, self.refresh_cluster_tasks)
 
         fetch_workers = [w for w in self._workers if isinstance(w, FetchWorker)]
         if not fetch_workers:
+            # Выбираем первый элемент до финальной перестройки дерева —
+            # сводка кластера появляется сразу, не дожидаясь _build_tree с сотнями VM
             if not getattr(self, '_first_selection_done', False):
-                self._first_selection_done = True
-                saved_key = getattr(self, '_saved_key', None)
-                if saved_key:
-                    item = self.tree_panel.find_item_by_key(saved_key)
-                    if item:
-                        self.tree_panel.tree.setCurrentItem(item)
-                        self.tree_panel._on_item_clicked(item, 0)
-                        saved_tab = getattr(self, '_saved_tab', 0)
-                        saved_type = getattr(self, '_saved_obj_type', None)
-                        if saved_type and saved_type == self.detail_panel.current_obj_type:
-                            QTimer.singleShot(100, lambda: self.detail_panel.tabs.setCurrentIndex(saved_tab))
-                    else:
-                        self.tree_panel.select_first_item()
-                else:
-                    self.tree_panel.select_first_item()
+                self._do_first_selection()
+            # Все данные загружены — финальная перестройка: спиннеры гаснут, VM/пулы в дереве
+            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
-            QTimer.singleShot(0, self.refresh_cluster_tasks)
 
-    def _detect_status_changes(self):
-        for node in self.all_nodes:
+    def _detect_status_changes(self, nodes=None, vms=None):
+        nodes = nodes if nodes is not None else self.all_nodes
+        vms = vms if vms is not None else self.all_vms
+        for node in nodes:
             name = node.get("node", "")
             status = node.get("status", "unknown")
             old = self._last_host_statuses.get(name)
@@ -482,7 +512,7 @@ class MainWindow(QMainWindow):
                 self._notifications.host_status_changed(display, old, status)
             self._last_host_statuses[name] = status
 
-        for vm in self.all_vms:
+        for vm in vms:
             key = (vm.get("host_name", ""), vm.get("vmid", 0))
             status = vm.get("status", "unknown")
             old = self._last_vm_statuses.get(key)
@@ -502,6 +532,7 @@ class MainWindow(QMainWindow):
             if now - self._soft_refresh_start > self._soft_refresh_timeout:
                 self._soft_gen += 1
                 self._soft_refresh_running = False
+                self._soft_refresh_active = False
                 self._soft_counter = 0
                 self._soft_nodes.clear()
                 self._soft_vms.clear()
@@ -509,6 +540,9 @@ class MainWindow(QMainWindow):
             else:
                 return
         self._soft_refresh_running = True
+        self._soft_refresh_active = True
+        if not self._spin_timer.isActive():
+            self._spin_timer.start()
         self._soft_refresh_start = now
         self.last_refresh_ts = now
         self._soft_gen += 1
@@ -534,11 +568,12 @@ class MainWindow(QMainWindow):
     @Slot(dict)
     def on_soft_refresh_result(self, data, worker=None, gen=0):
         if gen != self._soft_gen:
-            self._workers.discard(worker)
             return
         if data["status"] == "ok":
+            is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
             for node in data["nodes"]:
                 node["host_name"] = data["host"]
+                node["_is_cluster"] = is_cluster
                 self._soft_nodes.append(node)
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
@@ -563,11 +598,20 @@ class MainWindow(QMainWindow):
             if self._soft_nodes or self._soft_vms:
                 try:
                     self.tree_panel.update_node_statuses(self._soft_nodes, self._soft_vms)
-                    self.detail_panel.all_nodes = list(self._soft_nodes)
-                    self.detail_panel.all_vms = list(self._soft_vms)
-                    self.detail_panel.all_storages = list(self._soft_storages)
+                    self.all_nodes[:] = self._soft_nodes
+                    self.all_vms[:] = self._soft_vms
+                    self.all_storages[:] = self._soft_storages
+                    self.detail_panel.all_nodes[:] = self._soft_nodes
+                    self.detail_panel.all_vms[:] = self._soft_vms
+                    self.detail_panel.all_storages[:] = self._soft_storages
                     self.detail_panel.refresh_current_view()
-                    self._detect_status_changes()
+                    # Пробрасываем уже собранные на hard refresh пулы/HA/ISO —
+                    # soft refresh не имеет ProxmoxAPI, пересобрать не может
+                    self.detail_panel.all_pools = self.all_pools
+                    self.detail_panel.all_ha_groups = self.all_ha_groups
+                    self.detail_panel.all_iso_images = self.all_iso_images
+                    self._detect_status_changes(self._soft_nodes, self._soft_vms)
+                    self._update_status_bar()
                 except Exception:
                     traceback.print_exc()
             self._soft_nodes.clear()
@@ -575,30 +619,38 @@ class MainWindow(QMainWindow):
             self._soft_storages.clear()
             self._soft_counter = 0
             self._soft_refresh_running = False
+            self._soft_refresh_active = False
 
     # ------------------------------------------------------------
     # Обновление задач кластера
     # ------------------------------------------------------------
     def refresh_cluster_tasks(self):
+        # Показываем кэшированные задачи мгновенно, пока воркер грузит свежие
+        if self._cached_tasks:
+            self.tasks_widget.set_tasks(self._cached_tasks)
+        elif not self._workers:
+            self.tasks_widget.set_placeholder("Загрузка задач...")
         if not self.nodes_cfg or not self.all_nodes:
             return
 
         node_requests = []
         seen_nodes = set()
 
-        def _short_name(cfg):
-            return cfg["name"].split("@")[0]
-
         rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
         for n in self.all_nodes:
             pve_node = n.get("node", "")
+            host_name = n.get("host_name", "")
             if not pve_node or pve_node in seen_nodes:
                 continue
             display = n.get("_display_name", "")
+
             if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
                 cfg = rep_cfg
             else:
-                cfg = next((c for c in self.nodes_cfg if _short_name(c) == pve_node), None)
+                cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+                if cfg is None:
+                    cfg = next((c for c in self.nodes_cfg
+                                if c["name"].split("@")[0] == pve_node), None)
             if cfg:
                 node_requests.append((cfg, pve_node))
                 seen_nodes.add(pve_node)
@@ -616,14 +668,23 @@ class MainWindow(QMainWindow):
             )
         )
         worker.signals.tasks_error.connect(lambda err, w=worker: self._discard_worker(w))
-        self._run_worker(worker)
+        # Запускаем в отдельном потоке, а не через QThreadPool — чтобы не блокировать
+        # слот пула на время join() внутри ClusterTasksWorker.run()
+        t = threading.Thread(target=worker.run, daemon=True)
+        t.start()
 
     def _on_cluster_tasks_loaded(self, tasks, gen=None):
         if gen is None:
-            logger.warning("_on_cluster_tasks_loaded вызван без gen — пропускаем защиту")
-            gen = 0
-        if gen != 0 and gen != self._tasks_gen:
+            logger.warning("_on_cluster_tasks_loaded вызван без gen — обрабатываем без защиты по поколению")
+            self._update_cluster_tasks_widget(tasks)
             return
+        if gen != self._tasks_gen:
+            return
+        self._update_cluster_tasks_widget(tasks)
+
+    def _update_cluster_tasks_widget(self, tasks):
+        self._cached_tasks = tasks
+        save_tasks_cache(tasks)
         try:
             node_map = {}
             for n in self.all_nodes:
@@ -680,9 +741,35 @@ class MainWindow(QMainWindow):
             f"Хостов: {hosts_ok}/{hosts_total}  ВМ: {vms_count}  Обновлено: {now_str}"
         )
 
+    def _do_first_selection(self):
+        self._first_selection_done = True
+        saved_key = getattr(self, '_saved_key', None)
+        if saved_key:
+            item = self.tree_panel.find_item_by_key(saved_key)
+            if item:
+                self.tree_panel.tree.setCurrentItem(item)
+                self.tree_panel._on_item_clicked(item, 0)
+                saved_tab = getattr(self, '_saved_tab', 0)
+                saved_type = getattr(self, '_saved_obj_type', None)
+                if saved_type and saved_type == self.detail_panel.current_obj_type:
+                    QTimer.singleShot(100, lambda: self.detail_panel.tabs.setCurrentIndex(saved_tab))
+            else:
+                self.tree_panel.select_first_item()
+        else:
+            self.tree_panel.select_first_item()
+
     # ------------------------------------------------------------
     # Детектор зависания
     # ------------------------------------------------------------
+    def _tick_spinner(self):
+        """Анимирует спиннер в статус-баре при фоновом обновлении."""
+        if not self._soft_refresh_active:
+            self._refresh_spinner.setText("")
+            self._spin_timer.stop()
+            return
+        self._refresh_spinner.setText(self._spin_frames[self._spin_idx])
+        self._spin_idx = (self._spin_idx + 1) % len(self._spin_frames)
+
     def _heartbeat(self):
         self._last_heartbeat = time.time()
 

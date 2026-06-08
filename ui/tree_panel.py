@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
-                               QWidget, QAbstractItemView, QPushButton, QMenu, QToolButton)
+                               QWidget, QAbstractItemView, QPushButton, QMenu, QToolButton,
+                               QLabel)
 from PySide6.QtCore import Signal, QSettings, Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
@@ -8,6 +9,7 @@ from datetime import timedelta
 import re as _re
 
 from .icons import get_icon, init_icons, _make_loading_icon
+from .utils import STATUS_RU, format_uptime as _format_uptime
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2
@@ -33,19 +35,6 @@ class TreePanel(QWidget):
 
         self.settings = QSettings("PVECenter", "Dashboard")
 
-        self.tree = QTreeWidget()
-        self.tree.setColumnCount(1)
-        self.tree.setHeaderHidden(True)
-        self.tree.setAlternatingRowColors(True)
-        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.tree.setIndentation(20)
-        self.tree.setIconSize(QSize(22, 22))
-        self.tree.setRootIsDecorated(True)
-        self.tree.setAnimated(True)
-        self.tree.itemClicked.connect(self._on_item_clicked)
-        self.tree.currentItemChanged.connect(self._on_current_item_changed)
-        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tree.customContextMenuRequested.connect(self._on_context_menu)
         self._building = False
         self._nav_timer = QTimer()
         self._nav_timer.setSingleShot(True)
@@ -62,6 +51,7 @@ class TreePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         init_icons()
+
         self._toggle_btn = QToolButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
@@ -70,6 +60,26 @@ class TreePanel(QWidget):
         self._toggle_btn.setAutoRaise(True)
         self._toggled = False
         self._toggle_btn.clicked.connect(self._toggle_expand)
+
+        self._empty_label = QLabel("Нет добавленных серверов.\nНажмите + чтобы добавить")
+        self._empty_label.setAlignment(Qt.AlignCenter)
+        self._empty_label.setWordWrap(True)
+        self._empty_label.setStyleSheet("color: #9ca3af; font-size: 13px; padding: 40px 20px;")
+        layout.addWidget(self._empty_label)
+
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(1)
+        self.tree.setHeaderHidden(True)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.setIndentation(20)
+        self.tree.setIconSize(QSize(22, 22))
+        self.tree.setRootIsDecorated(True)
+        self.tree.setAnimated(True)
+        self.tree.itemClicked.connect(self._on_item_clicked)
+        self.tree.currentItemChanged.connect(self._on_current_item_changed)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_context_menu)
 
         layout.addWidget(self.tree)
 
@@ -226,18 +236,23 @@ class TreePanel(QWidget):
         for i in range(self.tree.topLevelItemCount()):
             spin(self.tree.topLevelItem(i))
 
-    def update_data(self, all_nodes, all_vms, all_storages=None):
+    def update_data(self, all_nodes, all_vms, all_storages=None, final=False):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
         self.all_storages = all_storages or []
-        self._loading_hosts.clear()
-        self._spin_timer.stop()
+        if final:
+            self._loading_hosts.clear()
+            self._spin_timer.stop()
         self._build_tree()
         self._restore_expanded_state()
         self._sync_toggle_button()
+        self._update_empty_visibility()
 
     def start_loading(self):
         self.tree.clear()
+        self._empty_label.setVisible(False)
+        self.tree.setVisible(True)
+        self._toggle_btn.setVisible(True)
         self._building = True
         self._loading_hosts.clear()
 
@@ -322,7 +337,7 @@ class TreePanel(QWidget):
         maxmem = vm.get("maxmem", 1) or 1
         mem_pct = int((mem / maxmem) * 100) if maxmem else 0
         status = vm.get("status", "")
-        vm_item.setToolTip(0, f"Статус: {status}\nЦП: {cpu_pct}%\nRAM: {mem_pct}%")
+        vm_item.setToolTip(0, f"Статус: {STATUS_RU.get(status, status)}\nЦП: {cpu_pct}%\nRAM: {mem_pct}%")
         return vm_item
 
     def _build_tree(self):
@@ -341,14 +356,63 @@ class TreePanel(QWidget):
             else:
                 standalone_nodes.append(node)
 
+        # Добавляем кластеры из конфига, которых ещё нет в данных — чтобы они
+        # не исчезали из дерева пока их воркер не завершился
+        for cfg in self.nodes_cfg:
+            if cfg.get("skip"):
+                continue
+            cluster_name = cfg.get("cluster")
+            if cluster_name and cluster_name not in (False, None, "Standalone"):
+                if cluster_name not in cluster_nodes:
+                    cluster_nodes[cluster_name] = []
+                    if f"cluster:{cluster_name}" not in self._loading_hosts:
+                        self._loading_hosts.add(f"cluster:{cluster_name}")
+
+        # Для standalone хостов — добавляем заглушки по имени из конфига
+        standalone_names = {n.get("host_name", "") for n in standalone_nodes}
+        for cfg in self.nodes_cfg:
+            if cfg.get("skip"):
+                continue
+            host_name = cfg.get("name", "")
+            cluster = cfg.get("cluster")
+            if cluster and cluster not in (False, None, "Standalone"):
+                continue
+            if host_name not in standalone_names:
+                standalone_nodes.append({
+                    "node": host_name,
+                    "host_name": host_name,
+                    "_display_name": host_name,
+                    "status": "loading",
+                })
+                self._loading_hosts.add(host_name)
+
+        # Убираем из _loading_hosts то, что уже загрузилось
+        for node in self.all_nodes:
+            hn = node.get("host_name", "")
+            self._loading_hosts.discard(hn)
+            if node.get("_is_cluster"):
+                cfg = next((c for c in self.nodes_cfg if c["name"] == hn), None)
+                if cfg:
+                    cl_name = cfg.get("cluster", "")
+                    if cl_name:
+                        self._loading_hosts.discard(f"cluster:{cl_name}")
+
         cluster_folder = self._make_section_item(self.tree, "Кластеры")
         standalone_folder = self._make_section_item(self.tree, "Отдельные хосты")
 
         if cluster_nodes:
             for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(cluster_folder)
+                nodes_in_cl = cluster_nodes[cluster_name]
+                if not nodes_in_cl:
+                    # Кластер есть в конфиге, но данные ещё не пришли — заглушка со спиннером
+                    cl_item.setText(0, cluster_name)
+                    cl_item.setIcon(0, _make_loading_icon(self._spinner_angle))
+                    cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+                    cl_item.setExpanded(True)
+                    continue
                 vms_in_cl = [vm for vm in self.all_vms
-                             if any(vm.get("node") == n.get("node") for n in cluster_nodes[cluster_name])]
+                             if any(vm.get("node") == n.get("node") for n in nodes_in_cl)]
                 cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
                 cl_item.setIcon(0, get_icon("cluster"))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
@@ -409,6 +473,12 @@ class TreePanel(QWidget):
                                if vm.get("node") == node_name
                                and vm.get("host_name") == host_name]
                 host_item = QTreeWidgetItem(standalone_folder)
+                if node.get("status") == "loading":
+                    host_item.setText(0, display_name)
+                    host_item.setIcon(0, _make_loading_icon(self._spinner_angle))
+                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
+                    host_item.setExpanded(True)
+                    continue
                 host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
                 host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
@@ -425,10 +495,9 @@ class TreePanel(QWidget):
                     f"ЦП: {cpu}%\nRAM: {mem_pct}%\nАптайм: {uptime_str}"
                 )
 
-                all_vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
                 pool_groups = defaultdict(list)
                 no_pool_vms = []
-                for vm in all_vms_on_host:
+                for vm in vms_on_host:
                     pool = vm.get("pool")
                     if pool and pool not in ("", "No pool"):
                         pool_groups[pool].append(vm)
@@ -505,8 +574,20 @@ class TreePanel(QWidget):
         self._building = False
 
     def update_node_statuses(self, all_nodes, all_vms):
-        self._loading_hosts.clear()
-        self._spin_timer.stop()
+        # Удаляем из _loading_hosts те, которые уже загрузились, чтобы спиннер погас
+        for node in all_nodes:
+            hn = node.get("host_name", "")
+            self._loading_hosts.discard(hn)
+            if node.get("_is_cluster"):
+                # Находим имя кластера из конфига — в start_loading он был ключом
+                cfg = next((c for c in self.nodes_cfg if c["name"] == hn), None)
+                if cfg:
+                    cluster_name = cfg.get("cluster", "")
+                    if cluster_name:
+                        self._loading_hosts.discard(f"cluster:{cluster_name}")
+        if not self._loading_hosts:
+            self._spin_timer.stop()
+
         def traverse(item):
             for i in range(item.childCount()):
                 child = item.child(i)
@@ -579,6 +660,13 @@ class TreePanel(QWidget):
 
     def save_state(self):
         self._save_expanded_state()
+
+    def _update_empty_visibility(self):
+        """Показывает/скрывает подсказку при пустом дереве."""
+        has_items = self.tree.topLevelItemCount() > 0
+        self._empty_label.setVisible(not has_items)
+        self.tree.setVisible(has_items)
+        self._toggle_btn.setVisible(has_items)
 
     def select_first_item(self):
         if self.tree.topLevelItemCount() > 0:

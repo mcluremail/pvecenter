@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
                                QLabel, QLineEdit, QPushButton, QCheckBox,
                                QMessageBox, QGroupBox)
-from PySide6.QtCore import Qt
-from ..backend import create_admin_token
+from PySide6.QtCore import Qt, QThreadPool
+from ..backend import TokenCreationWorker
 
 
 class AddServerDialog(QDialog):
@@ -14,8 +14,19 @@ class AddServerDialog(QDialog):
         self.setWindowTitle(f"Добавить сервер{title_suffix}")
         self.setFixedSize(500, 420)
         self._token_data = None
+        self._active_workers = set()
         self._build_ui()
         self._apply_context()
+
+    def closeEvent(self, event):
+        for w in list(self._active_workers):
+            try:
+                w.signals.token_ready.disconnect()
+                w.signals.token_error.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+        self._active_workers.clear()
+        super().closeEvent(event)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -123,21 +134,18 @@ class AddServerDialog(QDialog):
 
         self.auth_btn.setEnabled(False)
         self.auth_btn.setText("Подключение...")
-        self._set_status("Создание пользователя и токена...", "#6b7280")
+        self._set_status("Подключение и создание токена...", "#6b7280")
 
-        from PySide6.QtCore import QCoreApplication
-        QCoreApplication.processEvents()
+        worker = TokenCreationWorker(host, user, password)
+        self._active_workers.add(worker)
+        worker.signals.token_ready.connect(self._on_token_ready)
+        worker.signals.token_error.connect(self._on_token_error)
+        def _cleanup(w=worker):
+            self._active_workers.discard(w)
+        worker.signals.finished.connect(_cleanup)
+        QThreadPool.globalInstance().start(worker)
 
-        result = create_admin_token(host, user, password)
-
-        if "error" in result:
-            self._set_status(result["error"], "#ef4444")
-            self.auth_btn.setEnabled(True)
-            self.auth_btn.setText("Получить токен")
-            self._token_data = None
-            self.add_btn.setEnabled(False)
-            return
-
+    def _on_token_ready(self, result):
         self._token_data = result
         self.token_name_label.setText(result["token_name"])
         self.token_value_label.setText(result["token_value"])
@@ -147,7 +155,14 @@ class AddServerDialog(QDialog):
         self.add_btn.setEnabled(True)
 
         if not self.name_input.text().strip():
-            self.name_input.setText(host)
+            self.name_input.setText(self.host_input.text().strip())
+
+    def _on_token_error(self, error):
+        self._set_status(error, "#ef4444")
+        self.auth_btn.setEnabled(True)
+        self.auth_btn.setText("Получить токен")
+        self._token_data = None
+        self.add_btn.setEnabled(False)
 
     def _set_status(self, text, color="#6b7280"):
         self.status_label.setText(text)

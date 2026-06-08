@@ -26,43 +26,50 @@ def _make_icon(svg, size=ICON_SIZE):
     return QIcon(pixmap)
 
 _CLUSTER = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="5" height="5" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="10" y="1" width="5" height="5" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="4.5" y="10" width="7" height="5" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="5.5" y1="4" x2="10.5" y2="4" stroke="{c}" stroke-width="1.3"/>
-<line x1="6.5" y1="10" x2="4.5" y2="6.5" stroke="{c}" stroke-width="1.3"/>
-<line x1="9.5" y1="10" x2="11.5" y2="6.5" stroke="{c}" stroke-width="1.3"/>
+<circle cx="8" cy="8" r="2" fill="{c2}" stroke="{c}" stroke-width="1.2"/>
+<circle cx="3" cy="3.5" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="13" cy="3.5" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="3" cy="12.5" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="13" cy="12.5" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<line x1="8" y1="6" x2="4.1" y2="4.6" stroke="{c}" stroke-width="1"/>
+<line x1="8" y1="6" x2="11.9" y2="4.6" stroke="{c}" stroke-width="1"/>
+<line x1="8" y1="10" x2="4.1" y2="11.4" stroke="{c}" stroke-width="1"/>
+<line x1="8" y1="10" x2="11.9" y2="11.4" stroke="{c}" stroke-width="1"/>
 </svg>"""
 
 _HOST = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="2" y="1" width="12" height="14" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="4" y="3" width="8" height="1" rx="0" fill="{c}"/>
-<rect x="4" y="5" width="3" height="1" rx="0" fill="{c}"/>
-<rect x="4" y="7" width="8" height="1" rx="0" fill="{c}"/>
-<rect x="4" y="9" width="3" height="1" rx="0" fill="{c}"/>
-<circle cx="8" cy="12" r="1.5" fill="{c2}"/>
+<rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="{c}" stroke-width="1.4"/>
+<rect x="4" y="4" width="5" height="1.5" rx="0.5" fill="{c}"/>
+<rect x="4" y="7" width="8" height="1.5" rx="0.5" fill="{c}"/>
+<rect x="4" y="10" width="3" height="1.5" rx="0.5" fill="{c2}"/>
+<circle cx="12.5" cy="4.75" r="1.2" fill="#22c55e"/>
 </svg>"""
 
 _VM = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="14" height="10" rx="0" fill="none" stroke="{c}" stroke-width="1.5"/>
-<rect x="4" y="11" width="8" height="1" rx="0" fill="{c}"/>
-<rect x="5.5" y="12" width="5" height="1" rx="0" fill="{c}"/>
-<line x1="8" y1="11" x2="8" y2="13" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="14" x2="12" y2="14" stroke="{c}" stroke-width="1.5"/>
+<rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="{c}" stroke-width="1.4"/>
+<polyline points="3,8 5,6.5 3,5" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="6.5" y1="8" x2="9" y2="8" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<rect x="5.5" y="11" width="5" height="1" rx="0" fill="{c}"/>
+<line x1="4" y1="13" x2="12" y2="13" stroke="{c}" stroke-width="1.4" stroke-linecap="round"/>
 </svg>"""
 
 _POOL = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="2" y="1" width="12" height="4" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="2" y="6" width="12" height="4" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="2" y="11" width="12" height="4" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="3" x2="12" y2="3" stroke="{c}" stroke-width="1"/>
-<line x1="4" y1="8" x2="12" y2="8" stroke="{c}" stroke-width="1"/>
-<line x1="4" y1="13" x2="12" y2="13" stroke="{c}" stroke-width="1"/>
+<path d="M1 5 L4.5 5 L6 3 L15 3 L15 13 L1 13 Z" fill="none" stroke="{c}" stroke-width="1.3" stroke-linejoin="round"/>
+<rect x="5" y="7" width="6" height="4" rx="0.5" fill="none" stroke="{c}" stroke-width="1"/>
+<line x1="7" y1="11" x2="9" y2="11" stroke="{c}" stroke-width="1"/>
+</svg>"""
+
+_STORAGE = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<ellipse cx="8" cy="4" rx="6" ry="2" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="2" y1="4" x2="2" y2="12" stroke="{c}" stroke-width="1.3"/>
+<line x1="14" y1="4" x2="14" y2="12" stroke="{c}" stroke-width="1.3"/>
+<ellipse cx="8" cy="12" rx="6" ry="2" fill="none" stroke="{c}" stroke-width="1.3"/>
+<circle cx="11" cy="12" r="1" fill="{c2}"/>
 </svg>"""
 
 _FOLDER = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<path d="M1 3 L5 3 L6.5 5 L15 5 L15 14 L1 14 Z" fill="none" stroke="{c}" stroke-width="1.3" stroke-linejoin="miter"/>
-<line x1="1" y1="6" x2="15" y2="6" stroke="{c}" stroke-width="1.3"/>
+<path d="M1 4 L5.5 4 L7 2.5 L15 2.5 L15 13 L1 13 Z" fill="none" stroke="{c}" stroke-width="1.3" stroke-linejoin="round"/>
+<line x1="1" y1="6" x2="15" y2="6" stroke="{c}" stroke-width="1"/>
 </svg>"""
 
 _APP = """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
@@ -75,113 +82,160 @@ _APP = """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rend
 <rect x="11" y="20" width="2" height="2" rx="0" fill="{c}"/>
 </svg>"""
 
-_STORAGE = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="2" width="14" height="12" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="3" y="4" width="10" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1"/>
-<rect x="3" y="9" width="5" height="3" rx="0" fill="{c}"/>
-<circle cx="11" cy="10.5" r="1" fill="{c}"/>
-</svg>"""
-
 _REFRESH = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<path d="M1 7a6 6 0 0 1 10.5-4" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="11.5,1 11.5,3.5 9,3.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M13 7a6 6 0 0 1-10.5 4" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="2.5,13 2.5,10.5 5,10.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M2 7 A5 5 0 0 1 11.5 4" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<polyline points="11.5,2 11.5,4.5 9,4.5" fill="none" stroke="{c}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 7 A5 5 0 0 1 2.5 10" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<polyline points="2.5,12 2.5,9.5 5,9.5" fill="none" stroke="{c}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
 _MONITOR = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="12" height="8" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="9" x2="10" y2="9" stroke="{c}" stroke-width="1.3"/>
-<line x1="7" y1="9" x2="7" y2="12" stroke="{c}" stroke-width="1.3"/>
-<rect x="5" y="2" width="4" height="2" rx="0" fill="{c2}"/>
-<rect x="5" y="5" width="3" height="1" rx="0" fill="{c2}"/>
+<rect x="1" y="1.5" width="12" height="8" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<rect x="3" y="3.5" width="5" height="1" rx="0.5" fill="{c}"/>
+<rect x="3" y="5.5" width="8" height="1" rx="0.5" fill="{c2}"/>
+<rect x="3" y="7" width="6" height="1" rx="0.5" fill="{c2}"/>
+<line x1="5" y1="9.5" x2="9" y2="9.5" stroke="{c}" stroke-width="1"/>
+<line x1="7" y1="9.5" x2="7" y2="11.5" stroke="{c}" stroke-width="1"/>
+<line x1="4" y1="13" x2="10" y2="13" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
 </svg>"""
 
 _HARDWARE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="12" height="12" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="3" y="3" width="8" height="2" rx="0" fill="{c2}"/>
-<rect x="3" y="6" width="5" height="1" rx="0" fill="{c2}"/>
-<rect x="3" y="8" width="8" height="1" rx="0" fill="{c2}"/>
-<rect x="3" y="10" width="5" height="1" rx="0" fill="{c2}"/>
+<rect x="4" y="4" width="6" height="6" rx="0.5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="5" y1="4" x2="5" y2="2" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="7" y1="4" x2="7" y2="2" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="9" y1="4" x2="9" y2="2" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="5" y1="10" x2="5" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="7" y1="10" x2="7" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="9" y1="10" x2="9" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="4" y1="6" x2="2" y2="6" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="4" y1="8" x2="2" y2="8" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="10" y1="6" x2="12" y2="6" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="10" y1="8" x2="12" y2="8" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<circle cx="7" cy="7" r="1" fill="{c2}"/>
 </svg>"""
 
 _OPTIONS = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="5" y="1" width="4" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="5" y="10" width="4" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="1" y="5.5" width="3" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="10" y="5.5" width="3" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="5.5" y="5.5" width="3" height="3" rx="0" fill="{c2}"/>
+<line x1="1" y1="3" x2="13" y2="3" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="1" y1="7" x2="13" y2="7" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="1" y1="11" x2="13" y2="11" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<circle cx="9" cy="3" r="1.8" fill="{c2}" stroke="{c}" stroke-width="1.3"/>
+<circle cx="4" cy="7" r="1.8" fill="{c2}" stroke="{c}" stroke-width="1.3"/>
+<circle cx="10" cy="11" r="1.8" fill="{c2}" stroke="{c}" stroke-width="1.3"/>
 </svg>"""
 
 _HISTORY = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="12" height="12" rx="6" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="7" y1="3" x2="7" y2="7" stroke="{c}" stroke-width="1.3"/>
-<line x1="7" y1="7" x2="10" y2="7" stroke="{c}" stroke-width="1.3"/>
+<circle cx="7" cy="7" r="5.5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<polyline points="7,3.5 7,7 9.5,8.5" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
 _DISK = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="2" width="12" height="10" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="3" y="4" width="8" height="2" rx="0" fill="{c2}"/>
-<rect x="3" y="7" width="4" height="2" rx="0" fill="{c2}"/>
+<rect x="2" y="3" width="10" height="8" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<rect x="4" y="5" width="4" height="1.5" rx="0.5" fill="{c2}"/>
+<circle cx="10.5" cy="9" r="1" fill="{c2}"/>
+</svg>"""
+
+_NETWORK = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="7" cy="7" r="1.5" fill="{c2}" stroke="{c}" stroke-width="1"/>
+<circle cx="2.5" cy="3" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="11.5" cy="3" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="7" cy="12" r="1.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<line x1="7" y1="5.5" x2="3.7" y2="4.2" stroke="{c}" stroke-width="1"/>
+<line x1="7" y1="5.5" x2="10.3" y2="4.2" stroke="{c}" stroke-width="1"/>
+<line x1="7" y1="8.5" x2="7" y2="10.5" stroke="{c}" stroke-width="1"/>
+</svg>"""
+
+_SERVICES = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<line x1="5" y1="3" x2="12" y2="3" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="5" y1="7" x2="12" y2="7" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="5" y1="11" x2="12" y2="11" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<circle cx="2.5" cy="3" r="1.2" fill="#22c55e"/>
+<circle cx="2.5" cy="7" r="1.2" fill="#22c55e"/>
+<circle cx="2.5" cy="11" r="1.2" fill="#ef4444"/>
+</svg>"""
+
+_SNAPSHOT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="1" y="4" width="12" height="9" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<path d="M4 4 L5 2 L9 2 L10 4" fill="none" stroke="{c}" stroke-width="1.2" stroke-linejoin="round"/>
+<circle cx="7" cy="8.5" r="2.5" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="7" cy="8.5" r="1" fill="{c2}"/>
 </svg>"""
 
 _BACKUP = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="2" y="1" width="10" height="12" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="4" x2="10" y2="4" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="7" x2="10" y2="7" stroke="{c}" stroke-width="1.3"/>
-<rect x="4" y="10" width="3" height="1" rx="0" fill="{c2}"/>
+<rect x="2" y="1" width="10" height="12" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="4.5" y1="4" x2="9.5" y2="4" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="4.5" y1="6.5" x2="9.5" y2="6.5" stroke="{c2}" stroke-width="1" stroke-linecap="round"/>
+<polyline points="7,8.5 7,11 5.5,9.5" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="7" y1="11" x2="8.5" y2="9.5" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
 </svg>"""
 
 _ISO = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
 <circle cx="7" cy="7" r="5.5" fill="none" stroke="{c}" stroke-width="1.3"/>
-<circle cx="7" cy="7" r="2.5" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="7" y1="1.5" x2="7" y2="4.5" stroke="{c}" stroke-width="1.3"/>
+<circle cx="7" cy="7" r="1.8" fill="{c2}" stroke="{c}" stroke-width="1"/>
+<circle cx="7" cy="7" r="0.7" fill="{c2}"/>
+<line x1="7" y1="1.5" x2="7" y2="4" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
 </svg>"""
 
 _TEMPLATE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="12" height="4" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="3" y="5" width="8" height="8" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="4" y1="3" x2="10" y2="3" stroke="{c}" stroke-width="1"/>
-<rect x="5" y="7" width="4" height="2" rx="0" fill="{c2}"/>
-</svg>"""
-
-_NETWORK = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="5" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="8" y="1" width="5" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="8" y="10" width="5" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<line x1="6" y1="2.5" x2="8" y2="2.5" stroke="{c}" stroke-width="1.3"/>
-<line x1="6" y1="2.5" x2="8" y2="11.5" stroke="{c}" stroke-width="1.3"/>
-<line x1="8" y1="11.5" x2="10" y2="11.5" stroke="{c}" stroke-width="1.3"/>
-</svg>"""
-
-_SERVICES = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="1" width="12" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="1" y="5.5" width="12" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="1" y="10" width="12" height="3" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="3" y="2" width="2" height="1" rx="0" fill="{c2}"/>
-<rect x="3" y="6.5" width="2" height="1" rx="0" fill="{c2}"/>
-<rect x="3" y="11" width="2" height="1" rx="0" fill="{c2}"/>
-</svg>"""
-
-_SNAPSHOT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<rect x="1" y="3" width="12" height="10" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<rect x="4" y="1" width="6" height="2" rx="0" fill="none" stroke="{c}" stroke-width="1.3"/>
-<circle cx="7" cy="8" r="2.5" fill="none" stroke="{c}" stroke-width="1.3"/>
-<circle cx="7" cy="8" r="1" fill="{c2}"/>
+<rect x="2" y="1" width="10" height="12" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="4" y1="4" x2="10" y2="4" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="4" y1="6.5" x2="10" y2="6.5" stroke="{c2}" stroke-width="1" stroke-linecap="round"/>
+<rect x="4" y="8.5" width="6" height="3" rx="0.5" fill="{c2}" stroke="{c}" stroke-width="0.8"/>
 </svg>"""
 
 _EXPAND = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<line x1="6" y1="2" x2="6" y2="10" stroke="{c}" stroke-width="1.5"/>
-<line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
+<polyline points="1,4 1,1 4,1" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="8,1 11,1 11,4" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1,8 1,11 4,11" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="11,8 11,11 8,11" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
 _COLLAPSE = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
+<polyline points="4,1 1,4 4,4" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="11,4 8,4 8,1" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="4,11 4,8 1,8" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="8,8 11,8 8,11" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
 _ADD = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<line x1="6" y1="2" x2="6" y2="10" stroke="{c}" stroke-width="1.5"/>
-<line x1="2" y1="6" x2="10" y2="6" stroke="{c}" stroke-width="1.5"/>
+<circle cx="6" cy="6" r="5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="6" y1="3.5" x2="6" y2="8.5" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="3.5" y1="6" x2="8.5" y2="6" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+</svg>"""
+
+_START = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<polygon points="3,2 12,7 3,12" fill="{c}" stroke="{c}" stroke-width="1.3" stroke-linejoin="round"/>
+</svg>"""
+
+_SHUTDOWN = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<path d="M4.5 3.5 A5 5 0 1 0 9.5 3.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<line x1="7" y1="1.5" x2="7" y2="6.5" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+</svg>"""
+
+_REBOOT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<path d="M2 7 A5 5 0 1 1 7 12" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<polyline points="7,12 7,9.5 9.5,12" fill="none" stroke="{c}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
+_RESET = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<polyline points="8.5,1.5 4,7.5 7.5,7.5 5.5,12.5 10,6.5 6.5,6.5 8.5,1.5" fill="none" stroke="{c}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>"""
+
+_STOP = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="3" y="3" width="8" height="8" rx="1" fill="{c}"/>
+</svg>"""
+
+_CONSOLE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="1" y="2" width="12" height="8" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<polyline points="3,7.5 4.5,6 3,4.5" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="6" y1="7.5" x2="8.5" y2="7.5" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="5" y1="10" x2="9" y2="10" stroke="{c}" stroke-width="1" stroke-linecap="round"/>
+<line x1="7" y1="10" x2="7" y2="12" stroke="{c}" stroke-width="1" stroke-linecap="round"/>
+<line x1="4" y1="13" x2="10" y2="13" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+</svg>"""
+
+_RESUME = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<polygon points="1.5,3 6,7 1.5,11" fill="{c}"/>
+<polygon points="7,3 11.5,7 7,11" fill="{c}"/>
 </svg>"""
 
 _LOADING = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
@@ -252,4 +306,11 @@ def init_icons():
         "expand": _make_icon(_EXPAND.format(c=_C, c2=_C2), 12),
         "collapse": _make_icon(_COLLAPSE.format(c=_C, c2=_C2), 12),
         "add": _make_icon(_ADD.format(c=_C, c2=_C2), 12),
+        "start": _make_icon(_START.format(c=_C, c2=_C2)),
+        "shutdown": _make_icon(_SHUTDOWN.format(c=_C, c2=_C2)),
+        "reboot": _make_icon(_REBOOT.format(c=_C, c2=_C2)),
+        "reset": _make_icon(_RESET.format(c=_C, c2=_C2)),
+        "stop": _make_icon(_STOP.format(c=_C, c2=_C2)),
+        "console": _make_icon(_CONSOLE.format(c=_C, c2=_C2)),
+        "resume": _make_icon(_RESUME.format(c=_C, c2=_C2)),
     }

@@ -172,11 +172,11 @@ class CreateVmDialog(QDialog):
         self.node_combo.currentIndexChanged.connect(self._on_node_changed)
         g1.addWidget(self.node_combo, 0, 1)
         g1.addWidget(QLabel("VM ID:"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
-        self.vmid_spin = QSpinBox()
-        self.vmid_spin.setRange(0, 999999999)
-        self.vmid_spin.setValue(0)
-        self.vmid_spin.setSpecialValueText("авто")
-        g1.addWidget(self.vmid_spin, 0, 3)
+        self.vmid_line = QLineEdit()
+        self.vmid_line.setPlaceholderText("авто")
+        self.vmid_line.setValidator(QIntValidator(100, 999999999, self))
+        self.vmid_line.setFixedWidth(120)
+        g1.addWidget(self.vmid_line, 0, 3)
 
         g1.addWidget(QLabel("Имя ВМ:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.name_input = QLineEdit()
@@ -502,7 +502,9 @@ class CreateVmDialog(QDialog):
 
     def get_params(self):
         """Возвращает dict параметров для POST /nodes/{node}/qemu."""
-        vmid = self.vmid_spin.value()
+        name = self.name_input.text().strip()
+        vmid_text = self.vmid_line.text().strip()
+        vmid = int(vmid_text) if vmid_text else 0
         bus = self.bus_combo.currentData()
         slot = 0
         disk_key = f"{bus}{slot}"

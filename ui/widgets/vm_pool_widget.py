@@ -2,6 +2,8 @@ from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView,
                                QVBoxLayout, QWidget, QProgressBar)
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
+from ..detail_panel import _progress_style
+from ..utils import format_uptime as _format_uptime
 
 class VmPoolWidget(QWidget):
     def __init__(self, parent=None):
@@ -20,23 +22,6 @@ class VmPoolWidget(QWidget):
         layout.addWidget(self.table)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def _format_uptime(self, seconds):
-        if seconds <= 0:
-            return '0'
-        days, rem = divmod(int(seconds), 86400)
-        hours, rem = divmod(rem, 3600)
-        mins, secs = divmod(rem, 60)
-        parts = []
-        if days:
-            parts.append(f"{days}d")
-        if hours:
-            parts.append(f"{hours}h")
-        if mins:
-            parts.append(f"{mins}m")
-        if secs or not parts:
-            parts.append(f"{secs}s")
-        return ' '.join(parts)
-
     def set_pool_vms(self, vms):
         self.table.setRowCount(len(vms))
         for i, vm in enumerate(vms):
@@ -51,6 +36,7 @@ class VmPoolWidget(QWidget):
             disk_bar.setRange(0, 100)
             disk_bar.setValue(disk_pct)
             disk_bar.setFormat(f"{disk_pct}%")
+            disk_bar.setStyleSheet(_progress_style(disk_pct))
             self.table.setCellWidget(i, 2, disk_bar)
             di = QTableWidgetItem("")
             di.setFlags(Qt.ItemIsEnabled)
@@ -64,6 +50,7 @@ class VmPoolWidget(QWidget):
             mem_bar.setRange(0, 100)
             mem_bar.setValue(mem_pct)
             mem_bar.setFormat(f"{mem_pct}%")
+            mem_bar.setStyleSheet(_progress_style(mem_pct))
             self.table.setCellWidget(i, 3, mem_bar)
             mi = QTableWidgetItem("")
             mi.setFlags(Qt.ItemIsEnabled)
@@ -76,6 +63,7 @@ class VmPoolWidget(QWidget):
             cpu_bar.setRange(0, 100)
             cpu_bar.setValue(cpu_pct)
             cpu_bar.setFormat(f"{cpu_pct}%")
+            cpu_bar.setStyleSheet(_progress_style(cpu_pct))
             self.table.setCellWidget(i, 4, cpu_bar)
             ci = QTableWidgetItem("")
             ci.setFlags(Qt.ItemIsEnabled)
@@ -83,7 +71,7 @@ class VmPoolWidget(QWidget):
 
             # Uptime
             uptime_sec = vm.get("uptime", 0)
-            uptime_str = self._format_uptime(uptime_sec) if uptime_sec else ''
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
             self.table.setItem(i, 5, QTableWidgetItem(uptime_str))
 
         self.table.resizeRowsToContents()

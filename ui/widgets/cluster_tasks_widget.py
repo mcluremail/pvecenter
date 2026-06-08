@@ -248,3 +248,19 @@ class ClusterTasksWidget(QWidget):
         else:
             self.table.sortItems(0, Qt.DescendingOrder)
             self.table.setSortingEnabled(True)
+
+    def set_placeholder(self, text="Загрузка задач..."):
+        was_sorted = self.table.isSortingEnabled()
+        if was_sorted:
+            self.table.setSortingEnabled(False)
+        self.table.setUpdatesEnabled(False)
+        self.table.model().blockSignals(True)
+        self.table.setRowCount(0)
+        self.table.setRowCount(1)
+        item = QTableWidgetItem(text)
+        item.setForeground(QColor("#6b7280"))
+        self.table.setItem(0, 4, item)
+        self.table.model().blockSignals(False)
+        self.table.setUpdatesEnabled(True)
+        if was_sorted:
+            self.table.setSortingEnabled(True)

@@ -64,7 +64,6 @@ class FadeToast(QWidget):
     opacity = Property(float, get_opacity, set_opacity)
 
     def _copy_to_clipboard(self):
-        # TODO: убрать — дебаг-фича, копирует текст тоста в буфер
         QApplication.clipboard().setText(self._text)
         self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", "color: #bbf7d0;"))
         QTimer.singleShot(400, self._restore_color)
@@ -104,9 +103,11 @@ class NotificationManager:
 
     def vm_status_changed(self, vm_name, host_name, old_status, new_status):
         key = f"vm:{host_name}:{vm_name}"
+        status_ru = {"running": "Работает", "stopped": "Остановлена", "paused": "Приостановлена"}
+        ru = status_ru.get(new_status, new_status)
         status_icon = "🟢" if new_status == "running" else "🔴" if new_status == "stopped" else "🟡"
         color = "#16a34a" if new_status == "running" else "#dc2626" if new_status == "stopped" else "#d97706"
-        self._show(key, f"{status_icon} {vm_name} — {new_status}", color)
+        self._show(key, f"{status_icon} {vm_name} — {ru}", color)
 
     def _show(self, key, text, color):
         existing = self._active.get(key)

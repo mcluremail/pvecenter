@@ -110,18 +110,59 @@ def create_admin_token(host, user, password):
 # ----------------------------------------------------------------------
 # FetchWorker (QRunnable)
 # ----------------------------------------------------------------------
+class TokenCreationSignals(QObject):
+    token_ready = Signal(dict)
+    token_error = Signal(str)
+    finished = Signal()
+
+
+class TokenCreationWorker(QRunnable):
+    """Создаёт API-токен в фоновом потоке, не блокируя UI."""
+    def __init__(self, host, user, password):
+        super().__init__()
+        self.host = host
+        self.user = user
+        self.password = password
+        self.signals = TokenCreationSignals()
+
+    def run(self):
+        try:
+            result = create_admin_token(self.host, self.user, self.password)
+            if "error" in result:
+                try:
+                    self.signals.token_error.emit(result["error"])
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    self.signals.token_ready.emit(result)
+                except RuntimeError:
+                    pass
+        except Exception as e:
+            try:
+                self.signals.token_error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 class FetchSignals(QObject):
     result_ready = Signal(dict)
+    finished = Signal()
 
 
 class FetchWorker(QRunnable):
-    """Загружает сводку по узлу через QThreadPool."""
+    """Загружает сводку по узлу через QThreadPool.
+    Независимые API-запросы выполняются параллельно через threading.Thread."""
     def __init__(self, node_cfg):
         super().__init__()
         self.node_cfg = node_cfg
         self.signals = FetchSignals()
 
     def run(self):
+        import threading
         try:
             proxmox = ProxmoxAPI(
                 self.node_cfg["host"],
@@ -132,64 +173,132 @@ class FetchWorker(QRunnable):
                 timeout=15
             )
 
-            vmid_to_pool = {}
-            pool_names = []
-            try:
-                pools_data = proxmox.pools.get()
-                pool_names = [p.get("poolid") or p.get("pool") for p in pools_data if p.get("poolid") or p.get("pool")]
-                for p in pools_data:
-                    pool_name = p.get("poolid") or p.get("pool")
-                    if not pool_name:
-                        continue
-                    members = p.get("members")
-                    if not isinstance(members, list):
-                        continue
-                    for member in members:
-                        m_type = member.get("type")
-                        m_vmid = member.get("vmid")
-                        if m_type in ("qemu", "lxc") and m_vmid is not None:
-                            vmid_to_pool[int(m_vmid)] = pool_name
-            except Exception:
-                traceback.print_exc()
-
-            # ── HA группы ─────────────────────────────────────────
-            ha_groups = []
-            try:
-                for g in proxmox.cluster.ha.groups.get():
-                    gname = g.get("group")
-                    if gname:
-                        ha_groups.append(gname)
-                ha_groups.sort()
-            except Exception:
-                ha_groups = []
-
             is_cluster_rep = self.node_cfg.get("cluster_rep", False)
 
+            # ── Параллельная фаза 1: pools, HA groups, resources ──────
+            vmid_to_pool = {}
+            pool_names = []
+            ha_groups = []
+            nodes = []
+            vms = []
             storages = []
+            cluster_name = ""
+            node_name = ""
+
+            pool_lock = threading.Lock()
+            ha_lock = threading.Lock()
+            res_lock = threading.Lock()
+
+            def fetch_pools():
+                nonlocal vmid_to_pool, pool_names
+                try:
+                    pools_data = proxmox.pools.get()
+                    with pool_lock:
+                        pool_names = [p.get("poolid") or p.get("pool") for p in pools_data
+                                      if p.get("poolid") or p.get("pool")]
+                    # Дёргаем каждый пул параллельно
+                    def fetch_pool_detail(p):
+                        pname = p.get("poolid") or p.get("pool")
+                        if not pname:
+                            return
+                        try:
+                            pd = proxmox.pools(pname).get()
+                            members = pd.get("members") if isinstance(pd, dict) else None
+                        except Exception:
+                            members = p.get("members")
+                        if not isinstance(members, list):
+                            return
+                        local = {}
+                        for m in members:
+                            mt = m.get("type")
+                            mv = m.get("vmid")
+                            if mt in ("qemu", "lxc") and mv is not None:
+                                local[int(mv)] = pname
+                        with pool_lock:
+                            vmid_to_pool.update(local)
+                    pool_threads = [threading.Thread(target=fetch_pool_detail, args=(p,), daemon=True)
+                                    for p in pools_data if p.get("poolid") or p.get("pool")]
+                    for t in pool_threads:
+                        t.start()
+                    for t in pool_threads:
+                        t.join(timeout=10)
+                except Exception:
+                    traceback.print_exc()
+
+            def fetch_ha():
+                nonlocal ha_groups
+                try:
+                    result = []
+                    for g in proxmox.cluster.ha.groups.get():
+                        gn = g.get("group")
+                        if gn:
+                            result.append(gn)
+                    result.sort()
+                    with ha_lock:
+                        ha_groups = result
+                except Exception:
+                    pass
+
+            def fetch_resources():
+                nonlocal nodes, vms, storages, cluster_name
+                try:
+                    resources = proxmox.cluster.resources.get()
+                    with res_lock:
+                        nodes = [r for r in resources if r["type"] == "node"]
+                        vms = [r for r in resources if r["type"] in ("qemu", "lxc")]
+                        storages = [r for r in resources if r.get("type") == "storage"]
+                        cluster_name = self.node_cfg.get("cluster", "")
+                        for n in nodes:
+                            short = n["node"]
+                            n["_display_name"] = f"{short}@{cluster_name}" if cluster_name else short
+                except Exception:
+                    traceback.print_exc()
+
+            phase1 = []
+            phase1.append(threading.Thread(target=fetch_pools, daemon=True))
+            phase1.append(threading.Thread(target=fetch_ha, daemon=True))
             if is_cluster_rep:
-                resources = proxmox.cluster.resources.get()
-                nodes = [r for r in resources if r["type"] == "node"]
-                vms = [r for r in resources if r["type"] in ("qemu", "lxc")]
-                storages = [r for r in resources if r.get("type") == "storage"]
-                cluster_name = self.node_cfg.get("cluster", "")
+                phase1.append(threading.Thread(target=fetch_resources, daemon=True))
+
+            for t in phase1:
+                t.start()
+            for t in phase1:
+                t.join(timeout=20)
+
+            # ── Параллельная фаза 2: storage details per node / standalone data ──
+            iso_images = {}
+            iso_lock = threading.Lock()
+
+            if is_cluster_rep:
                 for n in nodes:
-                    short = n["node"]
-                    n["_display_name"] = f"{short}@{cluster_name}" if cluster_name else short
+                    n["host_name"] = self.node_cfg["name"]
                 for s in storages:
                     s["host_name"] = self.node_cfg["name"]
                     s["cluster"] = cluster_name
 
-                # Подтягиваем used/total с каждой ноды
+                # Подтягиваем used/total с каждой ноды параллельно
+                detail_lock = threading.Lock()
                 detail_by_node = {}
-                for n in nodes:
+
+                def fetch_node_storage(n):
                     node_name = n["node"]
                     try:
                         node_storages = proxmox.nodes(node_name).storage.get()
-                        detail_by_node[node_name] = {
-                            ds["storage"]: ds for ds in node_storages
-                        }
+                        with detail_lock:
+                            detail_by_node[node_name] = {
+                                ds["storage"]: ds for ds in node_storages
+                            }
                     except Exception:
-                        detail_by_node[node_name] = {}
+                        with detail_lock:
+                            detail_by_node[node_name] = {}
+
+                storage_threads = [threading.Thread(target=fetch_node_storage, args=(n,), daemon=True)
+                                   for n in nodes]
+                for t in storage_threads:
+                    t.start()
+                for t in storage_threads:
+                    t.join(timeout=20)
+
                 for s in storages:
                     detail = detail_by_node.get(s.get("node", ""), {}).get(s.get("storage", ""), {})
                     if detail.get("used") is not None and (s.get("used") or 0) == 0:
@@ -202,59 +311,86 @@ class FetchWorker(QRunnable):
                     if not vm.get("pool"):
                         vm["pool"] = vmid_to_pool.get(vm["vmid"])
             else:
-                # Получаем реальное короткое имя ноды с сервера (для API-запросов,
-                # чтобы избежать proxy loop в pveproxy)
-                try:
-                    local_nodes = proxmox.nodes.get()
-                    real_node_name = local_nodes[0]["node"] if local_nodes else self.node_cfg["name"]
-                except Exception:
-                    real_node_name = self.node_cfg["name"]
-                node_name = real_node_name
-                node_status = proxmox.nodes(node_name).status.get()
-                nodes = [{**node_status, "node": node_name,
-                          "_display_name": self.node_cfg["name"],
-                          "status": "online"}]
-                qemu_list = proxmox.nodes(node_name).qemu.get()
-                lxc_list = proxmox.nodes(node_name).lxc.get()
-                vms = []
-                for v in qemu_list:
-                    vms.append({**v, "type": "qemu",
-                                "node": node_name,
-                                "pool": vmid_to_pool.get(v["vmid"])})
-                for v in lxc_list:
-                    vms.append({**v, "type": "lxc",
-                                "node": node_name,
-                                "pool": vmid_to_pool.get(v["vmid"])})
-                storages = list(proxmox.nodes(node_name).storage.get())
-                for st in storages:
-                    st["node"] = node_name
-                    st["host_name"] = self.node_cfg["name"]
+                # Standalone: получаем имя ноды и данные параллельно
+                def fetch_standalone():
+                    nonlocal node_name, nodes, vms, storages
+                    try:
+                        local_nodes = proxmox.nodes.get()
+                        nn = local_nodes[0]["node"] if local_nodes else self.node_cfg["name"]
+                    except Exception:
+                        nn = self.node_cfg["name"]
+                    node_name = nn
+                    try:
+                        node_status = proxmox.nodes(node_name).status.get()
+                    except Exception:
+                        return
+                    with res_lock:
+                        nodes = [{**node_status, "node": node_name,
+                                  "_display_name": self.node_cfg["name"],
+                                  "status": "online"}]
+                    try:
+                        qemu_list = proxmox.nodes(node_name).qemu.get()
+                        lxc_list = proxmox.nodes(node_name).lxc.get()
+                        vms_local = []
+                        for v in qemu_list:
+                            vms_local.append({**v, "type": "qemu",
+                                              "node": node_name,
+                                              "pool": vmid_to_pool.get(v["vmid"])})
+                        for v in lxc_list:
+                            vms_local.append({**v, "type": "lxc",
+                                              "node": node_name,
+                                              "pool": vmid_to_pool.get(v["vmid"])})
+                        storages_local = list(proxmox.nodes(node_name).storage.get())
+                        for st in storages_local:
+                            st["node"] = node_name
+                            st["host_name"] = self.node_cfg["name"]
+                        with res_lock:
+                            vms = vms_local
+                            storages = storages_local
+                    except Exception:
+                        traceback.print_exc()
 
-            # ── Сбор ISO-образов ──────────────────────────────────
-            iso_images = {}
-            for n in nodes:
+                standalone_thread = threading.Thread(target=fetch_standalone, daemon=True)
+                standalone_thread.start()
+                standalone_thread.join(timeout=30)
+
+            # ── Параллельная фаза 3: ISO образы ────────────────────
+            def fetch_iso_for_node(n):
                 nname = n["node"]
                 iso_storages = [
                     s["storage"] for s in storages
                     if s.get("node") == nname and "iso" in (s.get("content", "") or "").split(",")
                 ]
-                if iso_storages:
-                    try:
-                        seen = {}
-                        for sname in iso_storages:
-                            for item in proxmox.nodes(nname).storage(sname).content.get(content="iso"):
-                                if item.get("content") == "iso":
-                                    volid = item["volid"]
-                                    if volid not in seen:
-                                        seen[volid] = {
-                                            "volid": volid,
-                                            "format": item.get("format", ""),
-                                            "size": item.get("size", 0),
-                                        }
+                if not iso_storages:
+                    with iso_lock:
+                        iso_images[nname] = []
+                    return
+                try:
+                    seen = {}
+                    for sname in iso_storages:
+                        for item in proxmox.nodes(nname).storage(sname).content.get(content="iso"):
+                            if item.get("content") == "iso":
+                                volid = item["volid"]
+                                if volid not in seen:
+                                    seen[volid] = {
+                                        "volid": volid,
+                                        "format": item.get("format", ""),
+                                        "size": item.get("size", 0),
+                                    }
+                    with iso_lock:
                         iso_images[nname] = sorted(seen.values(), key=lambda x: x["volid"])
-                    except Exception:
+                except Exception:
+                    with iso_lock:
                         iso_images[nname] = []
 
+            iso_threads = [threading.Thread(target=fetch_iso_for_node, args=(n,), daemon=True)
+                           for n in nodes]
+            for t in iso_threads:
+                t.start()
+            for t in iso_threads:
+                t.join(timeout=15)
+
+            # ── Отправляем результат ──────────────────────────────
             self.signals.result_ready.emit({
                 "host": self.node_cfg["name"],
                 "status": "ok",
@@ -274,6 +410,11 @@ class FetchWorker(QRunnable):
                 })
             except RuntimeError:
                 pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -281,6 +422,7 @@ class FetchWorker(QRunnable):
 # ----------------------------------------------------------------------
 class VmDetailSignals(QObject):
     detail_ready = Signal(dict)
+    finished = Signal()
 
 
 class VmDetailWorker(QRunnable):
@@ -324,6 +466,11 @@ class VmDetailWorker(QRunnable):
                 })
             except RuntimeError:
                 pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -332,6 +479,7 @@ class VmDetailWorker(QRunnable):
 class VmConfigSignals(QObject):
     config_ready = Signal(int, dict)
     config_error = Signal(int, str)
+    finished = Signal()
 
 
 class VmConfigWorker(QRunnable):
@@ -367,19 +515,22 @@ class VmConfigWorker(QRunnable):
                 self.signals.config_error.emit(self.vmid, str(e))
             except RuntimeError:
                 pass
-
-
-# ----------------------------------------------------------------------
-# VmTaskHistoryWorker (добавлен заново)
-# ----------------------------------------------------------------------
-class VmTaskHistorySignals(QObject):
-    tasks_ready = Signal(int, list)   # vmid, список задач
-    tasks_error = Signal(int, str)
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
 # VmTaskHistoryWorker
 # ----------------------------------------------------------------------
+class VmTaskHistorySignals(QObject):
+    tasks_ready = Signal(int, list)   # vmid, список задач
+    tasks_error = Signal(int, str)
+    finished = Signal()
+
+
 class VmTaskHistoryWorker(QRunnable):
     """Загружает историю задач для конкретной ВМ."""
     def __init__(self, host_cfg, node_name, vmid, limit=50):
@@ -411,6 +562,11 @@ class VmTaskHistoryWorker(QRunnable):
                 self.signals.tasks_error.emit(self.vmid, str(e))
             except RuntimeError:
                 pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -439,9 +595,19 @@ def delete_host_token(host_cfg):
 class VmActionSignals(QObject):
     action_result = Signal(str)
     action_error = Signal(str)
+    finished = Signal()
 
 
 class VmActionWorker(QRunnable):
+    ACTION_NAMES = {
+        "start": "Запуск",
+        "shutdown": "Выключение",
+        "stop": "Принудительное выключение",
+        "reboot": "Перезагрузка",
+        "reset": "Сброс",
+        "resume": "Возобновление",
+    }
+
     def __init__(self, host_cfg, node_name, vmid, vm_type, action):
         super().__init__()
         self.host_cfg = host_cfg
@@ -450,14 +616,6 @@ class VmActionWorker(QRunnable):
         self.vm_type = vm_type
         self.action = action
         self.signals = VmActionSignals()
-        self.ACTION_NAMES = {
-            "start": "Запуск",
-            "shutdown": "Выключение",
-            "stop": "Принудительное выключение",
-            "reboot": "Перезагрузка",
-            "reset": "Сброс",
-            "resume": "Возобновление",
-        }
 
     def run(self):
         try:
@@ -495,6 +653,11 @@ class VmActionWorker(QRunnable):
                 self.signals.action_error.emit(str(e))
             except RuntimeError:
                 pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -503,10 +666,11 @@ class VmActionWorker(QRunnable):
 class ClusterTasksSignals(QObject):
     tasks_ready = Signal(list)
     tasks_error = Signal(str)
+    finished = Signal()
 
 
 class ClusterTasksWorker(QRunnable):
-    """Загружает задачи со всех нод через QThreadPool.
+    """Загружает задачи со всех нод параллельно через threading.
     Принимает список (host_cfg, node_name) — для каждой ноды
     вызывается /nodes/{node}/tasks, результаты мержатся по UPID."""
     def __init__(self, node_requests):
@@ -515,37 +679,58 @@ class ClusterTasksWorker(QRunnable):
         self.signals = ClusterTasksSignals()
 
     def run(self):
-        all_by_upid = {}
-        errors = []
-        for host_cfg, node_name in self.node_requests:
-            try:
-                proxmox = ProxmoxAPI(
-                    host_cfg["host"],
-                    user=host_cfg["user"],
-                    token_name=host_cfg["token_name"],
-                    token_value=host_cfg["token_value"],
-                    verify_ssl=False,
-                    timeout=10
-                )
-                tasks = proxmox.nodes(node_name).tasks.get(limit=100)
+        import threading
+        try:
+            results = {}
+            errors = []
+            lock = threading.Lock()
+
+            def fetch_node(host_cfg, node_name):
+                try:
+                    proxmox = ProxmoxAPI(
+                        host_cfg["host"],
+                        user=host_cfg["user"],
+                        token_name=host_cfg["token_name"],
+                        token_value=host_cfg["token_value"],
+                        verify_ssl=False,
+                        timeout=10
+                    )
+                    tasks = proxmox.nodes(node_name).tasks.get(limit=100)
+                    with lock:
+                        results[node_name] = tasks
+                except Exception as e:
+                    with lock:
+                        errors.append(f"{node_name}: {e}")
+
+            threads = [threading.Thread(target=fetch_node, args=(hc, nn), daemon=True)
+                       for hc, nn in self.node_requests]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=15)
+
+            all_by_upid = {}
+            for node_name, tasks in results.items():
                 for idx, t in enumerate(tasks):
                     upid = t.get("upid")
                     if upid:
                         all_by_upid[upid] = t
                     else:
                         all_by_upid[f"_no_upid_{node_name}_{idx}"] = t
-            except Exception as e:
-                errors.append(f"{node_name}: {e}")
-                continue
-        merged = sorted(all_by_upid.values(),
-                        key=lambda x: float(x.get("starttime", 0) or 0),
-                        reverse=True)
-        if errors:
-            logger.warning("Ошибки при сборе задач: %s", "; ".join(errors))
-        try:
-            self.signals.tasks_ready.emit(merged)
-        except RuntimeError:
-            pass
+            merged = sorted(all_by_upid.values(),
+                            key=lambda x: float(x.get("starttime", 0) or 0),
+                            reverse=True)
+            if errors:
+                logger.warning("Ошибки при сборе задач: %s", "; ".join(errors))
+            try:
+                self.signals.tasks_ready.emit(merged)
+            except RuntimeError:
+                pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -554,102 +739,141 @@ class ClusterTasksWorker(QRunnable):
 class VmConsoleSignals(QObject):
     console_ready = Signal(str)
     console_error = Signal(str)
+    finished = Signal()
 
 
 class VmConsoleWorker(QRunnable):
     """Запрашивает SPICE proxy у PVE, пишет .vv файл и запускает remote-viewer."""
-    def __init__(self, host_cfg, node_name, vmid):
+    def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
         super().__init__()
         self.host_cfg = host_cfg
         self.node_name = node_name
         self.vmid = vmid
+        self.vm_type = vm_type
         self.signals = VmConsoleSignals()
 
     def run(self):
         import os, tempfile, subprocess
+        vv_path = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
-                timeout=10
-            )
-            config = proxmox.nodes(self.node_name).qemu(self.vmid).spiceproxy.post()
-        except Exception as e:
-            msg = str(e).lower()
-            if "not supported" in msg or "spice" in msg:
-                err = "SPICE не поддерживается для этой ВМ"
-            else:
-                err = f"Ошибка SPICE proxy: {e}"
             try:
-                self.signals.console_error.emit(err)
-            except RuntimeError:
-                pass
-            return
-
-        try:
-            lines = ["[virt-viewer]"]
-            host_raw = config.get("host", "")
-            if host_raw:
-                lines.append(f"host={host_raw}")
-            for key in ("password", "proxy", "secure-attention",
-                        "tls-port", "type", "delete-this-file",
-                        "host-subject", "toggle-fullscreen", "release-cursor"):
-                val = config.get(key)
-                if val is not None:
-                    lines.append(f"{key}={val}")
-            title = config.get("title")
-            if title:
-                lines.append(f"title={title}")
-            ca = config.get("ca", "")
-            if ca:
-                lines.append("ca=" + ca.replace("\n", "\\n"))
-
-            fd, path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-        except Exception as e:
-            try:
-                self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
-            except RuntimeError:
-                pass
-            return
-
-        try:
-            proc = subprocess.Popen(
-                ["remote-viewer", path],
-                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-            )
-            try:
-                _, stderr = proc.communicate(timeout=5)
-                if proc.returncode != 0:
-                    err_text = stderr.decode("utf-8", errors="replace").strip()
-                    logger.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
-                    try:
-                        self.signals.console_error.emit(
-                            f"remote-viewer: {err_text or 'код ' + str(proc.returncode)}"
-                        )
-                    except RuntimeError:
-                        pass
-                    return
-            except subprocess.TimeoutExpired:
-                logger.info("remote-viewer запущен (pid=%d)", proc.pid)
-        except FileNotFoundError:
-            try:
-                self.signals.console_error.emit(
-                    "remote-viewer не найден. Установите пакет virt-viewer:\n"
-                    "  apt install virt-viewer"
+                proxmox = ProxmoxAPI(
+                    self.host_cfg["host"],
+                    user=self.host_cfg["user"],
+                    token_name=self.host_cfg["token_name"],
+                    token_value=self.host_cfg["token_value"],
+                    verify_ssl=False,
+                    timeout=10
                 )
+                endpoint = (proxmox.nodes(self.node_name).lxc if self.vm_type == "lxc"
+                            else proxmox.nodes(self.node_name).qemu)
+                config = endpoint(self.vmid).spiceproxy.post(
+                    proxy=self.host_cfg["host"]
+                )
+            except Exception as e:
+                msg = str(e).lower()
+                if "permission check failed" in msg or "403" in msg:
+                    err = "Недостаточно прав PVE для SPICE (требуется VM.Console)"
+                elif "not supported" in msg or "spice" in msg:
+                    err = "SPICE не поддерживается для этой ВМ"
+                else:
+                    err = f"Ошибка SPICE proxy: {e}"
+                try:
+                    self.signals.console_error.emit(err)
+                except RuntimeError:
+                    pass
+                return
+
+            try:
+                lines = ["[virt-viewer]"]
+                host_raw = config.get("host", "")
+                if host_raw:
+                    lines.append(f"host={host_raw}")
+                for key in ("password", "proxy", "secure-attention",
+                            "tls-port", "type", "delete-this-file",
+                            "host-subject", "toggle-fullscreen", "release-cursor"):
+                    val = config.get(key)
+                    if val is not None:
+                        lines.append(f"{key}={val}")
+                title = config.get("title")
+                if title:
+                    lines.append(f"title={title}")
+                ca = config.get("ca", "")
+                if ca:
+                    lines.append("ca=" + ca.replace("\n", "\\n"))
+
+                fd, vv_path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write("\n".join(lines) + "\n")
+            except Exception as e:
+                try:
+                    self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
+                except RuntimeError:
+                    pass
+                return
+
+            try:
+                proc = subprocess.Popen(
+                    ["remote-viewer", vv_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+                )
+                try:
+                    _, stderr = proc.communicate(timeout=5)
+                    if proc.returncode != 0:
+                        err_text = stderr.decode("utf-8", errors="replace").strip()
+                        logger.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
+                        try:
+                            self.signals.console_error.emit(
+                                f"remote-viewer: {err_text or 'код ' + str(proc.returncode)}"
+                            )
+                        except RuntimeError:
+                            pass
+                        if vv_path and os.path.exists(vv_path):
+                            try:
+                                os.unlink(vv_path)
+                            except OSError:
+                                pass
+                        return
+                except subprocess.TimeoutExpired:
+                    logger.info("remote-viewer запущен (pid=%d)", proc.pid)
+                    # remote-viewer detached — следим за процессом в фоне,
+                    # удалим .vv после его завершения
+                    import threading
+                    def _cleanup():
+                        try:
+                            proc.wait()
+                        except Exception:
+                            pass
+                        if vv_path and os.path.exists(vv_path):
+                            try:
+                                os.unlink(vv_path)
+                            except OSError:
+                                pass
+                    threading.Thread(target=_cleanup, daemon=True).start()
+            except FileNotFoundError:
+                try:
+                    self.signals.console_error.emit(
+                        "remote-viewer не найден. Установите пакет virt-viewer:\n"
+                        "  apt install virt-viewer"
+                    )
+                except RuntimeError:
+                    pass
+                if vv_path and os.path.exists(vv_path):
+                    try:
+                        os.unlink(vv_path)
+                    except OSError:
+                        pass
+                return
+
+            try:
+                self.signals.console_ready.emit("🖥 SPICE консоль запущена")
             except RuntimeError:
                 pass
-            return
-
-        try:
-            self.signals.console_ready.emit("🖥 SPICE консоль запущена")
-        except RuntimeError:
-            pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -658,6 +882,7 @@ class VmConsoleWorker(QRunnable):
 class CreateVmSignals(QObject):
     vm_created = Signal(str)  # success message
     vm_error = Signal(str)    # error message
+    finished = Signal()
 
 
 class CreateVmWorker(QRunnable):
@@ -731,11 +956,17 @@ class CreateVmWorker(QRunnable):
                 self.signals.vm_error.emit(str(e))
             except RuntimeError:
                 pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
 
 
 class DeleteVmSignals(QObject):
     vm_deleted = Signal(str)  # success message
     vm_error = Signal(str)    # error message
+    finished = Signal()
 
 
 class DeleteVmWorker(QRunnable):
@@ -772,5 +1003,8 @@ class DeleteVmWorker(QRunnable):
                 self.signals.vm_error.emit(str(e))
             except RuntimeError:
                 pass
-
-
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass

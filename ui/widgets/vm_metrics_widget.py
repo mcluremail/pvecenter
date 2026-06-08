@@ -19,7 +19,7 @@ class VmMetricsWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.plot_widget = False
+        self._has_plot = False
         self._cached_data = None
         self._disk_visible = True
 
@@ -60,7 +60,7 @@ class VmMetricsWidget(QWidget):
             self.plot.setMouseEnabled(x=False, y=False)
             self._layout.addWidget(self.plot, 1)
 
-            self.plot_widget = True
+            self._has_plot = True
         else:
             self._layout.addWidget(QLabel("PyQtGraph не установлен. Графики недоступны."))
 
@@ -84,7 +84,7 @@ class VmMetricsWidget(QWidget):
 
     def clear_curves(self):
         self._cached_data = None
-        if self.plot_widget:
+        if self._has_plot:
             self.curve.setData([], [])
 
     def set_ram_range(self, max_bytes):
@@ -95,7 +95,7 @@ class VmMetricsWidget(QWidget):
         self._render_current_metric()
 
     def _render_current_metric(self):
-        if not self.plot_widget or self._cached_data is None:
+        if not self._has_plot or self._cached_data is None:
             return
         metric = self.metric_combo.currentText()
         data = self._cached_data

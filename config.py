@@ -1,13 +1,41 @@
 import json
 import os
 import base64
+import sqlite3
+import threading
 
 SALT_FILE = "nodes.salt"
 ENC_FILE = "nodes.enc"
 CONFIG_JSON = "nodes.json"
+TASKS_DB = "tasks_cache.sqlite"
 
 def _base_dir():
     return os.path.dirname(os.path.abspath(__file__))
+
+def _config_dir():
+    """Возвращает ~/.config/pve-center/, создавая если нет."""
+    xdg = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+    d = os.path.join(xdg, "pve-center")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def _migrate_if_needed(name):
+    """Переносит файл из _base_dir() в _config_dir(), если он есть только в старом месте.
+    После переноса — если в _base_dir() не осталось наших файлов, удаляет пустую директорию."""
+    src = os.path.join(_base_dir(), name)
+    dst = os.path.join(_config_dir(), name)
+    if os.path.exists(src) and not os.path.exists(dst):
+        import shutil
+        shutil.move(src, dst)
+    # Чистим пустую старую директорию, если там не осталось наших файлов
+    for leftover in (SALT_FILE, ENC_FILE, CONFIG_JSON):
+        if os.path.exists(os.path.join(_base_dir(), leftover)):
+            return
+    try:
+        if os.path.isdir(_base_dir()) and not os.listdir(_base_dir()):
+            os.rmdir(_base_dir())
+    except OSError:
+        pass
 
 def _derive_key(password: str, salt: bytes) -> bytes:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -114,7 +142,9 @@ def cache_password(pwd):
 def save_config(config_list):
     """Сохраняет конфигурацию, используя кешированный мастер-пароль (если есть)."""
     global _password
-    base = _base_dir()
+    for fn in (SALT_FILE, ENC_FILE, CONFIG_JSON):
+        _migrate_if_needed(fn)
+    base = _config_dir()
     enc_path = os.path.join(base, ENC_FILE)
     json_path = os.path.join(base, CONFIG_JSON)
 
@@ -134,7 +164,9 @@ def load_config():
     """Загружает конфигурацию. При необходимости показывает диалог пароля.
     Возвращает список узлов или None (отмена)."""
     global _password
-    base = _base_dir()
+    for fn in (SALT_FILE, ENC_FILE, CONFIG_JSON):
+        _migrate_if_needed(fn)
+    base = _config_dir()
     enc_path = os.path.join(base, ENC_FILE)
 
     if os.path.exists(enc_path):
@@ -186,3 +218,51 @@ def load_config():
             if dlg.exec() == QDialog.Accepted:
                 os.remove(json_path)
         return config
+
+
+# ------------------------------------------------------------
+# SQLite кэш задач
+# ------------------------------------------------------------
+
+_tasks_cache_lock = threading.Lock()
+
+
+def _tasks_db_path():
+    return os.path.join(_config_dir(), TASKS_DB)
+
+
+def _init_tasks_db():
+    path = _tasks_db_path()
+    conn = sqlite3.connect(path, timeout=5)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE IF NOT EXISTS tasks_cache (id INTEGER PRIMARY KEY, data TEXT)")
+    conn.commit()
+    return conn
+
+
+def save_tasks_cache(tasks: list[dict]):
+    try:
+        data = json.dumps(tasks, ensure_ascii=False, default=str)
+        with _tasks_cache_lock:
+            conn = _init_tasks_db()
+            conn.execute("INSERT OR REPLACE INTO tasks_cache (id, data) VALUES (1, ?)", (data,))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("save_tasks_cache: %s", e)
+
+
+def load_tasks_cache() -> list[dict]:
+    try:
+        with _tasks_cache_lock:
+            conn = _init_tasks_db()
+            cur = conn.execute("SELECT data FROM tasks_cache WHERE id = 1")
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                return json.loads(row[0])
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("load_tasks_cache: %s", e)
+    return []

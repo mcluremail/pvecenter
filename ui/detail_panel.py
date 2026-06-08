@@ -1,14 +1,32 @@
-import threading
 import traceback
 from collections import defaultdict
+from datetime import datetime
+from enum import IntEnum
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget, QTabWidget,
                                QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
                                QSizePolicy, QProgressBar, QHBoxLayout, QComboBox, QPushButton,
-                               QMenu)
-from PySide6.QtCore import Qt
+                               QMenu, QMessageBox)
+from PySide6.QtCore import Qt, QThreadPool
 from .hover import enable_row_hover
 from .icons import get_icon
+from .utils import STATUS_RU, ru_status as _ru_status, format_uptime as _format_uptime
 from PySide6.QtGui import QColor, QBrush
+
+
+def _progress_style(value, max_val=100):
+    """Возвращает QSS для QProgressBar с динамическим цветом."""
+    pct = int((value / max_val) * 100) if max_val else 0
+    if pct < 50:
+        color = "#22c55e"
+    elif pct < 80:
+        color = "#f59e0b"
+    else:
+        color = "#ef4444"
+    return (
+        f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
+        f"QProgressBar {{ border: 1px solid #d1d5db; border-radius: 3px;"
+        f" text-align: center; font-size: 11px; background: #f3f4f6; }}"
+    )
 
 try:
     import pyqtgraph as pg
@@ -24,7 +42,30 @@ from .widgets.vm_options_widget import VmOptionsWidget
 from .widgets.vm_task_history_widget import VmTaskHistoryWidget
 from .widgets.vm_pool_widget import VmPoolWidget
 
-# Максимум одновременно работающих воркеров в detail_panel
+
+class TabIndex(IntEnum):
+    """Именованные индексы вкладок detail_panel.
+    При добавлении/перестановке вкладки — править только этот enum."""
+    MONITOR = 0       # Мониторинг (графики)
+    HARDWARE = 1      # Оборудование
+    OPTIONS = 2       # Параметры
+    HISTORY = 3       # История задач
+    HOST_VMS = 4      # ВМ хоста
+    POOL_VMS = 5      # ВМ пула
+    SUMMARY = 6       # Сводка датацентра
+    STORAGES = 7      # Хранилища (сводка)
+    HOST_STORAGE = 8  # Хранилище хоста
+    STORAGE_DETAIL = 9  # Сводка хранилища
+    BACKUPS = 10      # Резервные копии
+    DISKS_VM = 11     # Диски ВМ
+    ISO = 12          # ISO образы
+    TEMPLATES = 13    # Шаблоны
+    NETWORK = 14      # Сеть
+    SERVICES = 15     # Сервисы
+    HOST_DISKS = 16   # Диски хоста
+    SNAPSHOTS = 17    # Снапшоты
+
+_MAX_WORKERS_DP = 8
 
 
 class DetailPanel(QWidget):
@@ -61,17 +102,19 @@ class DetailPanel(QWidget):
         action_layout.setSpacing(4)
 
         self._vm_actions = {
-            "start": "▶ Старт",
-            "shutdown": "⏻ Выкл",
-            "reboot": "⟳ Перезагр",
-            "reset": "↺ Сброс",
-            "stop": "⏹ Стоп",
-            "resume": "▶ Возобн",
+            "start": "Старт",
+            "shutdown": "Выкл",
+            "reboot": "Перезагр",
+            "reset": "Сброс",
+            "stop": "Стоп",
+            "resume": "Возобн",
         }
         action_layout.addStretch()
+        _btn_icon_map = {"start": "start", "shutdown": "shutdown", "reboot": "reboot",
+                        "reset": "reset", "stop": "stop", "resume": "resume"}
         self._action_buttons = {}
         for action_key, label in self._vm_actions.items():
-            btn = QPushButton(label)
+            btn = QPushButton(get_icon(_btn_icon_map[action_key]), label)
             btn.setFixedHeight(24)
             btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
@@ -85,7 +128,7 @@ class DetailPanel(QWidget):
         sep.setStyleSheet("background: #dde1e7;")
         action_layout.addWidget(sep)
 
-        self._console_btn = QPushButton("🖥 Консоль")
+        self._console_btn = QPushButton(get_icon("console"), "Консоль")
         self._console_btn.setFixedHeight(24)
         self._console_btn.setObjectName("accentBtn")
         self._console_btn.clicked.connect(self._on_vm_console)
@@ -131,6 +174,7 @@ class DetailPanel(QWidget):
         self.metrics_widget.timeframe_changed.connect(self._on_timeframe_changed)
 
         middle = QHBoxLayout()
+        middle.setContentsMargins(0, 0, 8, 0)
         middle.addWidget(self.info_stack)
         middle.addWidget(self.metrics_widget, 1)
         monitor_layout.addLayout(middle)
@@ -178,8 +222,8 @@ class DetailPanel(QWidget):
         host_layout.setContentsMargins(0, 0, 0, 0)
         host_layout.addWidget(self.host_vm_table)
         self.host_tab.setWidget(host_container)
-        self.tabs.addTab(self.host_tab, get_icon("disk"), "Виртуальные машины")
-        self.tabs.setTabVisible(4, False)
+        self.tabs.addTab(self.host_tab, get_icon("vm"), "Виртуальные машины")
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
 
         # --- Вкладка 5: Таблица ВМ пула ---
         self.pool_widget = VmPoolWidget()
@@ -187,7 +231,7 @@ class DetailPanel(QWidget):
         self.pool_tab.setWidgetResizable(True)
         self.pool_tab.setWidget(self.pool_widget)
         self.tabs.addTab(self.pool_tab, get_icon("pool"), "Виртуальные машины пула")
-        self.tabs.setTabVisible(5, False)
+        self.tabs.setTabVisible(TabIndex.POOL_VMS, False)
 
         # --- Вкладка 6: Сводка (хостов) ---
         self.datacenter_summary = QTableWidget()
@@ -208,7 +252,7 @@ class DetailPanel(QWidget):
         summary_layout.addWidget(self.datacenter_summary)
         self.summary_tab.setWidget(summary_container)
         self.tabs.addTab(self.summary_tab, get_icon("host"), "Сводка")
-        self.tabs.setTabVisible(6, False)
+        self.tabs.setTabVisible(TabIndex.SUMMARY, False)
 
         # --- Вкладка 7: Хранилища (сводка) ---
         self.storage_table = QTableWidget()
@@ -229,7 +273,7 @@ class DetailPanel(QWidget):
         storage_layout.addWidget(self.storage_table)
         self.storage_tab.setWidget(storage_container)
         self.tabs.addTab(self.storage_tab, get_icon("storage"), "Хранилища")
-        self.tabs.setTabVisible(7, False)
+        self.tabs.setTabVisible(TabIndex.STORAGES, False)
 
         # --- Вкладка 8: Хранилище хоста ---
         self.host_storage_table = QTableWidget()
@@ -247,7 +291,7 @@ class DetailPanel(QWidget):
         hs_layout.setContentsMargins(0, 0, 0, 0)
         hs_layout.addWidget(self.host_storage_table)
         self.tabs.addTab(self.host_storage_tab_widget, get_icon("storage"), "Хранилище")
-        self.tabs.setTabVisible(8, False)
+        self.tabs.setTabVisible(TabIndex.HOST_STORAGE, False)
 
         # --- Вкладка 9: Детали хранилища ---
         self.storage_detail_widget = QWidget()
@@ -333,7 +377,7 @@ class DetailPanel(QWidget):
 
         self.storage_detail_layout.addStretch()
         self.tabs.addTab(self.storage_detail_widget, get_icon("storage"), "Сводка хранилища")
-        self.tabs.setTabVisible(9, False)
+        self.tabs.setTabVisible(TabIndex.STORAGE_DETAIL, False)
 
         # --- Вкладка 10: Резервные копии ---
         self.storage_backups_table = QTableWidget()
@@ -362,7 +406,7 @@ class DetailPanel(QWidget):
         sb_layout.addWidget(self.storage_backups_stack)
         self.storage_backups_tab.setWidget(sb_container)
         self.tabs.addTab(self.storage_backups_tab, get_icon("backup"), "Резервные копии")
-        self.tabs.setTabVisible(10, False)
+        self.tabs.setTabVisible(TabIndex.BACKUPS, False)
 
         # --- Вкладка 11: Диски ВМ ---
         self.storage_disks_table = QTableWidget()
@@ -391,7 +435,7 @@ class DetailPanel(QWidget):
         sd2_layout.addWidget(self.storage_disks_stack)
         self.storage_disks_tab.setWidget(sd_container)
         self.tabs.addTab(self.storage_disks_tab, get_icon("disk"), "Диски ВМ")
-        self.tabs.setTabVisible(11, False)
+        self.tabs.setTabVisible(TabIndex.DISKS_VM, False)
 
         # --- Вкладка 12: ISO образы ---
         self.storage_iso_table = QTableWidget()
@@ -420,7 +464,7 @@ class DetailPanel(QWidget):
         iso_layout.addWidget(self.storage_iso_stack)
         self.storage_iso_tab.setWidget(iso_container)
         self.tabs.addTab(self.storage_iso_tab, get_icon("iso"), "ISO")
-        self.tabs.setTabVisible(12, False)
+        self.tabs.setTabVisible(TabIndex.ISO, False)
 
         # --- Вкладка 13: Шаблоны ---
         self.storage_tpl_table = QTableWidget()
@@ -449,7 +493,7 @@ class DetailPanel(QWidget):
         tpl_layout.addWidget(self.storage_tpl_stack)
         self.storage_tpl_tab.setWidget(tpl_container)
         self.tabs.addTab(self.storage_tpl_tab, get_icon("template"), "Шаблоны")
-        self.tabs.setTabVisible(13, False)
+        self.tabs.setTabVisible(TabIndex.TEMPLATES, False)
 
         # --- Вкладка 14: Сеть ---
         self.host_network_loading = QLabel("Загрузка...")
@@ -477,7 +521,7 @@ class DetailPanel(QWidget):
         net_layout.addWidget(self.host_network_stack)
         self.host_network_tab.setWidget(net_container)
         self.tabs.addTab(self.host_network_tab, get_icon("network"), "Сеть")
-        self.tabs.setTabVisible(14, False)
+        self.tabs.setTabVisible(TabIndex.NETWORK, False)
 
         # --- Вкладка 15: Сервисы ---
         self.host_services_loading = QLabel("Загрузка...")
@@ -505,7 +549,7 @@ class DetailPanel(QWidget):
         svc_layout.addWidget(self.host_services_stack)
         self.host_services_tab.setWidget(svc_container)
         self.tabs.addTab(self.host_services_tab, get_icon("services"), "Сервисы")
-        self.tabs.setTabVisible(15, False)
+        self.tabs.setTabVisible(TabIndex.SERVICES, False)
 
         # --- Вкладка 16: Диски ---
         self.host_disks_loading = QLabel("Загрузка...")
@@ -533,7 +577,7 @@ class DetailPanel(QWidget):
         disk_layout.addWidget(self.host_disks_stack)
         self.host_disks_tab.setWidget(disk_container)
         self.tabs.addTab(self.host_disks_tab, get_icon("disk"), "Диски")
-        self.tabs.setTabVisible(16, False)
+        self.tabs.setTabVisible(TabIndex.HOST_DISKS, False)
 
         # --- Вкладка 17: Снапшоты ВМ ---
         self.host_snapshots_loading = QLabel("Загрузка...")
@@ -562,7 +606,7 @@ class DetailPanel(QWidget):
         snap_layout.addWidget(self.host_snapshots_stack)
         self.host_snapshots_tab.setWidget(snap_container)
         self.tabs.addTab(self.host_snapshots_tab, get_icon("snapshot"), "Снапшоты")
-        self.tabs.setTabVisible(17, False)
+        self.tabs.setTabVisible(TabIndex.SNAPSHOTS, False)
 
         self.tabs.hide()
 
@@ -601,12 +645,11 @@ class DetailPanel(QWidget):
         return err
 
     def _run_worker(self, worker):
-        if len(self._workers) >= 16:
+        if len(self._workers) >= _MAX_WORKERS_DP:
             return
         self._workers.add(worker)
-        cls_name = type(worker).__name__
-        t = threading.Thread(target=worker.run, daemon=True, name=f"dp-{cls_name}-{id(worker)}")
-        t.start()
+        worker.signals.finished.connect(lambda w=worker: self._discard_worker(w))
+        QThreadPool.globalInstance().start(worker)
 
     def _discard_worker(self, worker):
         """Безопасно удаляет воркер из _workers.
@@ -627,6 +670,15 @@ class DetailPanel(QWidget):
         cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
         if not cfg:
             return
+        if action in ("stop", "reset"):
+            msgs = {
+                "stop": f"Принудительное выключение ВМ {vmid}? Несохранённые данные будут потеряны.",
+                "reset": f"Принудительная перезагрузка ВМ {vmid}?",
+            }
+            reply = QMessageBox.warning(self, "Подтверждение", msgs[action],
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                return
         node_name = self._last_vm_data.get("node") or host_name
         vm_type = self._last_vm_data.get("type", "qemu")
         from ..backend import VmActionWorker
@@ -649,23 +701,39 @@ class DetailPanel(QWidget):
         ))
         self._run_worker(worker)
 
-    def _on_action_finished(self, msg):
-        for btn in self._action_buttons.values():
+    def _update_action_buttons(self, vm_data=None):
+        """Пересчитывает состояние кнопок действий ВМ по статусу."""
+        if vm_data is None:
+            vm_data = self._last_vm_data or {}
+        status = vm_data.get("status", "") if vm_data else ""
+        for key, btn in self._action_buttons.items():
             btn.setEnabled(True)
-        self.detail_label.setText(f"ВМ/CT: {self._last_vm_data.get('name', self._last_vm_data.get('vmid', ''))} — {msg}")
+            if key == "start":
+                btn.setEnabled(status not in ("running",))
+            elif key in ("shutdown", "stop"):
+                btn.setEnabled(status == "running")
+            elif key in ("reboot", "reset"):
+                btn.setEnabled(status == "running")
+            elif key == "resume":
+                btn.setEnabled(status == "paused")
+        vm_type = vm_data.get("type", "qemu") if vm_data else "qemu"
+        self._console_btn.setEnabled(
+            vm_type in ("qemu", "lxc") and status == "running"
+        )
+
+    def _on_action_finished(self, msg):
+        vm = self._last_vm_data or {}
+        self.detail_label.setText(f"ВМ/CT: {vm.get('name', vm.get('vmid', ''))} — {msg}")
+        self._update_action_buttons(vm)
 
     def _on_action_error(self, err):
-        for btn in self._action_buttons.values():
-            btn.setEnabled(True)
         self.detail_label.setText(self._parse_pve_error(err))
+        self._update_action_buttons(self._last_vm_data)
 
     def _on_vm_console(self):
         if not self._last_vm_data:
             return
         vm_type = self._last_vm_data.get("type", "qemu")
-        if vm_type != "qemu":
-            self.detail_label.setText("SPICE консоль доступна только для QEMU ВМ")
-            return
         vmid = self._last_vm_data.get("vmid")
         host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
         cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
@@ -675,7 +743,7 @@ class DetailPanel(QWidget):
         self._console_btn.setEnabled(False)
         self.detail_label.setText(f"ВМ {vmid}: открытие SPICE консоли...")
         from ..backend import VmConsoleWorker
-        worker = VmConsoleWorker(cfg, node_name, vmid)
+        worker = VmConsoleWorker(cfg, node_name, vmid, vm_type)
         worker.signals.console_ready.connect(lambda msg: (
             self.detail_label.setText(msg),
             self._console_btn.setEnabled(True),
@@ -748,21 +816,7 @@ class DetailPanel(QWidget):
         self.tabs.show()
         if obj_type == "vm":
             self.vm_action_bar.setVisible(True)
-            status = data.get("status", "") if data else ""
-            for key, btn in self._action_buttons.items():
-                btn.setEnabled(True)
-                if key == "start":
-                    btn.setEnabled(status != "running")
-                elif key in ("shutdown", "stop"):
-                    btn.setEnabled(status == "running")
-                elif key in ("reboot", "reset"):
-                    btn.setEnabled(status == "running")
-                elif key == "resume":
-                    btn.setEnabled(status == "paused")
-            vm_type = data.get("type", "qemu") if data else "qemu"
-            self._console_btn.setEnabled(
-                vm_type == "qemu" and status == "running"
-            )
+            self._update_action_buttons(data)
         else:
             self.vm_action_bar.setVisible(False)
         try:
@@ -779,22 +833,22 @@ class DetailPanel(QWidget):
             self._cancel_history_worker()
             self.metrics_widget.clear_curves()
 
-            self.tabs.setTabVisible(2, False)
-            self.tabs.setTabVisible(3, False)
-            self.tabs.setTabVisible(4, False)
-            self.tabs.setTabVisible(5, False)
-            self.tabs.setTabVisible(6, False)
-            self.tabs.setTabVisible(7, False)
-            self.tabs.setTabVisible(8, False)
-            self.tabs.setTabVisible(9, False)
-            self.tabs.setTabVisible(10, False)
-            self.tabs.setTabVisible(11, False)
-            self.tabs.setTabVisible(12, False)
-            self.tabs.setTabVisible(13, False)
-            self.tabs.setTabVisible(14, False)
-            self.tabs.setTabVisible(15, False)
-            self.tabs.setTabVisible(16, False)
-            self.tabs.setTabVisible(17, False)
+            self.tabs.setTabVisible(TabIndex.OPTIONS, False)
+            self.tabs.setTabVisible(TabIndex.HISTORY, False)
+            self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+            self.tabs.setTabVisible(TabIndex.POOL_VMS, False)
+            self.tabs.setTabVisible(TabIndex.SUMMARY, False)
+            self.tabs.setTabVisible(TabIndex.STORAGES, False)
+            self.tabs.setTabVisible(TabIndex.HOST_STORAGE, False)
+            self.tabs.setTabVisible(TabIndex.STORAGE_DETAIL, False)
+            self.tabs.setTabVisible(TabIndex.BACKUPS, False)
+            self.tabs.setTabVisible(TabIndex.DISKS_VM, False)
+            self.tabs.setTabVisible(TabIndex.ISO, False)
+            self.tabs.setTabVisible(TabIndex.TEMPLATES, False)
+            self.tabs.setTabVisible(TabIndex.NETWORK, False)
+            self.tabs.setTabVisible(TabIndex.SERVICES, False)
+            self.tabs.setTabVisible(TabIndex.HOST_DISKS, False)
+            self.tabs.setTabVisible(TabIndex.SNAPSHOTS, False)
 
             if obj_type == "cluster_folder":
                 self._show_cluster_folder(obj_name)
@@ -834,6 +888,7 @@ class DetailPanel(QWidget):
     def _update_progress_bar(bar, value, fmt):
         bar.setValue(value)
         bar.setFormat(fmt)
+        bar.setStyleSheet(_progress_style(value))
 
     def _update_vm_summary_cell(self, label, value, fg_color=None):
         table = self.vm_summary_table
@@ -859,11 +914,11 @@ class DetailPanel(QWidget):
             uptime = host_data.get("uptime", 0)
             status = host_data.get("status", "")
 
-            self._update_vm_summary_cell("Статус", status,
+            self._update_vm_summary_cell("Статус", _ru_status(status),
                 "#22c55e" if status == "online" else "#ef4444" if status == "offline" else "#f59e0b")
             self._update_vm_summary_cell("ЦП", f"{cpu_pct}%")
             self._update_vm_summary_cell("RAM (GiB)", f"{mem_gb} / {maxmem_gb}")
-            self._update_vm_summary_cell("Аптайм", self._format_uptime(uptime))
+            self._update_vm_summary_cell("Аптайм", _format_uptime(uptime))
 
         WARN_ROLE = Qt.UserRole + 10
         vmid_role = Qt.UserRole + 30
@@ -945,7 +1000,7 @@ class DetailPanel(QWidget):
                 self._update_progress_bar(old_ram, mem_pct, f"{mem_gb}/{maxmem_gb} GiB")
 
             uptime_sec = node.get("uptime", 0)
-            uptime_str = self._format_uptime(uptime_sec) if uptime_sec else ''
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
             self._set_cell_text(table, r, 5, uptime_str)
 
     def _update_vm_cells(self, vm_data):
@@ -958,7 +1013,7 @@ class DetailPanel(QWidget):
 
         status = vm_data.get("status") or detail.get("status", "")
         status_color = "#22c55e" if status == "running" else "#ef4444" if status == "stopped" else "#f59e0b"
-        self._update_vm_summary_cell("Статус", status, status_color)
+        self._update_vm_summary_cell("Статус", _ru_status(status), status_color)
 
         cpu_usage = vm_data.get("cpu") or detail.get("cpu", 0)
         if isinstance(cpu_usage, float):
@@ -987,7 +1042,7 @@ class DetailPanel(QWidget):
         self._update_vm_summary_cell("Сеть исх (MB)", str(netout_mb))
 
         uptime = detail.get("uptime") or vm_data.get("uptime", "")
-        self._update_vm_summary_cell("Аптайм", self._format_uptime(uptime) if uptime else '')
+        self._update_vm_summary_cell("Аптайм", _format_uptime(uptime) if uptime else '')
 
     def _update_pool_cells(self):
         pool_name = self.current_obj_name
@@ -1025,6 +1080,7 @@ class DetailPanel(QWidget):
         self._set_storage_param("Занято", f"{used_gb} GiB")
         self._set_storage_param("Всего", f"{total_gb} GiB")
         self._set_storage_param("Использование", f"{total_pct}%")
+        self.storage_detail_bar.setStyleSheet(_progress_style(total_pct))
         self.storage_detail_bar.setValue(total_pct)
         self.storage_detail_bar.setFormat(f"{total_pct}%  ({used_gb}/{total_gb} GiB)")
 
@@ -1120,19 +1176,6 @@ class DetailPanel(QWidget):
             except RuntimeError: pass
             self.current_hist_worker = None
 
-    def _format_uptime(self, seconds):
-        if seconds <= 0:
-            return '0'
-        days, rem = divmod(int(seconds), 86400)
-        hours, rem = divmod(rem, 3600)
-        mins, secs = divmod(rem, 60)
-        parts = []
-        if days: parts.append(f"{days}d")
-        if hours: parts.append(f"{hours}h")
-        if mins: parts.append(f"{mins}m")
-        if secs or not parts: parts.append(f"{secs}s")
-        return ' '.join(parts)
-
     # ------------------------------------------------------------------
     # Заполнение сводной таблицы хостов (с прогресс-барами)
     # ------------------------------------------------------------------
@@ -1149,7 +1192,7 @@ class DetailPanel(QWidget):
             table.setItem(i, 0, QTableWidgetItem(node_name))
 
             status = node.get("status", "unknown")
-            status_item = QTableWidgetItem(f"● {status}")
+            status_item = QTableWidgetItem(f"● {_ru_status(status)}")
             if status == "online":
                 status_item.setForeground(QBrush(QColor("#22c55e")))
             elif status == "offline":
@@ -1168,6 +1211,7 @@ class DetailPanel(QWidget):
             cpu_bar = QProgressBar()
             cpu_bar.setRange(0, 100)
             cpu_bar.setValue(int(cpu_pct))
+            cpu_bar.setStyleSheet(_progress_style(int(cpu_pct)))
             cpu_bar.setFormat(f"{cpu_pct}%")
             table.setCellWidget(i, 3, cpu_bar)
             cpu_item = QTableWidgetItem("")
@@ -1182,6 +1226,7 @@ class DetailPanel(QWidget):
             ram_bar = QProgressBar()
             ram_bar.setRange(0, 100)
             ram_bar.setValue(mem_pct)
+            ram_bar.setStyleSheet(_progress_style(mem_pct))
             ram_bar.setFormat(f"{mem_gb}/{maxmem_gb} GiB")
             table.setCellWidget(i, 4, ram_bar)
             ram_item = QTableWidgetItem("")
@@ -1189,7 +1234,7 @@ class DetailPanel(QWidget):
             table.setItem(i, 4, ram_item)
 
             uptime_sec = node.get("uptime", 0)
-            uptime_str = self._format_uptime(uptime_sec) if uptime_sec else ''
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
             table.setItem(i, 5, QTableWidgetItem(uptime_str))
 
         table.resizeRowsToContents()
@@ -1197,11 +1242,11 @@ class DetailPanel(QWidget):
 
     def _show_cluster_folder(self, name):
         self.detail_label.setText("Кластеры")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(4, False)
-        self.tabs.setTabVisible(6, True)
-        self.tabs.setCurrentIndex(6)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+        self.tabs.setTabVisible(TabIndex.SUMMARY, True)
+        self.tabs.setCurrentIndex(TabIndex.SUMMARY)
         clusters = {}
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
@@ -1229,6 +1274,7 @@ class DetailPanel(QWidget):
             cpu_bar = QProgressBar()
             cpu_bar.setRange(0, 100)
             cpu_bar.setValue(int(avg_cpu))
+            cpu_bar.setStyleSheet(_progress_style(int(avg_cpu)))
             cpu_bar.setFormat(f"{avg_cpu}%")
             table.setCellWidget(i, 3, cpu_bar)
             ci = QTableWidgetItem("")
@@ -1242,6 +1288,7 @@ class DetailPanel(QWidget):
             ram_bar = QProgressBar()
             ram_bar.setRange(0, 100)
             ram_bar.setValue(mem_pct)
+            ram_bar.setStyleSheet(_progress_style(mem_pct))
             ram_bar.setFormat(f"{mem_used_gb}/{mem_total_gb} GiB")
             table.setCellWidget(i, 4, ram_bar)
             ri = QTableWidgetItem("")
@@ -1275,6 +1322,7 @@ class DetailPanel(QWidget):
             bar = QProgressBar()
             bar.setRange(0, 100)
             bar.setValue(pct)
+            bar.setStyleSheet(_progress_style(pct))
             bar.setFormat(f"{pct}%")
             table.setCellWidget(i, 6, bar)
             bi = QTableWidgetItem("")
@@ -1287,10 +1335,10 @@ class DetailPanel(QWidget):
 
     def _show_storage_folder(self):
         self.detail_label.setText("Хранилища")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(7, True)
-        self.tabs.setCurrentIndex(7)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.STORAGES, True)
+        self.tabs.setCurrentIndex(TabIndex.STORAGES)
         seen = set()
         deduped = []
         for st in self.all_storages:
@@ -1314,21 +1362,21 @@ class DetailPanel(QWidget):
         else:
             title = storage_name
         self.detail_label.setText(f"Хранилище: {title}")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(2, False)
-        self.tabs.setTabVisible(3, False)
-        self.tabs.setTabVisible(4, False)
-        self.tabs.setTabVisible(5, False)
-        self.tabs.setTabVisible(6, False)
-        self.tabs.setTabVisible(7, False)
-        self.tabs.setTabVisible(8, False)
-        self.tabs.setTabVisible(9, True)
-        self.tabs.setTabVisible(10, False)
-        self.tabs.setTabVisible(11, False)
-        self.tabs.setTabVisible(12, False)
-        self.tabs.setTabVisible(13, False)
-        self.tabs.setCurrentIndex(9)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.OPTIONS, False)
+        self.tabs.setTabVisible(TabIndex.HISTORY, False)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+        self.tabs.setTabVisible(TabIndex.POOL_VMS, False)
+        self.tabs.setTabVisible(TabIndex.SUMMARY, False)
+        self.tabs.setTabVisible(TabIndex.STORAGES, False)
+        self.tabs.setTabVisible(TabIndex.HOST_STORAGE, False)
+        self.tabs.setTabVisible(TabIndex.STORAGE_DETAIL, True)
+        self.tabs.setTabVisible(TabIndex.BACKUPS, False)
+        self.tabs.setTabVisible(TabIndex.DISKS_VM, False)
+        self.tabs.setTabVisible(TabIndex.ISO, False)
+        self.tabs.setTabVisible(TabIndex.TEMPLATES, False)
+        self.tabs.setCurrentIndex(TabIndex.STORAGE_DETAIL)
         self.storage_detail_name.setText(title)
         if cluster:
             filtered = [s for s in self.all_storages
@@ -1367,6 +1415,7 @@ class DetailPanel(QWidget):
         for r in range(self.storage_detail_params.rowCount()):
             if self.storage_detail_params.rowHeight(r) > 22:
                 self.storage_detail_params.setRowHeight(r, 22)
+        self.storage_detail_bar.setStyleSheet(_progress_style(total_pct))
         self.storage_detail_bar.setValue(total_pct)
         self.storage_detail_bar.setFormat(f"{total_pct}%  ({used_gb}/{total_gb} GiB)")
         self.storage_detail_nodes_label.setText("По узлам:" if cluster else "Узел:")
@@ -1389,6 +1438,7 @@ class DetailPanel(QWidget):
             bar = QProgressBar()
             bar.setRange(0, 100)
             bar.setValue(pct)
+            bar.setStyleSheet(_progress_style(pct))
             bar.setFormat(f"{pct}%")
             self.storage_detail_nodes_table.setCellWidget(i, 5, bar)
             bi = QTableWidgetItem("")
@@ -1528,12 +1578,10 @@ class DetailPanel(QWidget):
             table.setItem(i, 2, QTableWidgetItem(self._format_volsize(vol.get("size", 0))))
             ctime = vol.get("ctime")
             if ctime:
-                from datetime import datetime
                 table.setItem(i, 3, QTableWidgetItem(datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")))
             else:
                 mtime = vol.get("mtime")
                 if mtime:
-                    from datetime import datetime
                     table.setItem(i, 3, QTableWidgetItem(datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")))
                 else:
                     table.setItem(i, 3, QTableWidgetItem(""))
@@ -1562,6 +1610,7 @@ class DetailPanel(QWidget):
             bar = QProgressBar()
             bar.setRange(0, 100)
             bar.setValue(pct)
+            bar.setStyleSheet(_progress_style(pct))
             bar.setFormat(f"{pct}%")
             table.setCellWidget(i, 5, bar)
             bi = QTableWidgetItem("")
@@ -1760,7 +1809,6 @@ class DetailPanel(QWidget):
             table.setItem(i, 3, QTableWidgetItem(self._format_volsize(size) if size else "0"))
             ctime = b.get("ctime")
             if ctime:
-                from datetime import datetime
                 table.setItem(i, 4, QTableWidgetItem(datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")))
             else:
                 table.setItem(i, 4, QTableWidgetItem(""))
@@ -1916,7 +1964,6 @@ class DetailPanel(QWidget):
             table.setItem(i, 2, QTableWidgetItem(snap.get("description", "")))
             snaptime = snap.get("snaptime", 0)
             if snaptime:
-                from datetime import datetime
                 ts = datetime.fromtimestamp(snaptime).strftime("%Y-%m-%d %H:%M:%S")
                 table.setItem(i, 3, QTableWidgetItem(ts))
             else:
@@ -1930,10 +1977,10 @@ class DetailPanel(QWidget):
 
     def _show_standalone_folder(self, name):
         self.detail_label.setText("Отдельные хосты")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(6, True)
-        self.tabs.setCurrentIndex(6)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.SUMMARY, True)
+        self.tabs.setCurrentIndex(TabIndex.SUMMARY)
         standalone = []
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
@@ -1945,12 +1992,12 @@ class DetailPanel(QWidget):
 
     def _show_cluster(self, cluster_name):
         self.detail_label.setText(f"Кластер: {cluster_name}")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(4, False)
-        self.tabs.setTabVisible(6, True)
-        self.tabs.setTabVisible(5, False)
-        self.tabs.setCurrentIndex(6)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+        self.tabs.setTabVisible(TabIndex.SUMMARY, True)
+        self.tabs.setTabVisible(TabIndex.POOL_VMS, False)
+        self.tabs.setCurrentIndex(TabIndex.SUMMARY)
 
         hosts = []
         for node in self.all_nodes:
@@ -1979,19 +2026,19 @@ class DetailPanel(QWidget):
             self.info_stack.setCurrentIndex(0)
             self.metrics_widget.setVisible(False)
             self.metrics_widget.clear_curves()
-            self.tabs.setCurrentIndex(0)
+            self.tabs.setCurrentIndex(TabIndex.MONITOR)
             return
 
         self.metrics_widget.setVisible(True)
-        self.tabs.setTabVisible(0, True)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(4, True)
-        self.tabs.setTabVisible(8, True)
-        self.tabs.setTabVisible(14, True)
-        self.tabs.setTabVisible(15, True)
-        self.tabs.setTabVisible(16, True)
-        self.tabs.setTabVisible(17, True)
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setTabVisible(TabIndex.MONITOR, True)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, True)
+        self.tabs.setTabVisible(TabIndex.HOST_STORAGE, True)
+        self.tabs.setTabVisible(TabIndex.NETWORK, True)
+        self.tabs.setTabVisible(TabIndex.SERVICES, True)
+        self.tabs.setTabVisible(TabIndex.HOST_DISKS, True)
+        self.tabs.setTabVisible(TabIndex.SNAPSHOTS, True)
+        self.tabs.setCurrentIndex(TabIndex.MONITOR)
 
         self.host_network_stack.setCurrentIndex(0)
         self.host_network_stack.widget(0).setText("Загрузка...")
@@ -2020,11 +2067,11 @@ class DetailPanel(QWidget):
             table = self.vm_summary_table
             params = [
                 ("Имя", host_data.get("node", "")),
-                ("Статус", host_data.get("status", "")),
+                ("Статус", _ru_status(host_data.get("status", ""))),
                 ("Адрес", address),
                 ("ЦП", f"{cpu_pct}%"),
                 ("RAM (GiB)", f"{mem_gb} / {maxmem_gb}"),
-                ("Аптайм", self._format_uptime(uptime)),
+                ("Аптайм", _format_uptime(uptime)),
             ]
             table.setRowCount(len(params))
             for i, (k, v) in enumerate(params):
@@ -2051,7 +2098,7 @@ class DetailPanel(QWidget):
             self.host_vm_table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
             self.host_vm_table.setItem(i, 2, QTableWidgetItem(str(vm.get("node", vm.get("host_name", "")))))
             vm_status = str(vm.get("status", ""))
-            vm_status_item = QTableWidgetItem(vm_status)
+            vm_status_item = QTableWidgetItem(_ru_status(vm_status))
             if vm_status == "running":
                 vm_status_item.setForeground(QBrush(QColor("#22c55e")))
             elif vm_status == "stopped":
@@ -2116,13 +2163,13 @@ class DetailPanel(QWidget):
 
     def _show_pool_info(self, pool_name):
         self.detail_label.setText(f"Пул: {pool_name}")
-        self.tabs.setTabVisible(0, False)
-        self.tabs.setTabVisible(1, False)
-        self.tabs.setTabVisible(2, False)
-        self.tabs.setTabVisible(3, False)
-        self.tabs.setTabVisible(4, False)
-        self.tabs.setTabVisible(5, True)
-        self.tabs.setCurrentIndex(5)
+        self.tabs.setTabVisible(TabIndex.MONITOR, False)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        self.tabs.setTabVisible(TabIndex.OPTIONS, False)
+        self.tabs.setTabVisible(TabIndex.HISTORY, False)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+        self.tabs.setTabVisible(TabIndex.POOL_VMS, True)
+        self.tabs.setCurrentIndex(TabIndex.POOL_VMS)
 
         vms_in_pool = [vm for vm in self.all_vms if vm.get("pool") == pool_name]
         self.pool_widget.set_pool_vms(vms_in_pool)
@@ -2141,12 +2188,12 @@ class DetailPanel(QWidget):
     def _show_vm_info_init(self, vm_name, vm_data, gen):
         self.detail_label.setText(f"ВМ/CT: {vm_name}")
         self._last_vm_data = vm_data
-        self.tabs.setTabVisible(0, True)
-        self.tabs.setTabVisible(1, True)
-        self.tabs.setTabVisible(2, True)
-        self.tabs.setTabVisible(3, True)
-        self.tabs.setTabVisible(4, False)
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setTabVisible(TabIndex.MONITOR, True)
+        self.tabs.setTabVisible(TabIndex.HARDWARE, True)
+        self.tabs.setTabVisible(TabIndex.OPTIONS, True)
+        self.tabs.setTabVisible(TabIndex.HISTORY, True)
+        self.tabs.setTabVisible(TabIndex.HOST_VMS, False)
+        self.tabs.setCurrentIndex(TabIndex.MONITOR)
 
         if not vm_data:
             self.info_label.setText("Нет данных")
@@ -2206,7 +2253,7 @@ class DetailPanel(QWidget):
             self.task_history_widget.set_tasks(self.task_history_cache[detail_key])
 
     def _show_vm_metrics(self, vm_data):
-        if not self.metrics_widget.plot_widget:
+        if not self.metrics_widget._has_plot:
             return
         self.metrics_widget.show_disk_io(True)
         vmid = vm_data.get("vmid")
@@ -2251,9 +2298,14 @@ class DetailPanel(QWidget):
         if detail["status"] == "ok":
             self.details_cache[detail_key] = detail["data"]
             self._display_full_vm_info(vm_data, detail["data"])
-            self.tabs.setCurrentIndex(0)
+            self.tabs.setCurrentIndex(TabIndex.MONITOR)
             if detail_key in self.config_cache:
                 self.hardware_widget.set_hardware_data(self.config_cache[detail_key], detail["data"])
+            # Обновляем _last_vm_data и кнопки (после start/stop/reboot статус мог измениться)
+            if self._last_vm_data:
+                merged = {**vm_data, **detail["data"]}
+                self._last_vm_data = merged
+                self._update_action_buttons(merged)
         else:
             self.info_label.setText(self._parse_pve_error(detail.get("error", "")))
             self.info_stack.setCurrentIndex(0)
@@ -2314,7 +2366,7 @@ class DetailPanel(QWidget):
             params = [
                 ("Имя", name),
                 ("Тип", vm_type.upper()),
-                ("Статус", status),
+                ("Статус", _ru_status(status)),
                 ("Пул", str(pool)),
                 ("Теги", tags or '-'),
                 ("Ядер ЦП", cpus),
@@ -2323,7 +2375,7 @@ class DetailPanel(QWidget):
                 ("Диск (GiB)", f"{disk_used_gb} / {maxdisk_gb}"),
                 ("Сеть вх (MB)", netin_mb),
                 ("Сеть исх (MB)", netout_mb),
-                ("Аптайм", self._format_uptime(uptime) if uptime else ''),
+                ("Аптайм", _format_uptime(uptime) if uptime else ''),
                 ("HA состояние", str(ha))
             ]
             table.setRowCount(len(params))
@@ -2331,9 +2383,9 @@ class DetailPanel(QWidget):
                 table.setItem(i, 0, QTableWidgetItem(k))
                 item = QTableWidgetItem(str(v))
                 if k == "Статус":
-                    if str(v) == "running":
+                    if status == "running":
                         item.setForeground(QBrush(QColor("#22c55e")))
-                    elif str(v) == "stopped":
+                    elif status == "stopped":
                         item.setForeground(QBrush(QColor("#ef4444")))
                     else:
                         item.setForeground(QBrush(QColor("#f59e0b")))
