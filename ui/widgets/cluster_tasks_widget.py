@@ -88,12 +88,20 @@ def _vmid_from_upid(upid):
     if not upid or not upid.startswith("UPID:"):
         return ""
     parts = upid.split(":")
-    # UPID:node:pid:pstart:starttime:type:vmid:user:extinfo
     if len(parts) < 7:
         return ""
     candidate = parts[6]
     if candidate.isdigit():
         return candidate
+    if len(parts) >= 9:
+        info = ":".join(parts[8:])
+        idx = info.find("--vmid ")
+        if idx >= 0:
+            rest = info[idx + 7:].lstrip()
+            end = rest.find(" ")
+            num = rest[:end] if end >= 0 else rest
+            if num.isdigit():
+                return num
     return ""
 
 
@@ -153,8 +161,12 @@ class ClusterTasksWidget(QWidget):
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
 
+        # Блокируем сигналы модели — иначе ResizeToContents и сортировка
+        # реагируют на каждый setItem, вызывая O(n²) при 500+ строках
         self.table.setUpdatesEnabled(False)
+        self.table.model().blockSignals(True)
         self.table.setRowCount(len(tasks))
+
         for i, task in enumerate(tasks):
             start_ts = task.get('starttime')
             if start_ts:
@@ -195,7 +207,7 @@ class ClusterTasksWidget(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(user))
 
             task_type = task.get('type', '')
-            vmid = task.get('vmid') or task.get('_vmid') or ''
+            vmid = task.get('vmid') or task.get('id') or task.get('_vmid') or ''
             if not vmid:
                 vmid = _vmid_from_upid(task.get('upid', ''))
             vm_name = task.get('_vm_name', '')
@@ -227,6 +239,7 @@ class ClusterTasksWidget(QWidget):
             if self.table.rowHeight(r) > 22:
                 self.table.setRowHeight(r, 22)
 
+        self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
 
         if was_sorted:

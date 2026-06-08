@@ -1,21 +1,23 @@
+import sys
 import time
 import threading
 import traceback
 import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
-                               QMessageBox, QLabel, QDialog, QPushButton)
+                               QMessageBox, QLabel, QDialog, QPushButton, QCheckBox)
 from PySide6.QtCore import Qt, Slot, QTimer
 
-from ..backend import FetchWorker, ClusterTasksWorker, delete_host_token
+from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
 from ..config import save_config
+from . import theme
 from .notification import NotificationManager
 from .tree_panel import TreePanel
-
-logger = logging.getLogger(__name__)
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 from .icons import get_icon
+
+logger = logging.getLogger(__name__)
 
 # Максимум одновременно работающих воркеров
 MAX_WORKERS = 16
@@ -29,115 +31,18 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(get_icon("app"))
         self.resize(1600, 900)
 
-        self.setStyleSheet("""
-            QTreeWidget {
-                font-size: 13px;
-                alternate-background-color: #f3f4f6;
-                border: none;
-                outline: none;
-            }
-            QTreeWidget::item {
-                padding: 1px 4px;
-                min-height: 20px;
-            }
-            QTreeView::branch {
-                background: transparent;
-            }
-            QTableWidget {
-                font-size: 12px;
-                alternate-background-color: #f3f4f6;
-                gridline-color: transparent;
-            }
-            QTableWidget::item {
-                padding: 1px 4px;
-            }
-            QHeaderView::section {
-                font-weight: 600;
-                padding: 3px 4px;
-                background-color: transparent;
-                border: none;
-                border-right: none;
-                border-bottom: 1px solid #d1d5db;
-                font-size: 13px;
-            }
-            QTableCornerButton::section {
-                background: transparent;
-                border: none;
-                border-bottom: 1px solid #d1d5db;
-            }
-            QTabWidget::pane {
-                border-top: 1px solid #d1d5db;
-            }
-            QTabBar {
-                margin-left: 4px;
-            }
-            QTabBar::tab {
-                padding: 4px 10px;
-                font-size: 12px;
-            }
-            QProgressBar {
-                border: 1px solid #d1d5db;
-                border-radius: 3px;
-                text-align: center;
-                height: 16px;
-                background: #f3f4f6;
-                font-size: 12px;
-            }
-            QProgressBar::chunk {
-                background-color: #6b7280;
-                border-radius: 2px;
-            }
-            QPushButton {
-                padding: 4px 14px;
-                font-size: 12px;
-                border: 1px solid #d1d5db;
-                border-radius: 4px;
-                background: #f9fafb;
-            }
-            QPushButton:hover {
-                background: #e5e7eb;
-            }
-            QPushButton:pressed {
-                background: #d1d5db;
-            }
-            QPushButton:disabled {
-                color: #9ca3af;
-                background: #f3f4f6;
-            }
-            QPushButton#refreshBtn {
-                background: transparent;
-                border: none;
-                padding: 2px;
-                min-width: 20px;
-                max-width: 20px;
-                min-height: 20px;
-                max-height: 20px;
-            }
-            QPushButton#refreshBtn:hover {
-                background: #e5e7eb;
-                border-radius: 3px;
-            }
-            QPushButton#refreshBtn:pressed {
-                background: #d1d5db;
-                border-radius: 3px;
-            }
-            QSplitter::handle {
-                width: 6px;
-                background: #d1d5db;
-                margin: 0 1px;
-            }
-            QSplitter::handle:hover {
-                background: #9ca3af;
-            }
-        """)
+        theme.load()
 
         self.nodes_cfg = nodes_cfg or []
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
+        self.all_iso_images = {}
+        self.all_ha_groups = {}
+        self.all_pools = []
 
+        self._first_selection_done = False
         self._seen_storage_keys = set()
-        self._first_data_ready = False
         self._last_host_statuses = {}
         self._last_vm_statuses = {}
 
@@ -151,6 +56,7 @@ class MainWindow(QMainWindow):
         self.tree_panel.host_remove_requested.connect(self._on_host_remove)
         self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
         self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
+        self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
 
         self._notifications = NotificationManager(self)
 
@@ -181,6 +87,7 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.status_label)
 
         self._workers = set()
+        self._tasks_gen = 0
 
         # Переменные для мягкого обновления
         self.last_refresh_ts = 0
@@ -189,6 +96,7 @@ class MainWindow(QMainWindow):
         self._soft_refresh_start = 0
         self._soft_refresh_timeout = 30
         self._soft_gen = 0
+        self._soft_counter = 0
         self._soft_nodes = []
         self._soft_vms = []
         self._soft_storages = []
@@ -235,6 +143,12 @@ class MainWindow(QMainWindow):
         t = threading.Thread(target=worker.run, daemon=True, name=f"wkr-{cls_name}-{id(worker)}")
         t.start()
 
+    def _discard_worker(self, worker):
+        """Безопасно удаляет воркер из _workers.
+        Вызывается в finally после обработки сигнала, чтобы воркер не утекал
+        при RuntimeError (уничтоженный виджет) или любом исключении в хендлере."""
+        self._workers.discard(worker)
+
     # ------------------------------------------------------------
     # Добавление сервера
     # ------------------------------------------------------------
@@ -253,11 +167,15 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------
     def _on_vm_create_requested(self, node_name, host_name):
         from .create_vm_dialog import CreateVmDialog
-        dialog = CreateVmDialog(self, nodes=self.all_nodes, storages=self.all_storages)
+        dialog = CreateVmDialog(self, nodes=self.all_nodes, storages=self.all_storages,
+                                pools=getattr(self, 'all_pools', []),
+                                iso_images=getattr(self, 'all_iso_images', {}),
+                                ha_groups=getattr(self, 'all_ha_groups', {}))
         if dialog.exec() != CreateVmDialog.Accepted:
             return
         params = dialog.get_params()
         sel_node = dialog.get_node()
+        ha_group = dialog.get_ha_group()
 
         cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
         if not cfg:
@@ -265,18 +183,100 @@ class MainWindow(QMainWindow):
             return
 
         from ..backend import CreateVmWorker
-        worker = CreateVmWorker(cfg, sel_node, params)
-        worker.signals.vm_created.connect(lambda msg: (
+        worker = CreateVmWorker(cfg, sel_node, params, ha_group=ha_group)
+        worker.signals.vm_created.connect(lambda msg, w=worker: (
             self._notifications.show(msg),
             self.status_label.setText(msg),
-            QTimer.singleShot(1500, self.refresh_data)
+            QTimer.singleShot(1500, self.refresh_data),
+            self._discard_worker(w)
         ))
-        worker.signals.vm_error.connect(lambda err: (
+        worker.signals.vm_error.connect(lambda err, w=worker: (
             self._notifications.show(f"Ошибка создания ВМ: {err}", error=True),
-            self.status_label.setText(f"Ошибка: {err}")
+            self.status_label.setText(f"Ошибка: {err}"),
+            self._discard_worker(w)
         ))
         self._run_worker(worker)
         self.status_label.setText("Создание ВМ...")
+
+    # ------------------------------------------------------------
+    # Удаление ВМ
+    # ------------------------------------------------------------
+    def _on_vm_delete_requested(self, host_name, node, vmid):
+        # Найти ВМ по vmid + host_name
+        vm = next((v for v in self.all_vms
+                   if v.get("vmid") == vmid and v.get("host_name") == host_name), None)
+        vm_name = vm.get("name") if vm else f"VM {vmid}"
+
+        # Найти конфиг хоста
+        cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+        if not cfg:
+            self._notifications.show(f"Конфиг не найден для {host_name}", error=True)
+            return
+
+        # Диалог подтверждения
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Удаление ВМ")
+        dlg.setFixedSize(480, 240)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+
+        warning = QLabel(
+            f"<b>ВМ «{vm_name}» (VMID: {vmid})</b> на узле <b>{node}</b>"
+            "<br><br>"
+            "<span style='color:#c0392b;'>Это действие необратимо. "
+            "Все диски ВМ будут удалены.</span>"
+        )
+        warning.setWordWrap(True)
+        layout.addWidget(warning)
+
+        confirm_check = QCheckBox("Я подтверждаю удаление")
+        layout.addWidget(confirm_check)
+
+        layout.addStretch()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        delete_btn = QPushButton("Удалить")
+        delete_btn.setFixedWidth(120)
+        delete_btn.setObjectName("dangerBtn")
+        delete_btn.setEnabled(False)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.setDefault(True)
+
+        confirm_check.toggled.connect(delete_btn.setEnabled)
+        btn_layout.addWidget(delete_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        cancel_btn.clicked.connect(dlg.reject)
+
+        confirmed = [False]
+        def do_delete():
+            confirmed[0] = True
+            dlg.accept()
+        delete_btn.clicked.connect(do_delete)
+
+        dlg.exec()
+        if not confirmed[0]:
+            return
+
+        worker = DeleteVmWorker(cfg, node, vmid)
+        worker.signals.vm_deleted.connect(lambda msg, w=worker: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            QTimer.singleShot(1500, self.refresh_data),
+            self._discard_worker(w)
+        ))
+        worker.signals.vm_error.connect(lambda err, w=worker: (
+            self._notifications.show(f"Ошибка удаления ВМ: {err}", error=True),
+            self.status_label.setText(f"Ошибка: {err}"),
+            self._discard_worker(w)
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(f"Удаление ВМ {vmid}...")
 
     def _confirm_delete(self, text):
         dlg = QDialog(self)
@@ -375,6 +375,8 @@ class MainWindow(QMainWindow):
         self.all_nodes.clear()
         self.all_vms.clear()
         self.all_storages.clear()
+        self.all_iso_images.clear()
+        self.all_ha_groups.clear()
         self._seen_storage_keys.clear()
         self._first_selection_done = False
 
@@ -385,7 +387,7 @@ class MainWindow(QMainWindow):
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(
-                lambda data, w=worker: (self.on_worker_finished(data, w), self._workers.discard(w))
+                lambda data, w=worker: (self.on_worker_finished(data, w), self._discard_worker(w))
             )
             self._run_worker(worker)
 
@@ -400,9 +402,13 @@ class MainWindow(QMainWindow):
     @Slot(dict)
     def on_worker_finished(self, data, worker=None):
         self._workers.discard(worker)
+        if not hasattr(self, 'all_pools'):
+            self.all_pools = []
         if data["status"] == "ok":
+            is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
             for node in data["nodes"]:
                 node["host_name"] = data["host"]
+                node["_is_cluster"] = is_cluster
                 self.all_nodes.append(node)
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
@@ -413,13 +419,30 @@ class MainWindow(QMainWindow):
                 if key not in self._seen_storage_keys:
                     self._seen_storage_keys.add(key)
                     self.all_storages.append(st)
+            # Собираем уникальные имена пулов
+            known = {p["poolid"] for p in self.all_pools if "poolid" in p}
+            for pn in data.get("pool_names", []):
+                if pn and pn not in known:
+                    known.add(pn)
+                    self.all_pools.append({"poolid": pn})
+            # Собираем ISO-образы (node -> list volid)
+            for nname, isos in data.get("iso_images", {}).items():
+                if isos:
+                    self.all_iso_images[nname] = isos
+            # Собираем HA группы (host_name -> [group, ...])
+            host = data["host"]
+            ha_list = data.get("ha_groups", [])
+            if ha_list:
+                self.all_ha_groups[host] = ha_list
         else:
+            is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
             self.all_nodes.append({
                 "node": data["host"],
                 "status": "error",
                 "error": data["error"],
                 "host_name": data["host"],
-                "_display_name": data["host"]
+                "_display_name": data["host"],
+                "_is_cluster": is_cluster_err
             })
 
         self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
@@ -504,7 +527,7 @@ class MainWindow(QMainWindow):
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(
-                lambda data, w=worker, g=soft_gen: (self.on_soft_refresh_result(data, w, g), self._workers.discard(w))
+                lambda data, w=worker, g=soft_gen: (self.on_soft_refresh_result(data, w, g), self._discard_worker(w))
             )
             self._run_worker(worker)
 
@@ -520,6 +543,9 @@ class MainWindow(QMainWindow):
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
                 self._soft_vms.append(vm)
+            for st in data.get("storages", []):
+                st["host_name"] = data["host"]
+                self._soft_storages.append(st)
         else:
             self._soft_had_errors = True
             self._soft_nodes.append({
@@ -539,12 +565,14 @@ class MainWindow(QMainWindow):
                     self.tree_panel.update_node_statuses(self._soft_nodes, self._soft_vms)
                     self.detail_panel.all_nodes = list(self._soft_nodes)
                     self.detail_panel.all_vms = list(self._soft_vms)
+                    self.detail_panel.all_storages = list(self._soft_storages)
                     self.detail_panel.refresh_current_view()
                     self._detect_status_changes()
                 except Exception:
                     traceback.print_exc()
             self._soft_nodes.clear()
             self._soft_vms.clear()
+            self._soft_storages.clear()
             self._soft_counter = 0
             self._soft_refresh_running = False
 
@@ -578,12 +606,24 @@ class MainWindow(QMainWindow):
         if not node_requests:
             return
 
+        self._tasks_gen += 1
+        tasks_gen = self._tasks_gen
         worker = ClusterTasksWorker(node_requests)
-        worker.signals.tasks_ready.connect(lambda t, w=worker: (self._on_cluster_tasks_loaded(t), self._workers.discard(w)))
-        worker.signals.tasks_error.connect(lambda err, w=worker: self._workers.discard(w))
+        worker.signals.tasks_ready.connect(
+            lambda t, w=worker, g=tasks_gen: (
+                self._on_cluster_tasks_loaded(t, g),
+                self._discard_worker(w)
+            )
+        )
+        worker.signals.tasks_error.connect(lambda err, w=worker: self._discard_worker(w))
         self._run_worker(worker)
 
-    def _on_cluster_tasks_loaded(self, tasks):
+    def _on_cluster_tasks_loaded(self, tasks, gen=None):
+        if gen is None:
+            logger.warning("_on_cluster_tasks_loaded вызван без gen — пропускаем защиту")
+            gen = 0
+        if gen != 0 and gen != self._tasks_gen:
+            return
         try:
             node_map = {}
             for n in self.all_nodes:
@@ -597,13 +637,23 @@ class MainWindow(QMainWindow):
                 node = task.get("node", "")
                 if node in node_map:
                     task["_display_name"] = node_map[node]
-                vmid = task.get("vmid")
-                if vmid is None:
+                # API может вернуть vmid как 'vmid', 'id' или только в UPID
+                vmid = task.get("vmid") or task.get("id")
+                if vmid is None or vmid == "":
                     upid = task.get("upid", "")
                     if upid.startswith("UPID:"):
                         parts = upid.split(":")
                         if len(parts) >= 7 and parts[6].isdigit():
                             vmid = parts[6]
+                        if not vmid and len(parts) >= 9:
+                            info = ":".join(parts[8:])
+                            idx = info.find("--vmid ")
+                            if idx >= 0:
+                                rest = info[idx + 7:].lstrip()
+                                end = rest.find(" ")
+                                num = rest[:end] if end >= 0 else rest
+                                if num.isdigit():
+                                    vmid = num
                 if vmid is not None:
                     try:
                         task["_vmid"] = str(vmid)
@@ -637,7 +687,6 @@ class MainWindow(QMainWindow):
         self._last_heartbeat = time.time()
 
     def _detect_freeze(self):
-        import sys
         while True:
             time.sleep(2)
             now = time.time()

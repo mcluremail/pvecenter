@@ -72,7 +72,8 @@ def create_admin_token(host, user, password):
             logger.error("token_create error: %s", r.text[:300])
             return {"error": f"Ошибка создания токена: {r.status_code}"}
 
-        data = r.json().get("data", r.json())
+        data = r.json()
+        data = data.get("data", data)
         token_value = ""
         if isinstance(data, dict) and "value" in data:
             token_value = data["value"]
@@ -132,8 +133,10 @@ class FetchWorker(QRunnable):
             )
 
             vmid_to_pool = {}
+            pool_names = []
             try:
                 pools_data = proxmox.pools.get()
+                pool_names = [p.get("poolid") or p.get("pool") for p in pools_data if p.get("poolid") or p.get("pool")]
                 for p in pools_data:
                     pool_name = p.get("poolid") or p.get("pool")
                     if not pool_name:
@@ -148,6 +151,17 @@ class FetchWorker(QRunnable):
                             vmid_to_pool[int(m_vmid)] = pool_name
             except Exception:
                 traceback.print_exc()
+
+            # ── HA группы ─────────────────────────────────────────
+            ha_groups = []
+            try:
+                for g in proxmox.cluster.ha.groups.get():
+                    gname = g.get("group")
+                    if gname:
+                        ha_groups.append(gname)
+                ha_groups.sort()
+            except Exception:
+                ha_groups = []
 
             is_cluster_rep = self.node_cfg.get("cluster_rep", False)
 
@@ -216,12 +230,40 @@ class FetchWorker(QRunnable):
                     st["node"] = node_name
                     st["host_name"] = self.node_cfg["name"]
 
+            # ── Сбор ISO-образов ──────────────────────────────────
+            iso_images = {}
+            for n in nodes:
+                nname = n["node"]
+                iso_storages = [
+                    s["storage"] for s in storages
+                    if s.get("node") == nname and "iso" in (s.get("content", "") or "").split(",")
+                ]
+                if iso_storages:
+                    try:
+                        seen = {}
+                        for sname in iso_storages:
+                            for item in proxmox.nodes(nname).storage(sname).content.get(content="iso"):
+                                if item.get("content") == "iso":
+                                    volid = item["volid"]
+                                    if volid not in seen:
+                                        seen[volid] = {
+                                            "volid": volid,
+                                            "format": item.get("format", ""),
+                                            "size": item.get("size", 0),
+                                        }
+                        iso_images[nname] = sorted(seen.values(), key=lambda x: x["volid"])
+                    except Exception:
+                        iso_images[nname] = []
+
             self.signals.result_ready.emit({
                 "host": self.node_cfg["name"],
                 "status": "ok",
                 "nodes": nodes,
                 "vms": vms,
-                "storages": storages
+                "storages": storages,
+                "pool_names": pool_names,
+                "iso_images": iso_images,
+                "ha_groups": ha_groups
             })
         except Exception as e:
             try:
@@ -336,29 +378,6 @@ class VmTaskHistorySignals(QObject):
 
 
 # ----------------------------------------------------------------------
-# Удаление токена с сервера
-# ----------------------------------------------------------------------
-def delete_host_token(host_cfg):
-    """Удаляет API-токен с PVE-сервера через Proxmoxer.
-       Не выбрасывает исключения — ошибки только в лог."""
-    try:
-        proxmox = ProxmoxAPI(
-            host_cfg["host"],
-            user=host_cfg["user"],
-            token_name=host_cfg["token_name"],
-            token_value=host_cfg["token_value"],
-            verify_ssl=False,
-            timeout=10,
-        )
-        userid = host_cfg["user"]
-        token_id = host_cfg["token_name"]
-        proxmox.access.users(userid).token(token_id).delete()
-        logger.info("Token %s for user %s deleted from %s", token_id, userid, host_cfg["host"])
-    except Exception as e:
-        logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
-
-
-# ----------------------------------------------------------------------
 # VmTaskHistoryWorker
 # ----------------------------------------------------------------------
 class VmTaskHistoryWorker(QRunnable):
@@ -392,6 +411,29 @@ class VmTaskHistoryWorker(QRunnable):
                 self.signals.tasks_error.emit(self.vmid, str(e))
             except RuntimeError:
                 pass
+
+
+# ----------------------------------------------------------------------
+# Удаление токена с сервера
+# ----------------------------------------------------------------------
+def delete_host_token(host_cfg):
+    """Удаляет API-токен с PVE-сервера через Proxmoxer.
+       Не выбрасывает исключения — ошибки только в лог."""
+    try:
+        proxmox = ProxmoxAPI(
+            host_cfg["host"],
+            user=host_cfg["user"],
+            token_name=host_cfg["token_name"],
+            token_value=host_cfg["token_value"],
+            verify_ssl=False,
+            timeout=10,
+        )
+        userid = host_cfg["user"]
+        token_id = host_cfg["token_name"]
+        proxmox.access.users(userid).token(token_id).delete()
+        logger.info("Token %s for user %s deleted from %s", token_id, userid, host_cfg["host"])
+    except Exception as e:
+        logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
 
 
 class VmActionSignals(QObject):
@@ -473,8 +515,6 @@ class ClusterTasksWorker(QRunnable):
         self.signals = ClusterTasksSignals()
 
     def run(self):
-        import logging
-        log = logging.getLogger(__name__)
         all_by_upid = {}
         errors = []
         for host_cfg, node_name in self.node_requests:
@@ -488,12 +528,12 @@ class ClusterTasksWorker(QRunnable):
                     timeout=10
                 )
                 tasks = proxmox.nodes(node_name).tasks.get(limit=100)
-                for t in tasks:
+                for idx, t in enumerate(tasks):
                     upid = t.get("upid")
                     if upid:
                         all_by_upid[upid] = t
                     else:
-                        all_by_upid[id(t)] = t
+                        all_by_upid[f"_no_upid_{node_name}_{idx}"] = t
             except Exception as e:
                 errors.append(f"{node_name}: {e}")
                 continue
@@ -501,7 +541,7 @@ class ClusterTasksWorker(QRunnable):
                         key=lambda x: float(x.get("starttime", 0) or 0),
                         reverse=True)
         if errors:
-            log.warning("Ошибки при сборе задач: %s", "; ".join(errors))
+            logger.warning("Ошибки при сборе задач: %s", "; ".join(errors))
         try:
             self.signals.tasks_ready.emit(merged)
         except RuntimeError:
@@ -527,7 +567,6 @@ class VmConsoleWorker(QRunnable):
 
     def run(self):
         import os, tempfile, subprocess
-        log = logging.getLogger(__name__)
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -587,7 +626,7 @@ class VmConsoleWorker(QRunnable):
                 _, stderr = proc.communicate(timeout=5)
                 if proc.returncode != 0:
                     err_text = stderr.decode("utf-8", errors="replace").strip()
-                    log.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
+                    logger.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
                     try:
                         self.signals.console_error.emit(
                             f"remote-viewer: {err_text or 'код ' + str(proc.returncode)}"
@@ -596,7 +635,7 @@ class VmConsoleWorker(QRunnable):
                         pass
                     return
             except subprocess.TimeoutExpired:
-                log.info("remote-viewer запущен (pid=%d)", proc.pid)
+                logger.info("remote-viewer запущен (pid=%d)", proc.pid)
         except FileNotFoundError:
             try:
                 self.signals.console_error.emit(
@@ -623,14 +662,16 @@ class CreateVmSignals(QObject):
 
 class CreateVmWorker(QRunnable):
     """Создаёт QEMU VM через POST /nodes/{node}/qemu."""
-    def __init__(self, host_cfg, node_name, params):
+    def __init__(self, host_cfg, node_name, params, ha_group=None):
         """
         params: dict с параметрами VM (name, cores, memory, sockets, ostype, etc.)
+        ha_group: имя HA группы (опционально)
         """
         super().__init__()
         self.host_cfg = host_cfg
         self.node_name = node_name
         self.params = params
+        self.ha_group = ha_group
         self.signals = CreateVmSignals()
 
     def run(self):
@@ -643,12 +684,86 @@ class CreateVmWorker(QRunnable):
                 verify_ssl=False,
                 timeout=30,
             )
-            result = proxmox.nodes(self.node_name).qemu.post(**self.params)
-            vmid = result.get("data", result).get("vmid", "?")
+
+            params = dict(self.params)
+            # Если vmid не указан (0, None) — запрашиваем следующий свободный
+            if not params.get("vmid"):
+                try:
+                    params["vmid"] = proxmox.cluster.nextid.get()
+                except Exception:
+                    try:
+                        self.signals.vm_error.emit(
+                            "Не удалось получить следующий свободный VMID от кластера"
+                        )
+                    except RuntimeError:
+                        pass
+                    return
+
+            result = proxmox.nodes(self.node_name).qemu.post(**params)
+            if isinstance(result, dict):
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    vmid = data.get("vmid", "?")
+                else:
+                    vmid = str(data)
+            else:
+                vmid = str(result)
+            msg = f"VM {vmid} создана на {self.node_name}"
+
+            # Добавление в HA группу
+            if self.ha_group:
+                try:
+                    proxmox.cluster.ha.resources.post(
+                        sid=f"vm:{vmid}",
+                        group=self.ha_group
+                    )
+                    msg += f", добавлена в HA «{self.ha_group}»"
+                except Exception as ha_err:
+                    msg += f", но ошибка HA: {ha_err}"
+
             try:
-                self.signals.vm_created.emit(
-                    f"VM {vmid} создана на {self.node_name}"
-                )
+                self.signals.vm_created.emit(msg)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self.signals.vm_error.emit(str(e))
+            except RuntimeError:
+                pass
+
+
+class DeleteVmSignals(QObject):
+    vm_deleted = Signal(str)  # success message
+    vm_error = Signal(str)    # error message
+
+
+class DeleteVmWorker(QRunnable):
+    """Удаляет QEMU VM через DELETE /nodes/{node}/qemu/{vmid}."""
+    def __init__(self, host_cfg, node_name, vmid, force=True):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.force = force
+        self.signals = DeleteVmSignals()
+
+    def run(self):
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=False,
+                timeout=30,
+            )
+
+            params = {"force": 1} if self.force else {}
+            proxmox.nodes(self.node_name).qemu(self.vmid).delete(**params)
+            msg = f"VM {self.vmid} удалена с {self.node_name}"
+            try:
+                self.signals.vm_deleted.emit(msg)
             except RuntimeError:
                 pass
         except Exception as e:

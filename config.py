@@ -138,17 +138,18 @@ def load_config():
     enc_path = os.path.join(base, ENC_FILE)
 
     if os.path.exists(enc_path):
-        password = _ask_password("enter")
-        if password is None:
-            return None
-        cache_password(password)
-        try:
-            return _decrypt_from_file(enc_path, password)
-        except Exception:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.critical(None, "Ошибка",
-                                 "Неверный пароль или повреждённые данные.")
-            return None
+        while True:
+            password = _ask_password("enter")
+            if password is None:
+                return None
+            cache_password(password)
+            try:
+                return _decrypt_from_file(enc_path, password)
+            except Exception:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.warning(None, "Ошибка",
+                                     "Неверный пароль. Попробуйте снова.")
+                # цикл: снова показываем диалог пароля
     else:
         json_path = os.path.join(base, CONFIG_JSON)
         if not os.path.exists(json_path):

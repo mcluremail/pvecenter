@@ -73,30 +73,22 @@ class DetailPanel(QWidget):
         for action_key, label in self._vm_actions.items():
             btn = QPushButton(label)
             btn.setFixedHeight(24)
-            btn.setStyleSheet(
-                "QPushButton { font-size: 11px; padding: 0 8px; border: 1px solid #d1d5db; "
-                "border-radius: 3px; background: #f9fafb; color: #374151; }"
-                "QPushButton:hover { background: #e5e7eb; }"
-                "QPushButton:disabled { color: #9ca3af; background: #f3f4f6; }"
-            )
+            btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
 
-        action_layout.addSpacing(12)
+        # Разделитель между power actions и консолью
+        sep = QWidget()
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(18)
+        sep.setStyleSheet("background: #dde1e7;")
+        action_layout.addWidget(sep)
+
         self._console_btn = QPushButton("🖥 Консоль")
         self._console_btn.setFixedHeight(24)
-        self._console_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 0 10px; border: 1px solid #2563eb; "
-            "border-radius: 3px; background: #eff6ff; color: #1d4ed8; font-weight: 600; }"
-            "QPushButton:hover { background: #dbeafe; }"
-            "QPushButton:disabled { color: #9ca3af; background: #f3f4f6; border-color: #d1d5db; }"
-            "QPushButton::menu-indicator { image: none; padding-left: 4px; }"
-        )
-
-        self._console_menu = QMenu(self)
-        self._console_menu.addAction("SPICE", self._on_vm_console)
-        self._console_btn.setMenu(self._console_menu)
+        self._console_btn.setObjectName("accentBtn")
+        self._console_btn.clicked.connect(self._on_vm_console)
         action_layout.addWidget(self._console_btn)
 
         self.tabs = QTabWidget()
@@ -616,6 +608,12 @@ class DetailPanel(QWidget):
         t = threading.Thread(target=worker.run, daemon=True, name=f"dp-{cls_name}-{id(worker)}")
         t.start()
 
+    def _discard_worker(self, worker):
+        """Безопасно удаляет воркер из _workers.
+        Вызывается в finally после обработки сигнала, чтобы воркер не утекал
+        при RuntimeError (уничтоженный виджет) или любом исключении в хендлере."""
+        self._workers.discard(worker)
+
     def set_lists(self, all_nodes, all_vms, all_storages=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
@@ -643,11 +641,11 @@ class DetailPanel(QWidget):
         worker.signals.action_result.connect(lambda msg: (
             self._on_action_finished(msg),
             self._refresh_after_action(),
-            self._workers.discard(worker)
+            self._discard_worker(worker)
         ))
         worker.signals.action_error.connect(lambda err: (
             self._on_action_error(err),
-            self._workers.discard(worker)
+            self._discard_worker(worker)
         ))
         self._run_worker(worker)
 
@@ -681,15 +679,14 @@ class DetailPanel(QWidget):
         worker.signals.console_ready.connect(lambda msg: (
             self.detail_label.setText(msg),
             self._console_btn.setEnabled(True),
-            self._workers.discard(worker)
+            self._discard_worker(worker)
         ))
         worker.signals.console_error.connect(lambda err: (
             self.detail_label.setText(err),
             self._console_btn.setEnabled(True),
-            self._workers.discard(worker)
+            self._discard_worker(worker)
         ))
         self._run_worker(worker)
-
 
 
     def _refresh_after_action(self):
@@ -708,7 +705,7 @@ class DetailPanel(QWidget):
         worker = VmDetailWorker(cfg, node_name, vmid, vm_type)
         worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (
             self._on_detail_loaded(d, g, h),
-            self._workers.discard(w)
+            self._discard_worker(w)
         ))
         self.current_worker = worker
         self._run_worker(worker)
@@ -1100,14 +1097,14 @@ class DetailPanel(QWidget):
 
     def _cancel_detail_worker(self):
         if self.current_worker:
-            self._workers.discard(self.current_worker)
+            self._discard_worker(self.current_worker)
             try: self.current_worker.signals.detail_ready.disconnect()
             except RuntimeError: pass
             self.current_worker = None
 
     def _cancel_config_worker(self):
         if self.current_config_worker:
-            self._workers.discard(self.current_config_worker)
+            self._discard_worker(self.current_config_worker)
             try: self.current_config_worker.signals.config_ready.disconnect()
             except RuntimeError: pass
             try: self.current_config_worker.signals.config_error.disconnect()
@@ -1116,7 +1113,7 @@ class DetailPanel(QWidget):
 
     def _cancel_history_worker(self):
         if self.current_hist_worker:
-            self._workers.discard(self.current_hist_worker)
+            self._discard_worker(self.current_hist_worker)
             try: self.current_hist_worker.signals.tasks_ready.disconnect()
             except RuntimeError: pass
             try: self.current_hist_worker.signals.tasks_error.disconnect()
@@ -1478,13 +1475,13 @@ class DetailPanel(QWidget):
                 worker.signals.result.connect(
                     lambda sn, content_type, data, w=worker: (
                         self._on_storage_content_piece(sn, content_type, data),
-                        self._workers.discard(w)
+                        self._discard_worker(w)
                     )
                 )
                 worker.signals.error.connect(
                     lambda sn, content_type, err, w=worker: (
                         self._on_storage_content_piece(sn, content_type, []),
-                        self._workers.discard(w)
+                        self._discard_worker(w)
                     )
                 )
                 self._run_worker(worker)
@@ -1588,13 +1585,13 @@ class DetailPanel(QWidget):
         worker.signals.network_ready.connect(
             lambda nn, data, w=worker: (
                 self._on_host_network(nn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.network_error.connect(
             lambda nn, err, w=worker: (
                 self._on_host_network(nn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -1641,13 +1638,13 @@ class DetailPanel(QWidget):
         worker.signals.services_ready.connect(
             lambda nn, data, w=worker: (
                 self._on_host_services(nn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.services_error.connect(
             lambda nn, err, w=worker: (
                 self._on_host_services(nn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -1709,10 +1706,10 @@ class DetailPanel(QWidget):
         worker.signals.data_fetched.connect(
             lambda tf, nn, md, w=worker: (
                 self._on_storage_metrics_fetched(tf, nn, md),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
-        worker.signals.error_occurred.connect(lambda err, w=worker: self._workers.discard(w))
+        worker.signals.error_occurred.connect(lambda err, w=worker: self._discard_worker(w))
         self._run_worker(worker)
 
     def _on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict):
@@ -1730,13 +1727,13 @@ class DetailPanel(QWidget):
         worker.signals.backups_ready.connect(
             lambda sn, data, w=worker: (
                 self._on_storage_backups(sn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.backups_error.connect(
             lambda sn, err, w=worker: (
                 self._on_storage_backups(sn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -1778,13 +1775,13 @@ class DetailPanel(QWidget):
         worker.signals.disks_ready.connect(
             lambda sn, data, w=worker: (
                 self._on_storage_disks(sn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.disks_error.connect(
             lambda sn, err, w=worker: (
                 self._on_storage_disks(sn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -1827,13 +1824,13 @@ class DetailPanel(QWidget):
         worker.signals.disks_ready.connect(
             lambda nn, data, w=worker: (
                 self._on_host_disks(nn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.disks_error.connect(
             lambda nn, err, w=worker: (
                 self._on_host_disks(nn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -1889,13 +1886,13 @@ class DetailPanel(QWidget):
         worker.signals.snapshots_ready.connect(
             lambda nn, data, w=worker: (
                 self._on_host_snapshots(nn, data),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         worker.signals.snapshots_error.connect(
             lambda nn, err, w=worker: (
                 self._on_host_snapshots(nn, []),
-                self._workers.discard(w)
+                self._discard_worker(w)
             )
         )
         self._run_worker(worker)
@@ -2106,8 +2103,8 @@ class DetailPanel(QWidget):
             return
         from .api.metrics import HostMetricsWorker
         worker = HostMetricsWorker(cfg, node_name, timeframe)
-        worker.signals.data_fetched.connect(lambda tf, nn, md, g=self._generation, w=worker: (self._on_host_metrics_fetched(tf, nn, md, g), self._workers.discard(w)))
-        worker.signals.error_occurred.connect(lambda err, w=worker: self._workers.discard(w))
+        worker.signals.data_fetched.connect(lambda tf, nn, md, g=self._generation, w=worker: (self._on_host_metrics_fetched(tf, nn, md, g), self._discard_worker(w)))
+        worker.signals.error_occurred.connect(lambda err, w=worker: self._discard_worker(w))
         self._run_worker(worker)
 
     def _on_host_metrics_fetched(self, timeframe, node_name, metrics_dict, gen):
@@ -2171,7 +2168,7 @@ class DetailPanel(QWidget):
                 vm_type = vm_data.get("type", "qemu")
                 from ..backend import VmDetailWorker
                 worker = VmDetailWorker(cfg, node_name, vmid, vm_type)
-                worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (self._on_detail_loaded(d, g, h), self._workers.discard(w)))
+                worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (self._on_detail_loaded(d, g, h), self._discard_worker(w)))
                 self.current_worker = worker
                 self._run_worker(worker)
         else:
@@ -2186,8 +2183,8 @@ class DetailPanel(QWidget):
                 vm_type = vm_data.get("type", "qemu")
                 from ..backend import VmConfigWorker
                 worker = VmConfigWorker(cfg, node_name, vmid, vm_type)
-                worker.signals.config_ready.connect(lambda vid, c, g=gen, h=host_name, w=worker: (self._on_config_loaded(vid, c, g, h), self._workers.discard(w)))
-                worker.signals.config_error.connect(lambda vid, err, w=worker: self._workers.discard(w))
+                worker.signals.config_ready.connect(lambda vid, c, g=gen, h=host_name, w=worker: (self._on_config_loaded(vid, c, g, h), self._discard_worker(w)))
+                worker.signals.config_error.connect(lambda vid, err, w=worker: self._discard_worker(w))
                 self.current_config_worker = worker
                 self._run_worker(worker)
         else:
@@ -2202,8 +2199,8 @@ class DetailPanel(QWidget):
                 node_name = vm_data.get("node") or host_name
                 from ..backend import VmTaskHistoryWorker
                 self.current_hist_worker = VmTaskHistoryWorker(cfg, node_name, vmid, limit=50)
-                self.current_hist_worker.signals.tasks_ready.connect(lambda vid, t, g=gen, h=host_name, w=self.current_hist_worker: (self._on_tasks_loaded(vid, t, g, h), self._workers.discard(w)))
-                self.current_hist_worker.signals.tasks_error.connect(lambda vid, err, w=self.current_hist_worker: self._workers.discard(w))
+                self.current_hist_worker.signals.tasks_ready.connect(lambda vid, t, g=gen, h=host_name, w=self.current_hist_worker: (self._on_tasks_loaded(vid, t, g, h), self._discard_worker(w)))
+                self.current_hist_worker.signals.tasks_error.connect(lambda vid, err, w=self.current_hist_worker: self._discard_worker(w))
                 self._run_worker(self.current_hist_worker)
         else:
             self.task_history_widget.set_tasks(self.task_history_cache[detail_key])
@@ -2228,8 +2225,8 @@ class DetailPanel(QWidget):
 
         from .api.metrics import MetricsWorker
         worker = MetricsWorker(cfg, node_name, vmid, vm_type, timeframe)
-        worker.signals.data_fetched.connect(lambda tf, v, md, g=self._generation, h=host_name, w=worker: (self._on_metrics_fetched(tf, v, md, g, h), self._workers.discard(w)))
-        worker.signals.error_occurred.connect(lambda err, w=worker: self._workers.discard(w))
+        worker.signals.data_fetched.connect(lambda tf, v, md, g=self._generation, h=host_name, w=worker: (self._on_metrics_fetched(tf, v, md, g, h), self._discard_worker(w)))
+        worker.signals.error_occurred.connect(lambda err, w=worker: self._discard_worker(w))
         self._run_worker(worker)
 
     def _on_metrics_fetched(self, timeframe, vmid, metrics_dict, gen, host_name):

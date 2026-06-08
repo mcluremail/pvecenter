@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QRect, Property
 from PySide6.QtGui import QColor
 
@@ -9,6 +9,8 @@ class FadeToast(QWidget):
     def __init__(self, parent, text, color="#1f2937"):
         super().__init__(parent)
         self._opacity = 1.0
+        self._text = text
+        self._bg_color = color
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -26,14 +28,16 @@ class FadeToast(QWidget):
         """)
         self.label.setWordWrap(True)
         self.label.setMaximumWidth(320)
+        self.label.setCursor(Qt.PointingHandCursor)
+        self.label.mousePressEvent = lambda e: self._copy_to_clipboard()
         layout.addWidget(self.label)
 
         self.adjustSize()
 
         # Позиционируем в правом верхнем углу родителя
         parent_rect = parent.rect()
-        x = parent_rect.width() - self.width() - 16
-        y = 40
+        x = parent_rect.width() - self.width() - 20
+        y = 12
         self.move(x, y)
 
         self._fade_timer = QTimer(self)
@@ -58,6 +62,15 @@ class FadeToast(QWidget):
         self.setWindowOpacity(val)
 
     opacity = Property(float, get_opacity, set_opacity)
+
+    def _copy_to_clipboard(self):
+        # TODO: убрать — дебаг-фича, копирует текст тоста в буфер
+        QApplication.clipboard().setText(self._text)
+        self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", "color: #bbf7d0;"))
+        QTimer.singleShot(400, self._restore_color)
+
+    def _restore_color(self):
+        self.label.setStyleSheet(self.label.styleSheet().replace("color: #bbf7d0;", "color: white;"))
 
     def _start_fade(self):
         self._fade_anim.start()
@@ -107,4 +120,4 @@ class NotificationManager:
 
     def show(self, text, error=False):
         color = "#dc2626" if error else "#1f2937"
-        self._show(str(id(text)), text, color)
+        self._show(text, text, color)

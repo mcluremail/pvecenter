@@ -196,7 +196,8 @@ def _make_icon_with_dot(template, status):
         return _make_icon(template.format(c=_C, c2=_C2))
     svg = template.format(c=_C, c2=_C2).replace(
         "</svg>",
-        f'<circle cx="12.5" cy="12.5" r="4" fill="{dot_color}" stroke="white" stroke-width="1.2"/></svg>'
+        f'<circle cx="12.5" cy="12.5" r="3.5" fill="{dot_color}" '
+        f'stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.9"/></svg>'
     )
     return _make_icon(svg, 16)
 
@@ -208,9 +209,16 @@ def _make_loading_icon(angle):
     )
     return _make_icon(svg, 16)
 
+_SVG_TEMPLATES = {
+    "host": _HOST,
+    "vm": _VM,
+    "cluster": _CLUSTER,
+    "pool": _POOL,
+}
+
 def get_icon(name, status=None):
-    if status and name in ("host", "vm", "cluster", "pool"):
-        return _make_icon_with_dot(globals()[f"_{name.upper()}"], status)
+    if status and name in _SVG_TEMPLATES:
+        return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
     if _icons is None:
         init_icons()
     return _icons.get(name)

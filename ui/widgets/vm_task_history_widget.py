@@ -80,7 +80,7 @@ class VmTaskHistoryWidget(QWidget):
             # Описание (тип + VMID + узел, без разбора upid)
             task_type = task.get('type', '')
             node = task.get('node') or ''
-            vmid = task.get('vmid') or ''
+            vmid = task.get('vmid') or task.get('id') or ''
             upid = task.get('upid', '')
 
             if vmid and node:

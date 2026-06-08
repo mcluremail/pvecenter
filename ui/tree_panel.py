@@ -5,8 +5,7 @@ from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
 from datetime import timedelta
 
-from .icons import get_icon, init_icons, _make_loading_icon
-from datetime import timedelta
+import re as _re
 
 from .icons import get_icon, init_icons, _make_loading_icon
 
@@ -24,6 +23,7 @@ class TreePanel(QWidget):
     host_remove_requested = Signal(str, str)  # type ("host"/"cluster"/"section"), name
     host_token_refresh_requested = Signal(str)  # host_name
     vm_create_requested = Signal(str, str)  # node_name, host_name
+    vm_delete_requested = Signal(str, str, int)  # host_name, node, vmid
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -96,6 +96,26 @@ class TreePanel(QWidget):
         item = self.tree.itemAt(pos)
         if not item:
             return
+
+        vm_key = item.data(0, VM_KEY_ROLE)
+        if vm_key is not None:
+            host_name, vmid, node = vm_key
+            vm = next((v for v in self.all_vms
+                       if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+            menu = QMenu(self.tree)
+            menu.setStyleSheet(
+                "QMenu { font-size: 12px; padding: 2px; }"
+                "QMenu::item { padding: 4px 12px; }"
+                "QMenu::item:selected { background: #e5e7eb; }"
+            )
+            delete_action = QAction("Удалить ВМ", self.tree)
+            delete_action.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_delete_requested.emit(hn, nd, vid)
+            )
+            menu.addAction(delete_action)
+            menu.exec(self.tree.viewport().mapToGlobal(pos))
+            return
+
         key = item.data(0, ITEM_KEY_ROLE)
         if not key or not isinstance(key, tuple):
             return
@@ -131,6 +151,20 @@ class TreePanel(QWidget):
                 menu.addAction(refresh_action)
 
         elif item_type == "cluster":
+            # Берём первый хост из кластера для передачи в диалог
+            cl_hosts = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
+            if cl_hosts:
+                first = cl_hosts[0]
+                cl_node_name = first.get("node", "")
+                cl_host_name = first.get("name", "")
+                create_vm_action = QAction("Создать ВМ", self.tree)
+                create_vm_action.setIcon(get_icon("vm"))
+                create_vm_action.triggered.connect(
+                    lambda checked, nn=cl_node_name, hn=cl_host_name:
+                        self.vm_create_requested.emit(nn, hn)
+                )
+                menu.addAction(create_vm_action)
+                menu.addSeparator()
             delete_action = QAction("Удалить кластер", self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
             menu.addAction(delete_action)
@@ -278,7 +312,7 @@ class TreePanel(QWidget):
         vm_name = vm.get("name") or f"VM {vm.get('vmid')}"
         vm_item.setText(0, vm_name)
         vm_item.setIcon(0, get_icon("vm", vm.get("status")))
-        vm_item.setData(0, VM_KEY_ROLE, (vm.get("host_name", ""), vm.get("vmid", 0)))
+        vm_item.setData(0, VM_KEY_ROLE, (vm.get("host_name", ""), vm.get("vmid", 0), vm.get("node", "")))
         cpu = vm.get("cpu", 0)
         if isinstance(cpu, float):
             cpu_pct = round(cpu * 100, 1)
@@ -391,10 +425,10 @@ class TreePanel(QWidget):
                     f"ЦП: {cpu}%\nRAM: {mem_pct}%\nАптайм: {uptime_str}"
                 )
 
-                vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
+                all_vms_on_host = [vm for vm in self.all_vms if vm.get("node") == node_name]
                 pool_groups = defaultdict(list)
                 no_pool_vms = []
-                for vm in vms_on_host:
+                for vm in all_vms_on_host:
                     pool = vm.get("pool")
                     if pool and pool not in ("", "No pool"):
                         pool_groups[pool].append(vm)
@@ -478,7 +512,7 @@ class TreePanel(QWidget):
                 child = item.child(i)
                 vm_key = child.data(0, VM_KEY_ROLE)
                 if vm_key is not None:
-                    host_name, vmid = vm_key
+                    host_name, vmid, _node = vm_key
                     vm = next((v for v in all_vms
                                if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
                     if vm:
@@ -488,10 +522,17 @@ class TreePanel(QWidget):
                 key = child.data(0, ITEM_KEY_ROLE)
                 if key and isinstance(key, tuple) and key[0] == "host":
                     hn = key[2] if len(key) > 2 else None
+                    node_name = key[1]
                     if hn:
-                        host = next((n for n in all_nodes if n.get("host_name") == hn), None)
+                        # Ищем по ОБОИМ: host_name И node — иначе все ноды кластера
+                        # получают статус первой ноды (одинаковый host_name у всех)
+                        host = next((n for n in all_nodes
+                                     if n.get("host_name") == hn
+                                     and n.get("node") == node_name), None)
+                        if host is None:
+                            host = next((n for n in all_nodes if n.get("host_name") == hn), None)
                     else:
-                        host = next((n for n in all_nodes if n.get("node") == key[1] or n.get("host_name") == key[1]), None)
+                        host = next((n for n in all_nodes if n.get("node") == node_name or n.get("host_name") == node_name), None)
                     if host:
                         child.setIcon(0, get_icon("host", host.get("status")))
                     traverse(child)
@@ -503,7 +544,6 @@ class TreePanel(QWidget):
     @staticmethod
     def _strip_count(text):
         """Убирает суффикс VM-счётчика вида '[3/5]' для стабильных путей."""
-        import re as _re
         return _re.sub(r'\s+\[\d+/\d+\]$', '', text)
 
     def _save_expanded_state(self):
@@ -577,7 +617,7 @@ class TreePanel(QWidget):
 
         vm_key = item.data(0, VM_KEY_ROLE)
         if vm_key is not None:
-            host_name, vmid = vm_key
+            host_name, vmid, _node = vm_key
             vm = next((v for v in self.all_vms
                        if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
             if vm is not None:
@@ -610,8 +650,16 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name_key = key[2] if len(key) > 2 else None
             if host_name_key:
+                # Фильтруем по ОБОИМ: host_name (конфиг) И node (PVE-имя ноды).
+                # Без фильтра по node все ноды кластера возвращают первую ноду,
+                # т.к. у них одинаковый host_name (имя кластерного конфига).
                 host_data = next((n for n in self.all_nodes
-                                  if n.get("host_name") == host_name_key), None)
+                                  if n.get("host_name") == host_name_key
+                                  and n.get("node") == item_name), None)
+                # Fallback: только по host_name (standalone или нестандартный кейс)
+                if host_data is None:
+                    host_data = next((n for n in self.all_nodes
+                                      if n.get("host_name") == host_name_key), None)
             else:
                 host_data = next((n for n in self.all_nodes if n.get("node") == item_name), None)
             self.item_selected.emit("host", item_name, host_data or {})
