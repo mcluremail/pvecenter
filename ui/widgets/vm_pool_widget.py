@@ -15,7 +15,17 @@ class VmPoolWidget(QWidget):
         self.table.setHorizontalHeaderLabels([
             "Имя", "Тип", "Диск %", "ОЗУ %", "ЦП %", "Аптайм"
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.table.setColumnWidth(1, 50)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        self.table.setColumnWidth(2, 65)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        self.table.setColumnWidth(3, 60)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        self.table.setColumnWidth(4, 55)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        self.table.setColumnWidth(5, 80)
 
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 

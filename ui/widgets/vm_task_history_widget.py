@@ -13,17 +13,12 @@ class VmTaskHistoryWidget(QWidget):
         self.table.setHorizontalHeaderLabels([
             "Начало", "Окончание", "Статус", "Пользователь", "Описание"
         ])
-        # Все колонки по умолчанию Stretch
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        # Первые четыре — по содержимому
+        # Колонки времени и статуса — по содержимому, описание — Stretch
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 

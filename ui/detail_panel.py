@@ -220,7 +220,16 @@ class DetailPanel(QWidget):
         self.host_vm_table.setHorizontalHeaderLabels(
             ["Имя", "Тип", "Узел", "Статус", "ЦП %"]
         )
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        host_vm_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        host_vm_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        host_vm_table.setColumnWidth(1, 50)
+        host_vm_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        host_vm_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        host_vm_table.setColumnWidth(3, 70)
+        host_vm_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        host_vm_table.setColumnWidth(4, 55)
+        host_vm_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        host_vm_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_vm_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -253,7 +262,18 @@ class DetailPanel(QWidget):
         self.datacenter_summary.setHorizontalHeaderLabels([
             "Хост", "Статус", "Адрес", "ЦП %", "RAM (GiB)", "Аптайм"
         ])
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        datacenter_summary.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        datacenter_summary.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        datacenter_summary.setColumnWidth(1, 70)
+        datacenter_summary.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        datacenter_summary.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        datacenter_summary.setColumnWidth(3, 55)
+        datacenter_summary.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        datacenter_summary.setColumnWidth(4, 80)
+        datacenter_summary.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        datacenter_summary.setColumnWidth(5, 85)
+        datacenter_summary.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        datacenter_summary.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.datacenter_summary.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -278,7 +298,19 @@ class DetailPanel(QWidget):
         self.storage_table.setHorizontalHeaderLabels([
             "Имя", "Тип", "Содержимое", "Кластер/Узел", "Занято", "Всего", "Использование"
         ])
-        self.storage_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        storage_table.setColumnWidth(1, 65)
+        storage_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        storage_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        storage_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        storage_table.setColumnWidth(4, 70)
+        storage_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        storage_table.setColumnWidth(5, 70)
+        storage_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Interactive)
+        storage_table.setColumnWidth(6, 95)
+        storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -303,7 +335,18 @@ class DetailPanel(QWidget):
         self.host_storage_table.setHorizontalHeaderLabels([
             "Имя", "Тип", "Содержимое", "Занято", "Всего", "Использование"
         ])
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.host_storage_table.setColumnWidth(1, 65)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        self.host_storage_table.setColumnWidth(3, 70)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        self.host_storage_table.setColumnWidth(4, 70)
+        self.host_storage_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        self.host_storage_table.setColumnWidth(5, 95)
+        self.host_storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.host_storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -331,7 +374,10 @@ class DetailPanel(QWidget):
         self.storage_detail_params.verticalHeader().hide()
         self.storage_detail_params.setColumnCount(2)
         self.storage_detail_params.setHorizontalHeaderLabels(["Параметр", "Значение"])
-        self.storage_detail_params.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_detail_params.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_detail_params.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        storage_detail_params.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_detail_params.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_detail_params.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -397,7 +443,18 @@ class DetailPanel(QWidget):
         self.storage_detail_nodes_table.setHorizontalHeaderLabels([
             "Узел", "Тип", "Содержимое", "Занято", "Всего", "Использование"
         ])
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        storage_detail_nodes_table.setColumnWidth(1, 65)
+        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        storage_detail_nodes_table.setColumnWidth(3, 70)
+        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        storage_detail_nodes_table.setColumnWidth(4, 70)
+        storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        storage_detail_nodes_table.setColumnWidth(5, 95)
+        storage_detail_nodes_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_detail_nodes_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_detail_nodes_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -419,7 +476,16 @@ class DetailPanel(QWidget):
         self.storage_backups_table.setHorizontalHeaderLabels([
             "ВМ", "Тип", "Формат", "Размер", "Создан"
         ])
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_backups_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_backups_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        storage_backups_table.setColumnWidth(1, 65)
+        storage_backups_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        storage_backups_table.setColumnWidth(2, 60)
+        storage_backups_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        storage_backups_table.setColumnWidth(3, 70)
+        storage_backups_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        storage_backups_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_backups_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_backups_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -452,7 +518,15 @@ class DetailPanel(QWidget):
         self.storage_disks_table.setHorizontalHeaderLabels([
             "ВМ", "Имя", "Том", "Шина", "Размер"
         ])
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_disks_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_disks_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        storage_disks_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        storage_disks_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        storage_disks_table.setColumnWidth(3, 55)
+        storage_disks_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        storage_disks_table.setColumnWidth(4, 70)
+        storage_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -485,7 +559,14 @@ class DetailPanel(QWidget):
         self.storage_iso_table.setHorizontalHeaderLabels([
             "Том", "Формат", "Размер", "Изменён"
         ])
-        self.storage_iso_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_iso_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_iso_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        storage_iso_table.setColumnWidth(1, 60)
+        storage_iso_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        storage_iso_table.setColumnWidth(2, 70)
+        storage_iso_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        storage_iso_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_iso_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_iso_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -518,7 +599,14 @@ class DetailPanel(QWidget):
         self.storage_tpl_table.setHorizontalHeaderLabels([
             "Том", "Формат", "Размер", "Изменён"
         ])
-        self.storage_tpl_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        storage_tpl_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        storage_tpl_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        storage_tpl_table.setColumnWidth(1, 60)
+        storage_tpl_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        storage_tpl_table.setColumnWidth(2, 70)
+        storage_tpl_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        storage_tpl_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        storage_tpl_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.storage_tpl_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -554,7 +642,16 @@ class DetailPanel(QWidget):
         self.host_network_table.setHorizontalHeaderLabels([
             "Интерфейс", "Тип", "Состояние", "Method", "CIDR"
         ])
-        self.host_network_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        host_network_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        host_network_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        host_network_table.setColumnWidth(1, 65)
+        host_network_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        host_network_table.setColumnWidth(2, 75)
+        host_network_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        host_network_table.setColumnWidth(3, 70)
+        host_network_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        host_network_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        host_network_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_network_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -586,7 +683,12 @@ class DetailPanel(QWidget):
         self.host_services_table.setHorizontalHeaderLabels([
             "Сервис", "Состояние", "Описание"
         ])
-        self.host_services_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        host_services_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        host_services_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        host_services_table.setColumnWidth(1, 75)
+        host_services_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        host_services_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        host_services_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_services_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -618,7 +720,15 @@ class DetailPanel(QWidget):
         self.host_disks_table.setHorizontalHeaderLabels([
             "Устройство", "Тип", "Модель", "Размер", "Серийный"
         ])
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        host_disks_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        host_disks_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        host_disks_table.setColumnWidth(1, 65)
+        host_disks_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        host_disks_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        host_disks_table.setColumnWidth(3, 70)
+        host_disks_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        host_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        host_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -650,7 +760,14 @@ class DetailPanel(QWidget):
         self.host_snapshots_table.setHorizontalHeaderLabels([
             "ВМ", "Снапшот", "Описание", "Создан", "Текущий"
         ])
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.        host_snapshots_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        host_snapshots_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        host_snapshots_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        host_snapshots_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        host_snapshots_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        host_snapshots_table.setColumnWidth(4, 65)
+        host_snapshots_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        host_snapshots_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
 
         self.host_snapshots_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -1249,10 +1366,17 @@ class DetailPanel(QWidget):
         table.setHorizontalHeaderLabels([
             "Хост", "Статус", "Адрес", "ЦП %", "RAM (GiB)", "Аптайм"
         ])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        table.setColumnWidth(1, 70)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        table.setColumnWidth(3, 55)
+        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        table.setColumnWidth(4, 80)
+        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        table.setColumnWidth(5, 85)
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
         table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
@@ -1329,10 +1453,16 @@ class DetailPanel(QWidget):
         table = self.datacenter_summary
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels(["Кластер", "Хосты", "ВМ", "ЦП %", "RAM (GiB)"])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        table.setColumnWidth(1, 65)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        table.setColumnWidth(2, 65)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        table.setColumnWidth(3, 55)
+        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        table.setColumnWidth(4, 85)
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
         table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         table.setRowCount(len(clusters))
         for i, (cl_name, cl_data) in enumerate(sorted(clusters.items(), key=lambda x: x[0].lower())):
