@@ -107,8 +107,10 @@ QSS = f"""
     QTableWidget {{
         font-family: "{Color.MONO_FONT}", "Noto Sans Mono", monospace;
         font-size: 13px;
+        background: {Color.PANEL};
         alternate-background-color: {Color.ALT_ROW};
         gridline-color: transparent;
+        border: 1px solid {Color.BORDER};
     }}
     QTableWidget::item {{
         padding: 2px 4px;
@@ -141,10 +143,12 @@ QSS = f"""
     QTabWidget::pane {{
         border: none;
         border-top: 1px solid {Color.BORDER};
-        background: {Color.PANEL};
+        background: {Color.RAISED};
+        padding: 8px;
     }}
     QTabBar {{
         margin-left: 4px;
+        background: {Color.PANEL};
     }}
     QTabBar::tab {{
         padding: 6px 14px;
