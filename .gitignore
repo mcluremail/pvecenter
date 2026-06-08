@@ -13,4 +13,4 @@ debian/tmp/
 *.deb
 *.buildinfo
 *.changes
-*.ddeb
+*.ddeb.omo/
