@@ -42,7 +42,6 @@ HW_LABELS = {
     "args": "Доп. аргументы QEMU",
     "hookscript": "Скрипт-хук",
     "running-machine": "Чипсет (работает)",
-    "running-qemu": "Версия QEMU",
     "efidisk0": "EFI диск",
     "tpmstate0": "TPM",
 }
@@ -411,9 +410,6 @@ def get_hardware_rows(config_data, detail_data=None):
         rm = detail_data.get("running-machine")
         if rm and "machine" not in seen:
             extra.append(("running-machine", rm))
-        rq = detail_data.get("running-qemu")
-        if rq:
-            extra.append(("running-qemu", rq))
         for key, value in extra:
             label = HW_LABELS.get(key, key)
             rows.append((label, value))

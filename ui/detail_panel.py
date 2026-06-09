@@ -15,6 +15,11 @@ import json as _json
 from PySide6.QtGui import QColor, QBrush
 
 
+def _fmt_pveversion(val):
+    val = str(val)
+    return val.split("/")[1] if "/" in val else val
+
+
 def _progress_style(value, max_val=100):
     """Возвращает QSS для QProgressBar с динамическим цветом."""
     pct = int((value / max_val) * 100) if max_val else 0
@@ -2267,6 +2272,10 @@ class DetailPanel(QWidget):
                 ("Имя", host_data.get("node", "")),
                 ("Статус", _ru_status(host_data.get("status", ""))),
                 ("Адрес", address),
+                ("PVE", _fmt_pveversion(host_data.get("pveversion", "?"))),
+                ("QEMU", host_data.get("qemu", "?")),
+                ("Ядро", host_data.get("kernel", "?")),
+                ("LXC", host_data.get("lxc", "?")),
                 ("ЦП", f"{cpu_pct}%"),
                 ("RAM (GiB)", f"{mem_gb} / {maxmem_gb}"),
                 ("Аптайм", _format_uptime(uptime)),
@@ -2559,6 +2568,7 @@ class DetailPanel(QWidget):
             tags = basic.get("tags") or detail.get("tags") or ""
 
             ha = detail.get("hastate", "Неизвестно")
+            running_qemu = detail.get("running-qemu", "")
 
             table = self.vm_summary_table
             params = [
@@ -2574,8 +2584,10 @@ class DetailPanel(QWidget):
                 ("Сеть вх (MB)", netin_mb),
                 ("Сеть исх (MB)", netout_mb),
                 ("Аптайм", _format_uptime(uptime) if uptime else ''),
-                ("HA состояние", str(ha))
+                ("HA состояние", str(ha)),
             ]
+            if running_qemu:
+                params.append(("Версия QEMU", running_qemu))
             table.setRowCount(len(params))
             for i, (k, v) in enumerate(params):
                 table.setItem(i, 0, QTableWidgetItem(k))

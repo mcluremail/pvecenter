@@ -299,6 +299,29 @@ class FetchWorker(QRunnable):
                 for t in storage_threads:
                     t.join(timeout=20)
 
+                # Подтягиваем версии с каждой ноды параллельно
+                version_lock = threading.Lock()
+
+                def fetch_node_version(n):
+                    node_name = n["node"]
+                    try:
+                        ver = proxmox.nodes(node_name).version.get()
+                        with version_lock:
+                            n["pveversion"] = ver.get("pveversion", "")
+                            n["kernel"] = ver.get("kernel", "")
+                            n["qemu"] = ver.get("qemu", "")
+                            n["lxc"] = ver.get("lxc", "")
+                    except Exception:
+                        with version_lock:
+                            n["pveversion"] = "?"
+
+                ver_threads = [threading.Thread(target=fetch_node_version, args=(n,), daemon=True)
+                              for n in nodes]
+                for t in ver_threads:
+                    t.start()
+                for t in ver_threads:
+                    t.join(timeout=10)
+
                 for s in storages:
                     detail = detail_by_node.get(s.get("node", ""), {}).get(s.get("storage", ""), {})
                     if detail.get("used") is not None and (s.get("used") or 0) == 0:
@@ -353,6 +376,18 @@ class FetchWorker(QRunnable):
                 standalone_thread = threading.Thread(target=fetch_standalone, daemon=True)
                 standalone_thread.start()
                 standalone_thread.join(timeout=30)
+
+                # Версии для standalone ноды
+                if nodes:
+                    try:
+                        ver = proxmox.nodes(node_name).version.get()
+                        for n in nodes:
+                            n["pveversion"] = ver.get("pveversion", "")
+                            n["kernel"] = ver.get("kernel", "")
+                            n["qemu"] = ver.get("qemu", "")
+                            n["lxc"] = ver.get("lxc", "")
+                    except Exception:
+                        pass
 
             # ── Параллельная фаза 3: ISO образы ────────────────────
             def fetch_iso_for_node(n):
