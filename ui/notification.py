@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
-from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property
+from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
 
 
 class FadeToast(QWidget):
@@ -35,14 +35,6 @@ class FadeToast(QWidget):
         self.label.mousePressEvent = lambda e: self._copy_to_clipboard()
         layout.addWidget(self.label)
 
-        self.adjustSize()
-
-        # Правый верхний угол родительского окна (глобальные координаты)
-        parent_geo = parent.frameGeometry()
-        x = parent_geo.right() - self.width() - 20
-        y = parent_geo.top() + 12
-        self.move(x, y)
-
         self._fade_timer = QTimer(self)
         self._fade_timer.setSingleShot(True)
         self._fade_timer.setInterval(4000)
@@ -55,6 +47,14 @@ class FadeToast(QWidget):
         self._fade_anim.finished.connect(self.deleteLater)
 
         self.show()
+
+        # Правый верхний угол родителя — позиционируем только после show(),
+        # иначе на X11 Tool-окна могут игнорировать move().
+        parent_pos = parent.mapToGlobal(QPoint(0, 0))
+        x = parent_pos.x() + parent.width() - self.width() - 20
+        y = parent_pos.y() + 12
+        self.move(x, y)
+
         self._fade_timer.start()
 
     opacity = Property(float, lambda s: s._opacity_effect.opacity(), lambda s, v: s._opacity_effect.setOpacity(v))
