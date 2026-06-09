@@ -308,13 +308,18 @@ class FetchWorker(QRunnable):
                         ver = proxmox.nodes(node_name).version.get()
                         with version_lock:
                             n["pveversion"] = ver.get("pveversion", "")
-                            n["kernel"] = ver.get("kernel", "")
                             n["qemu"] = ver.get("qemu", "")
-                            n["lxc"] = ver.get("lxc", "")
-                            n["release"] = ver.get("release", "")
+                            n["lxctype"] = ver.get("lxc", "")
                     except Exception:
                         with version_lock:
                             n["pveversion"] = "?"
+                    # kernel из статуса ноды
+                    try:
+                        st = proxmox.nodes(node_name).status.get()
+                        with version_lock:
+                            n["kernel"] = st.get("kversion", "")
+                    except Exception:
+                        pass
 
                 ver_threads = [threading.Thread(target=fetch_node_version, args=(n,), daemon=True)
                               for n in nodes]
@@ -382,12 +387,12 @@ class FetchWorker(QRunnable):
                 if nodes:
                     try:
                         ver = proxmox.nodes(node_name).version.get()
+                        st = proxmox.nodes(node_name).status.get()
                         for n in nodes:
                             n["pveversion"] = ver.get("pveversion", "")
-                            n["kernel"] = ver.get("kernel", "")
                             n["qemu"] = ver.get("qemu", "")
-                            n["lxc"] = ver.get("lxc", "")
-                            n["release"] = ver.get("release", "")
+                            n["lxctype"] = ver.get("lxc", "")
+                            n["kernel"] = st.get("kversion", "")
                     except Exception:
                         pass
 
