@@ -307,12 +307,17 @@ class FetchWorker(QRunnable):
                     try:
                         ver = proxmox.nodes(node_name).version.get()
                         with version_lock:
-                            n["pveversion"] = ver.get("pveversion", "")
-                            n["qemu"] = ver.get("qemu", "")
-                            n["lxctype"] = ver.get("lxc", "")
+                            pve = ver.get("pveversion")
+                            if pve:
+                                n["pveversion"] = pve
+                            qemu = ver.get("qemu")
+                            if qemu:
+                                n["qemu"] = qemu
+                            lxc = ver.get("lxc")
+                            if lxc:
+                                n["lxctype"] = lxc
                     except Exception:
-                        with version_lock:
-                            n["pveversion"] = "?"
+                        pass
                     # kernel из статуса ноды
                     try:
                         st = proxmox.nodes(node_name).status.get()
@@ -387,12 +392,26 @@ class FetchWorker(QRunnable):
                 if nodes:
                     try:
                         ver = proxmox.nodes(node_name).version.get()
+                        pve = ver.get("pveversion")
+                        if pve:
+                            for n in nodes:
+                                n["pveversion"] = pve
+                        qemu = ver.get("qemu")
+                        if qemu:
+                            for n in nodes:
+                                n["qemu"] = qemu
+                        lxc = ver.get("lxc")
+                        if lxc:
+                            for n in nodes:
+                                n["lxctype"] = lxc
+                    except Exception:
+                        pass
+                    try:
                         st = proxmox.nodes(node_name).status.get()
-                        for n in nodes:
-                            n["pveversion"] = ver.get("pveversion", "")
-                            n["qemu"] = ver.get("qemu", "")
-                            n["lxctype"] = ver.get("lxc", "")
-                            n["kernel"] = st.get("kversion", "")
+                        kver = st.get("kversion")
+                        if kver:
+                            for n in nodes:
+                                n["kernel"] = kver
                     except Exception:
                         pass
 
