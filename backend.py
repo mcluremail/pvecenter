@@ -1,6 +1,7 @@
 import urllib3
 import traceback
 import logging
+import threading
 from PySide6.QtCore import Signal, QRunnable, QObject
 from proxmoxer import ProxmoxAPI
 
@@ -162,7 +163,6 @@ class FetchWorker(QRunnable):
         self.signals = FetchSignals()
 
     def run(self):
-        import threading
         try:
             proxmox = ProxmoxAPI(
                 self.node_cfg["host"],
@@ -781,7 +781,7 @@ class ClusterTasksSignals(QObject):
     finished = Signal()
 
 
-class ClusterTasksWorker(QRunnable):
+class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
     """Загружает задачи со всех нод параллельно через threading.
     Принимает список (host_cfg, node_name) — для каждой ноды
     вызывается /nodes/{node}/tasks, результаты мержатся по UPID."""
@@ -791,7 +791,6 @@ class ClusterTasksWorker(QRunnable):
         self.signals = ClusterTasksSignals()
 
     def run(self):
-        import threading
         try:
             results = {}
             errors = []
@@ -950,7 +949,6 @@ class VmConsoleWorker(QRunnable):
                     logger.info("remote-viewer запущен (pid=%d)", proc.pid)
                     # remote-viewer detached — следим за процессом в фоне,
                     # удалим .vv после его завершения
-                    import threading
                     def _cleanup():
                         try:
                             proc.wait()

@@ -118,11 +118,8 @@ def _ask_password(mode="enter"):
         result[0] = pwd
         dialog.accept()
 
-    def on_cancel():
-        dialog.reject()
-
     ok_btn.clicked.connect(on_ok)
-    cancel_btn.clicked.connect(on_cancel)
+    cancel_btn.clicked.connect(dialog.reject)
     pwd_input.returnPressed.connect(on_ok)
     if confirm_input:
         confirm_input.returnPressed.connect(on_ok)
