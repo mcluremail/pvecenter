@@ -966,12 +966,11 @@ class DeleteVmSignals(QObject):
 
 class DeleteVmWorker(QRunnable):
     """Удаляет QEMU VM через DELETE /nodes/{node}/qemu/{vmid}."""
-    def __init__(self, host_cfg, node_name, vmid, force=True):
+    def __init__(self, host_cfg, node_name, vmid):
         super().__init__()
         self.host_cfg = host_cfg
         self.node_name = node_name
         self.vmid = vmid
-        self.force = force
         self.signals = DeleteVmSignals()
 
     def run(self):
@@ -985,8 +984,7 @@ class DeleteVmWorker(QRunnable):
                 timeout=30,
             )
 
-            params = {"force": 1} if self.force else {}
-            proxmox.nodes(self.node_name).qemu(self.vmid).delete(**params)
+            proxmox.nodes(self.node_name).qemu(self.vmid).delete()
             msg = f"VM {self.vmid} удалена с {self.node_name}"
             try:
                 self.signals.vm_deleted.emit(msg)
