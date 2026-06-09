@@ -89,6 +89,7 @@ class DetailPanel(QWidget):
         self.task_history_cache = {}
         self._storage_content_pending = {}
         self._iso_by_node = {}
+        self._all_iso_catalog = {}  # source: mainwindow.all_iso_images
         self._vm_iso_pending = {}
         self._workers = set()
         self.current_worker = None
@@ -849,6 +850,9 @@ class DetailPanel(QWidget):
         self.all_vms = all_vms
         self.all_storages = all_storages or []
 
+    def set_iso_catalog(self, iso_images):
+        self._all_iso_catalog = iso_images or {}
+
     def _on_vm_action(self, action):
         if not self._last_vm_data:
             return
@@ -1331,6 +1335,7 @@ class DetailPanel(QWidget):
                               and v.get("host_name") == (vm_data.get("host_name") or vm_data.get("node"))), None)
                 if fresh:
                     self.current_obj_data = fresh
+                    self.hardware_widget.set_vm_status(fresh.get("status", ""))
                 self._update_vm_cells(fresh or vm_data)
                 self._show_vm_metrics(fresh or vm_data)
         elif self.current_obj_type == "storage":
@@ -2497,6 +2502,11 @@ class DetailPanel(QWidget):
         # Контекст для редакторов (host_name, vmid, node)
         self.hardware_widget.set_context(host_name, vmid, node_name)
         self.hardware_widget.set_vm_status(vm_data.get("status", ""))
+        # ISO — сначала из all_iso_catalog (mainwindow), потом из async-загрузки
+        if node_name not in self._iso_by_node and self._all_iso_catalog:
+            self._iso_by_node[node_name] = {
+                iso["volid"] for iso in self._all_iso_catalog.get(node_name, [])
+            }
         iso_set = self._iso_by_node.setdefault(node_name, set())
         self.hardware_widget.set_iso_list(iso_set)
         self.options_widget.set_context(host_name, vmid, node_name)

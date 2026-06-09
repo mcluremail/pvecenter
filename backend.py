@@ -2,6 +2,7 @@ import urllib3
 import traceback
 import logging
 import threading
+import concurrent.futures
 from PySide6.QtCore import Signal, QRunnable, QObject
 from proxmoxer import ProxmoxAPI
 
@@ -196,7 +197,7 @@ class FetchWorker(QRunnable):
                     with pool_lock:
                         pool_names = [p.get("poolid") or p.get("pool") for p in pools_data
                                       if p.get("poolid") or p.get("pool")]
-                    # Дёргаем каждый пул параллельно
+
                     def fetch_pool_detail(p):
                         pname = p.get("poolid") or p.get("pool")
                         if not pname:
@@ -216,12 +217,9 @@ class FetchWorker(QRunnable):
                                 local[int(mv)] = pname
                         with pool_lock:
                             vmid_to_pool.update(local)
-                    pool_threads = [threading.Thread(target=fetch_pool_detail, args=(p,), daemon=True)
-                                    for p in pools_data if p.get("poolid") or p.get("pool")]
-                    for t in pool_threads:
-                        t.start()
-                    for t in pool_threads:
-                        t.join(timeout=10)
+                    pool_candidates = [p for p in pools_data if p.get("poolid") or p.get("pool")]
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+                        ex.map(fetch_pool_detail, pool_candidates, timeout=10)
                 except Exception:
                     traceback.print_exc()
 
@@ -686,7 +684,7 @@ class VmTaskHistoryWorker(QRunnable):
 # ----------------------------------------------------------------------
 def delete_host_token(host_cfg):
     """Удаляет API-токен с PVE-сервера через Proxmoxer.
-       Не выбрасывает исключения — ошибки только в лог."""
+       Возвращает True при успехе, False при ошибке."""
     try:
         proxmox = ProxmoxAPI(
             host_cfg["host"],
@@ -700,8 +698,10 @@ def delete_host_token(host_cfg):
         token_id = host_cfg["token_name"]
         proxmox.access.users(userid).token(token_id).delete()
         logger.info("Token %s for user %s deleted from %s", token_id, userid, host_cfg["host"])
+        return True
     except Exception as e:
         logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
+        return False
 
 
 class VmActionSignals(QObject):

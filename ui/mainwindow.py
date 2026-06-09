@@ -370,8 +370,15 @@ class MainWindow(QMainWindow):
             return
         if not self._confirm_delete(text):
             return
+        errors = []
         for cfg in matched:
-            delete_host_token(cfg)
+            ok = delete_host_token(cfg)
+            if not ok:
+                errors.append(cfg.get("name", cfg.get("host", "?")))
+        if errors:
+            self._notifications.show(
+                f"Не удалось удалить токены: {', '.join(errors)}. "
+                f"Конфигурация очищена.", error=True)
         self.nodes_cfg = [c for c in self.nodes_cfg if c not in matched]
         save_config(self.nodes_cfg)
         self.refresh_data()
@@ -454,6 +461,7 @@ class MainWindow(QMainWindow):
             self.all_storages.clear()
             self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
             self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+            self.detail_panel.set_iso_catalog(self.all_iso_images)
             self._update_status_bar()
 
     @Slot(dict)
@@ -517,6 +525,7 @@ class MainWindow(QMainWindow):
         # Не загрузившиеся кластеры остаются в дереве как заглушки со спиннерами.
         self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=False)
         self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+        self.detail_panel.set_iso_catalog(self.all_iso_images)
 
         # Выбираем первый элемент в дереве при первой же возможности.
         if not getattr(self, '_first_selection_done', False) and self.tree_panel.tree.topLevelItemCount() > 0:
@@ -617,9 +626,17 @@ class MainWindow(QMainWindow):
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
                 self._soft_vms.append(vm)
+            # Дедупликация storages (как в on_worker_finished)
+            seen_soft_storage = set()
+            for st in self._soft_storages:
+                key = (st.get("storage"), st.get("node"), st.get("host_name"))
+                seen_soft_storage.add(key)
             for st in data.get("storages", []):
                 st["host_name"] = data["host"]
-                self._soft_storages.append(st)
+                key = (st.get("storage"), st.get("node"), data["host"])
+                if key not in seen_soft_storage:
+                    seen_soft_storage.add(key)
+                    self._soft_storages.append(st)
         else:
             self._soft_had_errors = True
             self._soft_nodes.append({
@@ -644,11 +661,11 @@ class MainWindow(QMainWindow):
                     self.detail_panel.all_vms[:] = self._soft_vms
                     self.detail_panel.all_storages[:] = self._soft_storages
                     self.detail_panel.refresh_current_view()
-                    # Пробрасываем уже собранные на hard refresh пулы/HA/ISO —
+                    # Пробрасываем уже собранные на hard refresh пулы/HA —
                     # soft refresh не имеет ProxmoxAPI, пересобрать не может
                     self.detail_panel.all_pools = self.all_pools
                     self.detail_panel.all_ha_groups = self.all_ha_groups
-                    self.detail_panel.all_iso_images = self.all_iso_images
+                    self.detail_panel.set_iso_catalog(self.all_iso_images)
                     self._detect_status_changes(self._soft_nodes, self._soft_vms)
                     self._update_status_bar()
                 except Exception:

@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       0.1.1
+Version:       0.1.2
 Release:       1%{?dist}
 Summary:       Десктопная панель управления Proxmox VE
 

@@ -64,9 +64,10 @@ class VmConfigEditorDialog(QDialog):
             self._editor = QLineEdit(str(current_value) if current_value is not None else "")
             form.addRow("Значение:", self._editor)
             if key.rstrip("0123456789") in ("net", "ide", "sata", "scsi", "virtio"):
-                hint = QLabel("Формат: модель=MAC,bridge=vmbr0,tag=10")
-                hint.setStyleSheet("color: #6b7280; font-size: 11px;")
-                form.addRow("", hint)
+                if key.rstrip("0123456789") not in ("ide",) or key != "ide2":
+                    hint = QLabel("Формат: модель=MAC,bridge=vmbr0,tag=10")
+                    hint.setStyleSheet("color: #6b7280; font-size: 11px;")
+                    form.addRow("", hint)
             elif key.rstrip("0123456789") == "efidisk":
                 hint = QLabel("Формат: storage:size,format=qcow2")
                 hint.setStyleSheet("color: #6b7280; font-size: 11px;")

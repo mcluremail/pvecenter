@@ -174,6 +174,7 @@ CHOICE_LABELS = {
         "network,disk": "Сеть, Диски",
         "network,usb": "Сеть, USB",
         "disk,usb": "Диски, USB",
+        "network,disk,usb": "Сеть, Диски, USB",
         "networkdisk,usb": "Сеть, Диски, USB",
     },
 }
@@ -318,12 +319,12 @@ _HW_SECTIONS = [
     ("cpu",            ["cpu", "cores", "sockets"]),
     ("memory",         ["memory"]),
     ("system",         ["bios", "machine", "vga", "scsihw"]),
-    ("network",        ["net0", "net1", "net2", "net3"]),
-    ("storage",        ["ide0", "ide1", "ide2", "ide3",
-                        "sata0", "sata1", "sata2", "sata3",
-                        "scsi0", "scsi1", "scsi2", "scsi3",
-                        "virtio0", "virtio1", "virtio2", "virtio3",
-                        "efidisk0", "tpmstate0"]),
+    ("network",        [f"net{i}" for i in range(32)]),
+    ("storage",        [f"ide{i}" for i in range(4)] +
+                        [f"sata{i}" for i in range(6)] +
+                        [f"scsi{i}" for i in range(31)] +
+                        [f"virtio{i}" for i in range(16)] +
+                        ["efidisk0", "tpmstate0"]),
 ]
 
 # Formatter helpers
@@ -437,7 +438,7 @@ def _fmt_cpu(val):
         "x86-64-v3-AES": "x86-64 v3 + AES",
         "x86-64-v4": "x86-64 v4",
         "x86-64-v4-AES": "x86-64 v4 + AES",
-        "max": "Host (max, risky)",
+        "max": "Host (max, рискованно)",
     }.get(val, val)
 
 
@@ -638,7 +639,7 @@ def get_hardware_rows(config_data, detail_data=None):
                 rows.append((key, label, value))
     if detail_data:
         rm = detail_data.get("running-machine")
-        if rm and "machine" not in seen:
+        if rm:
             label = HW_LABELS.get("running-machine", "running-machine")
             rows.append(("running-machine", label, rm))
     return rows
