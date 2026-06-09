@@ -108,16 +108,22 @@ class VmNetworkEditorDialog(QDialog):
             self._model_combo.setCurrentIndex(idx)
         form.addRow("Модель:", self._model_combo)
 
-        # MAC (только чтение)
         self._mac_edit = QLineEdit(self._parsed["mac"])
-        self._mac_edit.setReadOnly(True)
-        self._mac_edit.setPlaceholderText("назначается автоматически")
+        self._mac_edit.setPlaceholderText("оставьте пустым для авто-назначения")
         form.addRow("MAC:", self._mac_edit)
 
-        # Мост
-        self._bridge_edit = QLineEdit(self._parsed["bridge"])
-        self._bridge_edit.setPlaceholderText("vmbr0")
-        form.addRow("Мост:", self._bridge_edit)
+        self._bridge_combo = QComboBox()
+        self._bridge_combo.setEditable(True)
+        default_bridges = ["vmbr0", "vmbr1", "vmbr2", "vmbr3", "vmbr99"]
+        for b in default_bridges:
+            self._bridge_combo.addItem(b, b)
+        bridge_val = self._parsed["bridge"]
+        idx = self._bridge_combo.findData(bridge_val)
+        if idx >= 0:
+            self._bridge_combo.setCurrentIndex(idx)
+        else:
+            self._bridge_combo.setEditText(bridge_val)
+        form.addRow("Мост:", self._bridge_combo)
 
         # VLAN
         self._vlan_spin = QSpinBox()
@@ -161,7 +167,7 @@ class VmNetworkEditorDialog(QDialog):
     def get_raw_value(self):
         model = self._model_combo.currentData()
         mac = self._mac_edit.text().strip()
-        bridge = self._bridge_edit.text().strip()
+        bridge = self._bridge_combo.currentText().strip()
         tag = self._vlan_spin.value()
         queues = self._queues_spin.value()
         net_val = _build_net(model, mac, bridge,

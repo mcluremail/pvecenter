@@ -43,8 +43,8 @@ class VmHardwareWidget(QWidget):
         self._vmid = vmid
         self._node = node
 
-    def set_iso_list(self, iso_list):
-        self._iso_list = list(iso_list) if iso_list else []
+    def set_iso_list(self, iso_set):
+        self._iso_list = iso_set
 
     def set_hardware_data(self, config_data, detail_data=None):
         self._config_data = config_data or {}

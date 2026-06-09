@@ -88,7 +88,8 @@ class DetailPanel(QWidget):
         self.metrics_cache = {}
         self.task_history_cache = {}
         self._storage_content_pending = {}
-        self._iso_volids = set()
+        self._iso_by_node = {}
+        self._vm_iso_pending = {}
         self._workers = set()
         self.current_worker = None
         self.current_config_worker = None
@@ -2406,6 +2407,37 @@ class DetailPanel(QWidget):
         elif self._last_vm_data is not None:
             self._show_vm_metrics(self._last_vm_data)
 
+    def _load_iso_for_node(self, host_name, node_name):
+        """Load ISO images available on a node and store in _iso_by_node."""
+        node_name = node_name or host_name
+        if node_name in self._iso_by_node:
+            return
+        self._iso_by_node[node_name] = set()
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        storages = [s for s in self.all_storages
+                    if s.get("node") == node_name
+                    and "iso" in (s.get("content", "").split(","))]
+        for storage_info in storages:
+            storage = storage_info.get("storage")
+            if not storage:
+                continue
+            from .api.metrics import StorageContentListWorker
+            worker = StorageContentListWorker(cfg, node_name, storage, "iso")
+            worker.signals.result.connect(
+                lambda sn, ct, data, n=node_name: self._on_vm_iso_loaded(n, data)
+            )
+            worker.signals.error.connect(
+                lambda sn, ct, err, n=node_name: None
+            )
+            self._run_worker(worker)
+
+    def _on_vm_iso_loaded(self, node_name, data):
+        vols = {v.get("volid") for v in (data or []) if v.get("volid")}
+        if node_name in self._iso_by_node:
+            self._iso_by_node[node_name].update(vols)
+
     def _show_vm_info_init(self, vm_name, vm_data, gen):
         self.detail_label.setText(f"ВМ/CT: {vm_name}")
         self._last_vm_data = vm_data
@@ -2442,12 +2474,14 @@ class DetailPanel(QWidget):
         else:
             self._display_full_vm_info(vm_data, self.details_cache[detail_key])
 
+        node_name = vm_data.get("node") or host_name
+        self._load_iso_for_node(host_name, node_name)
+
         if detail_key not in self.config_cache:
             self.hardware_widget.set_hardware_data(None)
             self.options_widget.set_options_data(None)
             cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
             if cfg:
-                node_name = vm_data.get("node") or host_name
                 vm_type = vm_data.get("type", "qemu")
                 from ..backend import VmConfigWorker
                 worker = VmConfigWorker(cfg, node_name, vmid, vm_type)
@@ -2461,10 +2495,10 @@ class DetailPanel(QWidget):
             self.options_widget.set_options_data(self.config_cache[detail_key])
 
         # Контекст для редакторов (host_name, vmid, node)
-        vm_node = vm_data.get("node") or host_name
-        self.hardware_widget.set_context(host_name, vmid, vm_node)
-        self.hardware_widget.set_iso_list(self._iso_volids)
-        self.options_widget.set_context(host_name, vmid, vm_node)
+        self.hardware_widget.set_context(host_name, vmid, node_name)
+        iso_set = self._iso_by_node.setdefault(node_name, set())
+        self.hardware_widget.set_iso_list(iso_set)
+        self.options_widget.set_context(host_name, vmid, node_name)
 
         if detail_key not in self.task_history_cache:
             self.task_history_widget.set_tasks([])

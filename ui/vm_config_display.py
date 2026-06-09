@@ -51,7 +51,7 @@ _DEVICE_PREFIX_LABELS = {
     "ide": "IDE",
     "sata": "SATA",
     "scsi": "SCSI",
-    "virtio": "VirtIO",
+    "virtio": "Жёсткий диск",
     "efidisk": "EFI диск",
     "tpmstate": "TPM",
 }
@@ -61,6 +61,12 @@ def _device_label(key):
     prefix = key.rstrip("0123456789")
     num = key[len(prefix):]
     base = _DEVICE_PREFIX_LABELS.get(prefix, prefix)
+    if prefix == "ide" and num == "2":
+        return "Оптический привод"
+    if prefix in ("virtio", "scsi", "sata", "ide"):
+        if num:
+            return f"{base} ({prefix}{num})"
+        return base
     if num:
         return f"{base} {num}"
     return base
