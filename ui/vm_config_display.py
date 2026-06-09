@@ -1,0 +1,436 @@
+"""
+vm_config_display.py — Human-readable VM config display.
+
+PVE API returns only modified (non-default) values from config endpoint.
+This module fills in known defaults and translates values to human-readable
+Russian labels and formatted strings.
+"""
+# Labels for config keys (Russian)
+HW_LABELS = {
+    "name": "Имя",
+    "cpu": "Тип CPU",
+    "cores": "Ядер",
+    "sockets": "Сокетов",
+    "memory": "Память",
+    "bios": "BIOS",
+    "machine": "Чипсет",
+    "vga": "VGA",
+    "scsihw": "SCSI контроллер",
+    "vmgenid": "VM Generation ID",
+    "ostype": "Тип ОС",
+    "acpi": "ACPI",
+    "agent": "QEMU Agent",
+    "kvm": "KVM (вложенная виртуализация)",
+    "tablet": "USB Tablet",
+    "boot": "Загрузка",
+    "bootdisk": "Загрузочный диск",
+    "onboot": "Автозапуск",
+    "startup": "Порядок запуска",
+    "numa": "NUMA",
+    "hotplug": "Горячее подключение",
+    "freeze": "Freeze (приостановка на старте)",
+    "keyboard": "Раскладка клавиатуры",
+    "localtime": "Локальное время",
+    "protection": "Защита от удаления",
+    "reboot": "Перезагрузка после сбоя",
+    "rtc": "RTC",
+    "smbios1": "SMBIOS",
+    "tags": "Теги",
+    "tdf": "TDF",
+    "template": "Шаблон",
+    "vcpus": "Виртуальных CPU (hotplug)",
+    "args": "Доп. аргументы QEMU",
+    "hookscript": "Скрипт-хук",
+    "running-machine": "Чипсет (работает)",
+    "running-qemu": "Версия QEMU",
+    "efidisk0": "EFI диск",
+    "tpmstate0": "TPM",
+}
+
+# PVE defaults for keys absent from config API
+HW_DEFAULTS = {
+    "cores": 1,
+    "sockets": 1,
+    "memory": 512,
+    "cpu": "kvm64",
+    "bios": "seabios",
+    "machine": "i440fx",
+    "vga": "std",
+    "scsihw": "lsi",
+    "acpi": 1,
+    "agent": 0,
+    "kvm": 1,
+    "tablet": 1,
+    "boot": "order=ide2;ide0;scsi0;virtio0;net0",
+    "onboot": 0,
+    "numa": 0,
+    "hotplug": "networkdisk,usb",
+    "freeze": 0,
+    "localtime": 0,
+    "protection": 0,
+    "reboot": 1,
+    "rtc": "utc",
+    "tdf": 0,
+    "template": 0,
+    "ostype": "l26",
+}
+
+# Config keys not shown in either tab
+SERVICE_KEYS = {
+    "digest", "description", "meta",
+    "hookscript", "parent", "template",
+    "searchdomain", "hostname", "password", "sshkeys",
+    "ciuser", "cipassword", "cicustom",
+}
+
+# Ordered groups for hardware tab
+_HW_SECTIONS = [
+    ("identity",       ["name"]),
+    ("cpu",            ["cpu", "cores", "sockets"]),
+    ("memory",         ["memory"]),
+    ("system",         ["ostype", "bios", "machine", "vga", "scsihw"]),
+    ("network",        ["net0", "net1", "net2", "net3"]),
+    ("storage",        ["ide0", "ide1", "ide2", "ide3",
+                        "sata0", "sata1", "sata2", "sata3",
+                        "scsi0", "scsi1", "scsi2", "scsi3",
+                        "virtio0", "virtio1", "virtio2", "virtio3",
+                        "efidisk0", "tpmstate0"]),
+    ("other_hw",       ["acpi", "agent", "kvm", "tablet", "smbios1",
+                        "vmgenid", "vcpus"]),
+]
+
+# Formatter helpers
+# ---------------------------------------------------------------------------
+
+def _fmt_memory(val):
+    try:
+        mb = int(val)
+        if mb >= 1024:
+            gb = mb / 1024
+            if mb % 1024 == 0:
+                return f"{mb // 1024} ГБ"
+            return f"{gb:.1f} ГБ ({mb} МБ)"
+        return f"{mb} МБ"
+    except (ValueError, TypeError):
+        return str(val)
+
+
+def _fmt_ostype(val):
+    return {
+        "other": "Не указан",
+        "wxp": "Windows XP",
+        "w2k": "Windows 2000",
+        "w2k3": "Windows 2003",
+        "w2k8": "Windows 2008",
+        "w2k12": "Windows 2012",
+        "wvista": "Windows Vista",
+        "win7": "Windows 7",
+        "win8": "Windows 8",
+        "win10": "Windows 10/11",
+        "l24": "Linux 2.4",
+        "l26": "Linux 2.6+",
+        "solaris": "Solaris",
+    }.get(str(val), str(val))
+
+
+def _fmt_bool(val):
+    return "Да" if val in (1, "1", True) else "Нет"
+
+
+def _fmt_agent(val):
+    return "Включён" if val in (1, "1", True) else "Выключен"
+
+
+def _fmt_boot(val):
+    val = str(val)
+    if val.startswith("order="):
+        parts = val[6:].split(";")
+        return "Порядок: " + ", ".join(parts)
+    if val == "cdn":
+        return "CDN (сеть)"
+    return val
+
+
+def _fmt_hotplug(val):
+    return {
+        "networkdisk,usb": "Сеть, Диски, USB",
+        "network,disk,usb": "Сеть, Диски, USB",
+        "network": "Сеть",
+        "disk": "Диски",
+        "usb": "USB",
+        "1": "Всё",
+        "0": "Отключено",
+    }.get(val, val)
+
+
+def _fmt_startup(val):
+    parts = str(val).split(",")
+    out = []
+    for p in parts:
+        if p.startswith("order="):
+            out.append(f"Порядок: {p[6:]}")
+        elif p.startswith("up="):
+            out.append(f"Ожидание: {p[3:]}с")
+        elif p.startswith("down="):
+            out.append(f"Остановка: {p[5:]}с")
+    return " | ".join(out) if out else str(val)
+
+
+def _fmt_keyboard(val):
+    return {
+        "ar": "Арабская", "da": "Датская", "de": "Немецкая",
+        "de-ch": "Швейцарская (нем.)", "en-gb": "Английская (Великобритания)",
+        "en-us": "Английская (США)", "es": "Испанская", "fi": "Финская",
+        "fr": "Французская", "fr-be": "Французская (Бельгия)",
+        "fr-ca": "Французская (Канада)", "fr-ch": "Швейцарская (фр.)",
+        "hr": "Хорватская", "hu": "Венгерская", "is": "Исландская",
+        "it": "Итальянская", "ja": "Японская", "lt": "Литовская",
+        "mk": "Македонская", "nl": "Нидерландская", "no": "Норвежская",
+        "pl": "Польская", "pt": "Португальская",
+        "pt-br": "Португальская (Бразилия)", "ru": "Русская",
+        "sk": "Словацкая", "sl": "Словенская", "sv": "Шведская",
+        "tr": "Турецкая", "ua": "Украинская",
+    }.get(val, val)
+
+
+def _fmt_cpu(val):
+    val = str(val)
+    if val.startswith("custom-"):
+        return f"x86-64 {val[7:]} (PVE custom)"
+    return {
+        "kvm64": "KVM64 (совместимый)",
+        "host": "Host (максимум)",
+        "qemu64": "QEMU64",
+        "x86-64-v2": "x86-64 v2",
+        "x86-64-v2-AES": "x86-64 v2 + AES",
+        "x86-64-v3": "x86-64 v3",
+        "x86-64-v3-AES": "x86-64 v3 + AES",
+        "x86-64-v4": "x86-64 v4",
+        "x86-64-v4-AES": "x86-64 v4 + AES",
+        "max": "Host (max, risky)",
+    }.get(val, val)
+
+
+def _fmt_scsihw(val):
+    return {
+        "lsi": "LSI 53C895A",
+        "lsi53c810": "LSI 53C810",
+        "megasas": "MegaSAS",
+        "pvscsi": "VMware PVSCSI",
+        "virtio-scsi-single": "VirtIO SCSI Single",
+        "virtio-scsi-pci": "VirtIO SCSI PCI",
+    }.get(val, val)
+
+
+def _fmt_vga(val):
+    return {
+        "std": "VGA",
+        "qxl": "QXL (SPICE)",
+        "virtio": "VirtIO-GPU",
+        "vmware": "VMware",
+        "cirrus": "Cirrus",
+        "serial0": "Serial",
+        "qxl2": "QXL (dual)",
+        "qxl3": "QXL (triple)",
+        "qxl4": "QXL (quad)",
+    }.get(val, val)
+
+
+def _fmt_bios(val):
+    return {"seabios": "SeaBIOS", "ovmf": "OVMF (UEFI)"}.get(val, val)
+
+
+def _fmt_machine(val):
+    return {"i440fx": "i440fx", "q35": "Q35"}.get(val, val) if val else val
+
+
+def _fmt_rtc(val):
+    return {"utc": "UTC", "localtime": "Локальное"}.get(val, val)
+
+
+def _fmt_smbios(val):
+    parts = str(val).split(",")
+    filtered = [p for p in parts if not p.startswith("uuid=")]
+    return ", ".join(filtered) if filtered else "Задан"
+
+
+def _fmt_net(val):
+    """Распарсить строку сетевого устройства: virtio=MAC,bridge=vmbr0,tag=10"""
+    val = str(val)
+    parts = val.split(",")
+    first = parts[0]
+
+    if "=" in first:
+        model, mac = first.split("=", 1)
+    else:
+        model, mac = first, ""
+
+    bridge = ""
+    tag = ""
+    for p in parts[1:]:
+        if p.startswith("bridge="):
+            bridge = p.split("=", 1)[1]
+        elif p.startswith("tag="):
+            tag = p.split("=", 1)[1]
+
+    out = model
+    if bridge:
+        out += f" | {bridge}"
+    if tag:
+        out += f" | VLAN {tag}"
+    if mac and mac != "none":
+        out += f" | {mac}"
+    return out
+
+
+def _fmt_disk(val):
+    """Распарсить строку диска: storage:size,format=qcow2,cache=writeback,..."""
+    val = str(val)
+    parts = val.split(",")
+    storage_part = parts[0]
+
+    if ":" in storage_part:
+        storage = storage_part.split(":")[0]
+        size = storage_part.split(":", 1)[1]
+    else:
+        storage = storage_part
+        size = ""
+
+    fmt = ""
+    cache = ""
+    for p in parts[1:]:
+        if p.startswith("cache="):
+            cache = p.split("=", 1)[1]
+        elif p.startswith("format="):
+            fmt = p.split("=", 1)[1]
+
+    _cache_labels = {"none": "Нет", "writeback": "Write back",
+                     "writethrough": "Write through",
+                     "directsync": "Direct sync", "unsafe": "Unsafe"}
+    cache = _cache_labels.get(cache, cache)
+
+    out = storage
+    if size:
+        out += f" | {size}"
+    if fmt:
+        out += f" | {fmt}"
+    if cache:
+        out += f" | Кэш: {cache}"
+    return out
+
+
+# Formatter registry: key prefix -> callable(value) -> str
+_FORMATTERS = {
+    "memory": _fmt_memory,
+    "ostype": _fmt_ostype,
+    "acpi": _fmt_bool,
+    "kvm": _fmt_bool,
+    "tablet": _fmt_bool,
+    "onboot": _fmt_bool,
+    "numa": _fmt_bool,
+    "freeze": _fmt_bool,
+    "localtime": _fmt_bool,
+    "protection": _fmt_bool,
+    "reboot": _fmt_bool,
+    "tdf": _fmt_bool,
+    "template": _fmt_bool,
+    "agent": _fmt_agent,
+    "boot": _fmt_boot,
+    "hotplug": _fmt_hotplug,
+    "startup": _fmt_startup,
+    "rtc": _fmt_rtc,
+    "keyboard": _fmt_keyboard,
+    "cpu": _fmt_cpu,
+    "scsihw": _fmt_scsihw,
+    "vga": _fmt_vga,
+    "bios": _fmt_bios,
+    "machine": _fmt_machine,
+    "smbios1": _fmt_smbios,
+    "sockets": str,
+    "cores": str,
+}
+
+# Disk and network device prefixes
+_DISK_PREFIXES = {"ide", "sata", "scsi", "virtio", "efidisk", "tpmstate"}
+_NET_PREFIXES = {"net"}
+
+
+def format_value(key, value):
+    """Apply the best formatter for a config key+value."""
+    if key in _FORMATTERS:
+        return _FORMATTERS[key](value)
+    prefix = key.rstrip("0123456789")
+    if prefix in _DISK_PREFIXES:
+        return _fmt_disk(value)
+    if prefix in _NET_PREFIXES:
+        return _fmt_net(value)
+    return str(value)
+
+
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def get_hardware_rows(config_data, detail_data=None):
+    """Return ordered list of (label, formatted_value) for hardware tab.
+
+    Fills in PVE defaults for keys absent from config_data.
+    """
+    config = dict(config_data) if config_data else {}
+
+    # Заполняем умолчания для известных ключей
+    for key, default in HW_DEFAULTS.items():
+        if key not in config:
+            config[key] = default
+
+    rows = []
+    seen = set()
+
+    # Пробегаем по секциям в заданном порядке
+    for _section_name, keys in _HW_SECTIONS:
+        for key in keys:
+            if key in config:
+                seen.add(key)
+                label = HW_LABELS.get(key, key)
+                value = format_value(key, config[key])
+                rows.append((label, value))
+
+    # Добавляем поля из detail (статус), которые не дублируются
+    if detail_data:
+        extra = []
+        rm = detail_data.get("running-machine")
+        if rm and "machine" not in seen:
+            extra.append(("running-machine", rm))
+        rq = detail_data.get("running-qemu")
+        if rq:
+            extra.append(("running-qemu", rq))
+        for key, value in extra:
+            label = HW_LABELS.get(key, key)
+            rows.append((label, value))
+
+    return rows
+
+
+def get_options_rows(config_data):
+    """Return ordered list of (label, formatted_value) for options tab.
+
+    Shows all config keys not already shown on hardware tab.
+    """
+    if not config_data:
+        return []
+
+    # Собираем ключи, которые идут на hardware tab (из секций, с учётом HW_DEFAULTS)
+    hw_keys = set()
+    for _section_name, keys in _HW_SECTIONS:
+        for key in keys:
+            hw_keys.add(key)
+
+    rows = []
+    for key, value in sorted(config_data.items()):
+        if key in hw_keys or key in SERVICE_KEYS:
+            continue
+        label = HW_LABELS.get(key, key)
+        formatted = format_value(key, value)
+        rows.append((label, formatted))
+
+    return rows

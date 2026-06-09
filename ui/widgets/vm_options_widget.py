@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
+from ..vm_config_display import get_options_rows
 
 class VmOptionsWidget(QWidget):
     def __init__(self, parent=None):
@@ -20,44 +21,14 @@ class VmOptionsWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
     def set_options_data(self, config_data):
-        """Заполняет таблицу всеми ключами config_data, которых нет в списке аппаратных ключей."""
         self.table.setRowCount(0)
-        if not config_data:
+        rows = get_options_rows(config_data)
+        if not rows:
             return
-
-        # Ключи, которые уже отображаются на вкладке «Оборудование» (не дублируем)
-        hardware_keys = {
-            'name', 'cpu', 'cores', 'sockets', 'memory',
-            'bios', 'machine',
-            'vmgenid', 'vga', 'scsihw',
-            'net0', 'net1', 'net2', 'net3',
-            'ide0', 'ide1', 'ide2', 'ide3',
-            'sata0', 'sata1', 'sata2', 'sata3',
-            'scsi0', 'scsi1', 'scsi2', 'scsi3',
-            'virtio0', 'virtio1', 'virtio2', 'virtio3',
-        }
-
-        # Дополнительные служебные ключи, которые не стоит показывать
-        service_keys = {
-            'digest', 'description', 'meta',
-            'hookscript', 'parent', 'template',
-            'searchdomain', 'hostname', 'password', 'sshkeys',
-            'ciuser', 'cipassword', 'cicustom',
-        }
-
-        rows = []
-        for key, value in sorted(config_data.items()):
-            if key in hardware_keys or key in service_keys:
-                continue
-            if isinstance(value, list):
-                value = ', '.join(value)
-            rows.append((key, str(value)))
-
-        for i, (param, val) in enumerate(rows):
+        for i, (label, value) in enumerate(rows):
             self.table.insertRow(i)
-            self.table.setItem(i, 0, QTableWidgetItem(param))
-            self.table.setItem(i, 1, QTableWidgetItem(val))
-
+            self.table.setItem(i, 0, QTableWidgetItem(label))
+            self.table.setItem(i, 1, QTableWidgetItem(value))
         self.table.resizeRowsToContents()
         for r in range(self.table.rowCount()):
             if self.table.rowHeight(r) > 22:
