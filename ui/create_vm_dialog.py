@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
                                QComboBox, QSpinBox, QScrollArea,
                                QWidget, QFrame)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIntValidator
+from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression
 from ..config import save_ui_state, load_ui_state
 import json as _json
 
@@ -248,6 +249,9 @@ class CreateVmDialog(QDialog):
         g1.addWidget(QLabel("Имя ВМ:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("my-vm")
+        self.name_input.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"[a-zA-Z0-9\-._]+"), self)
+        )
         g1.addWidget(self.name_input, 1, 1, 1, 3)
 
         g1.addWidget(QLabel("Тип ОС:"), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
