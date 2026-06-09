@@ -99,7 +99,7 @@ def _ask_password(mode="enter"):
     layout.addWidget(error_label)
 
     btn_layout = QHBoxLayout()
-    ok_btn = QPushButton("OK")
+    ok_btn = QPushButton(tr("OK"))
     cancel_btn = QPushButton(tr("Cancel"))
     btn_layout.addStretch()
     btn_layout.addWidget(ok_btn)
