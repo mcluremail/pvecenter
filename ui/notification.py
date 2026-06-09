@@ -1,3 +1,5 @@
+import sys
+
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
 
@@ -9,9 +11,15 @@ class FadeToast(QWidget):
         super().__init__(parent)
         self._text = text
         self._bg_color = color
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
+
+        flags = Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint
+        # X11BypassWindowManagerHint — KDE не центрирует, не трогает позицию
+        if sys.platform.startswith("linux"):
+            flags |= Qt.X11BypassWindowManagerHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WA_DontShowOnScreen, False)
 
         # QGraphicsOpacityEffect работает на всех платформах (в отличие от setWindowOpacity)
         self._opacity_effect = QGraphicsOpacityEffect(self)
@@ -46,15 +54,15 @@ class FadeToast(QWidget):
         self._fade_anim.setEndValue(0.0)
         self._fade_anim.finished.connect(self.deleteLater)
 
+        self.adjustSize()
+
+        # Позиционируем ДО show() — с X11BypassWindowManagerHint WM не тронет
+        p = self.parent()
+        if p:
+            parent_pos = p.mapToGlobal(QPoint(0, 0))
+            self.move(parent_pos.x() + p.width() - self.width() - 20, parent_pos.y() + 12)
+
         self.show()
-
-        # Правый верхний угол родителя — позиционируем только после show(),
-        # иначе на X11 Tool-окна могут игнорировать move().
-        parent_pos = parent.mapToGlobal(QPoint(0, 0))
-        x = parent_pos.x() + parent.width() - self.width() - 20
-        y = parent_pos.y() + 12
-        self.move(x, y)
-
         self._fade_timer.start()
 
     opacity = Property(float, lambda s: s._opacity_effect.opacity(), lambda s, v: s._opacity_effect.setOpacity(v))
