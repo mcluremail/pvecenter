@@ -71,17 +71,20 @@ class VmMetricsWidget(QWidget):
 
     def show_disk_io(self, visible=True):
         self._disk_visible = visible
+        expected = list(METRICS) if visible else [m for m in METRICS if m != "Диск"]
         current = self.metric_combo.currentText()
-        if visible:
-            self.metric_combo.clear()
-            self.metric_combo.addItems(METRICS)
-        else:
-            self.metric_combo.clear()
-            self.metric_combo.addItems([m for m in METRICS if m != "Диск"])
-        if current in [self.metric_combo.itemText(i) for i in range(self.metric_combo.count())]:
+        items = [self.metric_combo.itemText(i) for i in range(self.metric_combo.count())]
+        if items == expected:
+            return
+        self.metric_combo.blockSignals(True)
+        self.metric_combo.clear()
+        self.metric_combo.addItems(expected)
+        self.metric_combo.blockSignals(False)
+        if current in expected:
             self.metric_combo.setCurrentText(current)
         else:
             self.metric_combo.setCurrentText("ЦП")
+            self.metric_changed.emit("ЦП")
 
     def clear_curves(self):
         self._cached_data = None
