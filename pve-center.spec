@@ -1,9 +1,9 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       0.1.2
+Version:       1.0.0
 Release:       1%{?dist}
-Summary:       Десктопная панель управления Proxmox VE
+Summary:       Desktop client for Proxmox VE clusters
 
 License:       GPLv3
 URL:           https://github.com/mcluremail/pvecenter
@@ -12,6 +12,8 @@ Source0:       %{pypi_source}
 BuildArch:     noarch
 BuildRequires: python3-devel
 BuildRequires: python3-setuptools
+BuildRequires: python3-pip
+BuildRequires: python3-wheel
 
 Requires:      python3
 Requires:      python3-pyside6
@@ -35,7 +37,7 @@ PVE Center — десктопный инструмент для монитори
 %autosetup -n %{pypi_name}-%{version}
 
 %build
-%py3_build
+%pyproject_build
 
 %install
 %py3_install

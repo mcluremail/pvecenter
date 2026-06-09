@@ -1,3 +1,14 @@
+pve-center (1.0.0-1) unstable; urgency=medium
+
+  * v1.0 — Multilingual release (EN, RU, ZH, FR, ES, AR).
+  * Full hardware config editor for running VMs.
+  * Storage monitoring with usage charts.
+  * VM migration, disk resize, snapshot rollback.
+  * PVE firewall, SDN, Ceph, HA, replication management.
+  * Language switcher in status bar.
+
+ -- Taurus McLure <taurus@mclure.ru>  Tue, 09 Jun 2026 23:30:00 +0300
+
 pve-center (0.1.2-1) unstable; urgency=medium
 
   * Удалена диагностическая печать из SPICE-консоли.

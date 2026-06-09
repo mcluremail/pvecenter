@@ -33,8 +33,9 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq devscripts debhelper dh-python \
-            python3-all python3-setuptools python3-pyside6 \
-            python3-requests python3-pyqtgraph python3-cryptography
+            python3-all python3-setuptools python3-requests \
+            python3-pyqtgraph python3-cryptography python3-pip
+          pip3 install PySide6 --break-system-packages
       - name: Build .deb
         run: dpkg-buildpackage -b --no-sign
       - name: Copy .deb
@@ -56,7 +57,8 @@ jobs:
       - name: Install build deps
         run: |
           dnf install -y -q rpm-build python3-devel python3-setuptools \
-            python3-pyside6 python3-requests python3-pyqtgraph python3-cryptography
+            python3-pip python3-wheel python3-requests \
+            python3-pyqtgraph python3-cryptography
       - name: Build .rpm
         run: |
           mkdir -p /tmp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
