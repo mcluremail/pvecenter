@@ -161,6 +161,7 @@ class DetailPanel(QWidget):
 
         self.vm_summary_table = QTableWidget()
         self.vm_summary_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.vm_summary_table.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.vm_summary_table.verticalHeader().hide()
         self.vm_summary_table.setColumnCount(2)
         self.vm_summary_table.setHorizontalHeaderLabels(["Параметр", "Значение"])
@@ -1468,7 +1469,13 @@ class DetailPanel(QWidget):
         table.setColumnWidth(4, 85)
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        table.setRowCount(len(clusters))
+        table.setRowCount(max(len(clusters), 1))
+        if not clusters:
+            table.setSpan(0, 0, 1, 5)
+            empty = QTableWidgetItem("Нет настроенных кластеров")
+            empty.setFlags(empty.flags() & ~Qt.ItemIsSelectable)
+            empty.setTextAlignment(Qt.AlignCenter)
+            table.setItem(0, 0, empty)
         for i, (cl_name, cl_data) in enumerate(sorted(clusters.items(), key=lambda x: x[0].lower())):
             table.setItem(i, 0, QTableWidgetItem(cl_name))
             hosts_ok = sum(1 for h in cl_data["hosts"] if h.get("status") == "online")
