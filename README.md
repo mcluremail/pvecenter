@@ -14,7 +14,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Debian / Ubuntu | .deb | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | Source | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v0.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.2)
+Latest release: [v1.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.0)
 
 ## Features
 
