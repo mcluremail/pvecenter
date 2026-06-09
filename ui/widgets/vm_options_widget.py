@@ -3,6 +3,9 @@ from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
 from ..vm_config_display import get_options_rows, get_editor_spec, OPT_DEFAULTS
 from ..vm_config_editor_dialog import VmConfigEditorDialog
+from ..vm_device_editors import (VmBootEditorDialog,
+                                 VmBootdiskEditorDialog,
+                                 VmStartupEditorDialog)
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -65,6 +68,41 @@ class VmOptionsWidget(QWidget):
         raw_key = item.data(_KEY_ROLE)
         if not raw_key:
             return
+
+        if raw_key == "boot":
+            current_value = self._config_data.get(raw_key)
+            label = item.text()
+            dlg = VmBootEditorDialog(raw_key, label, current_value,
+                                     self._config_data, self)
+            if dlg.exec() != VmBootEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            if value is not None:
+                self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
+            return
+
+        if raw_key == "bootdisk":
+            current_value = self._config_data.get(raw_key)
+            label = item.text()
+            dlg = VmBootdiskEditorDialog(raw_key, label, current_value,
+                                         self._config_data, self)
+            if dlg.exec() != VmBootdiskEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            if value is not None:
+                self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
+            return
+
+        if raw_key == "startup":
+            current_value = self._config_data.get(raw_key)
+            label = item.text()
+            dlg = VmStartupEditorDialog(raw_key, label, current_value, self)
+            if dlg.exec() != VmStartupEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
+            return
+
         ft, choices, choice_labels = get_editor_spec(raw_key)
         if ft == "readonly":
             return

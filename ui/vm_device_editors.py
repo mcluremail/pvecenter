@@ -345,3 +345,289 @@ class VmDiskEditorDialog(QDialog):
         if parts:
             new_val += "," + ",".join(parts)
         return (self._key, new_val)
+
+
+class VmBootEditorDialog(QDialog):
+    _DEVICE_TYPES = ("ide", "sata", "scsi", "virtio", "net")
+
+    def __init__(self, key, label, current_value, config_data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Редактирование: {label}")
+        self.setMinimumWidth(500)
+        self.setMinimumHeight(400)
+        self._key = key
+        self._config_data = config_data or {}
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{label}</b>")
+        layout.addWidget(header)
+
+        info = QLabel("Перемещайте устройства между доступными и порядком "
+                      "загрузки с помощью кнопок")
+        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        avail_label = QLabel("Доступные устройства:")
+        avail_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(avail_label)
+        self._avail = QListWidget()
+        self._avail.itemDoubleClicked.connect(self._to_order)
+        layout.addWidget(self._avail)
+
+        move_row = QHBoxLayout()
+        to_order_btn = QPushButton(">")
+        to_order_btn.setFixedWidth(40)
+        to_order_btn.clicked.connect(self._add_selected)
+        move_row.addWidget(to_order_btn)
+        to_avail_btn = QPushButton("<")
+        to_avail_btn.setFixedWidth(40)
+        to_avail_btn.clicked.connect(self._remove_selected)
+        move_row.addWidget(to_avail_btn)
+        move_row.addStretch()
+        layout.addLayout(move_row)
+
+        order_label = QLabel("Порядок загрузки:")
+        order_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(order_label)
+        self._order = QListWidget()
+        self._order.itemDoubleClicked.connect(self._to_avail)
+        layout.addWidget(self._order)
+
+        order_btn_row = QHBoxLayout()
+        up_btn = QPushButton("Вверх")
+        up_btn.setFixedWidth(80)
+        up_btn.clicked.connect(self._move_up)
+        order_btn_row.addWidget(up_btn)
+        down_btn = QPushButton("Вниз")
+        down_btn.setFixedWidth(80)
+        down_btn.clicked.connect(self._move_down)
+        order_btn_row.addWidget(down_btn)
+        order_btn_row.addStretch()
+        layout.addLayout(order_btn_row)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("Сохранить")
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self._on_ok)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        self._fill(current_value)
+
+    def _collect_devices(self):
+        devices = set()
+        for key in (self._config_data or {}):
+            for pfx in self._DEVICE_TYPES:
+                if key.startswith(pfx):
+                    devices.add(key)
+        return sorted(devices)
+
+    def _fill(self, val):
+        raw = str(val or "")
+        if raw.startswith("order="):
+            order_parts = [p.strip() for p in raw[6:].split(";") if p.strip()]
+        elif raw:
+            order_parts = [p.strip() for p in raw.split(";") if p.strip()]
+        else:
+            order_parts = []
+        order_set = set(order_parts)
+        for d in order_parts:
+            self._order.addItem(QListWidgetItem(d))
+        for d in self._collect_devices():
+            if d not in order_set:
+                self._avail.addItem(QListWidgetItem(d))
+
+    def _add_selected(self):
+        item = self._avail.currentItem()
+        if item:
+            self._to_order(item)
+
+    def _remove_selected(self):
+        item = self._order.currentItem()
+        if item:
+            self._to_avail(item)
+
+    def _to_order(self, item):
+        self._order.addItem(QListWidgetItem(item.text()))
+        self._avail.takeItem(self._avail.row(item))
+
+    def _to_avail(self, item):
+        self._avail.addItem(QListWidgetItem(item.text()))
+        self._order.takeItem(self._order.row(item))
+
+    def _move_up(self):
+        r = self._order.currentRow()
+        if r > 0:
+            it = self._order.takeItem(r)
+            self._order.insertItem(r - 1, it)
+            self._order.setCurrentRow(r - 1)
+
+    def _move_down(self):
+        r = self._order.currentRow()
+        if r >= 0 and r < self._order.count() - 1:
+            it = self._order.takeItem(r)
+            self._order.insertItem(r + 1, it)
+            self._order.setCurrentRow(r + 1)
+
+    def _on_ok(self):
+        if self._order.count() == 0:
+            ret = QMessageBox.question(
+                self, "Пустой порядок",
+                "Не выбрано ни одного устройства. ВМ может не загрузиться. "
+                "Продолжить?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if ret != QMessageBox.Yes:
+                return
+        self.accept()
+
+    def get_raw_value(self):
+        parts = [self._order.item(i).text() for i in range(self._order.count())]
+        return (self._key, f"order={';'.join(parts)}")
+
+
+class VmBootdiskEditorDialog(QDialog):
+    _DEVICE_TYPES = ("ide", "sata", "scsi", "virtio", "net", "efidisk")
+
+    def __init__(self, key, label, current_value, config_data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Редактирование: {label}")
+        self.setMinimumWidth(400)
+        self._key = key
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{label} — загрузочный диск</b>")
+        layout.addWidget(header)
+
+        devices = set()
+        for k in (config_data or {}):
+            for pfx in self._DEVICE_TYPES:
+                if k.startswith(pfx):
+                    devices.add(k)
+
+        self._combo = QComboBox()
+        self._combo.addItem("— нет —", "")
+        for d in sorted(devices):
+            self._combo.addItem(d, d)
+        idx = self._combo.findData(str(current_value or ""))
+        if idx >= 0:
+            self._combo.setCurrentIndex(idx)
+        else:
+            self._combo.setEditText(str(current_value or ""))
+        form = QFormLayout()
+        form.addRow("Устройство:", self._combo)
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("Сохранить")
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_raw_value(self):
+        val = self._combo.currentData()
+        return (self._key, val if val else None)
+
+
+class VmStartupEditorDialog(QDialog):
+    def __init__(self, key, label, current_value, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Редактирование: {label}")
+        self.setMinimumWidth(400)
+        self._key = key
+
+        parsed = {"order": "", "up": "", "down": ""}
+        if current_value:
+            for part in str(current_value).split(","):
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    parsed[k] = v
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{label} — порядок и задержки запуска</b>")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+
+        self._order_spin = QSpinBox()
+        self._order_spin.setRange(0, 9999)
+        self._order_spin.setSpecialValueText("Не задан")
+        try:
+            self._order_spin.setValue(int(parsed.get("order", 0) or 0))
+        except ValueError:
+            self._order_spin.setValue(0)
+        form.addRow("Порядок:", self._order_spin)
+
+        self._up_spin = QSpinBox()
+        self._up_spin.setRange(0, 99999)
+        self._up_spin.setSuffix(" сек")
+        self._up_spin.setSpecialValueText("Не задана")
+        try:
+            self._up_spin.setValue(int(parsed.get("up", 0) or 0))
+        except ValueError:
+            self._up_spin.setValue(0)
+        form.addRow("Задержка запуска:", self._up_spin)
+
+        self._down_spin = QSpinBox()
+        self._down_spin.setRange(0, 99999)
+        self._down_spin.setSuffix(" сек")
+        self._down_spin.setSpecialValueText("Не задана")
+        try:
+            self._down_spin.setValue(int(parsed.get("down", 0) or 0))
+        except ValueError:
+            self._down_spin.setValue(0)
+        form.addRow("Задержка остановки:", self._down_spin)
+
+        layout.addLayout(form)
+
+        info = QLabel("Чем меньше число в поле «Порядок», тем раньше "
+                      "запустится ВМ среди других ВМ на узле.")
+        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("Сохранить")
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_raw_value(self):
+        parts = []
+        if self._order_spin.value() > 0:
+            parts.append(f"order={self._order_spin.value()}")
+        if self._up_spin.value() > 0:
+            parts.append(f"up={self._up_spin.value()}")
+        if self._down_spin.value() > 0:
+            parts.append(f"down={self._down_spin.value()}")
+        return (self._key, ",".join(parts) if parts else None)
