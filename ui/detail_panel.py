@@ -2531,16 +2531,9 @@ class DetailPanel(QWidget):
         if not cfg:
             return
         vmid = int(vmid_str)
-        node = next(
-            (n.get("node") for n in self.all_nodes
-             if n.get("host_name") == host_name and n.get("vmid") == vmid),
-            None
-        )
-        # Ищем ноду через vm_data
-        if node is None:
-            vm = next((v for v in self.all_vms
-                       if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
-            node = vm.get("node") if vm else host_name
+        vm = next((v for v in self.all_vms
+                   if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+        node = vm.get("node") if vm else host_name
         vm_type = "qemu"
 
         from ..backend import VmConfigUpdateWorker
