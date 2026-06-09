@@ -47,7 +47,7 @@ HW_LABELS = {
     "tpmstate0": "TPM",
 }
 
-# PVE defaults for keys absent from config API
+# PVE defaults for keys absent from config API (hardware tab)
 HW_DEFAULTS = {
     "cores": 1,
     "sockets": 1,
@@ -57,6 +57,11 @@ HW_DEFAULTS = {
     "machine": "i440fx",
     "vga": "std",
     "scsihw": "lsi",
+}
+
+# PVE defaults for keys absent from config API (options tab)
+OPT_DEFAULTS = {
+    "ostype": "l26",
     "acpi": 1,
     "agent": 0,
     "kvm": 1,
@@ -72,7 +77,9 @@ HW_DEFAULTS = {
     "rtc": "utc",
     "tdf": 0,
     "template": 0,
-    "ostype": "l26",
+    "smbios1": "type=1,uuid=auto",
+    "vmgenid": "auto",
+    "vcpus": 0,
 }
 
 # Config keys not shown in either tab
@@ -88,15 +95,13 @@ _HW_SECTIONS = [
     ("identity",       ["name"]),
     ("cpu",            ["cpu", "cores", "sockets"]),
     ("memory",         ["memory"]),
-    ("system",         ["ostype", "bios", "machine", "vga", "scsihw"]),
+    ("system",         ["bios", "machine", "vga", "scsihw"]),
     ("network",        ["net0", "net1", "net2", "net3"]),
     ("storage",        ["ide0", "ide1", "ide2", "ide3",
                         "sata0", "sata1", "sata2", "sata3",
                         "scsi0", "scsi1", "scsi2", "scsi3",
                         "virtio0", "virtio1", "virtio2", "virtio3",
                         "efidisk0", "tpmstate0"]),
-    ("other_hw",       ["acpi", "agent", "kvm", "tablet", "smbios1",
-                        "vmgenid", "vcpus"]),
 ]
 
 # Formatter helpers
@@ -254,6 +259,10 @@ def _fmt_smbios(val):
     return ", ".join(filtered) if filtered else "Задан"
 
 
+def _fmt_vcpus(val):
+    return str(val) if val not in (0, "0") else "Не задано"
+
+
 def _fmt_net(val):
     """Распарсить строку сетевого устройства: virtio=MAC,bridge=vmbr0,tag=10"""
     val = str(val)
@@ -346,6 +355,7 @@ _FORMATTERS = {
     "bios": _fmt_bios,
     "machine": _fmt_machine,
     "smbios1": _fmt_smbios,
+    "vcpus": _fmt_vcpus,
     "sockets": str,
     "cores": str,
 }
@@ -414,19 +424,24 @@ def get_hardware_rows(config_data, detail_data=None):
 def get_options_rows(config_data):
     """Return ordered list of (label, formatted_value) for options tab.
 
-    Shows all config keys not already shown on hardware tab.
+    Shows all config keys not already shown on hardware tab,
+    with PVE defaults filled in for absent keys.
     """
-    if not config_data:
-        return []
+    config = dict(config_data) if config_data else {}
 
-    # Собираем ключи, которые идут на hardware tab (из секций, с учётом HW_DEFAULTS)
+    # Заполняем умолчания для опциональных ключей
+    for key, default in OPT_DEFAULTS.items():
+        if key not in config:
+            config[key] = default
+
+    # Собираем ключи, которые идут на hardware tab
     hw_keys = set()
     for _section_name, keys in _HW_SECTIONS:
         for key in keys:
             hw_keys.add(key)
 
     rows = []
-    for key, value in sorted(config_data.items()):
+    for key, value in sorted(config.items()):
         if key in hw_keys or key in SERVICE_KEYS:
             continue
         label = HW_LABELS.get(key, key)
