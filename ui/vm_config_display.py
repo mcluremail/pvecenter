@@ -302,7 +302,17 @@ FIELD_REVERSE = {
     "bool": lambda v: v in (1, "1", True),
 }
 
-# Ordered groups for hardware tab
+# Ordered groups for options tab
+_OPT_SECTIONS = [
+    ("os",           ["ostype"]),
+    ("boot",         ["boot", "bootdisk", "startup", "onboot"]),
+    ("video",        ["vga", "spice", "spice_enhancements", "tablet", "keyboard"]),
+    ("system",       ["acpi", "kvm", "numa", "tdf", "rtc", "localtime"]),
+    ("hotplug",      ["hotplug", "vcpus"]),
+    ("behaviour",    ["agent", "freeze", "protection", "reboot"]),
+    ("misc",         ["tags", "smbios1", "args"]),
+]
+
 _HW_SECTIONS = [
     ("identity",       ["name"]),
     ("cpu",            ["cpu", "cores", "sockets"]),
@@ -643,11 +653,24 @@ def get_options_rows(config_data):
     for _section_name, keys in _HW_SECTIONS:
         for key in keys:
             hw_keys.add(key)
+    opt_keys = set()
+    for _section_name, keys in _OPT_SECTIONS:
+        for key in keys:
+            opt_keys.add(key)
+    # Collect extra keys not in any section
+    extra = set()
+    for key in config:
+        if key not in hw_keys and key not in SERVICE_KEYS and key not in opt_keys:
+            extra.add(key)
     rows = []
-    for key, value in sorted(config.items()):
-        if key in hw_keys or key in SERVICE_KEYS:
-            continue
+    for _section_name, keys in _OPT_SECTIONS:
+        for key in keys:
+            if key in config:
+                label = HW_LABELS.get(key) or _device_label(key)
+                formatted = format_value(key, config[key])
+                rows.append((key, label, formatted))
+    for key in sorted(extra):
         label = HW_LABELS.get(key) or _device_label(key)
-        formatted = format_value(key, value)
+        formatted = format_value(key, config[key])
         rows.append((key, label, formatted))
     return rows
