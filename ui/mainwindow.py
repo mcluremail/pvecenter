@@ -944,14 +944,19 @@ class MainWindow(QMainWindow):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
         )
         if reply == QMessageBox.Yes:
-            # Save everything and restart
+            # Save everything and restart via Python module (path-independent)
             self.refresh_timer.stop()
             self.tasks_timer.stop()
             self.tree_panel.save_state()
             from PySide6.QtCore import QCoreApplication
             QCoreApplication.quit()
             import os, sys
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            self_dir = os.path.dirname(os.path.abspath(__file__))          # ui/
+            pkg_dir = os.path.dirname(self_dir)                            # pve_center/
+            parent_dir = os.path.dirname(pkg_dir)                          # /home/taurus
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{parent_dir}:{env.get('PYTHONPATH', '')}"
+            os.execve(sys.executable, [sys.executable, "-m", "pve_center.main"], env)
 
     # ------------------------------------------------------------
     # Закрытие приложения
