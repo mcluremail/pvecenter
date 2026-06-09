@@ -375,7 +375,6 @@ class CreateVmDialog(QDialog):
         self.bus_combo = QComboBox()
         for bus in DISK_BUSES:
             self.bus_combo.addItem(bus, bus)
-        self.bus_combo.currentTextChanged.connect(self._on_bus_changed)
         g4.addWidget(self.bus_combo, 1, 1)
         self.scsi_label = QLabel("SCSI:")
         g4.addWidget(self.scsi_label, 1, 2, Qt.AlignRight | Qt.AlignVCenter)
@@ -384,9 +383,6 @@ class CreateVmDialog(QDialog):
             self.scsi_combo.addItem(label, val)
         self.scsi_combo.setCurrentIndex(0)
         g4.addWidget(self.scsi_combo, 1, 3)
-        # SCSI виден только при шине scsi
-        self.scsi_label.setVisible(False)
-        self.scsi_combo.setVisible(False)
 
         g4.addWidget(QLabel("Кэш:"), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.cache_combo = QComboBox()
@@ -516,11 +512,6 @@ class CreateVmDialog(QDialog):
         if is_ovmf and self.chipset_combo.currentData() != "q35":
             self.chipset_combo.setCurrentIndex(0)  # q35 для UEFI
 
-    def _on_bus_changed(self, bus):
-        is_scsi = bus == "scsi"
-        self.scsi_label.setVisible(is_scsi)
-        self.scsi_combo.setVisible(is_scsi)
-
     def _populate_iso_combo(self, node):
         """Заполнить комбобокс ISO образами, доступными на узле."""
         self.iso_combo.clear()
@@ -611,9 +602,8 @@ class CreateVmDialog(QDialog):
             "start": int(self.start_check.isChecked()),
         }
 
-        # SCSI контроллер — только если шина SCSI
-        if bus == "scsi":
-            params["scsihw"] = self.scsi_combo.currentData()
+        # SCSI контроллер (всегда, иначе PVE 8+ ставит LSI 53C895A по умолчанию)
+        params["scsihw"] = self.scsi_combo.currentData()
 
         # BIOS (ovmf / seabios)
         bios_val = self.bios_combo.currentData()
