@@ -140,6 +140,7 @@ class CreateVmDialog(QDialog):
             "model": self.model_combo.currentIndex(),
             "queues": self.queues_spin.value(),
             "start": int(self.start_check.isChecked()),
+            "agent": int(self.agent_check.isChecked()),
         }
         save_ui_state(VM_SETTINGS_KEY, _json.dumps(data))
 
@@ -181,6 +182,8 @@ class CreateVmDialog(QDialog):
             self.queues_spin.setValue(data["queues"])
         if data.get("start") is not None:
             self.start_check.setChecked(bool(data["start"]))
+        if data.get("agent") is not None:
+            self.agent_check.setChecked(bool(data["agent"]))
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -440,6 +443,9 @@ class CreateVmDialog(QDialog):
         self.start_check = QCheckBox("Запустить после создания")
         self.start_check.setChecked(False)
         footer.addWidget(self.start_check)
+        self.agent_check = QCheckBox("QEMU Agent")
+        self.agent_check.setChecked(True)
+        footer.addWidget(self.agent_check)
         footer.addStretch()
 
         self.create_btn = QPushButton("Создать")
@@ -600,6 +606,7 @@ class CreateVmDialog(QDialog):
             disk_key: disk_val,
             "net0": net_val,
             "start": int(self.start_check.isChecked()),
+            "agent": int(self.agent_check.isChecked()),
         }
 
         # SCSI контроллер (всегда, иначе PVE 8+ ставит LSI 53C895A по умолчанию)
