@@ -3,7 +3,6 @@ from .ui.i18n import tr
 import traceback
 import logging
 import threading
-import concurrent.futures
 from PySide6.QtCore import Signal, QRunnable, QObject
 from proxmoxer import ProxmoxAPI
 
@@ -220,8 +219,12 @@ class FetchWorker(QRunnable):
                         with pool_lock:
                             vmid_to_pool.update(local)
                     pool_candidates = [p for p in pools_data if p.get("poolid") or p.get("pool")]
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-                        ex.map(fetch_pool_detail, pool_candidates, timeout=10)
+                    pool_threads = [threading.Thread(target=fetch_pool_detail, args=(p,), daemon=True)
+                                    for p in pool_candidates]
+                    for t in pool_threads:
+                        t.start()
+                    for t in pool_threads:
+                        t.join(timeout=10)
                 except Exception:
                     traceback.print_exc()
 

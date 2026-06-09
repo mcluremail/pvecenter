@@ -103,11 +103,13 @@ class MainWindow(QMainWindow):
         self._lang_combo = QComboBox()
         self._lang_combo.setFixedWidth(100)
         self._lang_combo.setStyleSheet("font-size: 12px; border: none; margin: 0 4px;")
+        self._lang_combo.blockSignals(True)
         current_lang = get_language()
         for code, native_name in sorted(supported_languages().items(), key=lambda x: x[0]):
             self._lang_combo.addItem(native_name, code)
             if code == current_lang:
                 self._lang_combo.setCurrentIndex(self._lang_combo.count() - 1)
+        self._lang_combo.blockSignals(False)
         self._lang_combo.currentIndexChanged.connect(self._on_language_changed)
         self.status_bar.insertPermanentWidget(1, self._lang_combo)
         self._spin_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -929,18 +931,17 @@ class MainWindow(QMainWindow):
         code = self._lang_combo.itemData(idx)
         if not code or code == get_language():
             return
+        save_ui_state("language", code)
         reply = QMessageBox.question(
             self, tr("Language changed"),
             tr("The language will change after restart. Restart now?"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
         )
         if reply == QMessageBox.Yes:
-            save_ui_state("language", code)
-            self.closeEvent(None)
-            from PySide6.QtCore import QCoreApplication
-            QCoreApplication.quit()
             import os, sys
-            os.execl(sys.executable, sys.executable, *sys.argv)
+            self.closeEvent(None)
+            QApplication.quit()
+            sys.exit(0)
 
     # ------------------------------------------------------------
     # Закрытие приложения
