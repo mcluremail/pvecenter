@@ -101,8 +101,14 @@ class MainWindow(QMainWindow):
         self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
 
         self._lang_combo = QComboBox()
-        self._lang_combo.setFixedWidth(100)
-        self._lang_combo.setStyleSheet("font-size: 12px; border: none; margin: 0 4px;")
+        self._lang_combo.setFixedWidth(110)
+        self._lang_combo.setStyleSheet(
+            "QComboBox { font-size: 12px; border: 1px solid #cbd5e1; border-radius: 3px; "
+            "padding: 1px 4px; background: #f1f5f9; color: #334155; }"
+            "QComboBox:hover { border-color: #94a3b8; background: #e2e8f0; }"
+            "QComboBox::drop-down { border: none; width: 16px; }"
+            "QComboBox QAbstractItemView { font-size: 12px; }"
+        )
         self._lang_combo.blockSignals(True)
         current_lang = get_language()
         for code, native_name in sorted(supported_languages().items(), key=lambda x: x[0]):
@@ -938,10 +944,14 @@ class MainWindow(QMainWindow):
             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
         )
         if reply == QMessageBox.Yes:
+            # Save everything and restart
+            self.refresh_timer.stop()
+            self.tasks_timer.stop()
+            self.tree_panel.save_state()
+            from PySide6.QtCore import QCoreApplication
+            QCoreApplication.quit()
             import os, sys
-            self.closeEvent(None)
-            QApplication.quit()
-            sys.exit(0)
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     # ------------------------------------------------------------
     # Закрытие приложения
