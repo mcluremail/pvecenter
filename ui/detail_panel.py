@@ -2273,6 +2273,7 @@ class DetailPanel(QWidget):
                 ("Статус", _ru_status(host_data.get("status", ""))),
                 ("Адрес", address),
                 ("PVE", _fmt_pveversion(host_data.get("pveversion", "?"))),
+                ("Distro", host_data.get("release", "?")),
                 ("QEMU", host_data.get("qemu", "?")),
                 ("Ядро", host_data.get("kernel", "?")),
                 ("LXC", host_data.get("lxc", "?")),

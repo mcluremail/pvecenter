@@ -311,6 +311,7 @@ class FetchWorker(QRunnable):
                             n["kernel"] = ver.get("kernel", "")
                             n["qemu"] = ver.get("qemu", "")
                             n["lxc"] = ver.get("lxc", "")
+                            n["release"] = ver.get("release", "")
                     except Exception:
                         with version_lock:
                             n["pveversion"] = "?"
@@ -386,6 +387,7 @@ class FetchWorker(QRunnable):
                             n["kernel"] = ver.get("kernel", "")
                             n["qemu"] = ver.get("qemu", "")
                             n["lxc"] = ver.get("lxc", "")
+                            n["release"] = ver.get("release", "")
                     except Exception:
                         pass
 
