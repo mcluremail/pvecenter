@@ -7,7 +7,7 @@ from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
 class FadeToast(QWidget):
     """Затухающее уведомление в правом верхнем углу родителя."""
 
-    def __init__(self, parent, text, color="#1f2937"):
+    def __init__(self, parent, text, color="#1f2937", offset_y=12):
         super().__init__(parent)
         self._text = text
         self._bg_color = color
@@ -60,7 +60,7 @@ class FadeToast(QWidget):
         p = self.parent()
         if p:
             parent_pos = p.mapToGlobal(QPoint(0, 0))
-            self.move(parent_pos.x() + p.width() - self.width() - 20, parent_pos.y() + 12)
+            self.move(parent_pos.x() + p.width() - self.width() - 20, parent_pos.y() + offset_y)
 
         self.show()
         self._fade_timer.start()
@@ -119,7 +119,12 @@ class NotificationManager:
             existing._fade_timer.stop()
             existing._fade_anim.stop()
             existing.deleteLater()
-        toast = FadeToast(self.parent, text, color)
+        # Стекинг тостов: вычисляем смещение по Y на основе высоты активных
+        offset_y = 12
+        for k, t in self._active.items():
+            if t is not None and t.isVisible():
+                offset_y += t.height() + 8
+        toast = FadeToast(self.parent, text, color, offset_y=offset_y)
         self._active[key] = toast
         toast.destroyed.connect(lambda k=key: self._active.pop(k, None))
 

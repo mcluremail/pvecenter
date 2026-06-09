@@ -39,7 +39,7 @@ class VmTaskHistoryWidget(QWidget):
             start_ts = task.get('starttime')
             if start_ts:
                 try:
-                    start_dt = datetime.fromtimestamp(float(start_ts), tz=timezone.utc)
+                    start_dt = datetime.fromtimestamp(float(start_ts))
                     start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')
                 except (ValueError, TypeError):
                     start_str = str(start_ts)
@@ -51,7 +51,7 @@ class VmTaskHistoryWidget(QWidget):
             end_ts = task.get('endtime')
             if end_ts:
                 try:
-                    end_dt = datetime.fromtimestamp(float(end_ts), tz=timezone.utc)
+                    end_dt = datetime.fromtimestamp(float(end_ts))
                     end_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
                 except (ValueError, TypeError):
                     end_str = str(end_ts)

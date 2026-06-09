@@ -440,67 +440,43 @@ def format_value(key, value):
 
 
 def get_hardware_rows(config_data, detail_data=None):
-    """Return ordered list of (label, formatted_value) for hardware tab.
-
-    Fills in PVE defaults for keys absent from config_data.
-    """
+    """Return ordered list of (key, label, formatted_value) for hardware tab."""
     config = dict(config_data) if config_data else {}
-
-    # Заполняем умолчания для известных ключей
     for key, default in HW_DEFAULTS.items():
         if key not in config:
             config[key] = default
-
     rows = []
     seen = set()
-
-    # Пробегаем по секциям в заданном порядке
     for _section_name, keys in _HW_SECTIONS:
         for key in keys:
             if key in config:
                 seen.add(key)
                 label = HW_LABELS.get(key, key)
                 value = format_value(key, config[key])
-                rows.append((label, value))
-
-    # Добавляем поля из detail (статус), которые не дублируются
+                rows.append((key, label, value))
     if detail_data:
-        extra = []
         rm = detail_data.get("running-machine")
         if rm and "machine" not in seen:
-            extra.append(("running-machine", rm))
-        for key, value in extra:
-            label = HW_LABELS.get(key, key)
-            rows.append((label, value))
-
+            label = HW_LABELS.get("running-machine", "running-machine")
+            rows.append(("running-machine", label, rm))
     return rows
 
 
 def get_options_rows(config_data):
-    """Return ordered list of (label, formatted_value) for options tab.
-
-    Shows all config keys not already shown on hardware tab,
-    with PVE defaults filled in for absent keys.
-    """
+    """Return ordered list of (key, label, formatted_value) for options tab."""
     config = dict(config_data) if config_data else {}
-
-    # Заполняем умолчания для опциональных ключей
     for key, default in OPT_DEFAULTS.items():
         if key not in config:
             config[key] = default
-
-    # Собираем ключи, которые идут на hardware tab
     hw_keys = set()
     for _section_name, keys in _HW_SECTIONS:
         for key in keys:
             hw_keys.add(key)
-
     rows = []
     for key, value in sorted(config.items()):
         if key in hw_keys or key in SERVICE_KEYS:
             continue
         label = HW_LABELS.get(key, key)
         formatted = format_value(key, value)
-        rows.append((label, formatted))
-
+        rows.append((key, label, formatted))
     return rows

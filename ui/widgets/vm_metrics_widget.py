@@ -58,6 +58,7 @@ class VmMetricsWidget(QWidget):
             self.plot.enableAutoRange(axis='y')
             self.curve = self.plot.plot([], [], pen=pg.mkPen('#374151', width=2))
             self.plot.setMouseEnabled(x=False, y=False)
+            self._legend = self.plot.addLegend()
             self._layout.addWidget(self.plot, 1)
 
             self._has_plot = True
@@ -139,6 +140,8 @@ class VmMetricsWidget(QWidget):
             self.plot.setTitle(title)
             self.plot.setLabel('left', default_unit)
             self.plot.clear()
+            if self._legend:
+                self._legend.clear()
             return
         max_val = max(abs(d['value']) for d in all_data)
         if max_val < 1024:
@@ -151,6 +154,8 @@ class VmMetricsWidget(QWidget):
             unit, div = 'GB', 1024**3
 
         self.plot.clear()
+        if self._legend:
+            self._legend.clear()
         label_in = 'In' if title == "Сетевой трафик" else 'Read'
         label_out = 'Out' if title == "Сетевой трафик" else 'Write'
         self.plot.plot([d['time'] for d in data1], [d['value'] / div for d in data1],
@@ -159,5 +164,4 @@ class VmMetricsWidget(QWidget):
                        pen=pg.mkPen('#9ca3af', width=2), name=label_out)
         self.plot.setTitle(title)
         self.plot.setLabel('left', unit)
-        self.plot.addLegend()
 

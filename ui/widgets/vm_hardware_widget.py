@@ -1,10 +1,17 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
-from ..vm_config_display import get_hardware_rows, FIELD_TYPES, HW_LABELS
+from ..vm_config_display import get_hardware_rows, FIELD_TYPES
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 
 _FT = FIELD_TYPES
+_KEY_ROLE = Qt.UserRole + 100
+_READONLY_ROLE = Qt.UserRole + 101
+
+_READONLY_KEYS = {
+    k for k, v in _FT.items()
+    if v == "readonly" or (isinstance(v, tuple) and v[0] == "readonly")
+}
 
 
 class VmHardwareWidget(QWidget):
@@ -44,9 +51,13 @@ class VmHardwareWidget(QWidget):
         rows = get_hardware_rows(config_data, detail_data)
         if not rows:
             return
-        for i, (label, value) in enumerate(rows):
+        for i, (key, label, value) in enumerate(rows):
             self.table.insertRow(i)
-            self.table.setItem(i, 0, QTableWidgetItem(label))
+            item = QTableWidgetItem(label)
+            item.setData(_KEY_ROLE, key)
+            if key in _READONLY_KEYS:
+                item.setData(_READONLY_ROLE, True)
+            self.table.setItem(i, 0, item)
             self.table.setItem(i, 1, QTableWidgetItem(value))
         self.table.resizeRowsToContents()
         for r in range(self.table.rowCount()):
@@ -57,10 +68,9 @@ class VmHardwareWidget(QWidget):
         if not (self._host_name and self._vmid):
             return
         item = self.table.item(row, 0)
-        if not item:
+        if not item or item.data(_READONLY_ROLE):
             return
-        label = item.text()
-        raw_key = next((k for k, v in HW_LABELS.items() if v == label), None)
+        raw_key = item.data(_KEY_ROLE)
         if not raw_key or raw_key not in _FT:
             return
 
@@ -71,6 +81,7 @@ class VmHardwareWidget(QWidget):
             ft_type, choices = field_spec, None
 
         current_value = self._config_data.get(raw_key)
+        label = item.text()
 
         dlg = VmConfigEditorDialog(raw_key, label, ft_type, current_value, choices, self)
         if dlg.exec() != VmConfigEditorDialog.Accepted:
