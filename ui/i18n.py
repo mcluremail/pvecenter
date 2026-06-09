@@ -484,6 +484,10 @@ _RU = {
     "Language changed": "Язык изменён",
     "The language will change after restart. Restart now?": "Язык изменится после перезапуска. Перезапустить сейчас?",
     "Restart now": "Перезапустить сейчас",
+
+    # Yes/No for buttons
+    "Yes": "Да",
+    "No": "Нет",
 }
 
 

@@ -867,7 +867,7 @@ class DetailPanel(QWidget):
                 "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
                 "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
             }
-            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], self)
+            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], parent=self)
             yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
             msg.addButton(tr("No"), QMessageBox.NoRole)
             msg.setDefaultButton(yes)

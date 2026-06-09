@@ -113,7 +113,8 @@ class VmConfigEditorDialog(QDialog):
         val = self.get_raw_value()
         if val == "" and self._field_type in ("string", "int"):
             msg = QMessageBox(QMessageBox.Question, tr("Empty value"),
-                              tr("Are you sure you want to set an empty value?"), self)
+                              tr("Are you sure you want to set an empty value?"),
+                              parent=self)
             yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
             msg.addButton(tr("No"), QMessageBox.NoRole)
             msg.setDefaultButton(yes)

@@ -939,7 +939,8 @@ class MainWindow(QMainWindow):
             return
         save_ui_state("language", code)
         msg = QMessageBox(QMessageBox.Question, tr("Language changed"),
-                          tr("The language will change after restart. Restart now?"), self)
+                          tr("The language will change after restart. Restart now?"),
+                          parent=self)
         yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
         msg.addButton(tr("No"), QMessageBox.NoRole)
         msg.setDefaultButton(yes)
