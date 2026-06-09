@@ -37,10 +37,11 @@ class FadeToast(QWidget):
 
         self.adjustSize()
 
-        # Позиционируем в правом верхнем углу родителя
+        # Правый верхний угол родителя (в глобальных координатах)
         parent_rect = parent.rect()
-        x = parent_rect.width() - self.width() - 20
-        y = 12
+        top_right = parent.mapToGlobal(parent_rect.topRight())
+        x = top_right.x() - self.width() - 20
+        y = top_right.y() + 12
         self.move(x, y)
 
         self._fade_timer = QTimer(self)
