@@ -938,12 +938,13 @@ class MainWindow(QMainWindow):
         if not code or code == get_language():
             return
         save_ui_state("language", code)
-        reply = QMessageBox.question(
-            self, tr("Language changed"),
-            tr("The language will change after restart. Restart now?"),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-        )
-        if reply == QMessageBox.Yes:
+        msg = QMessageBox(QMessageBox.Question, tr("Language changed"),
+                          tr("The language will change after restart. Restart now?"), self)
+        yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+        msg.addButton(tr("No"), QMessageBox.NoRole)
+        msg.setDefaultButton(yes)
+        msg.exec()
+        if msg.clickedButton() == yes:
             # Save everything and restart via Python module (path-independent)
             self.refresh_timer.stop()
             self.tasks_timer.stop()

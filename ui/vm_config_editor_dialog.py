@@ -112,12 +112,13 @@ class VmConfigEditorDialog(QDialog):
     def _on_ok(self):
         val = self.get_raw_value()
         if val == "" and self._field_type in ("string", "int"):
-            ret = QMessageBox.question(
-                self, tr("Empty value"),
-                tr("Are you sure you want to set an empty value?"),
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if ret != QMessageBox.Yes:
+            msg = QMessageBox(QMessageBox.Question, tr("Empty value"),
+                              tr("Are you sure you want to set an empty value?"), self)
+            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+            msg.addButton(tr("No"), QMessageBox.NoRole)
+            msg.setDefaultButton(yes)
+            msg.exec()
+            if msg.clickedButton() != yes:
                 return
         self.accept()
 

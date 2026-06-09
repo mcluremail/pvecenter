@@ -480,12 +480,13 @@ class VmBootEditorDialog(QDialog):
 
     def _on_ok(self):
         if self._order.count() == 0:
-            ret = QMessageBox.question(
-                self, tr("Empty boot order"),
-                tr("Empty boot order — VM may not boot") + "\n" + tr("Continue?"),
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if ret != QMessageBox.Yes:
+            msg = QMessageBox(QMessageBox.Question, tr("Empty boot order"),
+                              tr("Empty boot order — VM may not boot") + "\n" + tr("Continue?"), self)
+            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+            msg.addButton(tr("No"), QMessageBox.NoRole)
+            msg.setDefaultButton(yes)
+            msg.exec()
+            if msg.clickedButton() != yes:
                 return
         self.accept()
 

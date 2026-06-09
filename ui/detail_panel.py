@@ -867,9 +867,12 @@ class DetailPanel(QWidget):
                 "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
                 "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
             }
-            reply = QMessageBox.warning(self, tr("Confirm"), msgs[action],
-                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply != QMessageBox.Yes:
+            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], self)
+            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+            msg.addButton(tr("No"), QMessageBox.NoRole)
+            msg.setDefaultButton(yes)
+            msg.exec()
+            if msg.clickedButton() != yes:
                 return
         node_name = self._last_vm_data.get("node") or host_name
         vm_type = self._last_vm_data.get("type", "qemu")
