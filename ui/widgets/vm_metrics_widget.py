@@ -1,6 +1,6 @@
-# pve_center/ui/widgets/vm_metrics_widget.py
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QComboBox, QHBoxLayout, QLabel
 from PySide6.QtCore import Signal
+from ..i18n import tr
 
 try:
     import pyqtgraph as pg
@@ -11,7 +11,8 @@ except ImportError:
     pg = None
     _HAS_PG = False
 
-METRICS = ["ЦП", "ОЗУ", "Сеть", "Диск"]
+METRICS = [tr("CPU"), tr("RAM"), tr("Network"), tr("Disk")]
+
 
 class VmMetricsWidget(QWidget):
     timeframe_changed = Signal(str)
@@ -26,22 +27,21 @@ class VmMetricsWidget(QWidget):
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
 
-        # Верхняя панель: выбор метрики + интервал
         top = QHBoxLayout()
-        top.addWidget(QLabel("Метрика:"))
+        top.addWidget(QLabel(tr("Metric") + ":"))
         self.metric_combo = QComboBox()
         self.metric_combo.addItems(METRICS)
-        self.metric_combo.setCurrentText("ЦП")
+        self.metric_combo.setCurrentText(tr("CPU"))
         self.metric_combo.currentTextChanged.connect(self._on_metric_changed)
         top.addWidget(self.metric_combo)
         top.addSpacing(16)
-        top.addWidget(QLabel("Интервал:"))
+        top.addWidget(QLabel(tr("Interval") + ":"))
         self.timeframe_combo = QComboBox()
-        self.timeframe_combo.addItem("час", "hour")
-        self.timeframe_combo.addItem("день", "day")
-        self.timeframe_combo.addItem("неделя", "week")
-        self.timeframe_combo.addItem("месяц", "month")
-        self.timeframe_combo.addItem("год", "year")
+        self.timeframe_combo.addItem(tr("hour"), "hour")
+        self.timeframe_combo.addItem(tr("day"), "day")
+        self.timeframe_combo.addItem(tr("week"), "week")
+        self.timeframe_combo.addItem(tr("month"), "month")
+        self.timeframe_combo.addItem(tr("year"), "year")
         self.timeframe_combo.setCurrentIndex(0)
         self.timeframe_combo.currentIndexChanged.connect(
             lambda: self.timeframe_changed.emit(self.timeframe_combo.currentData())
@@ -52,7 +52,7 @@ class VmMetricsWidget(QWidget):
 
         if _HAS_PG:
             date_axis = pg.DateAxisItem(orientation='bottom')
-            self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title="ЦП, %")
+            self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title=tr("CPU, %"))
             self.plot.setLabel('left', '%')
             self.plot.showGrid(x=True, y=True)
             self.plot.enableAutoRange(axis='y')
@@ -60,10 +60,9 @@ class VmMetricsWidget(QWidget):
             self.plot.setMouseEnabled(x=False, y=False)
             self._legend = self.plot.addLegend()
             self._layout.addWidget(self.plot, 1)
-
             self._has_plot = True
         else:
-            self._layout.addWidget(QLabel("PyQtGraph не установлен. Графики недоступны."))
+            self._layout.addWidget(QLabel(tr("PyQtGraph not installed. Charts unavailable.")))
 
     def _on_metric_changed(self, metric):
         self.metric_changed.emit(metric)
@@ -71,7 +70,7 @@ class VmMetricsWidget(QWidget):
 
     def show_disk_io(self, visible=True):
         self._disk_visible = visible
-        expected = list(METRICS) if visible else [m for m in METRICS if m != "Диск"]
+        expected = list(METRICS) if visible else [m for m in METRICS if m != tr("Disk")]
         current = self.metric_combo.currentText()
         items = [self.metric_combo.itemText(i) for i in range(self.metric_combo.count())]
         if items == expected:
@@ -83,8 +82,8 @@ class VmMetricsWidget(QWidget):
         if current in expected:
             self.metric_combo.setCurrentText(current)
         else:
-            self.metric_combo.setCurrentText("ЦП")
-            self.metric_changed.emit("ЦП")
+            self.metric_combo.setCurrentText(tr("CPU"))
+            self.metric_changed.emit(tr("CPU"))
 
     def clear_curves(self):
         self._cached_data = None
@@ -104,16 +103,16 @@ class VmMetricsWidget(QWidget):
         metric = self.metric_combo.currentText()
         data = self._cached_data
 
-        if metric == "ЦП":
+        if metric == tr("CPU"):
             cpu = data.get('cpu', [])
             if cpu:
                 self.curve.setData([d['time'] for d in cpu], [d['value'] for d in cpu])
             else:
                 self.curve.setData([], [])
-            self.plot.setTitle("ЦП, %")
+            self.plot.setTitle(tr("CPU, %"))
             self.plot.setLabel('left', '%')
 
-        elif metric == "ОЗУ":
+        elif metric == tr("RAM"):
             mem = data.get('mem', [])
             if mem:
                 self.curve.setData([d['time'] for d in mem],
@@ -123,18 +122,18 @@ class VmMetricsWidget(QWidget):
                     self.plot.setYRange(0, (maxmem / (1024**3)) * 1.05)
             else:
                 self.curve.setData([], [])
-            self.plot.setTitle("ОЗУ, GiB")
+            self.plot.setTitle(tr("RAM, GiB"))
             self.plot.setLabel('left', 'GiB')
 
-        elif metric == "Сеть":
+        elif metric == tr("Network"):
             netin = data.get('netin', [])
             netout = data.get('netout', [])
-            self._format_and_set(netin, netout, "Сетевой трафик", "B")
+            self._format_and_set(netin, netout, tr("Network traffic"), "B")
 
-        elif metric == "Диск":
+        elif metric == tr("Disk"):
             diskread = data.get('diskread', [])
             diskwrite = data.get('diskwrite', [])
-            self._format_and_set(diskread, diskwrite, "Дисковый ввод/вывод", "B")
+            self._format_and_set(diskread, diskwrite, tr("Disk I/O"), "B")
 
     def _format_and_set(self, data1, data2, title, default_unit):
         all_data = data1 + data2
@@ -159,12 +158,11 @@ class VmMetricsWidget(QWidget):
         self.plot.clear()
         if self._legend:
             self._legend.clear()
-        label_in = 'In' if title == "Сетевой трафик" else 'Read'
-        label_out = 'Out' if title == "Сетевой трафик" else 'Write'
+        label_in = tr("In") if title == tr("Network traffic") else tr("Read")
+        label_out = tr("Out") if title == tr("Network traffic") else tr("Write")
         self.plot.plot([d['time'] for d in data1], [d['value'] / div for d in data1],
                        pen=pg.mkPen('#374151', width=2), name=label_in)
         self.plot.plot([d['time'] for d in data2], [d['value'] / div for d in data2],
                        pen=pg.mkPen('#9ca3af', width=2), name=label_out)
         self.plot.setTitle(title)
         self.plot.setLabel('left', unit)
-

@@ -1,24 +1,28 @@
-"""Общие утилиты UI: переводы, форматирование."""
+"""Common UI helpers: status text, formatting."""
+
+from .i18n import tr
 
 STATUS_RU = {
-    "running": "Работает",
-    "stopped": "Остановлена",
-    "paused": "Приостановлена",
-    "error": "Ошибка",
-    "offline": "Недоступен",
-    "online": "Доступен",
-    "unknown": "Неизвестно",
-    "mounted": "Подключено",
+    "running": "running",
+    "stopped": "stopped",
+    "paused": "paused",
+    "error": "error",
+    "offline": "offline",
+    "online": "online",
+    "unknown": "unknown",
+    "mounted": "mounted",
 }
 
 
-def ru_status(s):
-    """Возвращает русский перевод статуса для отображения."""
-    return STATUS_RU.get(s, s)
+def status_text(s):
+    """Return human-readable status for display.
+    tr() translates the status label to the current language.
+    """
+    return tr(STATUS_RU.get(s, s))
 
 
 def format_uptime(seconds):
-    """Форматирует uptime в секундах в компактный вид: '5d 3h 20m 10s'."""
+    """Format uptime in seconds to compact form: '5d 3h 20m 10s'."""
     if not seconds or seconds <= 0:
         return ""
     days, rem = divmod(int(seconds), 86400)

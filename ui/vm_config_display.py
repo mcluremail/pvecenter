@@ -1,61 +1,56 @@
-"""
-vm_config_display.py — Human-readable VM config display.
+from .i18n import tr
 
-PVE API returns only modified (non-default) values from config endpoint.
-This module fills in known defaults and translates values to human-readable
-Russian labels and formatted strings.
-"""
-# Labels for config keys (Russian)
+# Labels for config keys
 HW_LABELS = {
-    "name": "Имя",
-    "cpu": "Тип CPU",
-    "cores": "Ядра",
-    "sockets": "Сокеты",
-    "memory": "Память",
-    "bios": "BIOS",
-    "machine": "Чипсет",
-    "vga": "VGA",
-    "scsihw": "SCSI контроллер",
-    "vmgenid": "VM Generation ID",
-    "ostype": "Тип ОС",
-    "acpi": "ACPI",
-    "agent": "QEMU Agent",
-    "kvm": "KVM (вложенная виртуализация)",
-    "tablet": "USB Tablet",
-    "boot": "Загрузка",
-    "bootdisk": "Загрузочный диск",
-    "onboot": "Автозапуск",
-    "startup": "Порядок запуска",
-    "numa": "NUMA",
-    "hotplug": "Горячее подключение",
-    "freeze": "Freeze (приостановка на старте)",
-    "keyboard": "Раскладка клавиатуры",
-    "localtime": "Локальное время",
-    "protection": "Защита от удаления",
-    "reboot": "Перезагрузка после сбоя",
-    "rtc": "RTC",
-    "smbios1": "SMBIOS",
-    "tags": "Теги",
-    "tdf": "TDF",
-    "template": "Шаблон",
-    "vcpus": "Виртуальных CPU (hotplug)",
-    "spice": "SPICE",
-    "spice_enhancements": "Улучшения SPICE",
-    "args": "Доп. аргументы QEMU",
-    "hookscript": "Скрипт-хук",
-    "running-machine": "Чипсет (работает)",
-    "efidisk0": "EFI диск",
-    "tpmstate0": "TPM",
+    "name": tr("Name"),
+    "cpu": tr("CPU type"),
+    "cores": tr("Cores"),
+    "sockets": tr("Sockets"),
+    "memory": tr("Memory"),
+    "bios": tr("BIOS"),
+    "machine": tr("Chipset"),
+    "vga": tr("VGA"),
+    "scsihw": tr("SCSI controller"),
+    "vmgenid": tr("VM Generation ID"),
+    "ostype": tr("OS type"),
+    "acpi": tr("ACPI"),
+    "agent": tr("QEMU Agent"),
+    "kvm": tr("KVM (nested virtualization)"),
+    "tablet": tr("USB Tablet"),
+    "boot": tr("Boot"),
+    "bootdisk": tr("Boot disk"),
+    "onboot": tr("Start on boot"),
+    "startup": tr("Startup order"),
+    "numa": tr("NUMA"),
+    "hotplug": tr("Hotplug"),
+    "freeze": tr("Freeze (pause at start)"),
+    "keyboard": tr("Keyboard layout"),
+    "localtime": tr("Local time"),
+    "protection": tr("Delete protection"),
+    "reboot": tr("Reboot after crash"),
+    "rtc": tr("RTC"),
+    "smbios1": tr("SMBIOS"),
+    "tags": tr("Tags"),
+    "tdf": tr("TDF"),
+    "template": tr("Template"),
+    "vcpus": tr("Virtual CPUs (hotplug)"),
+    "spice": tr("SPICE"),
+    "spice_enhancements": tr("SPICE enhancements"),
+    "args": tr("Extra QEMU args"),
+    "hookscript": tr("Hook script"),
+    "running-machine": tr("Chipset (running)"),
+    "efidisk0": tr("EFI disk"),
+    "tpmstate0": tr("TPM"),
 }
 
 _DEVICE_PREFIX_LABELS = {
-    "net": "Сеть",
-    "ide": "IDE",
-    "sata": "SATA",
-    "scsi": "SCSI",
-    "virtio": "Жёсткий диск",
-    "efidisk": "EFI диск",
-    "tpmstate": "TPM",
+    "net": tr("Network"),
+    "ide": tr("IDE"),
+    "sata": tr("SATA"),
+    "scsi": tr("SCSI"),
+    "virtio": tr("Hard disk"),
+    "efidisk": tr("EFI disk"),
+    "tpmstate": tr("TPM"),
 }
 
 
@@ -64,7 +59,7 @@ def _device_label(key):
     num = key[len(prefix):]
     base = _DEVICE_PREFIX_LABELS.get(prefix, prefix)
     if prefix == "ide" and num == "2":
-        return "Оптический привод"
+        return tr("Optical drive")
     if prefix in ("virtio", "scsi", "sata", "ide"):
         if num:
             return f"{base} ({prefix}{num})"
@@ -76,106 +71,106 @@ def _device_label(key):
 
 CHOICE_LABELS = {
     "cpu": {
-        "kvm64": "KVM64 (совместимый)",
-        "host": "Host (максимум)",
-        "qemu64": "QEMU64",
-        "max": "Host (max, рискованно)",
-        "x86-64-v2": "x86-64 v2",
-        "x86-64-v2-AES": "x86-64 v2 + AES",
-        "x86-64-v3": "x86-64 v3",
-        "x86-64-v3-AES": "x86-64 v3 + AES",
-        "x86-64-v4": "x86-64 v4",
-        "x86-64-v4-AES": "x86-64 v4 + AES",
+        "kvm64": tr("KVM64 (compatible)"),
+        "host": tr("Host (maximum)"),
+        "qemu64": tr("QEMU64"),
+        "max": tr("Host (max, risky)"),
+        "x86-64-v2": tr("x86-64 v2"),
+        "x86-64-v2-AES": tr("x86-64 v2 + AES"),
+        "x86-64-v3": tr("x86-64 v3"),
+        "x86-64-v3-AES": tr("x86-64 v3 + AES"),
+        "x86-64-v4": tr("x86-64 v4"),
+        "x86-64-v4-AES": tr("x86-64 v4 + AES"),
     },
     "bios": {
-        "seabios": "SeaBIOS",
-        "ovmf": "OVMF (UEFI)",
+        "seabios": tr("SeaBIOS"),
+        "ovmf": tr("OVMF (UEFI)"),
     },
     "machine": {
-        "i440fx": "i440fx",
-        "q35": "Q35",
+        "i440fx": tr("i440fx"),
+        "q35": tr("Q35"),
     },
     "vga": {
-        "std": "VGA (стандартный)",
-        "qxl": "QXL (SPICE)",
-        "virtio": "VirtIO-GPU",
-        "vmware": "VMware",
-        "cirrus": "Cirrus",
-        "serial0": "Serial",
-        "qxl2": "QXL (двойной)",
-        "qxl3": "QXL (тройной)",
-        "qxl4": "QXL (четверной)",
+        "std": tr("VGA (standard)"),
+        "qxl": tr("QXL (SPICE)"),
+        "virtio": tr("VirtIO-GPU"),
+        "vmware": tr("VMware"),
+        "cirrus": tr("Cirrus"),
+        "serial0": tr("Serial"),
+        "qxl2": tr("QXL (dual)"),
+        "qxl3": tr("QXL (triple)"),
+        "qxl4": tr("QXL (quad)"),
     },
     "scsihw": {
-        "lsi": "LSI 53C895A",
-        "lsi53c810": "LSI 53C810",
-        "megasas": "MegaSAS",
-        "pvscsi": "VMware PVSCSI",
-        "virtio-scsi-single": "VirtIO SCSI Single",
-        "virtio-scsi-pci": "VirtIO SCSI PCI",
+        "lsi": tr("LSI 53C895A"),
+        "lsi53c810": tr("LSI 53C810"),
+        "megasas": tr("MegaSAS"),
+        "pvscsi": tr("VMware PVSCSI"),
+        "virtio-scsi-single": tr("VirtIO SCSI Single"),
+        "virtio-scsi-pci": tr("VirtIO SCSI PCI"),
     },
     "ostype": {
-        "other": "Не указан",
-        "wxp": "Windows XP",
-        "w2k": "Windows 2000",
-        "w2k3": "Windows 2003",
-        "w2k8": "Windows 2008",
-        "w2k12": "Windows 2012",
-        "wvista": "Windows Vista",
-        "win7": "Windows 7",
-        "win8": "Windows 8",
-        "win10": "Windows 10/11",
-        "l24": "Linux 2.4",
-        "l26": "Linux 2.6+",
-        "solaris": "Solaris",
+        "other": tr("Not set"),
+        "wxp": tr("Windows XP"),
+        "w2k": tr("Windows 2000"),
+        "w2k3": tr("Windows 2003"),
+        "w2k8": tr("Windows 2008"),
+        "w2k12": tr("Windows 2012"),
+        "wvista": tr("Windows Vista"),
+        "win7": tr("Windows 7"),
+        "win8": tr("Windows 8"),
+        "win10": tr("Windows 10/11"),
+        "l24": tr("Linux 2.4"),
+        "l26": tr("Linux 2.6+"),
+        "solaris": tr("Solaris"),
     },
     "rtc": {
-        "utc": "UTC",
-        "localtime": "Локальное",
+        "utc": tr("UTC"),
+        "localtime": tr("Local"),
     },
     "keyboard": {
-        "ar": "Арабская",
-        "da": "Датская",
-        "de": "Немецкая",
-        "de-ch": "Швейцарская (нем.)",
-        "en-gb": "Английская (Великобритания)",
-        "en-us": "Английская (США)",
-        "es": "Испанская",
-        "fi": "Финская",
-        "fr": "Французская",
-        "fr-be": "Французская (Бельгия)",
-        "fr-ca": "Французская (Канада)",
-        "fr-ch": "Швейцарская (фр.)",
-        "hr": "Хорватская",
-        "hu": "Венгерская",
-        "is": "Исландская",
-        "it": "Итальянская",
-        "ja": "Японская",
-        "lt": "Литовская",
-        "mk": "Македонская",
-        "nl": "Нидерландская",
-        "no": "Норвежская",
-        "pl": "Польская",
-        "pt": "Португальская",
-        "pt-br": "Португальская (Бразилия)",
-        "ru": "Русская",
-        "sk": "Словацкая",
-        "sl": "Словенская",
-        "sv": "Шведская",
-        "tr": "Турецкая",
-        "ua": "Украинская",
+        "ar": tr("Arabic"),
+        "da": tr("Danish"),
+        "de": tr("German"),
+        "de-ch": tr("Swiss (German)"),
+        "en-gb": tr("English (UK)"),
+        "en-us": tr("English (US)"),
+        "es": tr("Spanish"),
+        "fi": tr("Finnish"),
+        "fr": tr("French"),
+        "fr-be": tr("French (Belgium)"),
+        "fr-ca": tr("French (Canada)"),
+        "fr-ch": tr("Swiss (French)"),
+        "hr": tr("Croatian"),
+        "hu": tr("Hungarian"),
+        "is": tr("Icelandic"),
+        "it": tr("Italian"),
+        "ja": tr("Japanese"),
+        "lt": tr("Lithuanian"),
+        "mk": tr("Macedonian"),
+        "nl": tr("Dutch"),
+        "no": tr("Norwegian"),
+        "pl": tr("Polish"),
+        "pt": tr("Portuguese"),
+        "pt-br": tr("Portuguese (Brazil)"),
+        "ru": tr("Russian"),
+        "sk": tr("Slovak"),
+        "sl": tr("Slovenian"),
+        "sv": tr("Swedish"),
+        "tr": tr("Turkish"),
+        "ua": tr("Ukrainian"),
     },
     "hotplug": {
-        "0": "Отключено",
-        "1": "Всё",
-        "network": "Сеть",
-        "disk": "Диски",
-        "usb": "USB",
-        "network,disk": "Сеть, Диски",
-        "network,usb": "Сеть, USB",
-        "disk,usb": "Диски, USB",
-        "network,disk,usb": "Сеть, Диски, USB",
-        "networkdisk,usb": "Сеть, Диски, USB",
+        "0": tr("Disabled"),
+        "1": tr("All"),
+        "network": tr("Network"),
+        "disk": tr("Disks"),
+        "usb": tr("USB"),
+        "network,disk": tr("Network, Disks"),
+        "network,usb": tr("Network, USB"),
+        "disk,usb": tr("Disks, USB"),
+        "network,disk,usb": tr("Network, Disks, USB"),
+        "networkdisk,usb": tr("Network, Disks, USB"),
     },
 }
 
@@ -198,6 +193,7 @@ def is_cdrom_key(key):
 def is_disk_key(key):
     pfx = _key_prefix(key)
     return pfx in ("virtio", "scsi", "sata") or (pfx == "ide" and key != "ide2")
+
 
 # PVE defaults for keys absent from config API (hardware tab)
 HW_DEFAULTS = {
@@ -336,61 +332,61 @@ def _fmt_memory(val):
         if mb >= 1024:
             gb = mb / 1024
             if mb % 1024 == 0:
-                return f"{mb // 1024} ГБ"
-            return f"{gb:.1f} ГБ ({mb} МБ)"
-        return f"{mb} МБ"
+                return f"{mb // 1024} {tr('GB')}"
+            return f"{gb:.1f} {tr('GB')} ({mb} {tr('MB')})"
+        return f"{mb} {tr('MB')}"
     except (ValueError, TypeError):
         return str(val)
 
 
 def _fmt_ostype(val):
     return {
-        "other": "Не указан",
-        "wxp": "Windows XP",
-        "w2k": "Windows 2000",
-        "w2k3": "Windows 2003",
-        "w2k8": "Windows 2008",
-        "w2k12": "Windows 2012",
-        "wvista": "Windows Vista",
-        "win7": "Windows 7",
-        "win8": "Windows 8",
-        "win10": "Windows 10/11",
-        "l24": "Linux 2.4",
-        "l26": "Linux 2.6+",
-        "solaris": "Solaris",
+        "other": tr("Not set"),
+        "wxp": tr("Windows XP"),
+        "w2k": tr("Windows 2000"),
+        "w2k3": tr("Windows 2003"),
+        "w2k8": tr("Windows 2008"),
+        "w2k12": tr("Windows 2012"),
+        "wvista": tr("Windows Vista"),
+        "win7": tr("Windows 7"),
+        "win8": tr("Windows 8"),
+        "win10": tr("Windows 10/11"),
+        "l24": tr("Linux 2.4"),
+        "l26": tr("Linux 2.6+"),
+        "solaris": tr("Solaris"),
     }.get(str(val), str(val))
 
 
 def _fmt_bool(val):
-    return "Да" if val in (1, "1", True) else "Нет"
+    return tr("Yes") if val in (1, "1", True) else tr("No")
 
 
 def _fmt_agent(val):
-    return "Включён" if val in (1, "1", True) else "Выключен"
+    return tr("Enabled") if val in (1, "1", True) else tr("Disabled")
 
 
 def _fmt_boot(val):
     val = str(val)
     if val.startswith("order="):
         parts = val[6:].split(";")
-        return "Порядок: " + ", ".join(parts)
+        return tr("Boot order: ") + ", ".join(parts)
     if val == "cdn":
-        return "CDN (сеть)"
+        return tr("CDN (network)")
     return val
 
 
 def _fmt_hotplug(val):
     return {
-        "networkdisk,usb": "Сеть, Диски, USB",
-        "network,disk,usb": "Сеть, Диски, USB",
-        "network,disk": "Сеть, Диски",
-        "network,usb": "Сеть, USB",
-        "disk,usb": "Диски, USB",
-        "network": "Сеть",
-        "disk": "Диски",
-        "usb": "USB",
-        "1": "Всё",
-        "0": "Отключено",
+        "networkdisk,usb": tr("Network, Disks, USB"),
+        "network,disk,usb": tr("Network, Disks, USB"),
+        "network,disk": tr("Network, Disks"),
+        "network,usb": tr("Network, USB"),
+        "disk,usb": tr("Disks, USB"),
+        "network": tr("Network"),
+        "disk": tr("Disks"),
+        "usb": tr("USB"),
+        "1": tr("All"),
+        "0": tr("Disabled"),
     }.get(val, val)
 
 
@@ -399,98 +395,98 @@ def _fmt_startup(val):
     out = []
     for p in parts:
         if p.startswith("order="):
-            out.append(f"Порядок: {p[6:]}")
+            out.append(f"{tr('Order: ')}{p[6:]}")
         elif p.startswith("up="):
-            out.append(f"Ожидание: {p[3:]}с")
+            out.append(f"{tr('Delay: ')}{p[3:]}{tr('s')}")
         elif p.startswith("down="):
-            out.append(f"Остановка: {p[5:]}с")
+            out.append(f"{tr('Shutdown: ')}{p[5:]}{tr('s')}")
     return " | ".join(out) if out else str(val)
 
 
 def _fmt_keyboard(val):
     return {
-        "ar": "Арабская", "da": "Датская", "de": "Немецкая",
-        "de-ch": "Швейцарская (нем.)", "en-gb": "Английская (Великобритания)",
-        "en-us": "Английская (США)", "es": "Испанская", "fi": "Финская",
-        "fr": "Французская", "fr-be": "Французская (Бельгия)",
-        "fr-ca": "Французская (Канада)", "fr-ch": "Швейцарская (фр.)",
-        "hr": "Хорватская", "hu": "Венгерская", "is": "Исландская",
-        "it": "Итальянская", "ja": "Японская", "lt": "Литовская",
-        "mk": "Македонская", "nl": "Нидерландская", "no": "Норвежская",
-        "pl": "Польская", "pt": "Португальская",
-        "pt-br": "Португальская (Бразилия)", "ru": "Русская",
-        "sk": "Словацкая", "sl": "Словенская", "sv": "Шведская",
-        "tr": "Турецкая", "ua": "Украинская",
+        "ar": tr("Arabic"), "da": tr("Danish"), "de": tr("German"),
+        "de-ch": tr("Swiss (German)"), "en-gb": tr("English (UK)"),
+        "en-us": tr("English (US)"), "es": tr("Spanish"), "fi": tr("Finnish"),
+        "fr": tr("French"), "fr-be": tr("French (Belgium)"),
+        "fr-ca": tr("French (Canada)"), "fr-ch": tr("Swiss (French)"),
+        "hr": tr("Croatian"), "hu": tr("Hungarian"), "is": tr("Icelandic"),
+        "it": tr("Italian"), "ja": tr("Japanese"), "lt": tr("Lithuanian"),
+        "mk": tr("Macedonian"), "nl": tr("Dutch"), "no": tr("Norwegian"),
+        "pl": tr("Polish"), "pt": tr("Portuguese"),
+        "pt-br": tr("Portuguese (Brazil)"), "ru": tr("Russian"),
+        "sk": tr("Slovak"), "sl": tr("Slovenian"), "sv": tr("Swedish"),
+        "tr": tr("Turkish"), "ua": tr("Ukrainian"),
     }.get(val, val)
 
 
 def _fmt_cpu(val):
     val = str(val)
     if val.startswith("custom-"):
-        return f"x86-64 {val[7:]} (PVE custom)"
+        return f"x86-64 {val[7:]} ({tr('PVE custom')})"
     return {
-        "kvm64": "KVM64 (совместимый)",
-        "host": "Host (максимум)",
-        "qemu64": "QEMU64",
-        "x86-64-v2": "x86-64 v2",
-        "x86-64-v2-AES": "x86-64 v2 + AES",
-        "x86-64-v3": "x86-64 v3",
-        "x86-64-v3-AES": "x86-64 v3 + AES",
-        "x86-64-v4": "x86-64 v4",
-        "x86-64-v4-AES": "x86-64 v4 + AES",
-        "max": "Host (max, рискованно)",
+        "kvm64": tr("KVM64 (compatible)"),
+        "host": tr("Host (maximum)"),
+        "qemu64": tr("QEMU64"),
+        "x86-64-v2": tr("x86-64 v2"),
+        "x86-64-v2-AES": tr("x86-64 v2 + AES"),
+        "x86-64-v3": tr("x86-64 v3"),
+        "x86-64-v3-AES": tr("x86-64 v3 + AES"),
+        "x86-64-v4": tr("x86-64 v4"),
+        "x86-64-v4-AES": tr("x86-64 v4 + AES"),
+        "max": tr("Host (max, risky)"),
     }.get(val, val)
 
 
 def _fmt_scsihw(val):
     return {
-        "lsi": "LSI 53C895A",
-        "lsi53c810": "LSI 53C810",
-        "megasas": "MegaSAS",
-        "pvscsi": "VMware PVSCSI",
-        "virtio-scsi-single": "VirtIO SCSI Single",
-        "virtio-scsi-pci": "VirtIO SCSI PCI",
+        "lsi": tr("LSI 53C895A"),
+        "lsi53c810": tr("LSI 53C810"),
+        "megasas": tr("MegaSAS"),
+        "pvscsi": tr("VMware PVSCSI"),
+        "virtio-scsi-single": tr("VirtIO SCSI Single"),
+        "virtio-scsi-pci": tr("VirtIO SCSI PCI"),
     }.get(val, val)
 
 
 def _fmt_vga(val):
     return {
-        "std": "VGA",
-        "qxl": "QXL (SPICE)",
-        "virtio": "VirtIO-GPU",
-        "vmware": "VMware",
-        "cirrus": "Cirrus",
-        "serial0": "Serial",
-        "qxl2": "QXL (dual)",
-        "qxl3": "QXL (triple)",
-        "qxl4": "QXL (quad)",
+        "std": tr("VGA"),
+        "qxl": tr("QXL (SPICE)"),
+        "virtio": tr("VirtIO-GPU"),
+        "vmware": tr("VMware"),
+        "cirrus": tr("Cirrus"),
+        "serial0": tr("Serial"),
+        "qxl2": tr("QXL (dual)"),
+        "qxl3": tr("QXL (triple)"),
+        "qxl4": tr("QXL (quad)"),
     }.get(val, val)
 
 
 def _fmt_bios(val):
-    return {"seabios": "SeaBIOS", "ovmf": "OVMF (UEFI)"}.get(val, val)
+    return {"seabios": tr("SeaBIOS"), "ovmf": tr("OVMF (UEFI)")}.get(val, val)
 
 
 def _fmt_machine(val):
-    return {"i440fx": "i440fx", "q35": "Q35"}.get(val, val) if val else val
+    return {"i440fx": tr("i440fx"), "q35": tr("Q35")}.get(val, val) if val else val
 
 
 def _fmt_rtc(val):
-    return {"utc": "UTC", "localtime": "Локальное"}.get(val, val)
+    return {"utc": tr("UTC"), "localtime": tr("Local")}.get(val, val)
 
 
 def _fmt_smbios(val):
     parts = str(val).split(",")
     filtered = [p for p in parts if not p.startswith("uuid=")]
-    return ", ".join(filtered) if filtered else "Задан"
+    return ", ".join(filtered) if filtered else tr("Set")
 
 
 def _fmt_vcpus(val):
-    return str(val) if val not in (0, "0") else "Не задано"
+    return str(val) if val not in (0, "0") else tr("Not set")
 
 
 def _fmt_net(val):
-    """Распарсить строку сетевого устройства: virtio=MAC,bridge=vmbr0,tag=10"""
+    """Parse a network device string: virtio=MAC,bridge=vmbr0,tag=10"""
     val = str(val)
     parts = val.split(",")
     first = parts[0]
@@ -512,14 +508,14 @@ def _fmt_net(val):
     if bridge:
         out += f" | {bridge}"
     if tag:
-        out += f" | VLAN {tag}"
+        out += f" | {tr('VLAN')} {tag}"
     if mac and mac != "none":
         out += f" | {mac}"
     return out
 
 
 def _fmt_disk(val):
-    """Распарсить строку диска: storage:size,format=qcow2,cache=writeback,..."""
+    """Parse a disk string: storage:size,format=qcow2,cache=writeback,..."""
     val = str(val)
     parts = val.split(",")
     storage_part = parts[0]
@@ -539,9 +535,9 @@ def _fmt_disk(val):
         elif p.startswith("format="):
             fmt = p.split("=", 1)[1]
 
-    _cache_labels = {"none": "Нет", "writeback": "Write back",
-                     "writethrough": "Write through",
-                     "directsync": "Direct sync", "unsafe": "Unsafe"}
+    _cache_labels = {"none": tr("None"), "writeback": tr("Write back"),
+                     "writethrough": tr("Write through"),
+                     "directsync": tr("Direct sync"), "unsafe": tr("Unsafe")}
     cache = _cache_labels.get(cache, cache)
 
     out = storage
@@ -550,7 +546,7 @@ def _fmt_disk(val):
     if fmt:
         out += f" | {fmt}"
     if cache:
-        out += f" | Кэш: {cache}"
+        out += f" | {tr('Cache: ')}{cache}"
     return out
 
 

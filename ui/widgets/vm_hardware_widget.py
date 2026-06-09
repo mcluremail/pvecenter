@@ -6,6 +6,7 @@ from ..vm_config_display import (get_hardware_rows, get_editor_spec,
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 from ..vm_device_editors import (VmNetworkEditorDialog, VmCdromEditorDialog,
                                  VmDiskEditorDialog)
+from ..i18n import tr
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -29,7 +30,7 @@ class VmHardwareWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.verticalHeader().hide()
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Параметр", "Значение"])
+        self.table.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
@@ -84,10 +85,8 @@ class VmHardwareWidget(QWidget):
 
         is_running = self._vm_status == "running"
         if is_running and raw_key not in self._EDITABLE_WHEN_RUNNING:
-            QMessageBox.information(self, "Изменение недоступно",
-                                    "Этот параметр нельзя изменить "
-                                    "на работающей ВМ.\n"
-                                    "Остановите ВМ для редактирования.")
+            QMessageBox.information(self, tr("Cannot be changed on a running VM"),
+                                    tr("Stop the VM to edit"))
             return
 
         current_value = self._config_data.get(raw_key)

@@ -1,72 +1,74 @@
 # PVE Center
 
-Десктопная панель управления Proxmox VE. Написана на Python с PySide6.
+Desktop dashboard for Proxmox VE management. Written in Python with PySide6.
 
-Мониторинг кластеров и хостов, управление виртуальными машинами и контейнерами, лента задач — всё в одном окне без браузера.
+Monitor clusters and hosts, manage virtual machines and containers, view task history — all in one window, no browser needed.
 
-![PVE Center](Screenshots/main.png)## Скачать
+![PVE Center](Screenshots/main.png)
 
-| Платформа | Формат | Ссылка |
-|-----------|--------|--------|
-| Linux (любой) | pip | `pip install pvecenter` |
+## Download
+
+| Platform | Format | Link |
+|----------|--------|------|
+| Linux (any) | pip | `pip install pvecenter` |
 | Debian / Ubuntu | .deb | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
-| Любой | Исходники | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Any | Source | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Последний релиз: [v0.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.2)
+Latest release: [v0.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v0.1.2)
 
-## Возможности
+## Features
 
-**Мониторинг**
-- Дерево объектов: Кластеры → Хосты (ноды) → ВМ/Контейнеры с цветовой индикацией статуса
-- Графики загрузки ЦП, оперативной памяти, сети и дисков (данные RRD из PVE)
-- Сводка по пулам ВМ с прогресс-барами ресурсов
-- Хранилища: общая сводка, детализация по нодам, график заполнения
-- Содержимое storage: резервные копии, диски ВМ, ISO, шаблоны
-- Снапшоты — все снимки на хосте в единой таблице
-- Оборудование ВМ: конфигурация, параметры, история задач
-- Физические интерфейсы хоста, PVE-сервисы, диски (с дедупликацией FC multipath)
-- Статусные индикаторы с цветными маркерами (зелёный, красный, жёлтый)
+**Monitoring**
+- Object tree: Clusters → Hosts (nodes) → VMs/Containers with color status indicators
+- CPU, RAM, network, and disk usage charts (RRD data from PVE)
+- VM pool summary with resource progress bars
+- Storage: aggregated overview, per-node detail, fill-level chart
+- Storage content: backups, VM disks, ISO images, templates
+- Snapshots — all snapshots on a host in a single table
+- VM hardware configuration, options, task history
+- Host network interfaces, PVE services, disks (with FC multipath dedup)
+- Status indicators with colored markers (green, red, yellow)
 
-**Управление**
-- Power actions для QEMU и LXC: Старт, Выключение, Перезагрузка, Сброс, Останов, Возобновление
-- Создание виртуальных машин: диалог с настройками ЦП, RAM, диска, сети — прямо из контекстного меню узла
-- SPICE консоль (требуется virt-viewer)
-- Удаление хоста с удалением API-токена на сервере
-- Пересоздание токена через контекстное меню
+**Management**
+- Power actions for QEMU and LXC: Start, Shutdown, Reboot, Reset, Stop, Resume
+- Create Virtual Machines: dialog with CPU, RAM, disk, network settings — right from the node context menu
+- SPICE console (requires virt-viewer)
+- Delete host with API token removal on the server
+- Token recreation via context menu
 
-**Безопасность и аудит**
-- User-bound API-токены: при добавлении сервера токен создаётся автоматически, в аудите PVE виден реальный оператор
-- Шифрование токенов: мастер-пароль + PBKDF2 (600 000 итераций) + Fernet (AES-256)
-- Конфиг хранится в зашифрованном `nodes.enc`, можно коммитить в git
+**Security & Audit**
+- User-bound API tokens: created automatically when adding a server, actual operator visible in PVE audit log
+- Token encryption: master password + PBKDF2 (600,000 iterations) + Fernet (AES-256)
+- Config stored in encrypted `nodes.enc`, safe to commit to git
 
-**Интерфейс**
-- Русский язык интерфейса (ЦП, Аптайм, Снапшоты, Оперативная память и т.д.)
-- Фоновое автообновление каждые 20 секунд без сброса выделения и вкладок
-- Всплывающие уведомления при изменении статуса хоста или ВМ
-- Диагностика недоступных хостов (ошибка DNS, таймаут, авторизация и т.д.)
-- Быстрый старт: параллельная загрузка данных, сводка кластера и статусбар — за секунды
-- Персистентность: состояние окна, положение сплиттеров, настройки создания ВМ, развёрнутые узлы дерева сохраняются между запусками
-- Кэш задач кластера в SQLite — задачи видны мгновенно при повторном запуске
+**Interface**
+- Multi-language UI (English, Russian, Arabic, Chinese, French, Spanish)
+- Background auto-refresh every 20 seconds without losing selection or tabs
+- Toast notifications on host/VM status changes
+- Diagnostics for unreachable hosts (DNS error, timeout, auth failure, etc.)
+- Fast startup: parallel data loading, cluster summary and status bar in seconds
+- Persistence: window geometry, splitter positions, create-VM settings, expanded tree nodes saved between sessions
+- Cluster task cache in SQLite — tasks visible instantly on next launch
 
-## Требования
+## Requirements
 
 - Python 3.10+
 - PySide6
-- proxmoxer (нет в репозиториях Debian/Ubuntu — ставится через pip)
-- Proxmox VE (кластер или отдельный хост)
-- Доступ по API к PVE-хосту (порт 8006)
-- virt-viewer (для SPICE консоли)
+- proxmoxer (not in Debian/Ubuntu repos — install via pip)
+- Proxmox VE (cluster or standalone host)
+- API access to PVE host (port 8006)
+- virt-viewer (for SPICE console)
 
-## Установка
+## Installation
 
-### Через pip (PyPI)
+### Via pip (PyPI)
 
 ```bash
 pip install pvecenter
 pvecenter
 ```
 
-### В изолированное окружение
+### Isolated environment
 
 ```bash
 git clone https://github.com/mcluremail/pvecenter.git
@@ -76,22 +78,22 @@ source venv/bin/activate
 pip install PySide6 proxmoxer requests pyqtgraph cryptography
 ```
 
-### .deb пакет (Debian / Ubuntu)
+### .deb package (Debian / Ubuntu)
 
-Скачайте `.deb` из [GitHub Releases](https://github.com/mcluremail/pvecenter/releases):
+Download `.deb` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases):
 
 ```bash
-# скачать .deb с релизной страницы
+# download .deb from release page
 sudo dpkg -i pve-center_*.deb
-# доставить proxmoxer (нет в репозиториях)
+# install proxmoxer (not in repos)
 pip install proxmoxer
-# установить virt-viewer (если нужна SPICE консоль)
+# install virt-viewer (if SPICE console needed)
 sudo apt install virt-viewer
 ```
 
-После установки `.deb` — запуск через меню или командой `pvecenter`.
+After installing the `.deb` package, launch from the menu or via `pvecenter`.
 
-Сборка из исходников (если нужна своя версия):
+Build from source (for custom versions):
 
 ```bash
 sudo apt install devscripts debhelper dh-python python3-all python3-setuptools
@@ -100,7 +102,7 @@ dpkg-buildpackage -b
 sudo dpkg -i ../pve-center_*.deb
 ```
 
-### virt-viewer (для SPICE консоли)
+### virt-viewer (for SPICE console)
 
 ```bash
 # Debian / Ubuntu
@@ -113,61 +115,80 @@ sudo pacman -S virt-viewer
 sudo dnf install virt-viewer
 ```
 
-## Использование
+## Usage
 
 ```bash
-# Если установлено через pip или .deb:
+# If installed via pip or .deb:
 pvecenter
 
-# Из локального репозитория:
+# From local repository:
 ./run.py
-# или
+# or
 python -m pve_center.main
 ```
 
-### Первый запуск
+### First run
 
-1. Запустите приложение. Откроется окно настройки мастер-пароля.
-2. Придумайте и введите мастер-пароль. Он будет запрошен при каждом запуске.
-3. Нажмите `[+]` в дереве слева (на папке «Кластеры» или «Отдельные хосты»).
-4. В открывшемся диалоге укажите:
-   - **Адрес хоста** (FQDN или IP)
-   - **Пользователя** (например, `root@pam`)
-   - **Пароль пользователя**
-5. Токен создастся автоматически. Приложение подключится к хосту и начнёт мониторинг.
+1. Launch the application. A master password setup window will appear.
+2. Create and enter a master password. It will be requested at each startup.
+3. Click `[+]` in the tree panel (on the "Clusters" or "Standalone hosts" folder).
+4. In the dialog that opens, enter:
+   - **Host address** (FQDN or IP)
+   - **User** (e.g., `root@pam`)
+   - **User password**
+5. The API token is created automatically. The application connects to the host and starts monitoring.
 
-Для кластера достаточно добавить одну ноду — остальные подтянутся динамически через `/cluster/resources`.
+For a cluster, adding a single node is sufficient — others are discovered dynamically via `/cluster/resources`.
 
-### Зависимости
+### Dependencies
 
-| Пакет | Назначение |
-|-------|-----------|
-| PySide6 | Графический интерфейс |
-| proxmoxer | Клиент для Proxmox VE API |
-| requests | HTTP-запросы |
-| pyqtgraph | Графики |
-| cryptography | PBKDF2 + Fernet шифрование |
+| Package | Purpose |
+|---------|---------|
+| PySide6 | GUI framework |
+| proxmoxer | Proxmox VE API client |
+| requests | HTTP library |
+| pyqtgraph | Charts and plotting |
+| cryptography | PBKDF2 + Fernet encryption |
 
-Для `.deb` пакета: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` ставятся из репозитория Debian/Ubuntu. `proxmoxer` доставляется через pip (в репозиториях отсутствует).
+For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` are available from Debian/Ubuntu repos. `proxmoxer` is installed via pip (not in repos).
 
-### Структура проекта
+### Project structure
 
-| Файл | Назначение |
-|------|-----------|
-| `main.py` | Точка входа |
-| `backend.py` | API-клиент, управление токенами, рабочие потоки |
-| `config.py` | Шифрование и загрузка конфигурации |
-| `run.py` | Скрипт запуска |
-| `ui/mainwindow.py` | Главное окно |
-| `ui/tree_panel.py` | Дерево кластеров, хостов и ВМ |
-| `ui/detail_panel.py` | Панель деталей ВМ |
-| `ui/add_server_dialog.py` | Диалог добавления сервера |
-| `ui/create_vm_dialog.py` | Диалог создания ВМ |
-| `ui/widgets/cluster_tasks_widget.py` | Лента кластерных задач |
-| `ui/widgets/storage_widgets.py` | Виджеты хранилища |
-| `ui/widgets/disk_widget.py` | Виджет дисков |
-| `ui/widgets/summary_widgets.py` | Виджеты сводки |
+| File | Purpose |
+|------|---------|
+| `main.py` | Entry point |
+| `backend.py` | API client, token management, worker threads |
+| `config.py` | Encryption and configuration loading |
+| `run.py` | Launch script |
+| `ui/i18n.py` | Translation module (tr()) |
+| `ui/mainwindow.py` | Main window |
+| `ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
+| `ui/detail_panel.py` | VM detail panel |
+| `ui/add_server_dialog.py` | Add server dialog |
+| `ui/create_vm_dialog.py` | Create VM dialog |
+| `ui/vm_config_display.py` | VM config formatters and labels |
+| `ui/vm_device_editors.py` | Specialized device editors |
+| `ui/widgets/` | Widget modules |
+| `ui/widgets/cluster_tasks_widget.py` | Cluster task history |
+| `ui/widgets/vm_hardware_widget.py` | VM hardware tab |
+| `ui/widgets/vm_options_widget.py` | VM options tab |
+| `ui/widgets/vm_metrics_widget.py` | VM metrics charts |
+| `ui/api/` | API workers (RRD data, storage content) |
 
-## Лицензия
+## Language switching
 
-GNU General Public License v3.0. См. файл `LICENSE`.
+The interface language is stored in `~/.config/pve-center/tasks_cache.sqlite` (`ui_state` table, key `language`).
+
+Supported languages:
+- English (en)
+- Russian (ru)
+- Arabic (ar)
+- Chinese Simplified (zh)
+- French (fr)
+- Spanish (es)
+
+Translations are stored in the `translations` table. To add a new language, insert rows with `(lang, msgid, msgstr)`.
+
+## License
+
+GNU General Public License v3.0. See `LICENSE` file.

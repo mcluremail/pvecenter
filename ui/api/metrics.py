@@ -7,12 +7,12 @@ from PySide6.QtCore import QRunnable, QObject, Signal
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# PVE API default port — keep in sync with backend.py PVE_PORT
+# PVE API default port — keep in sync with backend.py
 PVE_PORT = 8006
 
 
 def _check_response(resp):
-    """Проверяет HTTP-ответ и достаёт тело ошибки из PVE JSON."""
+    """Check HTTP response and extract error body from PVE JSON."""
     if not resp.ok:
         try:
             body = resp.json()
@@ -23,7 +23,7 @@ def _check_response(resp):
 
 
 class _FinishedMixin(QObject):
-    """Добавляет finished-signal к любому Signals-классу воркера."""
+    """Add finished-signal to any worker Signals class."""
 
     finished = Signal()
 
@@ -121,7 +121,7 @@ class StorageContentListWorker(QRunnable):
                 pass
         except requests.exceptions.ReadTimeout:
             try:
-                self.signals.error.emit(self.storage_name, self.content_type, "Таймаут PVE при загрузке содержимого хранилища")
+                self.signals.error.emit(self.storage_name, self.content_type, "PVE timeout loading storage content")
             except RuntimeError:
                 pass
         except Exception as e:

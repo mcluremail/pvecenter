@@ -6,59 +6,58 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from ..config import save_ui_state, load_ui_state
+from .i18n import tr
 import json as _json
 
 VM_SETTINGS_KEY = "create_vm_settings"
 
-# ── Статические константы ─────────────────────────────────────────
-
 VM_OS_TYPES = [
-    ("other", "Other"),
-    ("l26", "Linux 2.6+ / 3.x / 4.x"),
-    ("l24", "Linux 2.4"),
-    ("win10", "Windows 10/11"),
-    ("win11", "Windows 11"),
-    ("win8", "Windows 8"),
-    ("win7", "Windows 7"),
-    ("w2k8", "Windows Server 2008"),
-    ("w2k3", "Windows Server 2003"),
-    ("w2k", "Windows 2000"),
-    ("wvista", "Windows Vista"),
-    ("wxp", "Windows XP"),
-    ("solaris", "Solaris"),
+    ("other", tr("Other")),
+    ("l26", tr("Linux 2.6+ / 3.x / 4.x")),
+    ("l24", tr("Linux 2.4")),
+    ("win10", tr("Windows 10/11")),
+    ("win11", tr("Windows 11")),
+    ("win8", tr("Windows 8")),
+    ("win7", tr("Windows 7")),
+    ("w2k8", tr("Windows Server 2008")),
+    ("w2k3", tr("Windows Server 2003")),
+    ("w2k", tr("Windows 2000")),
+    ("wvista", tr("Windows Vista")),
+    ("wxp", tr("Windows XP")),
+    ("solaris", tr("Solaris")),
 ]
 
 VGA_TYPES = [
-    ("qxl", "qxl (SPICE)"),
+    ("qxl", tr("qxl (SPICE)")),
     ("std", "std"),
     ("virtio", "virtio"),
     ("vmware", "vmware"),
     ("cirrus", "cirrus"),
     ("serial0", "serial0"),
-    ("qxl2", "qxl2 (dual)"),
-    ("qxl3", "qxl3 (triple)"),
-    ("qxl4", "qxl4 (quad)"),
+    ("qxl2", tr("qxl2 (dual)")),
+    ("qxl3", tr("qxl3 (triple)")),
+    ("qxl4", tr("qxl4 (quad)")),
 ]
 
 SCSI_CONTROLLERS = [
-    ("virtio-scsi-single", "VirtIO SCSI Single"),
-    ("virtio-scsi-pci", "VirtIO SCSI PCI"),
+    ("virtio-scsi-single", tr("VirtIO SCSI Single")),
+    ("virtio-scsi-pci", tr("VirtIO SCSI PCI")),
     ("megasas", "MegaSAS"),
     ("pvscsi", "VMware PVSCSI"),
-    ("lsi", "LSI (legacy)"),
+    ("lsi", tr("LSI (legacy)")),
     ("lsi53c810", "LSI 53C810"),
 ]
 
 DISK_CACHE = [
-    ("none", "No cache"),
-    ("writeback", "Write back"),
-    ("writethrough", "Write through"),
-    ("directsync", "Direct sync"),
-    ("unsafe", "Unsafe"),
+    ("none", tr("No cache")),
+    ("writeback", tr("Write back")),
+    ("writethrough", tr("Write through")),
+    ("directsync", tr("Direct sync")),
+    ("unsafe", tr("Unsafe")),
 ]
 
 CPU_TYPES = [
-    ("host", "host (рекомендуется)"),
+    ("host", tr("host (recommended)")),
     ("custom-x86-64-v2-AES", "x86-64-v2-AES"),
     ("custom-x86-64-v3", "x86-64-v3"),
     ("custom-x86-64-v4", "x86-64-v4"),
@@ -89,32 +88,18 @@ CHIPSETS = [
 ]
 
 BIOS_TYPES = [
-    ("seabios", "SeaBIOS"),
-    ("ovmf", "OVMF (UEFI)"),
+    ("seabios", tr("SeaBIOS")),
+    ("ovmf", tr("OVMF (UEFI)")),
 ]
-
-
-def _fmt_size(bytes_val):
-    """Форматирует размер в байтах в человекочитаемый вид."""
-    try:
-        b = int(bytes_val)
-    except (TypeError, ValueError):
-        return "?"
-    for unit in ("Б", "КБ", "МБ", "ГБ", "ТБ"):
-        if abs(b) < 1024:
-            return f"{b}{unit}"
-        b //= 1024
-    return f"{b}ТБ"
 
 
 class CreateVmDialog(QDialog):
     def __init__(self, parent=None, nodes=None, storages=None, pools=None, iso_images=None, ha_groups=None):
         super().__init__(parent)
-        self.setWindowTitle("Создание виртуальной машины")
+        self.setWindowTitle(tr("Create Virtual Machine"))
         self.setMinimumSize(700, 400)
         self.setMaximumWidth(780)
         self._nodes = nodes or []
-        # Кластеры — первыми, затем standalone; внутри групп — по алфавиту
         self._nodes = sorted(nodes or [], key=lambda n: (not n.get("_is_cluster", False),
                                         (n.get("_display_name") or n.get("node", "")).lower()))
         self._storages = storages or []
@@ -191,7 +176,6 @@ class CreateVmDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Scroll-область
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -201,7 +185,6 @@ class CreateVmDialog(QDialog):
         form.setContentsMargins(20, 16, 20, 16)
         form.setSpacing(0)
 
-        # ── Разметка полей: helper ──
         def _grid():
             g = QGridLayout()
             g.setVerticalSpacing(10)
@@ -223,30 +206,27 @@ class CreateVmDialog(QDialog):
             form.addWidget(sep)
             form.addSpacing(6)
 
-        # ================================================================
-        #  1. Основное
-        # ================================================================
-        title1 = QLabel("Основное")
+        title1 = QLabel(tr("General"))
         title1.setObjectName("sectionTitle")
         form.addWidget(title1)
         form.addSpacing(8)
 
         g1 = _grid()
-        g1.addWidget(QLabel("Узел:"), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g1.addWidget(QLabel(tr("Node:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.node_combo = QComboBox()
         for n in self._nodes:
             label = n.get("_display_name") or n.get("node", "?")
             self.node_combo.addItem(label, n.get("node", ""))
         self.node_combo.currentIndexChanged.connect(self._on_node_changed)
         g1.addWidget(self.node_combo, 0, 1)
-        g1.addWidget(QLabel("VM ID:"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g1.addWidget(QLabel(tr("VM ID:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.vmid_line = QLineEdit()
-        self.vmid_line.setPlaceholderText("авто")
+        self.vmid_line.setPlaceholderText(tr("auto"))
         self.vmid_line.setValidator(QIntValidator(100, 999999999, self))
         self.vmid_line.setFixedWidth(120)
         g1.addWidget(self.vmid_line, 0, 3)
 
-        g1.addWidget(QLabel("Имя ВМ:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g1.addWidget(QLabel(tr("VM Name:")), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("my-vm")
         self.name_input.setValidator(
@@ -254,21 +234,21 @@ class CreateVmDialog(QDialog):
         )
         g1.addWidget(self.name_input, 1, 1, 1, 3)
 
-        g1.addWidget(QLabel("Тип ОС:"), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g1.addWidget(QLabel(tr("OS Type:")), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.ostype_combo = QComboBox()
         for val, label in VM_OS_TYPES:
             self.ostype_combo.addItem(label, val)
         self.ostype_combo.setCurrentIndex(1)
         g1.addWidget(self.ostype_combo, 2, 1)
-        g1.addWidget(QLabel("Пул:"), 2, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g1.addWidget(QLabel(tr("Pool:")), 2, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.pool_combo = QComboBox()
-        self.pool_combo.addItem("— нет —", "")
+        self.pool_combo.addItem(tr("No pool"), "")
         for p in self._pools:
             pid = p.get("poolid", "")
             self.pool_combo.addItem(pid, pid)
         g1.addWidget(self.pool_combo, 2, 3)
 
-        self.ha_label = QLabel("HA группа:")
+        self.ha_label = QLabel(tr("HA group:"))
         g1.addWidget(self.ha_label, 3, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.ha_combo = QComboBox()
         self.ha_label.setVisible(False)
@@ -278,36 +258,33 @@ class CreateVmDialog(QDialog):
         form.addLayout(g1)
         form.addSpacing(18)
 
-        # ================================================================
-        #  2. CPU и память
-        # ================================================================
         _sep(form)
 
-        title2 = QLabel("CPU и память")
+        title2 = QLabel(tr("CPU & Memory"))
         title2.setObjectName("sectionTitle")
         form.addWidget(title2)
         form.addSpacing(8)
 
         g2 = _grid()
-        g2.addWidget(QLabel("Ядер:"), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g2.addWidget(QLabel(tr("Cores:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.cores_spin = QSpinBox()
         self.cores_spin.setRange(1, 128)
         self.cores_spin.setValue(2)
         g2.addWidget(self.cores_spin, 0, 1)
-        g2.addWidget(QLabel("Сокетов:"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g2.addWidget(QLabel(tr("Sockets:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.sockets_spin = QSpinBox()
         self.sockets_spin.setRange(1, 16)
         self.sockets_spin.setValue(1)
         g2.addWidget(self.sockets_spin, 0, 3)
 
-        g2.addWidget(QLabel("Память (МБ):"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g2.addWidget(QLabel(tr("Memory (MB):")), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.memory_spin = QSpinBox()
         self.memory_spin.setRange(16, 4194304)
         self.memory_spin.setValue(2048)
         self.memory_spin.setSingleStep(256)
         g2.addWidget(self.memory_spin, 1, 1)
 
-        g2.addWidget(QLabel("Тип CPU:"), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g2.addWidget(QLabel(tr("CPU type:")), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.cpu_combo = QComboBox()
         for val, label in CPU_TYPES:
             self.cpu_combo.addItem(label, val)
@@ -317,38 +294,35 @@ class CreateVmDialog(QDialog):
         form.addLayout(g2)
         form.addSpacing(18)
 
-        # ================================================================
-        #  3. Система
-        # ================================================================
         _sep(form)
 
-        title3 = QLabel("Система")
+        title3 = QLabel(tr("System"))
         title3.setObjectName("sectionTitle")
         form.addWidget(title3)
         form.addSpacing(8)
 
         g3 = _grid()
-        g3.addWidget(QLabel("VGA:"), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g3.addWidget(QLabel(tr("VGA:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.vga_combo = QComboBox()
         for val, label in VGA_TYPES:
             self.vga_combo.addItem(label, val)
         self.vga_combo.setCurrentIndex(0)
         g3.addWidget(self.vga_combo, 0, 1)
-        g3.addWidget(QLabel("Чипсет:"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g3.addWidget(QLabel(tr("Chipset:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.chipset_combo = QComboBox()
         for val, label in CHIPSETS:
             self.chipset_combo.addItem(label, val)
         self.chipset_combo.setCurrentIndex(0)
         g3.addWidget(self.chipset_combo, 0, 3)
 
-        g3.addWidget(QLabel("BIOS:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g3.addWidget(QLabel(tr("BIOS:")), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.bios_combo = QComboBox()
         for val, label in BIOS_TYPES:
             self.bios_combo.addItem(label, val)
         self.bios_combo.setCurrentIndex(0)
         self.bios_combo.currentTextChanged.connect(self._on_bios_changed)
         g3.addWidget(self.bios_combo, 1, 1)
-        self.efi_label = QLabel("EFI хранилище:")
+        self.efi_label = QLabel(tr("EFI storage:"))
         self.efi_label.setVisible(False)
         g3.addWidget(self.efi_label, 1, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.efi_storage_combo = QComboBox()
@@ -358,32 +332,29 @@ class CreateVmDialog(QDialog):
         form.addLayout(g3)
         form.addSpacing(18)
 
-        # ================================================================
-        #  4. Диск
-        # ================================================================
         _sep(form)
 
-        title4 = QLabel("Диск")
+        title4 = QLabel(tr("Disk"))
         title4.setObjectName("sectionTitle")
         form.addWidget(title4)
         form.addSpacing(8)
 
         g4 = _grid()
-        g4.addWidget(QLabel("Хранилище:"), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g4.addWidget(QLabel(tr("Storage:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.storage_combo = QComboBox()
         g4.addWidget(self.storage_combo, 0, 1)
-        g4.addWidget(QLabel("Размер (ГБ):"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g4.addWidget(QLabel(tr("Size (GB):")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.disk_size_spin = QSpinBox()
         self.disk_size_spin.setRange(1, 1048576)
         self.disk_size_spin.setValue(32)
         g4.addWidget(self.disk_size_spin, 0, 3)
 
-        g4.addWidget(QLabel("Шина:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g4.addWidget(QLabel(tr("Bus:")), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.bus_combo = QComboBox()
         for bus in DISK_BUSES:
             self.bus_combo.addItem(bus, bus)
         g4.addWidget(self.bus_combo, 1, 1)
-        self.scsi_label = QLabel("SCSI:")
+        self.scsi_label = QLabel(tr("SCSI:"))
         g4.addWidget(self.scsi_label, 1, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.scsi_combo = QComboBox()
         for val, label in SCSI_CONTROLLERS:
@@ -391,74 +362,70 @@ class CreateVmDialog(QDialog):
         self.scsi_combo.setCurrentIndex(0)
         g4.addWidget(self.scsi_combo, 1, 3)
 
-        g4.addWidget(QLabel("Кэш:"), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g4.addWidget(QLabel(tr("Cache:")), 2, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.cache_combo = QComboBox()
         for val, label in DISK_CACHE:
             self.cache_combo.addItem(label, val)
         self.cache_combo.setCurrentIndex(0)
         g4.addWidget(self.cache_combo, 2, 1)
 
-        g4.addWidget(QLabel("ISO/CDROM:"), 2, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g4.addWidget(QLabel(tr("ISO/CDROM:")), 2, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.iso_combo = QComboBox()
-        self.iso_combo.addItem("Не использовать носители", "")
+        self.iso_combo.addItem(tr("No media"), "")
         self.iso_combo.setMinimumWidth(200)
         g4.addWidget(self.iso_combo, 2, 3)
 
         form.addLayout(g4)
         form.addSpacing(18)
 
-        # ================================================================
-        #  5. Сеть
-        # ================================================================
         _sep(form)
 
-        title5 = QLabel("Сеть")
+        title5 = QLabel(tr("Network"))
         title5.setObjectName("sectionTitle")
         form.addWidget(title5)
         form.addSpacing(8)
 
         g5 = _grid()
-        g5.addWidget(QLabel("Мост:"), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g5.addWidget(QLabel(tr("Bridge:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.bridge_input = QLineEdit("vmbr0")
         g5.addWidget(self.bridge_input, 0, 1)
-        g5.addWidget(QLabel("Модель:"), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g5.addWidget(QLabel(tr("Model:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.model_combo = QComboBox()
         for m in NET_MODELS:
             self.model_combo.addItem(m, m)
         g5.addWidget(self.model_combo, 0, 3)
 
-        g5.addWidget(QLabel("VLAN tag:"), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
+        g5.addWidget(QLabel(tr("VLAN tag:")), 1, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.vlan_input = QLineEdit()
-        self.vlan_input.setPlaceholderText("0 — без VLAN")
+        self.vlan_input.setPlaceholderText(tr("0 — no VLAN"))
         self.vlan_input.setValidator(QIntValidator(0, 4094))
         g5.addWidget(self.vlan_input, 1, 1)
-        g5.addWidget(QLabel("Очередей:"), 1, 2, Qt.AlignRight | Qt.AlignVCenter)
+        g5.addWidget(QLabel(tr("Queues:")), 1, 2, Qt.AlignRight | Qt.AlignVCenter)
         self.queues_spin = QSpinBox()
         self.queues_spin.setRange(0, 64)
         self.queues_spin.setValue(0)
-        self.queues_spin.setSpecialValueText("авто")
+        self.queues_spin.setSpecialValueText(tr("auto"))
         g5.addWidget(self.queues_spin, 1, 3)
 
         form.addLayout(g5)
         form.addSpacing(18)
 
-        # ── Футер ──
         footer = QHBoxLayout()
-        self.start_check = QCheckBox("Запустить после создания")
+        self.start_check = QCheckBox(tr("Start after creation"))
         self.start_check.setChecked(False)
         footer.addWidget(self.start_check)
-        self.agent_check = QCheckBox("QEMU Agent")
+        self.agent_check = QCheckBox(tr("QEMU Agent"))
         self.agent_check.setChecked(True)
         footer.addWidget(self.agent_check)
         footer.addStretch()
 
-        self.create_btn = QPushButton("Создать")
+        self.create_btn = QPushButton(tr("Create"))
         self.create_btn.setFixedWidth(120)
         self.create_btn.setObjectName("accentBtn")
         self.create_btn.clicked.connect(self._on_create)
         footer.addWidget(self.create_btn)
 
-        self.cancel_btn = QPushButton("Отмена")
+        self.cancel_btn = QPushButton(tr("Cancel"))
         self.cancel_btn.setFixedWidth(100)
         self.cancel_btn.clicked.connect(self.reject)
         footer.addWidget(self.cancel_btn)
@@ -468,16 +435,12 @@ class CreateVmDialog(QDialog):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-        # Заполняем storage/EFI под первый узел
         self._on_node_changed(0)
-
-    # ── Слоты ──────────────────────────────────────────────────────
 
     def _on_node_changed(self, idx):
         node = self.node_combo.currentData()
         if not node:
             return
-        # Оставляем только storage, доступные на этом узле
         node_storages = [s for s in self._storages if s.get("node") == node]
         if not node_storages:
             node_storages = self._storages
@@ -494,7 +457,6 @@ class CreateVmDialog(QDialog):
         _fill(self.storage_combo)
         _fill(self.efi_storage_combo)
 
-        # Выбираем первый storage, поддерживающий диски ВМ (content содержит "images")
         for i in range(self.storage_combo.count()):
             name = self.storage_combo.itemText(i)
             if any(
@@ -504,10 +466,8 @@ class CreateVmDialog(QDialog):
                 self.storage_combo.setCurrentIndex(i)
                 break
 
-        # ISO-образы для выбранного узла
         self._populate_iso_combo(node)
 
-        # HA группы — только для хоста, которому принадлежит узел
         host_name = None
         for n in self._nodes:
             if n.get("node") == node:
@@ -516,39 +476,37 @@ class CreateVmDialog(QDialog):
         self._update_ha_combo(host_name)
 
     def _on_bios_changed(self, text):
-        is_ovmf = text == "OVMF (UEFI)"
+        is_ovmf = text == tr("OVMF (UEFI)")
         self.efi_label.setVisible(is_ovmf)
         self.efi_storage_combo.setVisible(is_ovmf)
         if is_ovmf and self.chipset_combo.currentData() != "q35":
-            self.chipset_combo.setCurrentIndex(0)  # q35 для UEFI
+            self.chipset_combo.setCurrentIndex(0)
 
     def _populate_iso_combo(self, node):
-        """Заполнить комбобокс ISO образами, доступными на узле."""
         self.iso_combo.clear()
-        self.iso_combo.addItem("Не использовать носители", "")
-        self.iso_combo.addItem("Физический привод", "__cdrom__")
+        self.iso_combo.addItem(tr("No media"), "")
+        self.iso_combo.addItem(tr("Physical drive"), "__cdrom__")
         if node:
             for iso in self._iso_images.get(node, []):
                 volid = iso["volid"]
                 fname = volid.split("/")[-1]
                 fmt = iso.get("format", "")
-                sz_str = _fmt_size(iso.get("size", 0))
+                sz_str = self._fmt_size(iso.get("size", 0))
                 details = []
                 if fmt:
                     details.append(fmt)
-                if sz_str not in ("?", "0 Б"):
+                if sz_str not in ("?", "0 B"):
                     details.append(sz_str)
                 display = f"{fname}  ({', '.join(details)})" if details else fname
                 self.iso_combo.addItem(display, volid)
 
     def _update_ha_combo(self, host_name):
-        """Заполнить комбобокс HA группами для указанного хоста."""
         groups = self._ha_groups.get(host_name, []) if host_name else []
         visible = bool(groups)
         self.ha_label.setVisible(visible)
         self.ha_combo.setVisible(visible)
         self.ha_combo.clear()
-        self.ha_combo.addItem("— нет —", "")
+        self.ha_combo.addItem(tr("No HA group"), "")
         for g in groups:
             self.ha_combo.addItem(g, g)
 
@@ -561,13 +519,11 @@ class CreateVmDialog(QDialog):
             return
         self.name_input.setStyleSheet("")
         self.create_btn.setEnabled(False)
-        self.create_btn.setText("Создание…")
+        self.create_btn.setText(tr("Creating..."))
         self.accept()
 
-    # ── Параметры для API ──────────────────────────────────────────
-
     def get_params(self):
-        """Возвращает dict параметров для POST /nodes/{node}/qemu."""
+        """Return dict of params for POST /nodes/{node}/qemu."""
         name = self.name_input.text().strip()
         vmid_text = self.vmid_line.text().strip()
         vmid = int(vmid_text) if vmid_text else 0
@@ -581,7 +537,6 @@ class CreateVmDialog(QDialog):
         if cache and cache != "none":
             disk_val += f",cache={cache}"
 
-        # Сеть: model=XXX,bridge=YYY [,tag=ZZZ]
         bridge = self.bridge_input.text().strip() or "vmbr0"
         model = self.model_combo.currentData()
         net_parts = [f"model={model},bridge={bridge}"]
@@ -613,21 +568,17 @@ class CreateVmDialog(QDialog):
             "agent": int(self.agent_check.isChecked()),
         }
 
-        # SCSI контроллер (всегда, иначе PVE 8+ ставит LSI 53C895A по умолчанию)
         params["scsihw"] = self.scsi_combo.currentData()
 
-        # BIOS (ovmf / seabios)
         bios_val = self.bios_combo.currentData()
         if bios_val != "seabios":
             params["bios"] = bios_val
 
-        # EFI для UEFI
         if bios_val == "ovmf":
             efi_stor = self.efi_storage_combo.currentText()
             if efi_stor:
                 params["efidisk0"] = f"{efi_stor}:4,efitype=4m,format=raw"
 
-        # ISO
         iso = self.iso_combo.currentData()
         if iso:
             if iso == "__cdrom__":
@@ -635,16 +586,13 @@ class CreateVmDialog(QDialog):
             else:
                 params["ide2"] = f"{iso},media=cdrom"
 
-        # Пул
         pool = self.pool_combo.currentData()
         if pool:
             params["pool"] = pool
 
-        # VM ID (0 = авто)
         if vmid > 0:
             params["vmid"] = vmid
 
-        # Убираем None-значения и пустые строки (чтобы не слать лишнего)
         params = {k: v for k, v in params.items() if v is not None and v != ""}
 
         return params
@@ -654,3 +602,16 @@ class CreateVmDialog(QDialog):
 
     def get_ha_group(self):
         return self.ha_combo.currentData()
+
+    @staticmethod
+    def _fmt_size(bytes_val):
+        """Format byte value to human-readable size."""
+        try:
+            b = int(bytes_val)
+        except (TypeError, ValueError):
+            return "?"
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if abs(b) < 1024:
+                return f"{b}{unit}"
+            b //= 1024
+        return f"{b}TB"

@@ -6,6 +6,7 @@ from ..vm_config_editor_dialog import VmConfigEditorDialog
 from ..vm_device_editors import (VmBootEditorDialog,
                                  VmBootdiskEditorDialog,
                                  VmStartupEditorDialog)
+from ..i18n import tr
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -25,7 +26,7 @@ class VmOptionsWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.verticalHeader().hide()
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Параметр", "Значение"])
+        self.table.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")

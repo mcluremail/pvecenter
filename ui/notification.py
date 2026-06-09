@@ -2,10 +2,11 @@ import sys
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
+from .i18n import tr
 
 
 class FadeToast(QWidget):
-    """Затухающее уведомление в правом верхнем углу родителя."""
+    """Fading notification in the top-right corner of the parent."""
 
     def __init__(self, parent, text, color="#1f2937", offset_y=12):
         super().__init__(parent)
@@ -13,7 +14,6 @@ class FadeToast(QWidget):
         self._bg_color = color
 
         flags = Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint
-        # X11BypassWindowManagerHint — KDE не центрирует, не трогает позицию
         if sys.platform.startswith("linux"):
             flags |= Qt.X11BypassWindowManagerHint
         self.setWindowFlags(flags)
@@ -21,7 +21,6 @@ class FadeToast(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_DontShowOnScreen, False)
 
-        # QGraphicsOpacityEffect работает на всех платформах (в отличие от setWindowOpacity)
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(1.0)
         self.setGraphicsEffect(self._opacity_effect)
@@ -56,7 +55,6 @@ class FadeToast(QWidget):
 
         self.adjustSize()
 
-        # Позиционируем ДО show() — с X11BypassWindowManagerHint WM не тронет
         p = self.parent()
         if p:
             parent_pos = p.mapToGlobal(QPoint(0, 0))
@@ -80,35 +78,32 @@ class FadeToast(QWidget):
 
 
 class NotificationManager:
-    """Показывает тосты об изменении статусов. Не дублирует одинаковые."""
+    """Shows notifications about status changes. Deduplicates identical ones."""
 
     def __init__(self, parent):
         self.parent = parent
-        self._active = {}  # key -> текущий тост
+        self._active = {}
 
     def host_status_changed(self, host_name, old_status, new_status):
         key = f"host:{host_name}"
-        text = ""
-        color = ""
         if new_status == "error" or new_status == "offline":
-            text = f"❌ {host_name} — недоступен"
+            text = tr("is unavailable") + f" ❌ {host_name}"
             color = "#dc2626"
         elif old_status in ("error", "offline", "unknown") and new_status == "online":
-            text = f"✅ {host_name} — снова в сети"
+            text = tr("is back online") + f" ✅ {host_name}"
             color = "#16a34a"
         elif new_status == "online":
-            text = f"🟢 {host_name} — онлайн"
+            text = tr("is online") + f" 🟢 {host_name}"
             color = "#1f2937"
         else:
             text = f"🟡 {host_name} — {new_status}"
             color = "#d97706"
-
         self._show(key, text, color)
 
     def vm_status_changed(self, vm_name, host_name, old_status, new_status):
         key = f"vm:{host_name}:{vm_name}"
-        status_ru = {"running": "Работает", "stopped": "Остановлена", "paused": "Приостановлена"}
-        ru = status_ru.get(new_status, new_status)
+        status_labels = {"running": tr("Running"), "stopped": tr("Stopped"), "paused": tr("Paused")}
+        ru = status_labels.get(new_status, new_status)
         status_icon = "🟢" if new_status == "running" else "🔴" if new_status == "stopped" else "🟡"
         color = "#16a34a" if new_status == "running" else "#dc2626" if new_status == "stopped" else "#d97706"
         self._show(key, f"{status_icon} {vm_name} — {ru}", color)
@@ -119,7 +114,6 @@ class NotificationManager:
             existing._fade_timer.stop()
             existing._fade_anim.stop()
             existing.deleteLater()
-        # Стекинг тостов: вычисляем смещение по Y на основе высоты активных
         offset_y = 12
         for k, t in self._active.items():
             if t is not None and t.isVisible():

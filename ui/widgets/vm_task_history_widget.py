@@ -3,6 +3,8 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
+from ..i18n import tr
+
 
 class VmTaskHistoryWidget(QWidget):
     def __init__(self, parent=None):
@@ -11,9 +13,9 @@ class VmTaskHistoryWidget(QWidget):
         self.table.verticalHeader().hide()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels([
-            "Начало", "Окончание", "Статус", "Пользователь", "Описание"
+            tr("Start time"), tr("End time"), tr("Status"),
+            tr("User"), tr("Description")
         ])
-        # Колонки времени и статуса — по содержимому, описание — Stretch
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -32,10 +34,8 @@ class VmTaskHistoryWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
     def set_tasks(self, tasks):
-        """tasks – список словарей, возвращённых /nodes/{node}/tasks"""
         self.table.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
-            # Начало
             start_ts = task.get('starttime')
             if start_ts:
                 try:
@@ -47,7 +47,6 @@ class VmTaskHistoryWidget(QWidget):
                 start_str = ''
             self.table.setItem(i, 0, QTableWidgetItem(start_str))
 
-            # Окончание
             end_ts = task.get('endtime')
             if end_ts:
                 try:
@@ -60,10 +59,9 @@ class VmTaskHistoryWidget(QWidget):
             end_item = QTableWidgetItem(end_str)
             if not end_str:
                 end_item.setForeground(QColor("#f59e0b"))
-                end_item.setText("выполняется...")
+                end_item.setText("running...")
             self.table.setItem(i, 1, end_item)
 
-            # Статус
             status = task.get('status', '')
             status_item = QTableWidgetItem(status)
             if status == 'OK':
@@ -74,22 +72,20 @@ class VmTaskHistoryWidget(QWidget):
                 status_item.setForeground(QColor("#ef4444"))
             self.table.setItem(i, 2, status_item)
 
-            # Пользователь
             user = task.get('user', '')
             self.table.setItem(i, 3, QTableWidgetItem(user))
 
-            # Описание (тип + VMID + узел, без разбора upid)
             task_type = task.get('type', '')
             node = task.get('node') or ''
             vmid = task.get('vmid') or task.get('id') or ''
             upid = task.get('upid', '')
 
             if vmid and node:
-                desc = f"{task_type}: VM {vmid} на {node}"
+                desc = f"{task_type}: VM {vmid} on {node}"
             elif vmid:
                 desc = f"{task_type}: VM {vmid}"
             elif node:
-                desc = f"{task_type} на {node}"
+                desc = f"{task_type} on {node}"
             elif upid:
                 desc = f"{task_type} ({upid})"
             else:

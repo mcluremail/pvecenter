@@ -1,9 +1,8 @@
-from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView,
-                               QVBoxLayout, QWidget, QProgressBar)
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget, QProgressBar
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
-from ..detail_panel import _progress_style
-from ..utils import format_uptime as _format_uptime
+from ..i18n import tr
+
 
 class VmPoolWidget(QWidget):
     def __init__(self, parent=None):
@@ -13,7 +12,8 @@ class VmPoolWidget(QWidget):
         self.table.verticalHeader().hide()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Имя", "Тип", "Диск %", "ОЗУ %", "ЦП %", "Аптайм"
+            tr("Name"), tr("Type"), tr("Disk %"), tr("RAM %"),
+            tr("CPU %"), tr("Uptime")
         ])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
@@ -28,7 +28,6 @@ class VmPoolWidget(QWidget):
         self.table.setColumnWidth(5, 80)
 
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
@@ -42,53 +41,68 @@ class VmPoolWidget(QWidget):
             self.table.setItem(i, 0, QTableWidgetItem(str(vm.get("name", ""))))
             self.table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
 
-            # Disk %
             maxdisk = vm.get("maxdisk", 0)
             disk = vm.get("disk", 0)
             disk_pct = int((disk / maxdisk) * 100) if maxdisk > 0 else 0
-            disk_bar = QProgressBar()
-            disk_bar.setRange(0, 100)
-            disk_bar.setValue(disk_pct)
-            disk_bar.setFormat(f"{disk_pct}%")
-            disk_bar.setStyleSheet(_progress_style(disk_pct))
-            self.table.setCellWidget(i, 2, disk_bar)
-            di = QTableWidgetItem("")
-            di.setFlags(Qt.ItemIsEnabled)
-            self.table.setItem(i, 2, di)
+            self._set_progress(i, 2, disk_pct)
 
-            # Mem %
             maxmem = vm.get("maxmem", 0)
             mem = vm.get("mem", 0)
             mem_pct = int((mem / maxmem) * 100) if maxmem > 0 else 0
-            mem_bar = QProgressBar()
-            mem_bar.setRange(0, 100)
-            mem_bar.setValue(mem_pct)
-            mem_bar.setFormat(f"{mem_pct}%")
-            mem_bar.setStyleSheet(_progress_style(mem_pct))
-            self.table.setCellWidget(i, 3, mem_bar)
-            mi = QTableWidgetItem("")
-            mi.setFlags(Qt.ItemIsEnabled)
-            self.table.setItem(i, 3, mi)
+            self._set_progress(i, 3, mem_pct)
 
-            # ЦП %
             cpu_fraction = vm.get("cpu", 0)
             cpu_pct = int(round(cpu_fraction * 100)) if isinstance(cpu_fraction, (int, float)) else 0
-            cpu_bar = QProgressBar()
-            cpu_bar.setRange(0, 100)
-            cpu_bar.setValue(cpu_pct)
-            cpu_bar.setFormat(f"{cpu_pct}%")
-            cpu_bar.setStyleSheet(_progress_style(cpu_pct))
-            self.table.setCellWidget(i, 4, cpu_bar)
-            ci = QTableWidgetItem("")
-            ci.setFlags(Qt.ItemIsEnabled)
-            self.table.setItem(i, 4, ci)
+            self._set_progress(i, 4, cpu_pct)
 
-            # Uptime
             uptime_sec = vm.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
+            uptime_str = self._fmt_uptime(uptime_sec) if uptime_sec else ''
             self.table.setItem(i, 5, QTableWidgetItem(uptime_str))
 
         self.table.resizeRowsToContents()
         for r in range(self.table.rowCount()):
             if self.table.rowHeight(r) > 24:
                 self.table.setRowHeight(r, 24)
+
+    def _set_progress(self, row, col, pct):
+        bar = QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(pct)
+        bar.setFormat(f"{pct}%")
+        bar.setStyleSheet(self._pstyle(pct))
+        self.table.setCellWidget(row, col, bar)
+        di = QTableWidgetItem("")
+        di.setFlags(Qt.ItemIsEnabled)
+        self.table.setItem(row, col, di)
+
+    @staticmethod
+    def _pstyle(pct):
+        if pct < 50:
+            color = "#22c55e"
+        elif pct < 80:
+            color = "#f59e0b"
+        else:
+            color = "#ef4444"
+        return (
+            f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
+            f"QProgressBar {{ border: 1px solid #d1d5db; border-radius: 3px;"
+            f" text-align: center; font-size: 11px; background: #f3f4f6; }}"
+        )
+
+    @staticmethod
+    def _fmt_uptime(seconds):
+        if not seconds or seconds <= 0:
+            return ""
+        days, rem = divmod(int(seconds), 86400)
+        hours, rem = divmod(rem, 3600)
+        mins, secs = divmod(rem, 60)
+        parts = []
+        if days:
+            parts.append(f"{days}d")
+        if hours:
+            parts.append(f"{hours}h")
+        if mins:
+            parts.append(f"{mins}m")
+        if secs or not parts:
+            parts.append(f"{secs}s")
+        return " ".join(parts)

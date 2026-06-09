@@ -11,7 +11,7 @@ class _RowHoverFilter(QObject):
         super().__init__(table)
         self.table = table
         self._prev_row = -1
-        self._orig_colors = {}  # row -> list of QBrush per column
+        self._orig_colors = {}
         table.setMouseTracking(True)
         table.viewport().setMouseTracking(True)
         table.cellEntered.connect(self._on_cell_entered)

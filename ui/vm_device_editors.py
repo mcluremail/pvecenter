@@ -1,18 +1,20 @@
 import re
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QLineEdit, QSpinBox, QComboBox,
-                               QFormLayout, QMessageBox, QGroupBox)
+                               QFormLayout, QMessageBox, QGroupBox,
+                               QListWidget, QListWidgetItem)
 from PySide6.QtCore import Qt
+from .i18n import tr
 
 
 NET_MODELS = ["virtio", "e1000", "rtl8139", "vmxnet3"]
 
 DISK_CACHE = [
-    ("none", "Нет"),
-    ("writeback", "Write back"),
-    ("writethrough", "Write through"),
-    ("directsync", "Direct sync"),
-    ("unsafe", "Unsafe"),
+    ("none", tr("None")),
+    ("writeback", tr("Write back")),
+    ("writethrough", tr("Write through")),
+    ("directsync", tr("Direct sync")),
+    ("unsafe", tr("Unsafe")),
 ]
 
 
@@ -83,7 +85,7 @@ def _parse_cdrom(val):
 class VmNetworkEditorDialog(QDialog):
     def __init__(self, key, label, current_value, running=False, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(500)
         self._key = key
         self._parsed = _parse_net(current_value)
@@ -97,7 +99,7 @@ class VmNetworkEditorDialog(QDialog):
         layout.addWidget(header)
 
         if running:
-            warn = QLabel("⚠ На работающей ВМ можно изменить только VLAN тег")
+            warn = QLabel(tr("On a running VM only the VLAN tag can be changed"))
             warn.setStyleSheet("color: #d97706; font-size: 11px;")
             warn.setWordWrap(True)
             layout.addWidget(warn)
@@ -105,7 +107,6 @@ class VmNetworkEditorDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(8)
 
-        # Модель
         self._model_combo = QComboBox()
         for m in NET_MODELS:
             self._model_combo.addItem(m, m)
@@ -113,12 +114,12 @@ class VmNetworkEditorDialog(QDialog):
         if idx >= 0:
             self._model_combo.setCurrentIndex(idx)
         self._model_combo.setEnabled(not running)
-        form.addRow("Модель:", self._model_combo)
+        form.addRow(tr("Model:"), self._model_combo)
 
         self._mac_edit = QLineEdit(self._parsed["mac"])
-        self._mac_edit.setPlaceholderText("оставьте пустым для авто-назначения")
+        self._mac_edit.setPlaceholderText(tr("leave empty for auto-assign"))
         self._mac_edit.setReadOnly(True)
-        form.addRow("MAC:", self._mac_edit)
+        form.addRow(tr("MAC:"), self._mac_edit)
 
         self._bridge_combo = QComboBox()
         self._bridge_combo.setEditable(True)
@@ -132,39 +133,36 @@ class VmNetworkEditorDialog(QDialog):
         else:
             self._bridge_combo.setEditText(bridge_val)
         self._bridge_combo.setEnabled(not running)
-        form.addRow("Мост:", self._bridge_combo)
+        form.addRow(tr("Bridge:"), self._bridge_combo)
 
-        # VLAN
         self._vlan_spin = QSpinBox()
         self._vlan_spin.setRange(0, 4094)
-        self._vlan_spin.setSpecialValueText("Нет")
+        self._vlan_spin.setSpecialValueText(tr("None"))
         try:
             self._vlan_spin.setValue(int(self._parsed["tag"]) if self._parsed["tag"] else 0)
         except ValueError:
             self._vlan_spin.setValue(0)
-        form.addRow("VLAN тег:", self._vlan_spin)
+        form.addRow(tr("VLAN tag:"), self._vlan_spin)
 
-        # Очереди
         self._queues_spin = QSpinBox()
         self._queues_spin.setRange(0, 64)
-        self._queues_spin.setSpecialValueText("Авто")
+        self._queues_spin.setSpecialValueText(tr("Auto"))
         try:
             self._queues_spin.setValue(int(self._parsed["queues"]) if self._parsed["queues"] else 0)
         except ValueError:
             self._queues_spin.setValue(0)
-        form.addRow("Очередей:", self._queues_spin)
+        form.addRow(tr("Queues:"), self._queues_spin)
 
         layout.addLayout(form)
 
-        # Кнопки
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self._ok_btn = QPushButton("Сохранить")
+        self._ok_btn = QPushButton(tr("Save"))
         self._ok_btn.setObjectName("accentBtn")
         self._ok_btn.setFixedWidth(120)
         self._ok_btn.clicked.connect(self._on_ok)
         btn_layout.addWidget(self._ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -186,10 +184,10 @@ class VmNetworkEditorDialog(QDialog):
 
 
 class VmCdromEditorDialog(QDialog):
-    """Редактирование CDROM (ide2)."""
+    """CDROM (ide2) editor."""
     def __init__(self, key, label, current_value, iso_list=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(500)
         self._key = key
         self._parsed = _parse_cdrom(current_value)
@@ -198,17 +196,16 @@ class VmCdromEditorDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        header = QLabel(f"<b>{label} — оптический привод</b>")
+        header = QLabel(f"<b>{label} — {tr('Optical drive')}</b>")
         layout.addWidget(header)
 
-        # Текущее состояние
         current_label = QLabel()
         if self._parsed["type"] == "physical":
-            current_label.setText("Текущее: <b>Физический привод</b>")
+            current_label.setText(tr("Current:") + f" <b>{tr('Physical drive')}</b>")
         elif self._parsed["type"] == "iso":
-            current_label.setText(f"Текущее: <b>{self._parsed['volid']}</b>")
+            current_label.setText(tr("Current:") + f" <b>{self._parsed['volid']}</b>")
         else:
-            current_label.setText("Текущее: <b>Нет носителя</b>")
+            current_label.setText(tr("Current:") + f" <b>{tr('No media')}</b>")
         layout.addWidget(current_label)
 
         form = QFormLayout()
@@ -216,8 +213,8 @@ class VmCdromEditorDialog(QDialog):
 
         self._iso_combo = QComboBox()
         self._iso_combo.setEditable(True)
-        self._iso_combo.addItem("— Нет носителя —", "__none__")
-        self._iso_combo.addItem("Физический привод (CD/DVD)", "__cdrom__")
+        self._iso_combo.addItem(tr("No media —"), "__none__")
+        self._iso_combo.addItem(tr("Physical drive (CD/DVD)"), "__cdrom__")
         if iso_list:
             for volid in iso_list:
                 fname = volid.split("/")[-1] if "/" in volid else volid
@@ -229,27 +226,26 @@ class VmCdromEditorDialog(QDialog):
             else:
                 self._iso_combo.addItem(str(self._parsed["volid"]), self._parsed["volid"])
                 self._iso_combo.setCurrentIndex(self._iso_combo.count() - 1)
-        form.addRow("Выбор ISO:", self._iso_combo)
+        form.addRow(tr("Select ISO:"), self._iso_combo)
 
         layout.addLayout(form)
 
-        info = QLabel("ISO-образы загружаются из хранилищ узла. "
-                      "Если нужного нет в списке, введите вручную volid.")
+        info = QLabel(tr("ISO images are loaded from node storage"))
         info.setStyleSheet("color: #6b7280; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
         btn_layout = QHBoxLayout()
-        eject_btn = QPushButton("Извлечь (Eject)")
+        eject_btn = QPushButton(tr("Eject"))
         eject_btn.clicked.connect(self._on_eject)
         btn_layout.addWidget(eject_btn)
         btn_layout.addStretch()
-        self._ok_btn = QPushButton("Сохранить")
+        self._ok_btn = QPushButton(tr("Save"))
         self._ok_btn.setObjectName("accentBtn")
         self._ok_btn.setFixedWidth(120)
         self._ok_btn.clicked.connect(self._on_ok)
         btn_layout.addWidget(self._ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -264,7 +260,7 @@ class VmCdromEditorDialog(QDialog):
     def get_raw_value(self):
         data = self._iso_combo.currentData()
         if data == "__none__":
-            return (self._key, None)  # remove ide2
+            return (self._key, None)
         elif data == "__cdrom__":
             return (self._key, "/dev/cdrom,media=cdrom")
         elif data:
@@ -273,10 +269,10 @@ class VmCdromEditorDialog(QDialog):
 
 
 class VmDiskEditorDialog(QDialog):
-    """Редактирование параметров диска (virtio0, scsi0, ...)."""
+    """Disk parameter editor (virtio0, scsi0, ...)."""
     def __init__(self, key, label, current_value, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(450)
         self._key = key
         self._parsed = _parse_disk(current_value)
@@ -291,48 +287,43 @@ class VmDiskEditorDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(8)
 
-        # Хранилище (только чтение)
         storage_edit = QLineEdit(self._parsed["storage"])
         storage_edit.setReadOnly(True)
-        form.addRow("Хранилище:", storage_edit)
+        form.addRow(tr("Storage:"), storage_edit)
 
-        # Размер (только чтение)
         size_edit = QLineEdit(self._parsed["size"])
         size_edit.setReadOnly(True)
-        form.addRow("Размер:", size_edit)
+        form.addRow(tr("Size:"), size_edit)
 
-        # Формат (только чтение)
         fmt_edit = QLineEdit(self._parsed["format"])
         fmt_edit.setReadOnly(True)
         if not self._parsed["format"]:
-            fmt_edit.setPlaceholderText("qcow2 (по умолчанию)")
-        form.addRow("Формат:", fmt_edit)
+            fmt_edit.setPlaceholderText("qcow2 (default)")
+        form.addRow(tr("Format:"), fmt_edit)
 
-        # Кэш (редактируемый)
         self._cache_combo = QComboBox()
         for val, label_text in DISK_CACHE:
             self._cache_combo.addItem(label_text, val)
         idx = self._cache_combo.findData(self._parsed["cache"])
         if idx >= 0:
             self._cache_combo.setCurrentIndex(idx)
-        form.addRow("Кэш:", self._cache_combo)
+        form.addRow(tr("Cache:"), self._cache_combo)
 
         layout.addLayout(form)
 
-        info = QLabel("Размер, хранилище и формат диска нельзя изменить "
-                      "через этот интерфейс (требуется создание нового диска).")
+        info = QLabel(tr("Disk size, storage and format cannot be changed here"))
         info.setStyleSheet("color: #6b7280; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self._ok_btn = QPushButton("Сохранить")
+        self._ok_btn = QPushButton(tr("Save"))
         self._ok_btn.setObjectName("accentBtn")
         self._ok_btn.setFixedWidth(120)
         self._ok_btn.clicked.connect(self._on_ok)
         btn_layout.addWidget(self._ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -344,7 +335,7 @@ class VmDiskEditorDialog(QDialog):
     def get_raw_value(self):
         cache = self._cache_combo.currentData()
         if cache == self._parsed["cache"]:
-            return (self._key, None)  # no change
+            return (self._key, None)
         new_val = f"{self._parsed['storage']}:{self._parsed['size']}"
         parts = []
         if self._parsed["format"]:
@@ -361,7 +352,7 @@ class VmBootEditorDialog(QDialog):
 
     def __init__(self, key, label, current_value, config_data, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
         self._key = key
@@ -374,13 +365,12 @@ class VmBootEditorDialog(QDialog):
         header = QLabel(f"<b>{label}</b>")
         layout.addWidget(header)
 
-        info = QLabel("Перемещайте устройства между доступными и порядком "
-                      "загрузки с помощью кнопок")
+        info = QLabel(tr("Move devices between available and boot order"))
         info.setStyleSheet("color: #6b7280; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
-        avail_label = QLabel("Доступные устройства:")
+        avail_label = QLabel(tr("Available devices:"))
         avail_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(avail_label)
         self._avail = QListWidget()
@@ -399,7 +389,7 @@ class VmBootEditorDialog(QDialog):
         move_row.addStretch()
         layout.addLayout(move_row)
 
-        order_label = QLabel("Порядок загрузки:")
+        order_label = QLabel(tr("Boot order:"))
         order_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(order_label)
         self._order = QListWidget()
@@ -407,11 +397,11 @@ class VmBootEditorDialog(QDialog):
         layout.addWidget(self._order)
 
         order_btn_row = QHBoxLayout()
-        up_btn = QPushButton("Вверх")
+        up_btn = QPushButton(tr("Up"))
         up_btn.setFixedWidth(80)
         up_btn.clicked.connect(self._move_up)
         order_btn_row.addWidget(up_btn)
-        down_btn = QPushButton("Вниз")
+        down_btn = QPushButton(tr("Down"))
         down_btn.setFixedWidth(80)
         down_btn.clicked.connect(self._move_down)
         order_btn_row.addWidget(down_btn)
@@ -420,12 +410,12 @@ class VmBootEditorDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton("Сохранить")
+        ok_btn = QPushButton(tr("Save"))
         ok_btn.setObjectName("accentBtn")
         ok_btn.setFixedWidth(120)
         ok_btn.clicked.connect(self._on_ok)
         btn_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -491,9 +481,8 @@ class VmBootEditorDialog(QDialog):
     def _on_ok(self):
         if self._order.count() == 0:
             ret = QMessageBox.question(
-                self, "Пустой порядок",
-                "Не выбрано ни одного устройства. ВМ может не загрузиться. "
-                "Продолжить?",
+                self, tr("Empty boot order"),
+                tr("Empty boot order — VM may not boot") + "\n" + tr("Continue?"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if ret != QMessageBox.Yes:
@@ -510,7 +499,7 @@ class VmBootdiskEditorDialog(QDialog):
 
     def __init__(self, key, label, current_value, config_data, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(400)
         self._key = key
 
@@ -518,7 +507,7 @@ class VmBootdiskEditorDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        header = QLabel(f"<b>{label} — загрузочный диск</b>")
+        header = QLabel(f"<b>{label} — {tr('Boot Disk')}</b>")
         layout.addWidget(header)
 
         devices = set()
@@ -528,7 +517,7 @@ class VmBootdiskEditorDialog(QDialog):
                     devices.add(k)
 
         self._combo = QComboBox()
-        self._combo.addItem("— нет —", "")
+        self._combo.addItem(tr("— none —"), "")
         for d in sorted(devices):
             self._combo.addItem(d, d)
         idx = self._combo.findData(str(current_value or ""))
@@ -537,17 +526,17 @@ class VmBootdiskEditorDialog(QDialog):
         else:
             self._combo.setEditText(str(current_value or ""))
         form = QFormLayout()
-        form.addRow("Устройство:", self._combo)
+        form.addRow(tr("Device:"), self._combo)
         layout.addLayout(form)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton("Сохранить")
+        ok_btn = QPushButton(tr("Save"))
         ok_btn.setObjectName("accentBtn")
         ok_btn.setFixedWidth(120)
         ok_btn.clicked.connect(self.accept)
         btn_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
@@ -561,7 +550,7 @@ class VmBootdiskEditorDialog(QDialog):
 class VmStartupEditorDialog(QDialog):
     def __init__(self, key, label, current_value, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(400)
         self._key = key
 
@@ -576,56 +565,55 @@ class VmStartupEditorDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        header = QLabel(f"<b>{label} — порядок и задержки запуска</b>")
+        header = QLabel(f"<b>{label} — {tr('Startup order and delays')}</b>")
         layout.addWidget(header)
 
         form = QFormLayout()
 
         self._order_spin = QSpinBox()
         self._order_spin.setRange(0, 9999)
-        self._order_spin.setSpecialValueText("Не задан")
+        self._order_spin.setSpecialValueText(tr("Not set"))
         try:
             self._order_spin.setValue(int(parsed.get("order", 0) or 0))
         except ValueError:
             self._order_spin.setValue(0)
-        form.addRow("Порядок:", self._order_spin)
+        form.addRow(tr("Order:"), self._order_spin)
 
         self._up_spin = QSpinBox()
         self._up_spin.setRange(0, 99999)
-        self._up_spin.setSuffix(" сек")
-        self._up_spin.setSpecialValueText("Не задана")
+        self._up_spin.setSuffix(" " + tr("sec"))
+        self._up_spin.setSpecialValueText(tr("Not set"))
         try:
             self._up_spin.setValue(int(parsed.get("up", 0) or 0))
         except ValueError:
             self._up_spin.setValue(0)
-        form.addRow("Задержка запуска:", self._up_spin)
+        form.addRow(tr("Start delay:"), self._up_spin)
 
         self._down_spin = QSpinBox()
         self._down_spin.setRange(0, 99999)
-        self._down_spin.setSuffix(" сек")
-        self._down_spin.setSpecialValueText("Не задана")
+        self._down_spin.setSuffix(" " + tr("sec"))
+        self._down_spin.setSpecialValueText(tr("Not set"))
         try:
             self._down_spin.setValue(int(parsed.get("down", 0) or 0))
         except ValueError:
             self._down_spin.setValue(0)
-        form.addRow("Задержка остановки:", self._down_spin)
+        form.addRow(tr("Stop delay:"), self._down_spin)
 
         layout.addLayout(form)
 
-        info = QLabel("Чем меньше число в поле «Порядок», тем раньше "
-                      "запустится ВМ среди других ВМ на узле.")
+        info = QLabel(tr("Lower number starts earlier"))
         info.setStyleSheet("color: #6b7280; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton("Сохранить")
+        ok_btn = QPushButton(tr("Save"))
         ok_btn.setObjectName("accentBtn")
         ok_btn.setFixedWidth(120)
         ok_btn.clicked.connect(self.accept)
         btn_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)

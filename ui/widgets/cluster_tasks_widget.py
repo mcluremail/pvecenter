@@ -4,85 +4,86 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
 from ...config import save_ui_state, load_ui_state
+from ..i18n import tr
 import json as _json
 
 TASK_COL_WIDTHS_KEY = "task_col_widths"
 
 
 TASK_TYPE_LABELS = {
-    # ВМ
-    "qemstart": "Запуск ВМ",
-    "qmstart": "Запуск ВМ",
-    "qemstop": "Остановка ВМ",
-    "qmstop": "Остановка ВМ",
-    "qemshutdown": "Выключение ВМ",
-    "qmshutdown": "Выключение ВМ",
-    "qemreboot": "Перезагрузка ВМ",
-    "qmreboot": "Перезагрузка ВМ",
-    "qemreset": "Сброс ВМ",
-    "qmreset": "Сброс ВМ",
-    "qemsuspend": "Приостановка ВМ",
-    "qmgestsuspend": "Приостановка ВМ",
-    "qmresume": "Возобновление ВМ",
-    "qmgestscreenshot": "Скриншот ВМ",
-    "qmgstdstva": "Задача ВМ",
-    "spiceproxy": "SPICE-консоль",
-    "vncproxy": "VNC-консоль",
-    "console": "Консоль",
+    # VM
+    "qemstart": tr("Start VM"),
+    "qmstart": tr("Start VM"),
+    "qemstop": tr("Stop VM"),
+    "qmstop": tr("Stop VM"),
+    "qemshutdown": tr("Shutdown VM"),
+    "qmshutdown": tr("Shutdown VM"),
+    "qemreboot": tr("Reboot VM"),
+    "qmreboot": tr("Reboot VM"),
+    "qemreset": tr("Reset VM"),
+    "qmreset": tr("Reset VM"),
+    "qemsuspend": tr("Suspend VM"),
+    "qmgestsuspend": tr("Suspend VM"),
+    "qmresume": tr("Resume VM"),
+    "qmgestscreenshot": tr("VM Screenshot"),
+    "qmgstdstva": tr("VM Task"),
+    "spiceproxy": tr("SPICE Console"),
+    "vncproxy": tr("VNC Console"),
+    "console": tr("Console"),
     # LXC
-    "lxc-start": "Запуск контейнера",
-    "lxc-stop": "Остановка контейнера",
-    "lxc-shutdown": "Выключение контейнера",
-    "lxc-reboot": "Перезагрузка контейнера",
-    "lxc-suspend": "Приостановка контейнера",
-    "lxc-resume": "Возобновление контейнера",
-    "vzstart": "Запуск контейнера",
-    "vzstop": "Остановка контейнера",
-    "vzreboot": "Перезагрузка контейнера",
-    # Управление ВМ/контейнерами
-    "create": "Создание",
-    "destroy": "Удаление",
-    "clone": "Клонирование",
-    "qmigrate": "Миграция",
-    "resize": "Изменение диска",
-    "qmmove": "Перемещение диска",
-    "move": "Перемещение",
-    "diskread": "Чтение с диска",
-    "diskwrite": "Запись на диск",
-    "imgdel": "Удаление образа",
-    "imgcopy": "Копирование образа",
-    # Снапшоты
-    "snapshot": "Создание снапшота",
-    "snapdestroy": "Удаление снапшота",
-    "snaprollback": "Откат к снапшоту",
-    "snapremove": "Удаление снапшота",
-    # Бэкапы и восстановление
-    "vzdump": "Резервное копирование",
-    "restore": "Восстановление",
-    "verify": "Проверка бэкапов",
-    "pull": "Импорт бэкапа",
-    # Хранилище
-    "dfs-migrate": "Миграция хранилища",
-    "dfs-del": "Удаление с хранилища",
-    # Сеть
-    "sdn-apply": "Применение SDN",
-    # Обновления
-    "pveupdate": "Обновление PVE",
-    "pveproxy": "Обновление прокси",
-    "apt": "APT-операция",
+    "lxc-start": tr("Start Container"),
+    "lxc-stop": tr("Stop Container"),
+    "lxc-shutdown": tr("Shutdown Container"),
+    "lxc-reboot": tr("Reboot Container"),
+    "lxc-suspend": tr("Suspend Container"),
+    "lxc-resume": tr("Resume Container"),
+    "vzstart": tr("Start Container"),
+    "vzstop": tr("Stop Container"),
+    "vzreboot": tr("Reboot Container"),
+    # VM/Container management
+    "create": tr("Create"),
+    "destroy": tr("Destroy"),
+    "clone": tr("Clone"),
+    "qmigrate": tr("Migrate"),
+    "resize": tr("Resize Disk"),
+    "qmmove": tr("Move Disk"),
+    "move": tr("Move"),
+    "diskread": tr("Disk Read"),
+    "diskwrite": tr("Disk Write"),
+    "imgdel": tr("Delete Image"),
+    "imgcopy": tr("Copy Image"),
+    # Snapshots
+    "snapshot": tr("Create Snapshot"),
+    "snapdestroy": tr("Delete Snapshot"),
+    "snaprollback": tr("Rollback to Snapshot"),
+    "snapremove": tr("Delete Snapshot"),
+    # Backups and restore
+    "vzdump": tr("Backup"),
+    "restore": tr("Restore"),
+    "verify": tr("Verify Backups"),
+    "pull": tr("Import Backup"),
+    # Storage
+    "dfs-migrate": tr("Migrate Storage"),
+    "dfs-del": tr("Delete from Storage"),
+    # Network
+    "sdn-apply": tr("Apply SDN"),
+    # Updates
+    "pveupdate": tr("Update PVE"),
+    "pveproxy": tr("Update Proxy"),
+    "apt": tr("APT Operation"),
     # HA
-    "ha-manager": "Менеджер HA",
-    "ha-crm": "HA CRM",
-    # Безопасность и ACME
-    "acmedns": "ACME DNS-вызов",
-    "pvefw-logger": "Файрвол PVE",
-    # Репликация
-    "repl": "Репликация",
+    "ha-manager": tr("HA Manager"),
+    "ha-crm": tr("HA CRM"),
+    # Security and ACME
+    "acmedns": tr("ACME DNS Challenge"),
+    "pvefw-logger": tr("PVE Firewall"),
+    # Replication
+    "repl": tr("Replication"),
     # Ceph
-    "ceph-apply": "Применение Ceph",
-    "ceph-destroy": "Удаление Ceph",
-    "ceph-create-fs": "Создание FS Ceph",
-    "ceph-install": "Установка Ceph",
+    "ceph-apply": tr("Apply Ceph"),
+    "ceph-destroy": tr("Destroy Ceph"),
+    "ceph-create-fs": tr("Create Ceph FS"),
+    "ceph-install": tr("Install Ceph"),
 }
 
 TIMESTAMP_FMT = "%d.%m.%y %H:%M"
@@ -130,7 +131,7 @@ class ClusterTasksWidget(QWidget):
         self.table.verticalHeader().hide()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Начало", "Окончание", "Хост", "Пользователь", "Описание", "Статус"
+            tr("Start time"), tr("End time"), tr("Host"), tr("User"), tr("Description"), tr("Status")
         ])
 
         h = self.table.horizontalHeader()
@@ -147,7 +148,7 @@ class ClusterTasksWidget(QWidget):
         self.table.setColumnWidth(0, 155)
         self.table.setColumnWidth(1, 155)
 
-        # Восстанавливаем ширину колонок (изменения сохраняем через sectionResized)
+        # Restore column widths (changes saved via sectionResized)
         self._restore_column_widths()
         h.sectionResized.connect(self._save_column_widths)
 
@@ -169,8 +170,8 @@ class ClusterTasksWidget(QWidget):
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
 
-        # Блокируем сигналы модели — иначе ResizeToContents и сортировка
-        # реагируют на каждый setItem, вызывая O(n²) при 500+ строках
+        # Block model signals — otherwise ResizeToContents and sorting
+        # react to every setItem, causing O(n²) with 500+ rows
         self.table.setUpdatesEnabled(False)
         self.table.model().blockSignals(True)
         self.table.setRowCount(len(tasks))
@@ -204,7 +205,7 @@ class ClusterTasksWidget(QWidget):
                 item1.setData(Qt.UserRole, float(end_ts))
             if not end_str:
                 item1.setForeground(QColor("#f59e0b"))
-                item1.setText("выполняется...")
+                item1.setText(tr("running..."))
             self.table.setItem(i, 1, item1)
 
             node = task.get('node', '')
@@ -258,7 +259,9 @@ class ClusterTasksWidget(QWidget):
             self.table.sortItems(0, Qt.DescendingOrder)
             self.table.setSortingEnabled(True)
 
-    def set_placeholder(self, text="Загрузка задач..."):
+    def set_placeholder(self, text=None):
+        if text is None:
+            text = tr("Loading tasks...")
         was_sorted = self.table.isSortingEnabled()
         if was_sorted:
             self.table.setSortingEnabled(False)

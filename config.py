@@ -65,28 +65,29 @@ def _decrypt_from_file(enc_path, password):
 # Password dialog (lazy import PySide6 to keep CLI importable)
 # ------------------------------------------------------------
 def _ask_password(mode="enter"):
-    """Показывает диалог ввода пароля.
-    mode='enter' — существующий пароль, mode='set' — установка нового.
-    Возвращает пароль или None (отмена)."""
+    """Show password input dialog.
+    mode='enter' — existing password, mode='set' — set new password.
+    Returns password or None (cancelled)."""
     from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                    QLineEdit, QPushButton, QApplication)
+    from .ui.i18n import tr
     dialog = QDialog()
-    dialog.setWindowTitle("PVE Dashboard — Авторизация")
+    dialog.setWindowTitle(tr("PVE Dashboard — Authorization"))
     dialog.setFixedSize(380, 160)
 
     layout = QVBoxLayout(dialog)
 
     if mode == "set":
-        layout.addWidget(QLabel("Установите мастер-пароль для шифрования токенов:"))
+        layout.addWidget(QLabel(tr("Set master password to encrypt tokens:")))
     else:
-        layout.addWidget(QLabel("Введите мастер-пароль:"))
+        layout.addWidget(QLabel(tr("Enter master password:")))
 
     pwd_input = QLineEdit()
     pwd_input.setEchoMode(QLineEdit.Password)
     layout.addWidget(pwd_input)
 
     if mode == "set":
-        layout.addWidget(QLabel("Повторите пароль:"))
+        layout.addWidget(QLabel(tr("Repeat password:")))
         confirm_input = QLineEdit()
         confirm_input.setEchoMode(QLineEdit.Password)
         layout.addWidget(confirm_input)
@@ -99,7 +100,7 @@ def _ask_password(mode="enter"):
 
     btn_layout = QHBoxLayout()
     ok_btn = QPushButton("OK")
-    cancel_btn = QPushButton("Отмена")
+    cancel_btn = QPushButton(tr("Cancel"))
     btn_layout.addStretch()
     btn_layout.addWidget(ok_btn)
     btn_layout.addWidget(cancel_btn)
@@ -110,10 +111,10 @@ def _ask_password(mode="enter"):
     def on_ok():
         pwd = pwd_input.text()
         if not pwd:
-            error_label.setText("Пароль не может быть пустым")
+            error_label.setText(tr("Password cannot be empty"))
             return
         if confirm_input is not None and pwd != confirm_input.text():
-            error_label.setText("Пароли не совпадают")
+            error_label.setText(tr("Passwords do not match"))
             return
         result[0] = pwd
         dialog.accept()
@@ -176,9 +177,9 @@ def load_config():
                 return _decrypt_from_file(enc_path, password)
             except Exception:
                 from PySide6.QtWidgets import QMessageBox
-                QMessageBox.warning(None, "Ошибка",
-                                     "Неверный пароль. Попробуйте снова.")
-                # цикл: снова показываем диалог пароля
+                from .ui.i18n import tr
+                QMessageBox.warning(None, tr("Error"),
+                                     tr("Wrong password. Try again."))
     else:
         json_path = os.path.join(base, CONFIG_JSON)
         if not os.path.exists(json_path):
@@ -195,17 +196,18 @@ def load_config():
             _encrypt_to_file(config, password, enc_path)
             from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                            QLabel, QPushButton)
+            from .ui.i18n import tr
             dlg = QDialog()
-            dlg.setWindowTitle("Безопасность")
+            dlg.setWindowTitle(tr("Security"))
             dlg.setFixedSize(480, 140)
             l = QVBoxLayout(dlg)
-            l.addWidget(QLabel("Токены зашифрованы в nodes.enc. Удалить nodes.json "
-                               "(исходный файл с токенами в открытом виде)?"))
+            l.addWidget(QLabel(tr("Tokens are encrypted in nodes.enc. Delete nodes.json "
+                                   "(source file with plaintext tokens)?")))
             l.addStretch()
             bl = QHBoxLayout()
             bl.addStretch()
-            yes_b = QPushButton("Да")
-            no_b = QPushButton("Нет")
+            yes_b = QPushButton(tr("Yes"))
+            no_b = QPushButton(tr("No"))
             no_b.setDefault(True)
             bl.addWidget(yes_b)
             bl.addWidget(no_b)
@@ -277,6 +279,14 @@ def _init_ui_db():
     conn = sqlite3.connect(path, timeout=5)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS translations (
+            lang  TEXT NOT NULL,
+            msgid TEXT NOT NULL,
+            msgstr TEXT NOT NULL,
+            PRIMARY KEY (lang, msgid)
+        )
+    """)
     conn.commit()
     return conn
 
@@ -305,6 +315,45 @@ def load_ui_state(key: str) -> str | None:
         import logging
         logging.getLogger(__name__).warning("load_ui_state(%s): %s", key, e)
         return None
+
+
+# ------------------------------------------------------------
+# Translations — bulk insert helper
+# ------------------------------------------------------------
+
+_translations_lock = _ui_state_lock
+
+
+def seed_translations(lang: str, translations: dict[str, str]):
+    """Insert a translation dictionary for a language if not already present.
+    Only inserts rows where (lang, msgid) does not exist — does not overwrite
+    user modifications.
+    """
+    try:
+        with _translations_lock:
+            conn = _init_ui_db()
+            inserted = 0
+            for msgid, msgstr in translations.items():
+                cur = conn.execute(
+                    "SELECT 1 FROM translations WHERE lang = ? AND msgid = ?",
+                    (lang, msgid),
+                )
+                if cur.fetchone() is None:
+                    conn.execute(
+                        "INSERT INTO translations (lang, msgid, msgstr) VALUES (?, ?, ?)",
+                        (lang, msgid, msgstr),
+                    )
+                    inserted += 1
+            conn.commit()
+            conn.close()
+            if inserted:
+                import logging
+                logging.getLogger(__name__).info(
+                    "Seeded %d translations for %s", inserted, lang
+                )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("seed_translations(%s): %s", lang, e)
 
 
 # Dead code below (kept for reference):

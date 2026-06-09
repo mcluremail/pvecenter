@@ -10,7 +10,8 @@ import re as _re
 
 from .icons import get_icon, init_icons, _make_loading_icon
 from ..config import save_ui_state, load_ui_state
-from .utils import STATUS_RU, format_uptime as _format_uptime
+from .utils import status_text, format_uptime as _format_uptime
+from .i18n import tr
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2
@@ -23,10 +24,10 @@ def _vm_count_str(vms):
 class TreePanel(QWidget):
     item_selected = Signal(str, str, dict)
     add_server_requested_context = Signal(str)
-    host_remove_requested = Signal(str, str)  # type ("host"/"cluster"/"section"), name
-    host_token_refresh_requested = Signal(str)  # host_name
-    vm_create_requested = Signal(str, str)  # node_name, host_name
-    vm_delete_requested = Signal(str, str, int)  # host_name, node, vmid
+    host_remove_requested = Signal(str, str)
+    host_token_refresh_requested = Signal(str)
+    vm_create_requested = Signal(str, str)
+    vm_delete_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -55,12 +56,12 @@ class TreePanel(QWidget):
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
         self._toggle_btn.setIconSize(QSize(14, 14))
-        self._toggle_btn.setToolTip("Развернуть всё")
+        self._toggle_btn.setToolTip(tr("Expand all"))
         self._toggle_btn.setAutoRaise(True)
         self._toggled = False
         self._toggle_btn.clicked.connect(self._toggle_expand)
 
-        self._empty_label = QLabel("Нет добавленных серверов.\nНажмите + чтобы добавить")
+        self._empty_label = QLabel(tr("No servers added.\nPress + to add"))
         self._empty_label.setAlignment(Qt.AlignCenter)
         self._empty_label.setWordWrap(True)
         self._empty_label.setStyleSheet("color: #9ca3af; font-size: 13px; padding: 40px 20px;")
@@ -95,11 +96,11 @@ class TreePanel(QWidget):
         if self._toggled:
             self.tree.expandAll()
             self._toggle_btn.setIcon(get_icon("collapse"))
-            self._toggle_btn.setToolTip("Свернуть всё")
+            self._toggle_btn.setToolTip(tr("Collapse all"))
         else:
             self.tree.collapseAll()
             self._toggle_btn.setIcon(get_icon("expand"))
-            self._toggle_btn.setToolTip("Развернуть всё")
+            self._toggle_btn.setToolTip(tr("Expand all"))
 
     def _on_context_menu(self, pos):
         item = self.tree.itemAt(pos)
@@ -117,7 +118,7 @@ class TreePanel(QWidget):
                 "QMenu::item { padding: 4px 12px; }"
                 "QMenu::item:selected { background: #e5e7eb; }"
             )
-            delete_action = QAction("Удалить ВМ", self.tree)
+            delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_delete_requested.emit(hn, nd, vid)
             )
@@ -144,29 +145,28 @@ class TreePanel(QWidget):
                 host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
                 host_name = host.get("host_name", "") if host else ""
             if host_name:
-                create_vm_action = QAction("Создать ВМ", self.tree)
+                create_vm_action = QAction(tr("Create VM"), self.tree)
                 create_vm_action.setIcon(get_icon("vm"))
                 create_vm_action.triggered.connect(
                     lambda checked, nn=item_name, hn=host_name: self.vm_create_requested.emit(nn, hn)
                 )
                 menu.addAction(create_vm_action)
                 menu.addSeparator()
-                delete_action = QAction("Удалить хост", self.tree)
+                delete_action = QAction(tr("Delete host"), self.tree)
                 delete_action.triggered.connect(lambda: self.host_remove_requested.emit("host", host_name))
                 menu.addAction(delete_action)
-                refresh_action = QAction("Создать токен заново", self.tree)
+                refresh_action = QAction(tr("Refresh token"), self.tree)
                 refresh_action.setIcon(get_icon("refresh"))
                 refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
                 menu.addAction(refresh_action)
 
         elif item_type == "cluster":
-            # Берём первый хост из кластера для передачи в диалог
             cl_hosts = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
             if cl_hosts:
                 first = cl_hosts[0]
                 cl_node_name = first.get("node", "")
                 cl_host_name = first.get("name", "")
-                create_vm_action = QAction("Создать ВМ", self.tree)
+                create_vm_action = QAction(tr("Create VM"), self.tree)
                 create_vm_action.setIcon(get_icon("vm"))
                 create_vm_action.triggered.connect(
                     lambda checked, nn=cl_node_name, hn=cl_host_name:
@@ -174,12 +174,12 @@ class TreePanel(QWidget):
                 )
                 menu.addAction(create_vm_action)
                 menu.addSeparator()
-            delete_action = QAction("Удалить кластер", self.tree)
+            delete_action = QAction(tr("Delete cluster"), self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
             menu.addAction(delete_action)
 
-        elif item_type == "section" and item_name in ("Кластеры", "Отдельные хосты"):
-            delete_action = QAction(f"Удалить все хосты из «{item_name}»", self.tree)
+        elif item_type == "section" and item_name in (tr("Clusters"), tr("Standalone hosts")):
+            delete_action = QAction(tr("Remove all hosts from") + f' "{item_name}"', self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("section", item_name))
             menu.addAction(delete_action)
 
@@ -194,7 +194,7 @@ class TreePanel(QWidget):
         item.setIcon(0, get_icon("folder"))
         item.setExpanded(True)
 
-        context_map = {"Кластеры": "cluster", "Отдельные хосты": "standalone"}
+        context_map = {tr("Clusters"): "cluster", tr("Standalone hosts"): "standalone"}
         ctx = context_map.get(label, "")
         if not ctx:
             return item
@@ -213,7 +213,7 @@ class TreePanel(QWidget):
             "color: #475569; padding: 0; outline: none; }"
             "QPushButton:hover { background: #e2e8f0; border-color: #94a3b8; color: #334155; }"
         )
-        btn.setToolTip(f"Добавить хост в «{label}»")
+        btn.setToolTip(tr("Add host to") + f' "{label}"')
         btn.clicked.connect(lambda checked, c=ctx: self.add_server_requested_context.emit(c))
         hbox.addWidget(btn)
         self.tree.setItemWidget(item, 0, w)
@@ -267,7 +267,7 @@ class TreePanel(QWidget):
             else:
                 standalone.append(name)
 
-        folder = self._make_section_item(self.tree, "Кластеры")
+        folder = self._make_section_item(self.tree, tr("Clusters"))
         for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
             cl_item = QTreeWidgetItem(folder)
             cl_item.setText(0, cl_name)
@@ -276,7 +276,7 @@ class TreePanel(QWidget):
             cl_item.setExpanded(True)
             self._loading_hosts.add(f"cluster:{cl_name}")
 
-        folder_standalone = self._make_section_item(self.tree, "Отдельные хосты")
+        folder_standalone = self._make_section_item(self.tree, tr("Standalone hosts"))
         if standalone:
             for hname in sorted(standalone, key=str.lower):
                 hi = QTreeWidgetItem(folder_standalone)
@@ -297,10 +297,10 @@ class TreePanel(QWidget):
         self._toggled = expanded
         if expanded:
             self._toggle_btn.setIcon(get_icon("collapse"))
-            self._toggle_btn.setToolTip("Свернуть всё")
+            self._toggle_btn.setToolTip(tr("Collapse all"))
         else:
             self._toggle_btn.setIcon(get_icon("expand"))
-            self._toggle_btn.setToolTip("Развернуть всё")
+            self._toggle_btn.setToolTip(tr("Expand all"))
 
     @staticmethod
     def _subtree_expanded(item):
@@ -336,7 +336,7 @@ class TreePanel(QWidget):
         maxmem = vm.get("maxmem", 1) or 1
         mem_pct = int((mem / maxmem) * 100) if maxmem else 0
         status = vm.get("status", "")
-        vm_item.setToolTip(0, f"Статус: {STATUS_RU.get(status, status)}\nЦП: {cpu_pct}%\nRAM: {mem_pct}%")
+        vm_item.setToolTip(0, tr("Status") + f": {status_text(status)}\n" + tr("CPU") + f": {cpu_pct}%\n" + tr("RAM") + f": {mem_pct}%")
         return vm_item
 
     def _build_tree(self):
@@ -355,8 +355,6 @@ class TreePanel(QWidget):
             else:
                 standalone_nodes.append(node)
 
-        # Добавляем кластеры из конфига, которых ещё нет в данных — чтобы они
-        # не исчезали из дерева пока их воркер не завершился
         for cfg in self.nodes_cfg:
             if cfg.get("skip"):
                 continue
@@ -367,7 +365,6 @@ class TreePanel(QWidget):
                     if f"cluster:{cluster_name}" not in self._loading_hosts:
                         self._loading_hosts.add(f"cluster:{cluster_name}")
 
-        # Для standalone хостов — добавляем заглушки по имени из конфига
         standalone_names = {n.get("host_name", "") for n in standalone_nodes}
         for cfg in self.nodes_cfg:
             if cfg.get("skip"):
@@ -385,7 +382,6 @@ class TreePanel(QWidget):
                 })
                 self._loading_hosts.add(host_name)
 
-        # Убираем из _loading_hosts то, что уже загрузилось
         for node in self.all_nodes:
             hn = node.get("host_name", "")
             self._loading_hosts.discard(hn)
@@ -396,15 +392,14 @@ class TreePanel(QWidget):
                     if cl_name:
                         self._loading_hosts.discard(f"cluster:{cl_name}")
 
-        cluster_folder = self._make_section_item(self.tree, "Кластеры")
-        standalone_folder = self._make_section_item(self.tree, "Отдельные хосты")
+        cluster_folder = self._make_section_item(self.tree, tr("Clusters"))
+        standalone_folder = self._make_section_item(self.tree, tr("Standalone hosts"))
 
         if cluster_nodes:
             for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(cluster_folder)
                 nodes_in_cl = cluster_nodes[cluster_name]
                 if not nodes_in_cl:
-                    # Кластер есть в конфиге, но данные ещё не пришли — заглушка со спиннером
                     cl_item.setText(0, cluster_name)
                     cl_item.setIcon(0, _make_loading_icon(self._spinner_angle))
                     cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
@@ -435,10 +430,8 @@ class TreePanel(QWidget):
                     uptime = node.get("uptime", 0)
                     uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
                     host_item.setToolTip(0,
-                        f"ЦП: {cpu}%\nRAM: {mem_pct}%\n"
-                        f"Аптайм: {uptime_str}"
+                        tr("CPU") + f": {cpu}%\n" + tr("RAM") + f": {mem_pct}%\n" + tr("Uptime") + f": {uptime_str}"
                     )
-
 
                 pool_groups = defaultdict(list)
                 no_pool_vms = []
@@ -491,7 +484,7 @@ class TreePanel(QWidget):
                 uptime = node.get("uptime", 0)
                 uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
                 host_item.setToolTip(0,
-                    f"ЦП: {cpu}%\nRAM: {mem_pct}%\nАптайм: {uptime_str}"
+                    tr("CPU") + f": {cpu}%\n" + tr("RAM") + f": {mem_pct}%\n" + tr("Uptime") + f": {uptime_str}"
                 )
 
                 pool_groups = defaultdict(list)
@@ -516,11 +509,9 @@ class TreePanel(QWidget):
                 for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
                     self._add_vm_item(host_item, vm)
 
-        # Хранилища
         if self.all_storages:
-            st_folder = self._make_section_item(self.tree, "Хранилища")
+            st_folder = self._make_section_item(self.tree, tr("Storage"))
 
-            # Группируем storage по кластеру для дерева
             cluster_storages = defaultdict(list)
             standalone_storages = []
             for st in self.all_storages:
@@ -551,9 +542,9 @@ class TreePanel(QWidget):
 
             if standalone_storages:
                 so_item = QTreeWidgetItem(st_folder)
-                so_item.setText(0, "Отдельные")
+                so_item.setText(0, tr("Standalone"))
                 so_item.setIcon(0, get_icon("folder"))
-                so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", "Отдельные"))
+                so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", tr("Standalone")))
                 so_item.setFlags(so_item.flags() & ~Qt.ItemIsSelectable)
                 so_item.setExpanded(True)
 
@@ -573,12 +564,10 @@ class TreePanel(QWidget):
         self._building = False
 
     def update_node_statuses(self, all_nodes, all_vms):
-        # Удаляем из _loading_hosts те, которые уже загрузились, чтобы спиннер погас
         for node in all_nodes:
             hn = node.get("host_name", "")
             self._loading_hosts.discard(hn)
             if node.get("_is_cluster"):
-                # Находим имя кластера из конфига — в start_loading он был ключом
                 cfg = next((c for c in self.nodes_cfg if c["name"] == hn), None)
                 if cfg:
                     cluster_name = cfg.get("cluster", "")
@@ -604,8 +593,6 @@ class TreePanel(QWidget):
                     hn = key[2] if len(key) > 2 else None
                     node_name = key[1]
                     if hn:
-                        # Ищем по ОБОИМ: host_name И node — иначе все ноды кластера
-                        # получают статус первой ноды (одинаковый host_name у всех)
                         host = next((n for n in all_nodes
                                      if n.get("host_name") == hn
                                      and n.get("node") == node_name), None)
@@ -623,7 +610,7 @@ class TreePanel(QWidget):
 
     @staticmethod
     def _strip_count(text):
-        """Убирает суффикс VM-счётчика вида '[3/5]' для стабильных путей."""
+        """Remove VM count suffix like '[3/5]' for stable paths."""
         return _re.sub(r'\s+\[\d+/\d+\]$', '', text)
 
     def _save_expanded_state(self):
@@ -667,7 +654,7 @@ class TreePanel(QWidget):
         self._save_expanded_state()
 
     def _update_empty_visibility(self):
-        """Показывает/скрывает подсказку при пустом дереве."""
+        """Show/hide the hint when the tree is empty."""
         has_items = self.tree.topLevelItemCount() > 0
         self._empty_label.setVisible(not has_items)
         self.tree.setVisible(has_items)
@@ -728,11 +715,11 @@ class TreePanel(QWidget):
         item_name = key[1] if len(key) > 1 else ""
 
         if item_type == "section":
-            if item_name == "Кластеры":
+            if item_name == tr("Clusters"):
                 self.item_selected.emit("cluster_folder", item_name, {})
-            elif item_name == "Отдельные хосты":
+            elif item_name == tr("Standalone hosts"):
                 self.item_selected.emit("standalone_folder", item_name, {})
-            elif item_name == "Хранилища":
+            elif item_name == tr("Storage"):
                 self.item_selected.emit("storage_folder", item_name, {})
             return
 
@@ -743,13 +730,9 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name_key = key[2] if len(key) > 2 else None
             if host_name_key:
-                # Фильтруем по ОБОИМ: host_name (конфиг) И node (PVE-имя ноды).
-                # Без фильтра по node все ноды кластера возвращают первую ноду,
-                # т.к. у них одинаковый host_name (имя кластерного конфига).
                 host_data = next((n for n in self.all_nodes
                                   if n.get("host_name") == host_name_key
                                   and n.get("node") == item_name), None)
-                # Fallback: только по host_name (standalone или нестандартный кейс)
                 if host_data is None:
                     host_data = next((n for n in self.all_nodes
                                       if n.get("host_name") == host_name_key), None)
@@ -766,7 +749,6 @@ class TreePanel(QWidget):
             data = {"storage_name": item_name}
             if len(key) >= 3:
                 val = key[2]
-                # Если третий элемент похож на хост-имя (с точками или длинное) — это standalone
                 if val and (val.count(".") > 0 or "/" in val):
                     data["host_name"] = val
                 else:

@@ -1,4 +1,5 @@
 import urllib3
+from .ui.i18n import tr
 import traceback
 import logging
 import threading
@@ -12,7 +13,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # ----------------------------------------------------------------------
-# Создание API токена для PVE Center
+# Create API token for PVE Center
 # ----------------------------------------------------------------------
 PVE_PORT = 8006
 
@@ -31,17 +32,18 @@ def _pve_ticket_auth(host, user, password):
 
 
 def create_admin_token(host, user, password):
-    """Создаёт API-токен для указанного пользователя PVE.
-    Токен создаётся от имени самого пользователя — аудит в PVE показывает
-    реального оператора, а права соответствуют его ролям.
+    """Create an API token for the specified PVE user.
+    The token is created on behalf of the user — PVE audit shows
+    the real operator, and permissions match their roles.
 
-    Аргументы:
-        host: адрес PVE-хоста
-        user: существующий пользователь PVE (root@pam, user@ipa, ...)
-        password: его пароль
+    Args:
+        host: PVE host address
+        user: existing PVE user (root@pam, user@ipa, ...)
+        password: user's password
 
-    Возвращает dict с полями token_name, token_value, user
-    или dict с полем error.
+    Returns:
+        dict with token_name, token_value, user fields
+        or dict with error field.
     """
     import requests as rq
     import secrets as sec
@@ -72,7 +74,7 @@ def create_admin_token(host, user, password):
                 break
         if r.status_code >= 400:
             logger.error("token_create error: %s", r.text[:300])
-            return {"error": f"Ошибка создания токена: {r.status_code}"}
+            return {"error": tr("Token creation error: {}").format(r.status_code)}
 
         data = r.json()
         data = data.get("data", data)
@@ -83,7 +85,7 @@ def create_admin_token(host, user, password):
             token_value = data.get("tokenid", "")
 
         if not token_value:
-            return {"error": "Пустое значение токена в ответе сервера"}
+            return {"error": tr("Empty token value in server response")}
 
         auth_header = f"PVEAPIToken={user}!{token_id}={token_value}"
         try:
@@ -94,7 +96,7 @@ def create_admin_token(host, user, password):
             )
             if vr.status_code != 200:
                 logger.warning("verify FAILED: %s", vr.text[:200])
-                return {"error": f"Токен создан, но не работает: {vr.status_code}"}
+                return {"error": tr("Token created but not working: {}").format(vr.status_code)}
         except Exception as ve:
             logger.warning("verify exception: %s", ve)
 
@@ -103,9 +105,9 @@ def create_admin_token(host, user, password):
     except Exception as e:
         msg = str(e)
         if "authorization" in msg.lower() or "permission" in msg.lower() or "401" in msg:
-            return {"error": "Неверный логин или пароль"}
+            return {"error": tr("Invalid login or password")}
         if "connection" in msg.lower() or "timeout" in msg.lower() or "resolve" in msg.lower():
-            return {"error": f"Не удалось подключиться к {host}"}
+            return {"error": tr("Cannot connect to {}").format(host)}
         return {"error": msg}
 
 
@@ -176,7 +178,7 @@ class FetchWorker(QRunnable):
 
             is_cluster_rep = self.node_cfg.get("cluster_rep", False)
 
-            # ── Параллельная фаза 1: pools, HA groups, resources ──────
+        # -- Parallel phase 1: pools, HA groups, resources --
             vmid_to_pool = {}
             pool_names = []
             ha_groups = []
@@ -263,7 +265,7 @@ class FetchWorker(QRunnable):
             for t in phase1:
                 t.join(timeout=20)
 
-            # ── Параллельная фаза 2: storage details per node / standalone data ──
+            # -- Parallel phase 2: storage details per node / standalone data --
             iso_images = {}
             iso_lock = threading.Lock()
 
@@ -413,7 +415,7 @@ class FetchWorker(QRunnable):
                     except Exception:
                         pass
 
-            # ── Параллельная фаза 3: ISO образы ────────────────────
+            # -- Parallel phase 3: ISO images --
             def fetch_iso_for_node(n):
                 nname = n["node"]
                 iso_storages = [
@@ -449,7 +451,7 @@ class FetchWorker(QRunnable):
             for t in iso_threads:
                 t.join(timeout=15)
 
-            # ── Отправляем результат ──────────────────────────────
+            # -- Emit result --
             self.signals.result_ready.emit({
                 "host": self.node_cfg["name"],
                 "status": "ok",
@@ -712,12 +714,12 @@ class VmActionSignals(QObject):
 
 class VmActionWorker(QRunnable):
     ACTION_NAMES = {
-        "start": "Запуск",
-        "shutdown": "Выключение",
-        "stop": "Принудительное выключение",
-        "reboot": "Перезагрузка",
-        "reset": "Сброс",
-        "resume": "Возобновление",
+        "start": tr("Start"),
+        "shutdown": tr("Shutdown"),
+        "stop": tr("Force stop"),
+        "reboot": tr("Reboot"),
+        "reset": tr("Reset"),
+        "resume": tr("Resume"),
     }
 
     def __init__(self, host_cfg, node_name, vmid, vm_type, action):
@@ -755,7 +757,7 @@ class VmActionWorker(QRunnable):
                     self.action, self.action
                 )
                 self.signals.action_result.emit(
-                    f"VM {self.vmid}: {action_name} выполнена"
+                    tr("VM {}: {} completed").format(self.vmid, action_name)
                 )
             except RuntimeError:
                 pass
@@ -782,9 +784,9 @@ class ClusterTasksSignals(QObject):
 
 
 class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
-    """Загружает задачи со всех нод параллельно через threading.
-    Принимает список (host_cfg, node_name) — для каждой ноды
-    вызывается /nodes/{node}/tasks, результаты мержатся по UPID."""
+    """Loads tasks from all nodes in parallel via threading.
+    Takes a list of (host_cfg, node_name) — for each node
+    calls /nodes/{node}/tasks, merges results by UPID."""
     def __init__(self, node_requests):
         super().__init__()
         self.node_requests = node_requests  # list of (host_cfg, node_name)
@@ -832,7 +834,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
                             key=lambda x: float(x.get("starttime", 0) or 0),
                             reverse=True)
             if errors:
-                logger.warning("Ошибки при сборе задач: %s", "; ".join(errors))
+                logger.warning("Task collection errors: %s", "; ".join(errors))
             try:
                 self.signals.tasks_ready.emit(merged)
             except RuntimeError:
@@ -884,11 +886,11 @@ class VmConsoleWorker(QRunnable):
             except Exception as e:
                 msg = str(e).lower()
                 if "permission check failed" in msg or "403" in msg:
-                    err = "Недостаточно прав PVE для SPICE (требуется VM.Console)"
+                    err = tr("PVE permission denied for SPICE (requires VM.Console)")
                 elif "not supported" in msg or "spice" in msg:
-                    err = "SPICE не поддерживается для этой ВМ"
+                    err = tr("SPICE not supported for this VM")
                 else:
-                    err = f"Ошибка SPICE proxy: {e}"
+                    err = tr("SPICE proxy error: {}").format(e)
                 try:
                     self.signals.console_error.emit(err)
                 except RuntimeError:
@@ -918,7 +920,7 @@ class VmConsoleWorker(QRunnable):
                     f.write("\n".join(lines) + "\n")
             except Exception as e:
                 try:
-                    self.signals.console_error.emit(f"Ошибка записи .vv: {e}")
+                    self.signals.console_error.emit(tr("VV file write error: {}").format(e))
                 except RuntimeError:
                     pass
                 return
@@ -935,7 +937,7 @@ class VmConsoleWorker(QRunnable):
                         logger.warning("remote-viewer exit code %d: %s", proc.returncode, err_text)
                         try:
                             self.signals.console_error.emit(
-                                f"remote-viewer: {err_text or 'код ' + str(proc.returncode)}"
+                                tr("remote-viewer: ") + (err_text or tr("code ") + str(proc.returncode))
                             )
                         except RuntimeError:
                             pass
@@ -946,7 +948,7 @@ class VmConsoleWorker(QRunnable):
                                 pass
                         return
                 except subprocess.TimeoutExpired:
-                    logger.info("remote-viewer запущен (pid=%d)", proc.pid)
+                    logger.info("remote-viewer started (pid=%d)", proc.pid)
                     # remote-viewer detached — следим за процессом в фоне,
                     # удалим .vv после его завершения
                     def _cleanup():
@@ -963,8 +965,7 @@ class VmConsoleWorker(QRunnable):
             except FileNotFoundError:
                 try:
                     self.signals.console_error.emit(
-                        "remote-viewer не найден. Установите пакет virt-viewer:\n"
-                        "  apt install virt-viewer"
+                        tr("remote-viewer not found. Install virt-viewer:\n  apt install virt-viewer")
                     )
                 except RuntimeError:
                     pass
@@ -976,7 +977,7 @@ class VmConsoleWorker(QRunnable):
                 return
 
             try:
-                self.signals.console_ready.emit("🖥 SPICE консоль запущена")
+                self.signals.console_ready.emit(tr("SPICE console launched"))
             except RuntimeError:
                 pass
         finally:
@@ -996,11 +997,11 @@ class CreateVmSignals(QObject):
 
 
 class CreateVmWorker(QRunnable):
-    """Создаёт QEMU VM через POST /nodes/{node}/qemu."""
+    """Creates QEMU VM via POST /nodes/{node}/qemu."""
     def __init__(self, host_cfg, node_name, params, ha_group=None):
         """
-        params: dict с параметрами VM (name, cores, memory, sockets, ostype, etc.)
-        ha_group: имя HA группы (опционально)
+        params: dict with VM parameters (name, cores, memory, sockets, ostype, etc.)
+        ha_group: HA group name (optional)
         """
         super().__init__()
         self.host_cfg = host_cfg
@@ -1021,39 +1022,39 @@ class CreateVmWorker(QRunnable):
             )
 
             params = dict(self.params)
-            # Если vmid не указан (0, None) — запрашиваем следующий свободный
+            # Request next free VMID if not specified
             if not params.get("vmid"):
                 try:
                     params["vmid"] = proxmox.cluster.nextid.get()
                 except Exception:
                     try:
                         self.signals.vm_error.emit(
-                            "Не удалось получить следующий свободный VMID от кластера"
+                            tr("Could not get next free VMID from cluster")
                         )
                     except RuntimeError:
                         pass
                     return
 
             result = proxmox.nodes(self.node_name).qemu.post(**params)
-            # POST /nodes/{node}/qemu возвращает UPID-строку, не {"data": {"vmid":...}}
-            # vmid уже гарантированно есть в params (user-provided или nextid)
+            # POST /nodes/{node}/qemu returns UPID string, not {"data": {"vmid":...}}
+            # vmid is now guaranteed in params (user-provided or nextid)
             vmid = params.get("vmid", "?")
-            msg = f"VM {vmid} создана на {self.node_name}"
+            msg = tr("VM {} created on {}").format(vmid, self.node_name)
 
-            # Добавление в HA группу
+            # Add to HA group
             if self.ha_group:
                 try:
                     ha_params = {
                         "sid": f"vm:{vmid}",
                         "group": self.ha_group,
                     }
-                    # Если пользователь снял галку «Запустить» — не даем HA стартовать VM
+                    # If user unchecked "Start", prevent HA from starting the VM
                     if not self.params.get("start"):
                         ha_params["state"] = "stopped"
                     proxmox.cluster.ha.resources.post(**ha_params)
-                    msg += f", добавлена в HA «{self.ha_group}»"
+                    msg += tr(", added to HA ") + self.ha_group
                 except Exception as ha_err:
-                    msg += f", но ошибка HA: {ha_err}"
+                    msg += tr(", but HA error: {}").format(ha_err)
 
             try:
                 self.signals.vm_created.emit(msg)
@@ -1099,7 +1100,7 @@ class DeleteVmWorker(QRunnable):
             )
 
             proxmox.nodes(self.node_name).qemu(self.vmid).delete(purge=1)
-            msg = f"VM {self.vmid} удалена с {self.node_name}"
+            msg = tr("VM {} deleted from {}").format(self.vmid, self.node_name)
             try:
                 self.signals.vm_deleted.emit(msg)
             except RuntimeError:

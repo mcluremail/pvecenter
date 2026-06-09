@@ -2,14 +2,15 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QLineEdit, QSpinBox, QComboBox,
                                QCheckBox, QFormLayout, QMessageBox)
 from PySide6.QtCore import Qt
+from .i18n import tr
 
 
 class VmConfigEditorDialog(QDialog):
-    """Модальный диалог для редактирования одного параметра VM."""
+    """Modal dialog for editing a single VM parameter."""
     def __init__(self, key, label, field_type, current_value, choices=None,
                  choice_labels=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Редактирование: {label}")
+        self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(450)
         self.setMinimumHeight(130)
 
@@ -26,9 +27,9 @@ class VmConfigEditorDialog(QDialog):
         form = QFormLayout()
 
         if field_type == "bool":
-            self._editor = QCheckBox("Включено")
+            self._editor = QCheckBox(tr("Enabled"))
             self._editor.setChecked(current_value in (1, "1", True))
-            form.addRow("Значение:", self._editor)
+            form.addRow(tr("Value:"), self._editor)
 
         elif field_type == "int":
             self._editor = QSpinBox()
@@ -37,10 +38,10 @@ class VmConfigEditorDialog(QDialog):
                 self._editor.setValue(int(current_value) if current_value is not None else 0)
             except (ValueError, TypeError):
                 self._editor.setValue(0)
-            suffix = " МБ" if key == "memory" else ""
+            suffix = tr(" MB") if key == "memory" else ""
             if suffix:
                 self._editor.setSuffix(suffix)
-            form.addRow("Значение:", self._editor)
+            form.addRow(tr("Value:"), self._editor)
 
         elif field_type == "choice":
             self._editor = QComboBox()
@@ -58,45 +59,45 @@ class VmConfigEditorDialog(QDialog):
                 if current_value is not None:
                     self._editor.addItem(str(current_value), current_value)
                     self._editor.setCurrentIndex(self._editor.count() - 1)
-            form.addRow("Значение:", self._editor)
+            form.addRow(tr("Value:"), self._editor)
 
         elif field_type == "string":
             self._editor = QLineEdit(str(current_value) if current_value is not None else "")
-            form.addRow("Значение:", self._editor)
+            form.addRow(tr("Value:"), self._editor)
             if key.rstrip("0123456789") in ("net", "ide", "sata", "scsi", "virtio"):
                 if key.rstrip("0123456789") not in ("ide",) or key != "ide2":
-                    hint = QLabel("Формат: модель=MAC,bridge=vmbr0,tag=10")
+                    hint = QLabel(tr("Format: model=MAC,bridge=vmbr0,tag=10"))
                     hint.setStyleSheet("color: #6b7280; font-size: 11px;")
                     form.addRow("", hint)
             elif key.rstrip("0123456789") == "efidisk":
-                hint = QLabel("Формат: storage:size,format=qcow2")
+                hint = QLabel(tr("Format: storage:size,format=qcow2"))
                 hint.setStyleSheet("color: #6b7280; font-size: 11px;")
                 form.addRow("", hint)
 
         elif field_type == "readonly":
             self._editor = QLabel(str(current_value) if current_value is not None else "")
             self._editor.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            form.addRow("Только чтение:", self._editor)
-            warning = QLabel("Этот параметр нельзя изменить через API")
+            form.addRow(tr("Read only:"), self._editor)
+            warning = QLabel(tr("This parameter cannot be changed via API"))
             warning.setStyleSheet("color: #d97706; font-size: 11px;")
             form.addRow(warning)
 
         else:
             self._editor = QLineEdit(str(current_value) if current_value is not None else "")
-            form.addRow("Значение:", self._editor)
+            form.addRow(tr("Value:"), self._editor)
 
         layout.addLayout(form)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._ok_btn = QPushButton("Сохранить")
+        self._ok_btn = QPushButton(tr("Save"))
         self._ok_btn.setObjectName("accentBtn")
         self._ok_btn.setFixedWidth(120)
         self._ok_btn.clicked.connect(self._on_ok)
         btn_layout.addWidget(self._ok_btn)
 
-        self._cancel_btn = QPushButton("Отмена")
+        self._cancel_btn = QPushButton(tr("Cancel"))
         self._cancel_btn.setFixedWidth(120)
         self._cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self._cancel_btn)
@@ -112,8 +113,8 @@ class VmConfigEditorDialog(QDialog):
         val = self.get_raw_value()
         if val == "" and self._field_type in ("string", "int"):
             ret = QMessageBox.question(
-                self, "Пустое значение",
-                "Вы уверены, что хотите установить пустое значение?",
+                self, tr("Empty value"),
+                tr("Are you sure you want to set an empty value?"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if ret != QMessageBox.Yes:
