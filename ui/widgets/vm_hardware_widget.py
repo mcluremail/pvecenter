@@ -1,17 +1,11 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
-from ..vm_config_display import get_hardware_rows, FIELD_TYPES
+from ..vm_config_display import get_hardware_rows, get_editor_spec, HW_DEFAULTS
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 
-_FT = FIELD_TYPES
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
-
-_READONLY_KEYS = {
-    k for k, v in _FT.items()
-    if v == "readonly" or (isinstance(v, tuple) and v[0] == "readonly")
-}
 
 
 class VmHardwareWidget(QWidget):
@@ -55,7 +49,8 @@ class VmHardwareWidget(QWidget):
             self.table.insertRow(i)
             item = QTableWidgetItem(label)
             item.setData(_KEY_ROLE, key)
-            if key in _READONLY_KEYS:
+            ft, _, _ = get_editor_spec(key)
+            if ft == "readonly":
                 item.setData(_READONLY_ROLE, True)
             self.table.setItem(i, 0, item)
             self.table.setItem(i, 1, QTableWidgetItem(value))
@@ -71,19 +66,17 @@ class VmHardwareWidget(QWidget):
         if not item or item.data(_READONLY_ROLE):
             return
         raw_key = item.data(_KEY_ROLE)
-        if not raw_key or raw_key not in _FT:
+        if not raw_key:
             return
-
-        field_spec = _FT[raw_key]
-        if isinstance(field_spec, tuple):
-            ft_type, choices = field_spec[0], field_spec[1]
-        else:
-            ft_type, choices = field_spec, None
-
+        ft, choices, choice_labels = get_editor_spec(raw_key)
+        if ft == "readonly":
+            return
         current_value = self._config_data.get(raw_key)
+        if current_value is None:
+            current_value = HW_DEFAULTS.get(raw_key, "")
         label = item.text()
-
-        dlg = VmConfigEditorDialog(raw_key, label, ft_type, current_value, choices, self)
+        dlg = VmConfigEditorDialog(raw_key, label, ft, current_value, choices,
+                                   choice_labels, self)
         if dlg.exec() != VmConfigEditorDialog.Accepted:
             return
         key, value = dlg.get_raw_value()

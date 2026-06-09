@@ -1,10 +1,9 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
-from ..vm_config_display import get_options_rows, FIELD_TYPES
+from ..vm_config_display import get_options_rows, get_editor_spec, OPT_DEFAULTS
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 
-_FT = FIELD_TYPES
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
 
@@ -64,24 +63,17 @@ class VmOptionsWidget(QWidget):
         if not item:
             return
         raw_key = item.data(_KEY_ROLE)
-        if not raw_key or raw_key not in _FT:
+        if not raw_key:
             return
-
-        field_spec = _FT[raw_key]
-        if isinstance(field_spec, tuple):
-            if field_spec[0] == "readonly":
-                return
-            ft_type, choices = field_spec[0], field_spec[1]
-        else:
-            ft_type = field_spec
-            choices = None
-            if ft_type == "readonly":
-                return
-
+        ft, choices, choice_labels = get_editor_spec(raw_key)
+        if ft == "readonly":
+            return
         current_value = self._config_data.get(raw_key)
+        if current_value is None:
+            current_value = OPT_DEFAULTS.get(raw_key, "")
         label = item.text()
-
-        dlg = VmConfigEditorDialog(raw_key, label, ft_type, current_value, choices, self)
+        dlg = VmConfigEditorDialog(raw_key, label, ft, current_value, choices,
+                                   choice_labels, self)
         if dlg.exec() != VmConfigEditorDialog.Accepted:
             return
         key, value = dlg.get_raw_value()

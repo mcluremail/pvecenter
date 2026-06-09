@@ -9,8 +9,8 @@ Russian labels and formatted strings.
 HW_LABELS = {
     "name": "Имя",
     "cpu": "Тип CPU",
-    "cores": "Ядер",
-    "sockets": "Сокетов",
+    "cores": "Ядра",
+    "sockets": "Сокеты",
     "memory": "Память",
     "bios": "BIOS",
     "machine": "Чипсет",
@@ -45,6 +45,122 @@ HW_LABELS = {
     "efidisk0": "EFI диск",
     "tpmstate0": "TPM",
 }
+
+_DEVICE_PREFIX_LABELS = {
+    "net": "Сеть",
+    "ide": "IDE",
+    "sata": "SATA",
+    "scsi": "SCSI",
+    "virtio": "VirtIO",
+    "efidisk": "EFI диск",
+    "tpmstate": "TPM",
+}
+
+
+def _device_label(key):
+    prefix = key.rstrip("0123456789")
+    num = key[len(prefix):]
+    base = _DEVICE_PREFIX_LABELS.get(prefix, prefix)
+    if num:
+        return f"{base} {num}"
+    return base
+
+
+CHOICE_LABELS = {
+    "cpu": {
+        "kvm64": "KVM64 (совместимый)",
+        "host": "Host (максимум)",
+        "qemu64": "QEMU64",
+        "max": "Host (max, рискованно)",
+        "x86-64-v2": "x86-64 v2",
+        "x86-64-v2-AES": "x86-64 v2 + AES",
+        "x86-64-v3": "x86-64 v3",
+        "x86-64-v3-AES": "x86-64 v3 + AES",
+        "x86-64-v4": "x86-64 v4",
+        "x86-64-v4-AES": "x86-64 v4 + AES",
+    },
+    "bios": {
+        "seabios": "SeaBIOS",
+        "ovmf": "OVMF (UEFI)",
+    },
+    "machine": {
+        "i440fx": "i440fx",
+        "q35": "Q35",
+    },
+    "vga": {
+        "std": "VGA (стандартный)",
+        "qxl": "QXL (SPICE)",
+        "virtio": "VirtIO-GPU",
+        "vmware": "VMware",
+        "cirrus": "Cirrus",
+        "serial0": "Serial",
+        "qxl2": "QXL (двойной)",
+        "qxl3": "QXL (тройной)",
+        "qxl4": "QXL (четверной)",
+    },
+    "scsihw": {
+        "lsi": "LSI 53C895A",
+        "lsi53c810": "LSI 53C810",
+        "megasas": "MegaSAS",
+        "pvscsi": "VMware PVSCSI",
+        "virtio-scsi-single": "VirtIO SCSI Single",
+        "virtio-scsi-pci": "VirtIO SCSI PCI",
+    },
+    "ostype": {
+        "other": "Не указан",
+        "wxp": "Windows XP",
+        "w2k": "Windows 2000",
+        "w2k3": "Windows 2003",
+        "w2k8": "Windows 2008",
+        "w2k12": "Windows 2012",
+        "wvista": "Windows Vista",
+        "win7": "Windows 7",
+        "win8": "Windows 8",
+        "win10": "Windows 10/11",
+        "l24": "Linux 2.4",
+        "l26": "Linux 2.6+",
+        "solaris": "Solaris",
+    },
+    "rtc": {
+        "utc": "UTC",
+        "localtime": "Локальное",
+    },
+    "keyboard": {
+        "ar": "Арабская",
+        "da": "Датская",
+        "de": "Немецкая",
+        "de-ch": "Швейцарская (нем.)",
+        "en-gb": "Английская (Великобритания)",
+        "en-us": "Английская (США)",
+        "es": "Испанская",
+        "fi": "Финская",
+        "fr": "Французская",
+        "fr-be": "Французская (Бельгия)",
+        "fr-ca": "Французская (Канада)",
+        "fr-ch": "Швейцарская (фр.)",
+        "hr": "Хорватская",
+        "hu": "Венгерская",
+        "is": "Исландская",
+        "it": "Итальянская",
+        "ja": "Японская",
+        "lt": "Литовская",
+        "mk": "Македонская",
+        "nl": "Нидерландская",
+        "no": "Норвежская",
+        "pl": "Польская",
+        "pt": "Португальская",
+        "pt-br": "Португальская (Бразилия)",
+        "ru": "Русская",
+        "sk": "Словацкая",
+        "sl": "Словенская",
+        "sv": "Шведская",
+        "tr": "Турецкая",
+        "ua": "Украинская",
+    },
+}
+
+# Device keys that can be edited as raw strings
+_EDITABLE_DEVICE_PREFIXES = {"net", "ide", "sata", "scsi", "virtio", "efidisk", "tpmstate"}
 
 # PVE defaults for keys absent from config API (hardware tab)
 HW_DEFAULTS = {
@@ -424,7 +540,6 @@ _NET_PREFIXES = {"net"}
 
 
 def format_value(key, value):
-    """Apply the best formatter for a config key+value."""
     if key in _FORMATTERS:
         return _FORMATTERS[key](value)
     prefix = key.rstrip("0123456789")
@@ -435,12 +550,26 @@ def format_value(key, value):
     return str(value)
 
 
+def get_editor_spec(key):
+    """Return (field_type, choices, display_labels) for a config key."""
+    if key in FIELD_TYPES:
+        spec = FIELD_TYPES[key]
+        if isinstance(spec, tuple):
+            ft, choices = spec[0], spec[1]
+            labels = CHOICE_LABELS.get(key, {})
+            return (ft, choices, labels)
+        return (spec, None, None)
+    prefix = key.rstrip("0123456789")
+    if prefix in _EDITABLE_DEVICE_PREFIXES:
+        return ("string", None, None)
+    return ("readonly", None, None)
+
+
 # Public API
 # ---------------------------------------------------------------------------
 
 
 def get_hardware_rows(config_data, detail_data=None):
-    """Return ordered list of (key, label, formatted_value) for hardware tab."""
     config = dict(config_data) if config_data else {}
     for key, default in HW_DEFAULTS.items():
         if key not in config:
@@ -451,7 +580,7 @@ def get_hardware_rows(config_data, detail_data=None):
         for key in keys:
             if key in config:
                 seen.add(key)
-                label = HW_LABELS.get(key, key)
+                label = HW_LABELS.get(key) or _device_label(key)
                 value = format_value(key, config[key])
                 rows.append((key, label, value))
     if detail_data:
@@ -463,7 +592,6 @@ def get_hardware_rows(config_data, detail_data=None):
 
 
 def get_options_rows(config_data):
-    """Return ordered list of (key, label, formatted_value) for options tab."""
     config = dict(config_data) if config_data else {}
     for key, default in OPT_DEFAULTS.items():
         if key not in config:
@@ -476,7 +604,7 @@ def get_options_rows(config_data):
     for key, value in sorted(config.items()):
         if key in hw_keys or key in SERVICE_KEYS:
             continue
-        label = HW_LABELS.get(key, key)
+        label = HW_LABELS.get(key) or _device_label(key)
         formatted = format_value(key, value)
         rows.append((key, label, formatted))
     return rows
