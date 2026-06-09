@@ -429,8 +429,10 @@ class MainWindow(QMainWindow):
         self.all_storages.clear()
         self.all_iso_images.clear()
         self.all_ha_groups.clear()
+        self.all_pools.clear()
         self._seen_storage_keys.clear()
         self._first_selection_done = False
+        self._tasks_started = False
 
         self.tree_panel.start_loading()
 
@@ -442,7 +444,7 @@ class MainWindow(QMainWindow):
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(
-                lambda data, w=worker, g=refresh_gen: (self.on_worker_finished(data, w, g), self._discard_worker(w))
+                lambda data, w=worker, g=refresh_gen: self.on_worker_finished(data, w, g)
             )
             self._run_worker(worker)
 
@@ -450,7 +452,7 @@ class MainWindow(QMainWindow):
             self.all_nodes.clear()
             self.all_vms.clear()
             self.all_storages.clear()
-            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages)
+            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
             self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
             self._update_status_bar()
 

@@ -127,15 +127,11 @@ class StorageContentListWorker(QRunnable):
         except Exception as e:
             traceback.print_exc()
             try:
-                self.signals.error_occurred.emit(str(e))
+                self.signals.error.emit(self.storage_name, self.content_type, str(e))
             except RuntimeError:
                 pass
         finally:
             session.close()
-            try:
-                self.signals.finished.emit()
-            except RuntimeError:
-                pass
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -173,15 +169,11 @@ class StorageBackupWorker(QRunnable):
         except Exception as e:
             traceback.print_exc()
             try:
-                self.signals.error_occurred.emit(str(e))
+                self.signals.backups_error.emit(self.storage_name, str(e))
             except RuntimeError:
                 pass
         finally:
             session.close()
-            try:
-                self.signals.finished.emit()
-            except RuntimeError:
-                pass
             try:
                 self.signals.finished.emit()
             except RuntimeError:
