@@ -925,14 +925,9 @@ class CreateVmWorker(QRunnable):
                     return
 
             result = proxmox.nodes(self.node_name).qemu.post(**params)
-            if isinstance(result, dict):
-                data = result.get("data", {})
-                if isinstance(data, dict):
-                    vmid = data.get("vmid", "?")
-                else:
-                    vmid = str(data)
-            else:
-                vmid = str(result)
+            # POST /nodes/{node}/qemu возвращает UPID-строку, не {"data": {"vmid":...}}
+            # vmid уже гарантированно есть в params (user-provided или nextid)
+            vmid = params.get("vmid", "?")
             msg = f"VM {vmid} создана на {self.node_name}"
 
             # Добавление в HA группу
