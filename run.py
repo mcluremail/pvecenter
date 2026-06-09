@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Запуск PVE Dashboard. Можно запускать из любого места."""
+"""Запуск PVE Center. Можно запускать из любого места."""
 import sys
 import os
 

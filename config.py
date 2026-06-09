@@ -72,7 +72,7 @@ def _ask_password(mode="enter"):
                                    QLineEdit, QPushButton, QApplication)
     from .ui.i18n import tr
     dialog = QDialog()
-    dialog.setWindowTitle(tr("PVE Dashboard — Authorization"))
+    dialog.setWindowTitle(tr("PVE Center — Authorization"))
     dialog.setFixedSize(380, 160)
 
     layout = QVBoxLayout(dialog)

@@ -70,7 +70,7 @@ pveum user token list pvecenter@pve
 
 # Если privsep=1 — пересоздать
 pveum user token remove pvecenter@pve pvecenter-main
-pveum user token add pvecenter@pve pvecenter-main --privsep 0 --comment "PVE Center dashboard"
+pveum user token add pvecenter@pve pvecenter-main --privsep 0 --comment "PVE Center"
 ```
 
 **Или пересоздать через диалог "+" в приложении** — он создаёт токен с `privsep=0`.

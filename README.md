@@ -1,6 +1,6 @@
 # PVE Center
 
-Desktop dashboard for Proxmox VE management. Written in Python with PySide6.
+Desktop client for Proxmox VE management. Written in Python with PySide6.
 
 Monitor clusters and hosts, manage virtual machines and containers, view task history — all in one window, no browser needed.
 

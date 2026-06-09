@@ -65,7 +65,7 @@ def create_admin_token(host, user, password):
         for method in ("post", "put"):
             r = getattr(sess, method)(
                 f"https://{host}:{PVE_PORT}/api2/json/access/users/{user}/token/{token_id}",
-                data={"comment": "PVE Center dashboard", "expire": 0, "privsep": 0},
+                data={"comment": "PVE Center", "expire": 0, "privsep": 0},
                 timeout=15,
             )
             logger.info("token_create %s %s HTTP %s", method, token_id, r.status_code)
