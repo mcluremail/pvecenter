@@ -256,7 +256,7 @@ class MainWindow(QMainWindow):
 
         if is_running:
             run_warning = QLabel(
-                "<span style='color:#c0392b; font-weight:bold;'>⚠ ВМ запущена!</span>"
+                "<span style='color:#c0392b; font-weight:bold;'>ВМ запущена!</span>"
                 "<br>Она будет принудительно остановлена и удалена."
             )
             run_warning.setWordWrap(True)
