@@ -233,7 +233,8 @@ class ClusterTasksWidget(QWidget):
             self.table.setItem(i, 4, item4)
 
             status = task.get('status', '')
-            item5 = QTableWidgetItem(status)
+            item5 = QTableWidgetItem(status[:30] + '…' if len(status) > 30 else status)
+            item5.setToolTip(status if len(status) > 30 else '')
             if status == 'OK':
                 item5.setForeground(QColor("#22c55e"))
             elif status == 'RUNNING':
