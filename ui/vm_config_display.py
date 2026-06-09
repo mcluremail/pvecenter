@@ -39,6 +39,8 @@ HW_LABELS = {
     "tdf": "TDF",
     "template": "Шаблон",
     "vcpus": "Виртуальных CPU (hotplug)",
+    "spice": "SPICE",
+    "spice_enhancements": "Улучшения SPICE",
     "args": "Доп. аргументы QEMU",
     "hookscript": "Скрипт-хук",
     "running-machine": "Чипсет (работает)",
@@ -163,6 +165,17 @@ CHOICE_LABELS = {
         "tr": "Турецкая",
         "ua": "Украинская",
     },
+    "hotplug": {
+        "0": "Отключено",
+        "1": "Всё",
+        "network": "Сеть",
+        "disk": "Диски",
+        "usb": "USB",
+        "network,disk": "Сеть, Диски",
+        "network,usb": "Сеть, USB",
+        "disk,usb": "Диски, USB",
+        "networkdisk,usb": "Сеть, Диски, USB",
+    },
 }
 
 # Device keys that can be edited as raw strings
@@ -202,8 +215,11 @@ OPT_DEFAULTS = {
     "ostype": "l26",
     "acpi": 1,
     "agent": 0,
+    "spice": 0,
+    "spice_enhancements": 0,
     "kvm": 1,
     "tablet": 1,
+    "keyboard": "en-us",
     "boot": "order=ide2;ide0;scsi0;virtio0;net0",
     "onboot": 0,
     "numa": 0,
@@ -216,7 +232,6 @@ OPT_DEFAULTS = {
     "tdf": 0,
     "template": 0,
     "smbios1": "type=1,uuid=auto",
-    "vmgenid": "auto",
     "vcpus": 0,
 }
 
@@ -226,6 +241,7 @@ SERVICE_KEYS = {
     "hookscript", "parent", "template",
     "searchdomain", "hostname", "password", "sshkeys",
     "ciuser", "cipassword", "cicustom",
+    "running-machine", "running-qemu", "vmgenid",
 }
 
 # Editor type and choices for each editable config key
@@ -252,6 +268,8 @@ FIELD_TYPES = {
     ]),
     "acpi": "bool",
     "agent": "bool",
+    "spice": "bool",
+    "spice_enhancements": "bool",
     "kvm": "bool",
     "tablet": "bool",
     "onboot": "bool",
@@ -263,7 +281,7 @@ FIELD_TYPES = {
     "tdf": "bool",
     "boot": "string",
     "bootdisk": "string",
-    "hotplug": "string",
+    "hotplug": ("choice", ["0", "1", "network", "disk", "usb", "network,disk", "network,usb", "disk,usb", "networkdisk,usb"]),
     "startup": "string",
     "rtc": ("choice", ["utc", "localtime"]),
     "keyboard": ("choice", [
@@ -277,9 +295,6 @@ FIELD_TYPES = {
     "tags": "string",
     "vcpus": "int",
     "args": "string",
-    "vmgenid": "readonly",
-    "running-machine": "readonly",
-    "running-qemu": "readonly",
 }
 
 # Reverse map: from raw PVE value to form widget value
@@ -357,6 +372,9 @@ def _fmt_hotplug(val):
     return {
         "networkdisk,usb": "Сеть, Диски, USB",
         "network,disk,usb": "Сеть, Диски, USB",
+        "network,disk": "Сеть, Диски",
+        "network,usb": "Сеть, USB",
+        "disk,usb": "Диски, USB",
         "network": "Сеть",
         "disk": "Диски",
         "usb": "USB",
@@ -530,6 +548,8 @@ _FORMATTERS = {
     "memory": _fmt_memory,
     "ostype": _fmt_ostype,
     "acpi": _fmt_bool,
+    "spice": _fmt_bool,
+    "spice_enhancements": _fmt_bool,
     "kvm": _fmt_bool,
     "tablet": _fmt_bool,
     "onboot": _fmt_bool,
