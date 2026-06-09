@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget, QTa
                                QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
                                QSizePolicy, QProgressBar, QHBoxLayout, QComboBox, QPushButton,
                                QMenu, QMessageBox)
-from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtCore import Qt, QThreadPool, Signal
 from .hover import enable_row_hover
 from .icons import get_icon
 from .utils import STATUS_RU, ru_status as _ru_status, format_uptime as _format_uptime
@@ -76,6 +76,7 @@ _MAX_WORKERS_DP = 8
 
 
 class DetailPanel(QWidget):
+    config_update_result = Signal(str)  # toast message
     def __init__(self, nodes_cfg):
         super().__init__()
         self.nodes_cfg = nodes_cfg
@@ -202,6 +203,7 @@ class DetailPanel(QWidget):
         self.hardware_widget = VmHardwareWidget()
         self.hardware_tab.setWidget(self.hardware_widget)
         self.tabs.addTab(self.hardware_tab, get_icon("hardware"), "Оборудование")
+        self.hardware_widget.config_changed.connect(self._on_vm_config_change_requested)
 
         # --- Вкладка 2: Параметры ---
         self.options_tab = QScrollArea()
@@ -209,6 +211,7 @@ class DetailPanel(QWidget):
         self.options_widget = VmOptionsWidget()
         self.options_tab.setWidget(self.options_widget)
         self.tabs.addTab(self.options_tab, get_icon("options"), "Параметры")
+        self.options_widget.config_changed.connect(self._on_vm_config_change_requested)
 
         # --- Вкладка 3: История задач ---
         self.history_tab = QScrollArea()
@@ -2446,6 +2449,11 @@ class DetailPanel(QWidget):
             self.hardware_widget.set_hardware_data(self.config_cache[detail_key], detail)
             self.options_widget.set_options_data(self.config_cache[detail_key])
 
+        # Контекст для редакторов (host_name, vmid, node)
+        vm_node = vm_data.get("node") or host_name
+        self.hardware_widget.set_context(host_name, vmid, vm_node)
+        self.options_widget.set_context(host_name, vmid, vm_node)
+
         if detail_key not in self.task_history_cache:
             self.task_history_widget.set_tasks([])
             cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
@@ -2517,6 +2525,41 @@ class DetailPanel(QWidget):
             self.info_label.setText(self._parse_pve_error(detail.get("error", "")))
             self.info_stack.setCurrentIndex(0)
 
+    def _on_vm_config_change_requested(self, host_name, vmid_str, params):
+        """Запускает VmConfigUpdateWorker для сохранения изменения параметра."""
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if not cfg:
+            return
+        vmid = int(vmid_str)
+        node = next(
+            (n.get("node") for n in self.all_nodes
+             if n.get("host_name") == host_name and n.get("vmid") == vmid),
+            None
+        )
+        # Ищем ноду через vm_data
+        if node is None:
+            vm = next((v for v in self.all_vms
+                       if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+            node = vm.get("node") if vm else host_name
+        vm_type = "qemu"
+
+        from ..backend import VmConfigUpdateWorker
+        worker = VmConfigUpdateWorker(cfg, node, vmid, params, vm_type)
+        worker.signals.config_updated.connect(
+            lambda vid, res, w=worker: (
+                self.config_update_result.emit(f"VM {vid}: параметр изменён"),
+                self._reload_config(vmid, host_name),
+                self._discard_worker(w),
+            )
+        )
+        worker.signals.config_update_error.connect(
+            lambda vid, err, w=worker: (
+                self.config_update_result.emit(f"Ошибка изменения VM {vid}: {err}"),
+                self._discard_worker(w),
+            )
+        )
+        self._run_worker(worker)
+
     def _on_config_loaded(self, vmid, config, gen, host_name):
         if gen != self._generation:
             return
@@ -2534,6 +2577,25 @@ class DetailPanel(QWidget):
         self.task_history_cache[detail_key] = tasks
         if self._last_vm_data and self._last_vm_data.get("vmid") == vmid and self._last_vm_data.get("host_name") == host_name:
             self.task_history_widget.set_tasks(tasks)
+
+    def _reload_config(self, vmid, host_name):
+        """Перезагружает конфиг VM после изменения."""
+        detail_key = (vmid, host_name)
+        self.config_cache.pop(detail_key, None)
+        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        if cfg and self._last_vm_data:
+            node_name = self._last_vm_data.get("node") or host_name
+            gen = self._generation
+            from ..backend import VmConfigWorker
+            worker = VmConfigWorker(cfg, node_name, vmid, "qemu")
+            worker.signals.config_ready.connect(
+                lambda vid, c, g=gen, h=host_name, w=worker: (
+                    self._on_config_loaded(vid, c, g, h),
+                    self._discard_worker(w),
+                )
+            )
+            worker.signals.config_error.connect(lambda vid, err, w=worker: self._discard_worker(w))
+            self._run_worker(worker)
 
     def _display_full_vm_info(self, basic, detail):
         try:

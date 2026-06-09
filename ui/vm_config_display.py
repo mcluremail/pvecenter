@@ -89,6 +89,65 @@ SERVICE_KEYS = {
     "ciuser", "cipassword", "cicustom",
 }
 
+# Editor type and choices for each editable config key
+# Types: bool, int, string, choice (with choices list), readonly
+FIELD_TYPES = {
+    "name": "string",
+    "cpu": ("choice", [
+        "kvm64", "host", "qemu64", "max",
+        "x86-64-v2", "x86-64-v2-AES",
+        "x86-64-v3", "x86-64-v3-AES",
+        "x86-64-v4", "x86-64-v4-AES",
+    ]),
+    "cores": "int",
+    "sockets": "int",
+    "memory": "int",
+    "bios": ("choice", ["seabios", "ovmf"]),
+    "machine": ("choice", ["i440fx", "q35"]),
+    "vga": ("choice", ["std", "qxl", "virtio", "vmware", "cirrus", "serial0", "qxl2", "qxl3", "qxl4"]),
+    "scsihw": ("choice", ["lsi", "lsi53c810", "megasas", "pvscsi", "virtio-scsi-single", "virtio-scsi-pci"]),
+    "ostype": ("choice", [
+        "other", "wxp", "w2k", "w2k3", "w2k8", "w2k12",
+        "wvista", "win7", "win8", "win10",
+        "l24", "l26", "solaris",
+    ]),
+    "acpi": "bool",
+    "agent": "bool",
+    "kvm": "bool",
+    "tablet": "bool",
+    "onboot": "bool",
+    "numa": "bool",
+    "freeze": "bool",
+    "localtime": "bool",
+    "protection": "bool",
+    "reboot": "bool",
+    "tdf": "bool",
+    "boot": "string",
+    "bootdisk": "string",
+    "hotplug": "string",
+    "startup": "string",
+    "rtc": ("choice", ["utc", "localtime"]),
+    "keyboard": ("choice", [
+        "ar", "da", "de", "de-ch", "en-gb", "en-us",
+        "es", "fi", "fr", "fr-be", "fr-ca", "fr-ch",
+        "hr", "hu", "is", "it", "ja", "lt", "mk",
+        "nl", "no", "pl", "pt", "pt-br", "ru",
+        "sk", "sl", "sv", "tr", "ua",
+    ]),
+    "smbios1": "string",
+    "tags": "string",
+    "vcpus": "int",
+    "args": "string",
+    "vmgenid": "readonly",
+    "running-machine": "readonly",
+    "running-qemu": "readonly",
+}
+
+# Reverse map: from raw PVE value to form widget value
+FIELD_REVERSE = {
+    "bool": lambda v: v in (1, "1", True),
+}
+
 # Ordered groups for hardware tab
 _HW_SECTIONS = [
     ("identity",       ["name"]),

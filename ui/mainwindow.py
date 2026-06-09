@@ -48,6 +48,9 @@ class MainWindow(QMainWindow):
 
         self.tree_panel = TreePanel(self.nodes_cfg)
         self.detail_panel = DetailPanel(self.nodes_cfg)
+        self.detail_panel.config_update_result.connect(
+            lambda msg: self._notifications.show(msg, error="Ошибка" in msg)
+        )
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
 

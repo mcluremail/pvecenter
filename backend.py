@@ -584,6 +584,57 @@ class VmConfigWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# VmConfigUpdateWorker — PUT /nodes/{node}/qemu/{vmid}/config
+# ----------------------------------------------------------------------
+class VmConfigUpdateSignals(QObject):
+    config_updated = Signal(int, object)
+    config_update_error = Signal(int, str)
+    finished = Signal()
+
+
+class VmConfigUpdateWorker(QRunnable):
+    """Обновляет параметры VM через PUT /nodes/{node}/qemu/{vmid}/config."""
+    def __init__(self, host_cfg, node_name, vmid, params, vm_type='qemu'):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.params = params
+        self.vm_type = vm_type
+        self.signals = VmConfigUpdateSignals()
+
+    def run(self):
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=False,
+                timeout=10,
+            )
+            if self.vm_type == "qemu":
+                result = proxmox.nodes(self.node_name).qemu(self.vmid).config.put(**self.params)
+            else:
+                result = proxmox.nodes(self.node_name).lxc(self.vmid).config.put(**self.params)
+            try:
+                self.signals.config_updated.emit(self.vmid, result)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                self.signals.config_update_error.emit(self.vmid, str(e))
+            except RuntimeError:
+                pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # VmTaskHistoryWorker
 # ----------------------------------------------------------------------
 class VmTaskHistorySignals(QObject):
