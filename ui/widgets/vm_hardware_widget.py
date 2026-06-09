@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget, QMessageBox
 from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
 from ..vm_config_display import (get_hardware_rows, get_editor_spec,
@@ -14,6 +14,8 @@ _READONLY_ROLE = Qt.UserRole + 101
 class VmHardwareWidget(QWidget):
     config_changed = Signal(str, str, object)
 
+    _EDITABLE_WHEN_RUNNING = ("ide2", "net0", "net1", "net2", "net3")
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._config_data = {}
@@ -21,6 +23,7 @@ class VmHardwareWidget(QWidget):
         self._vmid = 0
         self._node = ""
         self._iso_list = []
+        self._vm_status = "stopped"
 
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -42,6 +45,9 @@ class VmHardwareWidget(QWidget):
         self._host_name = host_name
         self._vmid = vmid
         self._node = node
+
+    def set_vm_status(self, status):
+        self._vm_status = status or "stopped"
 
     def set_iso_list(self, iso_set):
         self._iso_list = iso_set
@@ -75,11 +81,21 @@ class VmHardwareWidget(QWidget):
         raw_key = item.data(_KEY_ROLE)
         if not raw_key:
             return
+
+        is_running = self._vm_status == "running"
+        if is_running and raw_key not in self._EDITABLE_WHEN_RUNNING:
+            QMessageBox.information(self, "Изменение недоступно",
+                                    "Этот параметр нельзя изменить "
+                                    "на работающей ВМ.\n"
+                                    "Остановите ВМ для редактирования.")
+            return
+
         current_value = self._config_data.get(raw_key)
         label = item.text()
 
         if is_net_key(raw_key):
-            dlg = VmNetworkEditorDialog(raw_key, label, current_value, self)
+            dlg = VmNetworkEditorDialog(raw_key, label, current_value,
+                                        running=is_running, parent=self)
             if dlg.exec() != VmNetworkEditorDialog.Accepted:
                 return
             key, value = dlg.get_raw_value()

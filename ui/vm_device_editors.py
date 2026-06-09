@@ -81,13 +81,13 @@ def _parse_cdrom(val):
 
 
 class VmNetworkEditorDialog(QDialog):
-    """Редактирование сетевого устройства (net0, net1, ...)."""
-    def __init__(self, key, label, current_value, parent=None):
+    def __init__(self, key, label, current_value, running=False, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Редактирование: {label}")
         self.setMinimumWidth(500)
         self._key = key
         self._parsed = _parse_net(current_value)
+        self._running = running
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -95,6 +95,12 @@ class VmNetworkEditorDialog(QDialog):
 
         header = QLabel(f"<b>{label}</b>")
         layout.addWidget(header)
+
+        if running:
+            warn = QLabel("⚠ На работающей ВМ можно изменить только VLAN тег")
+            warn.setStyleSheet("color: #d97706; font-size: 11px;")
+            warn.setWordWrap(True)
+            layout.addWidget(warn)
 
         form = QFormLayout()
         form.setSpacing(8)
@@ -106,10 +112,12 @@ class VmNetworkEditorDialog(QDialog):
         idx = self._model_combo.findData(self._parsed["model"])
         if idx >= 0:
             self._model_combo.setCurrentIndex(idx)
+        self._model_combo.setEnabled(not running)
         form.addRow("Модель:", self._model_combo)
 
         self._mac_edit = QLineEdit(self._parsed["mac"])
         self._mac_edit.setPlaceholderText("оставьте пустым для авто-назначения")
+        self._mac_edit.setReadOnly(True)
         form.addRow("MAC:", self._mac_edit)
 
         self._bridge_combo = QComboBox()
@@ -123,6 +131,7 @@ class VmNetworkEditorDialog(QDialog):
             self._bridge_combo.setCurrentIndex(idx)
         else:
             self._bridge_combo.setEditText(bridge_val)
+        self._bridge_combo.setEnabled(not running)
         form.addRow("Мост:", self._bridge_combo)
 
         # VLAN

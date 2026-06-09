@@ -2496,6 +2496,7 @@ class DetailPanel(QWidget):
 
         # Контекст для редакторов (host_name, vmid, node)
         self.hardware_widget.set_context(host_name, vmid, node_name)
+        self.hardware_widget.set_vm_status(vm_data.get("status", ""))
         iso_set = self._iso_by_node.setdefault(node_name, set())
         self.hardware_widget.set_iso_list(iso_set)
         self.options_widget.set_context(host_name, vmid, node_name)
