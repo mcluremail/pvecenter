@@ -984,7 +984,7 @@ class DeleteVmWorker(QRunnable):
                 timeout=30,
             )
 
-            proxmox.nodes(self.node_name).qemu(self.vmid).delete()
+            proxmox.nodes(self.node_name).qemu(self.vmid).delete(purge=1)
             msg = f"VM {self.vmid} удалена с {self.node_name}"
             try:
                 self.signals.vm_deleted.emit(msg)
