@@ -228,6 +228,8 @@ class MainWindow(QMainWindow):
         vm = next((v for v in self.all_vms
                    if v.get("vmid") == vmid and v.get("host_name") == host_name), None)
         vm_name = vm.get("name") if vm else f"VM {vmid}"
+        vm_status = vm.get("status", "") if vm else ""
+        is_running = vm_status == "running"
 
         # Найти конфиг хоста
         cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
@@ -238,7 +240,7 @@ class MainWindow(QMainWindow):
         # Диалог подтверждения
         dlg = QDialog(self)
         dlg.setWindowTitle("Удаление ВМ")
-        dlg.setFixedSize(480, 240)
+        dlg.setFixedSize(480, is_running and 280 or 240)
         layout = QVBoxLayout(dlg)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
@@ -252,8 +254,21 @@ class MainWindow(QMainWindow):
         warning.setWordWrap(True)
         layout.addWidget(warning)
 
+        if is_running:
+            run_warning = QLabel(
+                "<span style='color:#c0392b; font-weight:bold;'>⚠ ВМ запущена!</span>"
+                "<br>Она будет принудительно остановлена и удалена."
+            )
+            run_warning.setWordWrap(True)
+            layout.addWidget(run_warning)
+
         confirm_check = QCheckBox("Я подтверждаю удаление")
         layout.addWidget(confirm_check)
+
+        if is_running:
+            force_check = QCheckBox("Принудительно остановить и удалить")
+            force_check.setStyleSheet("color: #c0392b;")
+            layout.addWidget(force_check)
 
         layout.addStretch()
 
@@ -268,7 +283,13 @@ class MainWindow(QMainWindow):
         cancel_btn.setFixedWidth(120)
         cancel_btn.setDefault(True)
 
-        confirm_check.toggled.connect(delete_btn.setEnabled)
+        if is_running:
+            confirm_check.toggled.connect(
+                lambda checked: delete_btn.setEnabled(checked and force_check.isChecked()))
+            force_check.toggled.connect(
+                lambda checked: delete_btn.setEnabled(checked and confirm_check.isChecked()))
+        else:
+            confirm_check.toggled.connect(delete_btn.setEnabled)
         btn_layout.addWidget(delete_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
