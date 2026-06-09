@@ -2233,6 +2233,9 @@ class DetailPanel(QWidget):
             self.metrics_widget.setVisible(False)
             self.metrics_widget.clear_curves()
             self.tabs.setCurrentIndex(TabIndex.MONITOR)
+            # Скрываем все вкладки, кроме Мониторинг (там текст ошибки)
+            for t in range(self.tabs.count()):
+                self.tabs.setTabVisible(t, t == TabIndex.MONITOR)
             return
 
         self.metrics_widget.setVisible(True)
