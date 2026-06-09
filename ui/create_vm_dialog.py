@@ -58,9 +58,9 @@ DISK_CACHE = [
 
 CPU_TYPES = [
     ("host", "host (рекомендуется)"),
-    ("x86-64-v2-AES", "x86-64-v2-AES"),
-    ("x86-64-v3", "x86-64-v3"),
-    ("x86-64-v4", "x86-64-v4"),
+    ("custom-x86-64-v2-AES", "x86-64-v2-AES"),
+    ("custom-x86-64-v3", "x86-64-v3"),
+    ("custom-x86-64-v4", "x86-64-v4"),
     ("kvm64", "kvm64"),
     ("qemu64", "qemu64"),
     ("max", "max"),
