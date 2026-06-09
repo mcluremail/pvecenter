@@ -88,6 +88,7 @@ class DetailPanel(QWidget):
         self.metrics_cache = {}
         self.task_history_cache = {}
         self._storage_content_pending = {}
+        self._iso_volids = set()
         self._workers = set()
         self.current_worker = None
         self.current_config_worker = None
@@ -161,7 +162,6 @@ class DetailPanel(QWidget):
 
         self.vm_summary_table = QTableWidget()
         self.vm_summary_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.vm_summary_table.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.vm_summary_table.verticalHeader().hide()
         self.vm_summary_table.setColumnCount(2)
         self.vm_summary_table.setHorizontalHeaderLabels(["Параметр", "Значение"])
@@ -1771,6 +1771,7 @@ class DetailPanel(QWidget):
             if ct == "iso" and items:
                 self.storage_iso_stack.setCurrentIndex(1)
                 self._populate_content_table(self.storage_iso_table, items)
+                self._iso_volids = {v.get("volid", "") for v in items if v.get("volid")}
             elif ct == "iso":
                 self.storage_iso_stack.widget(0).setText("Нет данных")
                 self.storage_iso_stack.setCurrentIndex(0)
@@ -2462,6 +2463,7 @@ class DetailPanel(QWidget):
         # Контекст для редакторов (host_name, vmid, node)
         vm_node = vm_data.get("node") or host_name
         self.hardware_widget.set_context(host_name, vmid, vm_node)
+        self.hardware_widget.set_iso_list(self._iso_volids)
         self.options_widget.set_context(host_name, vmid, vm_node)
 
         if detail_key not in self.task_history_cache:

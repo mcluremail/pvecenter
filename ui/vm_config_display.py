@@ -162,6 +162,23 @@ CHOICE_LABELS = {
 # Device keys that can be edited as raw strings
 _EDITABLE_DEVICE_PREFIXES = {"net", "ide", "sata", "scsi", "virtio", "efidisk", "tpmstate"}
 
+
+def _key_prefix(key):
+    return key.rstrip("0123456789")
+
+
+def is_net_key(key):
+    return _key_prefix(key) == "net"
+
+
+def is_cdrom_key(key):
+    return key == "ide2"
+
+
+def is_disk_key(key):
+    pfx = _key_prefix(key)
+    return pfx in ("virtio", "scsi", "sata") or (pfx == "ide" and key != "ide2")
+
 # PVE defaults for keys absent from config API (hardware tab)
 HW_DEFAULTS = {
     "cores": 1,

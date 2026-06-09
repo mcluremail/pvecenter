@@ -1,8 +1,11 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
 from ..hover import enable_row_hover
-from ..vm_config_display import get_hardware_rows, get_editor_spec, HW_DEFAULTS
+from ..vm_config_display import (get_hardware_rows, get_editor_spec,
+                                 HW_DEFAULTS, is_net_key, is_cdrom_key, is_disk_key)
 from ..vm_config_editor_dialog import VmConfigEditorDialog
+from ..vm_device_editors import (VmNetworkEditorDialog, VmCdromEditorDialog,
+                                 VmDiskEditorDialog)
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -17,6 +20,7 @@ class VmHardwareWidget(QWidget):
         self._host_name = ""
         self._vmid = 0
         self._node = ""
+        self._iso_list = []
 
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -38,6 +42,9 @@ class VmHardwareWidget(QWidget):
         self._host_name = host_name
         self._vmid = vmid
         self._node = node
+
+    def set_iso_list(self, iso_list):
+        self._iso_list = list(iso_list) if iso_list else []
 
     def set_hardware_data(self, config_data, detail_data=None):
         self._config_data = config_data or {}
@@ -68,13 +75,46 @@ class VmHardwareWidget(QWidget):
         raw_key = item.data(_KEY_ROLE)
         if not raw_key:
             return
+        current_value = self._config_data.get(raw_key)
+        label = item.text()
+
+        if is_net_key(raw_key):
+            dlg = VmNetworkEditorDialog(raw_key, label, current_value, self)
+            if dlg.exec() != VmNetworkEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            if value is not None:
+                self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
+            return
+
+        if is_cdrom_key(raw_key):
+            dlg = VmCdromEditorDialog(raw_key, label, current_value,
+                                      self._iso_list, self)
+            if dlg.exec() != VmCdromEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            if value is None:
+                self.config_changed.emit(self._host_name, str(self._vmid),
+                                         {key: "none"})
+            else:
+                self.config_changed.emit(self._host_name, str(self._vmid),
+                                         {key: value})
+            return
+
+        if is_disk_key(raw_key):
+            dlg = VmDiskEditorDialog(raw_key, label, current_value, self)
+            if dlg.exec() != VmDiskEditorDialog.Accepted:
+                return
+            key, value = dlg.get_raw_value()
+            if value is not None:
+                self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
+            return
+
         ft, choices, choice_labels = get_editor_spec(raw_key)
         if ft == "readonly":
             return
-        current_value = self._config_data.get(raw_key)
         if current_value is None:
             current_value = HW_DEFAULTS.get(raw_key, "")
-        label = item.text()
         dlg = VmConfigEditorDialog(raw_key, label, ft, current_value, choices,
                                    choice_labels, self)
         if dlg.exec() != VmConfigEditorDialog.Accepted:
