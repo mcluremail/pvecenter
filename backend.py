@@ -933,10 +933,14 @@ class CreateVmWorker(QRunnable):
             # Добавление в HA группу
             if self.ha_group:
                 try:
-                    proxmox.cluster.ha.resources.post(
-                        sid=f"vm:{vmid}",
-                        group=self.ha_group
-                    )
+                    ha_params = {
+                        "sid": f"vm:{vmid}",
+                        "group": self.ha_group,
+                    }
+                    # Если пользователь снял галку «Запустить» — не даем HA стартовать VM
+                    if not self.params.get("start"):
+                        ha_params["state"] = "stopped"
+                    proxmox.cluster.ha.resources.post(**ha_params)
                     msg += f", добавлена в HA «{self.ha_group}»"
                 except Exception as ha_err:
                     msg += f", но ошибка HA: {ha_err}"

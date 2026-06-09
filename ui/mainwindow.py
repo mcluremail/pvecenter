@@ -105,6 +105,9 @@ class MainWindow(QMainWindow):
         self._tasks_gen = 0
         self._tasks_started = False
 
+        # Поколение hard refresh — предотвращает race condition при повторных refresh_data()
+        self._refresh_gen = 0
+
         # Переменные для мягкого обновления
         self.last_refresh_ts = 0
         self.refresh_interval = 5
@@ -409,10 +412,13 @@ class MainWindow(QMainWindow):
 
         active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
 
+        self._refresh_gen += 1
+        refresh_gen = self._refresh_gen
+
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(
-                lambda data, w=worker: (self.on_worker_finished(data, w), self._discard_worker(w))
+                lambda data, w=worker, g=refresh_gen: (self.on_worker_finished(data, w, g), self._discard_worker(w))
             )
             self._run_worker(worker)
 
@@ -425,7 +431,9 @@ class MainWindow(QMainWindow):
             self._update_status_bar()
 
     @Slot(dict)
-    def on_worker_finished(self, data, worker=None):
+    def on_worker_finished(self, data, worker=None, gen=0):
+        if gen != 0 and gen != self._refresh_gen:
+            return
         if data["status"] == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
             for node in data["nodes"]:
@@ -434,7 +442,14 @@ class MainWindow(QMainWindow):
                 self.all_nodes.append(node)
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
-                self.all_vms.append(vm)
+                # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
+                vm_key = (data["host"], vm.get("vmid", 0))
+                idx = next((i for i, v in enumerate(self.all_vms)
+                            if (v.get("host_name"), v.get("vmid")) == vm_key), None)
+                if idx is not None:
+                    self.all_vms[idx] = vm
+                else:
+                    self.all_vms.append(vm)
             for st in data.get("storages", []):
                 st["host_name"] = data["host"]
                 key = (st.get("storage"), st.get("node"), data["host"])
