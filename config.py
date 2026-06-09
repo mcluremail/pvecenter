@@ -307,27 +307,6 @@ def load_ui_state(key: str) -> str | None:
         return None
 
 
-def load_all_ui_state() -> dict[str, str]:
-    try:
-        with _ui_state_lock:
-            conn = _init_ui_db()
-            cur = conn.execute("SELECT key, value FROM ui_state")
-            rows = cur.fetchall()
-            conn.close()
-            return {k: v for k, v in rows}
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("load_all_ui_state: %s", e)
-        return {}
-
-
-def delete_ui_state(key: str):
-    try:
-        with _ui_state_lock:
-            conn = _init_ui_db()
-            conn.execute("DELETE FROM ui_state WHERE key = ?", (key,))
-            conn.commit()
-            conn.close()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("delete_ui_state(%s): %s", key, e)
+# Dead code below (kept for reference):
+# def load_all_ui_state() -> dict[str, str]: ...
+# def delete_ui_state(key: str): ...
