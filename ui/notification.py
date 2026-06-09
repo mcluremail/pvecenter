@@ -1,6 +1,5 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
-from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, QRect, Property
-from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
+from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property
 
 
 class FadeToast(QWidget):
@@ -8,12 +7,16 @@ class FadeToast(QWidget):
 
     def __init__(self, parent, text, color="#1f2937"):
         super().__init__(parent)
-        self._opacity = 1.0
         self._text = text
         self._bg_color = color
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
+
+        # QGraphicsOpacityEffect работает на всех платформах (в отличие от setWindowOpacity)
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self._opacity_effect.setOpacity(1.0)
+        self.setGraphicsEffect(self._opacity_effect)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 6, 10, 6)
@@ -45,7 +48,7 @@ class FadeToast(QWidget):
         self._fade_timer.setInterval(4000)
         self._fade_timer.timeout.connect(self._start_fade)
 
-        self._fade_anim = QPropertyAnimation(self, b"opacity")
+        self._fade_anim = QPropertyAnimation(self._opacity_effect, b"opacity")
         self._fade_anim.setDuration(600)
         self._fade_anim.setStartValue(1.0)
         self._fade_anim.setEndValue(0.0)
@@ -54,14 +57,7 @@ class FadeToast(QWidget):
         self.show()
         self._fade_timer.start()
 
-    def get_opacity(self):
-        return self._opacity
-
-    def set_opacity(self, val):
-        self._opacity = val
-        self.setWindowOpacity(val)
-
-    opacity = Property(float, get_opacity, set_opacity)
+    opacity = Property(float, lambda s: s._opacity_effect.opacity(), lambda s, v: s._opacity_effect.setOpacity(v))
 
     def _copy_to_clipboard(self):
         QApplication.clipboard().setText(self._text)
