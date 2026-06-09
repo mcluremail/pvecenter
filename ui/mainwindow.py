@@ -5,7 +5,8 @@ import traceback
 import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
-                               QMessageBox, QLabel, QDialog, QPushButton, QCheckBox)
+                               QMessageBox, QLabel, QDialog, QPushButton, QCheckBox,
+                               QComboBox)
 from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
@@ -17,6 +18,7 @@ from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 from .icons import get_icon
+from .i18n import tr, set_language, get_language, supported_languages
 logger = logging.getLogger(__name__)
 
 # Максимум одновременно работающих воркеров
@@ -97,6 +99,17 @@ class MainWindow(QMainWindow):
         self._refresh_spinner = QLabel("")
         self._refresh_spinner.setStyleSheet("color: #6b7280; padding-right: 8px;")
         self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
+
+        self._lang_combo = QComboBox()
+        self._lang_combo.setFixedWidth(100)
+        self._lang_combo.setStyleSheet("font-size: 12px; border: none; margin: 0 4px;")
+        current_lang = get_language()
+        for code, native_name in sorted(supported_languages().items(), key=lambda x: x[0]):
+            self._lang_combo.addItem(native_name, code)
+            if code == current_lang:
+                self._lang_combo.setCurrentIndex(self._lang_combo.count() - 1)
+        self._lang_combo.currentIndexChanged.connect(self._on_language_changed)
+        self.status_bar.insertPermanentWidget(1, self._lang_combo)
         self._spin_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self._spin_idx = 0
         self._spin_timer = QTimer(self)
@@ -911,6 +924,23 @@ class MainWindow(QMainWindow):
                         print(f"Thread [{thread_id}] ({name}):")
                         traceback.print_stack(frame)
                 print("=== END FREEZE REPORT ===\n")
+
+    def _on_language_changed(self, idx):
+        code = self._lang_combo.itemData(idx)
+        if not code or code == get_language():
+            return
+        reply = QMessageBox.question(
+            self, tr("Language changed"),
+            tr("The language will change after restart. Restart now?"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+        )
+        if reply == QMessageBox.Yes:
+            save_ui_state("language", code)
+            self.closeEvent(None)
+            from PySide6.QtCore import QCoreApplication
+            QCoreApplication.quit()
+            import os, sys
+            os.execl(sys.executable, sys.executable, *sys.argv)
 
     # ------------------------------------------------------------
     # Закрытие приложения

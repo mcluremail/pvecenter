@@ -479,6 +479,11 @@ _RU = {
     "SCSI": "SCSI",
     "VirtIO": "VirtIO",
     "Network ": "Сеть ",
+
+    # Language switcher
+    "Language changed": "Язык изменён",
+    "The language will change after restart. Restart now?": "Язык изменится после перезапуска. Перезапустить сейчас?",
+    "Restart now": "Перезапустить сейчас",
 }
 
 
