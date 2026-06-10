@@ -11,8 +11,9 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Platform | Format | Link |
 |----------|--------|------|
 | Linux (any) | pip | `pip install pvecenter` |
-| Debian / Ubuntu | .deb | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
-| Any | Source | [GitHub Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Debian / Ubuntu | .deb | [Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
 Latest release: [v1.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.0)
 
