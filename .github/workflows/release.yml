@@ -59,8 +59,8 @@ jobs:
         run: |
           dnf install -y -q rpm-build python3-devel python3-setuptools \
             python3-pip python3-wheel python3-requests \
-            python3-pyqtgraph python3-cryptography pyproject-rpm-macros
-          pip3 install PySide6
+            python3-pyqtgraph python3-cryptography
+          pip3 install PySide6 --break-system-packages
       - name: Build .rpm
         run: |
           mkdir -p /tmp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
