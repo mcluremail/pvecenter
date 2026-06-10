@@ -12,6 +12,7 @@ Source0:       %{pypi_source}
 BuildArch:     noarch
 BuildRequires: python3-devel
 BuildRequires: python3-setuptools
+BuildRequires: python3-pip
 
 Requires:      python3
 
@@ -40,31 +41,16 @@ PVE Center — десктопный инструмент для монитори
 %py3_build
 
 %install
-# manual install (setup.py install is deprecated in modern setuptools)
-install -d %{buildroot}%{python3_sitelib}/pve_center/
-cp -a pve_center/ %{buildroot}%{python3_sitelib}/
-install -d %{buildroot}%{python3_sitelib}/pvecenter-%{version}.dist-info/
-cat > %{buildroot}%{python3_sitelib}/pvecenter-%{version}.dist-info/METADATA << EOF
-Name: pvecenter
-Version: %{version}
-Summary: Desktop client for Proxmox VE clusters
-EOF
-# entry point
-install -d %{buildroot}%{_bindir}
-cat > %{buildroot}%{_bindir}/pvecenter << 'SCRIPT'
-#!/usr/bin/env python3
-from pve_center.main import main
-main()
-SCRIPT
-chmod 755 %{buildroot}%{_bindir}/pvecenter
+# pip install respects pyproject.toml properly
+%{python3} -m pip install . --root=%{buildroot} --no-deps --ignore-installed --no-build-isolation
 # desktop entry
 mkdir -p %{buildroot}%{_datadir}/applications/
-install -m 644 debian/pve-center.desktop \
+install -m 644 %{_builddir}/%{pypi_name}-%{version}/debian/pve-center.desktop \
   %{buildroot}%{_datadir}/applications/pve-center.desktop
 
 %files
 %{python3_sitelib}/pve_center/
-%{python3_sitelib}/pve_center-*.egg-info/
+%{python3_sitelib}/pvecenter-*.dist-info/
 %{_bindir}/pvecenter
 %{_datadir}/applications/pve-center.desktop
 
