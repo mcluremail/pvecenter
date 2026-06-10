@@ -37,7 +37,7 @@ install -m 644 -D debian/pve-center.desktop \
 
 %files
 %{python3_sitelib}/pve_center/
-%{python3_sitelib}/pvecenter-*.dist-info/
+%{python3_sitelib}/pvecenter-*.egg-info/
 %{_bindir}/pvecenter
 %{_datadir}/applications/pve-center.desktop
 
