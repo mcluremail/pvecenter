@@ -12,10 +12,8 @@ Source0:       %{pypi_source}
 BuildArch:     noarch
 BuildRequires: python3-devel
 BuildRequires: python3-setuptools
-BuildRequires: python3-pip
 
 Requires:      python3
-
 Requires:      python3
 Requires:      python3-pyside6
 Requires:      python3-requests
@@ -41,11 +39,42 @@ PVE Center — десктопный инструмент для монитори
 %py3_build
 
 %install
-# pip install respects pyproject.toml properly
-%{python3} -m pip install . --root=%{buildroot} --no-deps --ignore-installed --no-build-isolation
+# Copy build artifacts produced by %py3_build (setup.py build)
+install -d %{buildroot}%{python3_sitelib}/
+cp -a build/lib/pve_center/ %{buildroot}%{python3_sitelib}/
+# dist-info metadata
+install -d %{buildroot}%{python3_sitelib}/pvecenter-%{version}.dist-info/
+cat > %{buildroot}%{python3_sitelib}/pvecenter-%{version}.dist-info/METADATA << EOF
+Name: pvecenter
+Version: %{version}
+Summary: Desktop client for Proxmox VE clusters
+EOF
+cat > %{buildroot}%{python3_sitelib}/pvecenter-%{version}.dist-info/RECORD << EOF
+pve_center/__init__.py,,
+pve_center/__main__.py,,
+pve_center/auth.py,,
+pve_center/backend.py,,
+pve_center/config.py,,
+pve_center/i18n.py,,
+pve_center/main.py,,
+pve_center/ui/__init__.py,,
+pve_center/ui/mainwindow.py,,
+pve_center/ui/manager.py,,
+pve_center/ui/node.py,,
+pve_center/ui/tasks.py,,
+pve_center/ui/api.py,,
+EOF
+# entry point script
+install -d %{buildroot}%{_bindir}
+cat > %{buildroot}%{_bindir}/pvecenter << 'SCRIPT'
+#!/usr/bin/env python3
+from pve_center.main import main
+main()
+SCRIPT
+chmod 755 %{buildroot}%{_bindir}/pvecenter
 # desktop entry
 mkdir -p %{buildroot}%{_datadir}/applications/
-install -m 644 %{_builddir}/%{pypi_name}-%{version}/debian/pve-center.desktop \
+install -m 644 debian/pve-center.desktop \
   %{buildroot}%{_datadir}/applications/pve-center.desktop
 
 %files
