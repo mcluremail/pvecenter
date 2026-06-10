@@ -14,7 +14,7 @@ BuildRequires: python3-devel
 BuildRequires: python3-setuptools
 BuildRequires: python3-pip
 BuildRequires: python3-wheel
-BuildRequires: python3-pyproject-rpm-macros
+BuildRequires: pyproject-rpm-macros
 
 Requires:      python3
 Requires:      python3-pyside6
@@ -41,7 +41,7 @@ PVE Center — десктопный инструмент для монитори
 %pyproject_build
 
 %install
-%py3_install
+%pyproject_install
 # desktop entry
 mkdir -p %{buildroot}%{_datadir}/applications/
 install -m 644 %{_builddir}/%{pypi_name}-%{version}/debian/pve-center.desktop \

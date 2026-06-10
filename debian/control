@@ -2,7 +2,8 @@ Source: pve-center
 Section: admin
 Priority: optional
 Maintainer: Taurus McLure <taurus@mclure.ru>
-Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-setuptools
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-setuptools,
+               pybuild-plugin-pyproject
 Standards-Version: 4.6.2
 Homepage: https://github.com/mcluremail/pvecenter
 Vcs-Git: https://github.com/mcluremail/pvecenter.git
