@@ -56,6 +56,11 @@ class TreePanel(QWidget):
         self._nav_timer.setInterval(300)
         self._nav_timer.timeout.connect(self._flush_nav)
 
+        self._rebuild_timer = QTimer()
+        self._rebuild_timer.setSingleShot(True)
+        self._rebuild_timer.setInterval(150)
+        self._rebuild_timer.timeout.connect(self._do_rebuild)
+
         self._loading_hosts = set()
         self._spinner_angle = 0
         self._spin_timer = QTimer()
@@ -257,6 +262,15 @@ class TreePanel(QWidget):
         if final:
             self._loading_hosts.clear()
             self._spin_timer.stop()
+            self._rebuild_timer.stop()
+            self._build_tree()
+            self._restore_expanded_state()
+            self._sync_toggle_button()
+            self._update_empty_visibility()
+        else:
+            self._rebuild_timer.start()
+
+    def _do_rebuild(self):
         self._build_tree()
         self._restore_expanded_state()
         self._sync_toggle_button()
@@ -356,6 +370,8 @@ class TreePanel(QWidget):
 
     def _build_tree(self):
         self._building = True
+        saved_key = self.get_current_item_key()
+        scroll_val = self.tree.verticalScrollBar().value()
         self.tree.clear()
 
         cluster_nodes = defaultdict(list)
@@ -556,6 +572,11 @@ class TreePanel(QWidget):
                         si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "host", shost))
 
         self.tree.expandAll()
+        if saved_key is not None:
+            item = self.find_item_by_key(saved_key)
+            if item is not None:
+                self.tree.setCurrentItem(item)
+        self.tree.verticalScrollBar().setValue(scroll_val)
         self._building = False
 
     def update_node_statuses(self, all_nodes, all_vms):

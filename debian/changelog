@@ -1,3 +1,10 @@
+pve-center (1.0.2-1) unstable; urgency=medium
+
+  * O1: debounced tree rebuild — intermediate updates (final=False) coalesce via 150ms QTimer instead of N full rebuilds.
+  * Selection and scroll position preserved across tree rebuilds.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:30:00 +0300
+
 pve-center (1.0.1-1) unstable; urgency=medium
 
   * Code audit fixes: executor.map workers (snapshots/disks), ClusterTasksWorker leak, freeze detector logging.
