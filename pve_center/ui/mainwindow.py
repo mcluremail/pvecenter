@@ -381,7 +381,7 @@ class MainWindow(QMainWindow):
             if not item_name:
                 return
             count = sum(1 for c in self.nodes_cfg if c.get("cluster") == item_name)
-            text = tr("Remove cluster «{}» ({} records) from configuration?").format(item_name, count)
+            text = tr("Remove cluster «{name}» ({count} records) from configuration?").format(name=item_name, count=count)
             matched = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
         elif item_type == "section":
             if item_name == tr("Clusters"):

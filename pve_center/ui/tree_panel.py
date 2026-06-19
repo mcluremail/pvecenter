@@ -8,7 +8,7 @@ from datetime import timedelta
 
 import re as _re
 
-from .icons import get_icon, init_icons, _make_loading_icon
+from .icons import get_icon, init_icons, make_loading_icon
 from ..config import save_ui_state, load_ui_state
 from .utils import status_text, format_uptime as _format_uptime, build_cfg_index, build_vm_index, build_node_index
 from .i18n import tr
@@ -241,7 +241,7 @@ class TreePanel(QWidget):
 
     def _tick_spinner(self):
         self._spinner_angle = (self._spinner_angle + 45) % 360
-        icon = _make_loading_icon(self._spinner_angle)
+        icon = make_loading_icon(self._spinner_angle)
         def spin(item):
             key = item.data(0, ITEM_KEY_ROLE)
             if key and isinstance(key, tuple):
@@ -300,7 +300,7 @@ class TreePanel(QWidget):
         for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
             cl_item = QTreeWidgetItem(folder)
             cl_item.setText(0, cl_name)
-            cl_item.setIcon(0, _make_loading_icon(0))
+            cl_item.setIcon(0, make_loading_icon(0))
             cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
             cl_item.setExpanded(True)
             self._loading_hosts.add(f"cluster:{cl_name}")
@@ -310,7 +310,7 @@ class TreePanel(QWidget):
             for hname in sorted(standalone, key=str.lower):
                 hi = QTreeWidgetItem(folder_standalone)
                 hi.setText(0, hname)
-                hi.setIcon(0, _make_loading_icon(0))
+                hi.setIcon(0, make_loading_icon(0))
                 hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
                 self._loading_hosts.add(hname)
 
@@ -432,7 +432,7 @@ class TreePanel(QWidget):
                 nodes_in_cl = cluster_nodes[cluster_name]
                 if not nodes_in_cl:
                     cl_item.setText(0, cluster_name)
-                    cl_item.setIcon(0, _make_loading_icon(self._spinner_angle))
+                    cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
                     cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
                     cl_item.setExpanded(True)
                     continue
@@ -488,7 +488,7 @@ class TreePanel(QWidget):
                 host_item = QTreeWidgetItem(standalone_folder)
                 if node.get("status") == "loading":
                     host_item.setText(0, display_name)
-                    host_item.setIcon(0, _make_loading_icon(self._spinner_angle))
+                    host_item.setIcon(0, make_loading_icon(self._spinner_angle))
                     host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
                     host_item.setExpanded(True)
                     continue
@@ -675,11 +675,16 @@ class TreePanel(QWidget):
             self._on_item_clicked(item, 0)
 
     def find_item_by_key(self, key_data):
+        if not isinstance(key_data, tuple) or len(key_data) < 2:
+            return None
+        is_vm_key = isinstance(key_data[1], int)
         def search(item):
-            if item.data(0, VM_KEY_ROLE) == key_data:
-                return item
-            if item.data(0, ITEM_KEY_ROLE) == key_data:
-                return item
+            if is_vm_key:
+                if item.data(0, VM_KEY_ROLE) == key_data:
+                    return item
+            else:
+                if item.data(0, ITEM_KEY_ROLE) == key_data:
+                    return item
             for i in range(item.childCount()):
                 found = search(item.child(i))
                 if found:

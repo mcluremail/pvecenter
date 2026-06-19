@@ -754,7 +754,7 @@ class VmActionWorker(QRunnable):
                     self.action, self.action
                 )
                 self.signals.action_result.emit(
-                    tr("VM {}: {} completed").format(self.vmid, action_name)
+                    tr("VM {vmid}: {action} completed").format(vmid=self.vmid, action=action_name)
                 )
             except RuntimeError:
                 pass
@@ -1036,7 +1036,7 @@ class CreateVmWorker(QRunnable):
             # POST /nodes/{node}/qemu returns UPID string, not {"data": {"vmid":...}}
             # vmid is now guaranteed in params (user-provided or nextid)
             vmid = params.get("vmid", "?")
-            msg = tr("VM {} created on {}").format(vmid, self.node_name)
+            msg = tr("VM {vmid} created on {node}").format(vmid=vmid, node=self.node_name)
 
             # Add to HA group
             if self.ha_group:
@@ -1097,7 +1097,7 @@ class DeleteVmWorker(QRunnable):
             )
 
             proxmox.nodes(self.node_name).qemu(self.vmid).delete(purge=1)
-            msg = tr("VM {} deleted from {}").format(self.vmid, self.node_name)
+            msg = tr("VM {vmid} deleted from {node}").format(vmid=self.vmid, node=self.node_name)
             try:
                 self.signals.vm_deleted.emit(msg)
             except RuntimeError:

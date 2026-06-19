@@ -263,6 +263,8 @@ def _make_loading_icon(angle):
     )
     return _make_icon(svg, 16)
 
+make_loading_icon = _make_loading_icon
+
 _SVG_TEMPLATES = {
     "host": _HOST,
     "vm": _VM,
@@ -270,14 +272,14 @@ _SVG_TEMPLATES = {
     "pool": _POOL,
 }
 
+_icons = None
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
     if _icons is None:
         init_icons()
     return _icons.get(name)
-
-_icons = None
 
 def init_icons():
     global _icons
