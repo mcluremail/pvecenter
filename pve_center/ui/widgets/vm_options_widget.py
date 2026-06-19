@@ -7,6 +7,7 @@ from ..vm_device_editors import (VmBootEditorDialog,
                                  VmBootdiskEditorDialog,
                                  VmStartupEditorDialog)
 from ..i18n import tr
+from ..detail_panel._table_utils import set_empty_placeholder
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -48,6 +49,7 @@ class VmOptionsWidget(QWidget):
         self.table.setRowCount(0)
         rows = get_options_rows(config_data)
         if not rows:
+            set_empty_placeholder(self.table, 2)
             return
         for i, (key, label, value) in enumerate(rows):
             self.table.insertRow(i)

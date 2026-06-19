@@ -209,8 +209,11 @@ class DetailPanel(QWidget):
             elif obj_type == "storage":
                 self._storage_tabs.show_storage_detail(obj_name, data)
 
-        except Exception:
+        except Exception as exc:
             traceback.print_exc()
+            self.config_update_result.emit(
+                tr("Error: {err}").format(err=str(exc)[:100])
+            )
             self.detail_label.setText(tr("Error: {name}").format(name=obj_name))
             self.info_label.setText(tr("An error occurred while loading information"))
             self.info_stack.setCurrentIndex(0)

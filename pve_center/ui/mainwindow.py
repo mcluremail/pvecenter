@@ -67,6 +67,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
         self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
+        self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
+        self.tree_panel.console_requested.connect(self._on_console_from_tree)
 
         self._notifications = NotificationManager(self)
 
@@ -392,6 +394,53 @@ class MainWindow(QMainWindow):
         dlg.exec()
         return result[0]
 
+    def _on_vm_action_from_tree(self, host_name, node, vmid, action):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        vm = self._vms_by_key.get((host_name, vmid))
+        vm_type = (vm.get("type", "qemu") if vm else "qemu")
+        if action in ("stop", "reset", "shutdown", "reboot", "suspend"):
+            msgs = {
+                "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
+                "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
+                "shutdown": tr("Send ACPI shutdown to VM {vmid}?").format(vmid=vmid),
+                "reboot": tr("Send ACPI reboot to VM {vmid}?").format(vmid=vmid),
+                "suspend": tr("Suspend VM {vmid}?").format(vmid=vmid),
+            }
+            from PySide6.QtWidgets import QMessageBox
+            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], parent=self)
+            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+            msg.addButton(tr("No"), QMessageBox.NoRole)
+            msg.setDefaultButton(yes)
+            msg.exec()
+            if msg.clickedButton() != yes:
+                return
+        from ..backend import VmActionWorker
+        worker = VmActionWorker(cfg, node, vmid, vm_type, action)
+        worker.signals.action_result.connect(lambda msg: (
+            self._notifications.show(msg),
+            self.refresh_data()
+        ))
+        worker.signals.action_error.connect(lambda err: (
+            self._notifications.show(tr("Action error: {}").format(err), error=True)
+        ))
+        self._run_worker(worker)
+
+    def _on_console_from_tree(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        vm = self._vms_by_key.get((host_name, vmid))
+        vm_type = (vm.get("type", "qemu") if vm else "qemu")
+        from ..backend import VmConsoleWorker
+        worker = VmConsoleWorker(cfg, node, vmid, vm_type)
+        worker.signals.console_ready.connect(lambda msg: self._notifications.show(msg))
+        worker.signals.console_error.connect(lambda err: self._notifications.show(err, error=True))
+        self._run_worker(worker)
+
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":
             text = tr("Remove host «{}» from configuration?").format(item_name)
@@ -709,8 +758,12 @@ class MainWindow(QMainWindow):
                     self.detail_panel.set_iso_catalog(self.all_iso_images)
                     self._detect_status_changes(self._soft_nodes, self._soft_vms)
                     self._update_status_bar()
-                except Exception:
+                except Exception as exc:
                     traceback.print_exc()
+                    self._notifications.show(
+                        tr("Error: {err}").format(err=str(exc)[:100]),
+                        error=True,
+                    )
             self._soft_nodes.clear()
             self._soft_vms.clear()
             self._soft_storages.clear()

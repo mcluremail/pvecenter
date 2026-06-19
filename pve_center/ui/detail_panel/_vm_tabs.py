@@ -128,10 +128,13 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        if action in ("stop", "reset"):
+        if action in ("stop", "reset", "shutdown", "reboot", "suspend"):
             msgs = {
                 "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
                 "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
+                "shutdown": tr("Send ACPI shutdown to VM {vmid}?").format(vmid=vmid),
+                "reboot": tr("Send ACPI reboot to VM {vmid}?").format(vmid=vmid),
+                "suspend": tr("Suspend VM {vmid}?").format(vmid=vmid),
             }
             msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], parent=panel)
             yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
@@ -516,8 +519,11 @@ class VMTabs:
             compact_table(table, 22)
 
             panel.info_stack.setCurrentIndex(1)
-        except Exception:
+        except Exception as exc:
             traceback.print_exc()
+            self.panel.config_update_result.emit(
+                tr("Error: {err}").format(err=str(exc)[:100])
+            )
             panel.info_label.setText(tr("Error building info"))
             panel.info_stack.setCurrentIndex(0)
 

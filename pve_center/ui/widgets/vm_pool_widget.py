@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBox
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
 from ..i18n import tr
+from ..detail_panel._table_utils import set_empty_placeholder
 from ..theme import Color
 
 
@@ -37,6 +38,9 @@ class VmPoolWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
     def set_pool_vms(self, vms):
+        if not vms:
+            set_empty_placeholder(self.table, 5)
+            return
         self.table.setRowCount(len(vms))
         for i, vm in enumerate(vms):
             self.table.setItem(i, 0, QTableWidgetItem(str(vm.get("name", ""))))

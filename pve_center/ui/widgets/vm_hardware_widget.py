@@ -7,6 +7,7 @@ from ..vm_config_editor_dialog import VmConfigEditorDialog
 from ..vm_device_editors import (VmNetworkEditorDialog, VmCdromEditorDialog,
                                  VmDiskEditorDialog)
 from ..i18n import tr
+from ..detail_panel._table_utils import set_empty_placeholder
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
@@ -58,6 +59,7 @@ class VmHardwareWidget(QWidget):
         self.table.setRowCount(0)
         rows = get_hardware_rows(config_data, detail_data)
         if not rows:
+            set_empty_placeholder(self.table, 2)
             return
         for i, (key, label, value) in enumerate(rows):
             self.table.insertRow(i)

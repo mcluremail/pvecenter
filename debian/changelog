@@ -1,3 +1,22 @@
+pve-center (1.1.7-1) unstable; urgency=medium
+
+  * H2: show notification toast with error text on traceback (3 sites:
+    soft_refresh, show_details, display_full_vm_info). Full traceback
+    still written to stderr.
+  * M3: empty table placeholder "No data" when rows==0 (6 tables:
+    vm_hardware, vm_options, vm_pool, cluster_summary, host_vm,
+    storage). New set_empty_placeholder() helper in _table_utils.py.
+  * M5: confirmation dialog for shutdown/reboot/suspend (previously
+    only stop/reset confirmed). 5 actions now confirm.
+  * M7: context menu on VM in tree now has Start/Shutdown/Reboot/Stop/
+    Reset/Console actions + Delete. Actions disabled based on VM status.
+    New signals vm_action_requested + console_requested in TreePanel,
+    handlers in MainWindow.
+  * i18n: add 4 new keys to all 5 languages (Error: {err}, Send ACPI
+    shutdown/reboot to VM {vmid}?, Suspend VM {vmid}?).
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 21:00:00 +0300
+
 pve-center (1.1.6-1) unstable; urgency=medium
 
   * M1: replace ~30 hardcoded QColor("#hex") with Color.* constants from

@@ -9,6 +9,7 @@ from datetime import timedelta
 import re as _re
 
 from .icons import get_icon, init_icons, make_loading_icon
+from .vm_actions import VM_ACTION_ICONS
 from ..config import save_ui_state, load_ui_state
 from .utils import status_text, format_uptime as _format_uptime, build_cfg_index, build_vm_index, build_node_index
 from .i18n import tr
@@ -42,6 +43,8 @@ class TreePanel(QWidget):
     host_token_refresh_requested = Signal(str)
     vm_create_requested = Signal(str, str)
     vm_delete_requested = Signal(str, str, int)
+    vm_action_requested = Signal(str, str, int, str)
+    console_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -138,6 +141,28 @@ class TreePanel(QWidget):
                 "QMenu::item { padding: 4px 12px; }"
                 f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
             )
+            vm_status = vm.get("status", "") if vm else ""
+            for act_key, act_label in [("start", tr("Start")), ("shutdown", tr("Shutdown")),
+                                       ("reboot", tr("Reboot")), ("stop", tr("Stop")),
+                                       ("reset", tr("Reset"))]:
+                act = QAction(act_label, self.tree)
+                act.setIcon(get_icon(VM_ACTION_ICONS[act_key]))
+                act.triggered.connect(
+                    lambda checked, hn=host_name, nd=node, vid=vmid, a=act_key:
+                        self.vm_action_requested.emit(hn, nd, vid, a)
+                )
+                if act_key in ("shutdown", "reboot", "stop", "reset") and vm_status != "running":
+                    act.setEnabled(False)
+                menu.addAction(act)
+            console_act = QAction(tr("Console"), self.tree)
+            console_act.setIcon(get_icon("console"))
+            console_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid:
+                    self.console_requested.emit(hn, nd, vid)
+            )
+            console_act.setEnabled(vm_status == "running")
+            menu.addAction(console_act)
+            menu.addSeparator()
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_delete_requested.emit(hn, nd, vid)

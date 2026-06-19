@@ -9,7 +9,7 @@ from ..i18n import tr
 from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime
 from ._constants import _progress_style, TabIndex
-from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar, safe_pct
+from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar, safe_pct, set_empty_placeholder
 
 _LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
@@ -437,6 +437,10 @@ class HostTabs:
                        if vm.get("node") == host_name
                        and vm.get("host_name") == (host_data.get("host_name") if host_data else host_name)]
         panel.host_vm_table.setSortingEnabled(False)
+        if not vms_of_host:
+            set_empty_placeholder(panel.host_vm_table, 5)
+            panel.host_vm_table.setSortingEnabled(True)
+            return
         panel.host_vm_table.setRowCount(len(vms_of_host))
         WARN_ROLE = Qt.UserRole + 10
         for i, vm in enumerate(vms_of_host):

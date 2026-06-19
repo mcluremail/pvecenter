@@ -117,3 +117,16 @@ def format_volsize(size_bytes):
     if gb >= 1024:
         return f"{gb/1024:.1f} TiB"
     return f"{gb:.1f} GiB"
+
+
+def set_empty_placeholder(table, col_count, text=None):
+    if text is None:
+        text = tr("No data")
+    table.setRowCount(1)
+    for c in range(col_count):
+        item = QTableWidgetItem(text if c == col_count // 2 else "")
+        item.setFlags(Qt.NoItemFlags)
+        item.setTextAlignment(Qt.AlignCenter)
+        if c == col_count // 2:
+            item.setForeground(QBrush(QColor(Color.GRAY_400)))
+        table.setItem(0, c, item)

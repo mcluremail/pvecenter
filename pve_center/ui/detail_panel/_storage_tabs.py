@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from ..i18n import tr
 from ..theme import Color
 from ._constants import _progress_style, _HAS_PG, TabIndex
-from ._table_utils import make_table, make_filterable_table, format_volsize, safe_pct
+from ._table_utils import make_table, make_filterable_table, format_volsize, safe_pct, set_empty_placeholder
 
 _LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
@@ -226,6 +226,9 @@ class StorageTabs:
 
     def populate_storage_table(self, storages):
         table = self.panel.storage_table
+        if not storages:
+            set_empty_placeholder(table, 5)
+            return
         table.setRowCount(len(storages))
         for i, st in enumerate(storages):
             table.setItem(i, 0, QTableWidgetItem(st.get("storage", st.get("id", ""))))
