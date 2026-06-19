@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.7
+Version:       1.1.8
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,11 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.8-1
+- L6: vm_action_bar setFixedHeight(32) -> setMinimumHeight(32), action buttons
+  setFixedHeight(24) -> setMinimumHeight(24) — bar adapts to DPI/font scaling.
+- L7: storage_plot_widget setFixedHeight(220) -> setMinimumHeight(220).
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.4-1
 - i18n: split tr("Serial") into "Serial" (disk serial number) and "Serial port" (display type).
 - i18n: translate 6 identity keys (Direct sync, RAM (GiB), Unsafe, VM Generation ID,

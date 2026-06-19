@@ -1,3 +1,11 @@
+pve-center (1.1.8-1) unstable; urgency=medium
+
+  * L6: vm_action_bar setFixedHeight(32) -> setMinimumHeight(32), action
+    buttons setFixedHeight(24) -> setMinimumHeight(24).
+  * L7: storage_plot_widget setFixedHeight(220) -> setMinimumHeight(220).
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
+
 pve-center (1.1.7-1) unstable; urgency=medium
 
   * H2: show notification toast with error text on traceback (3 sites:

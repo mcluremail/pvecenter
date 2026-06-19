@@ -91,7 +91,7 @@ class StorageTabs:
             panel.storage_plot_widget.showGrid(x=True, y=True)
             panel.storage_plot_widget.enableAutoRange(axis='y')
             panel.storage_plot_widget.setMouseEnabled(x=False, y=False)
-            panel.storage_plot_widget.setFixedHeight(220)
+            panel.storage_plot_widget.setMinimumHeight(220)
             panel.storage_plot_curve = panel.storage_plot_widget.plot(
                 [], [], pen=pg.mkPen(Color.SLATE_900, width=2)
             )

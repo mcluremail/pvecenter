@@ -57,7 +57,7 @@ class DetailPanel(QWidget):
         self.detail_label.setContentsMargins(8, 2, 0, 2)
 
         self.vm_action_bar = QWidget()
-        self.vm_action_bar.setFixedHeight(32)
+        self.vm_action_bar.setMinimumHeight(32)
         self.vm_action_bar.setVisible(False)
         action_layout = QHBoxLayout(self.vm_action_bar)
         action_layout.setContentsMargins(4, 2, 4, 2)
@@ -68,7 +68,7 @@ class DetailPanel(QWidget):
         self._action_buttons = {}
         for action_key, label in self._vm_actions.items():
             btn = QPushButton(get_icon(VM_ACTION_ICONS[action_key]), label)
-            btn.setFixedHeight(24)
+            btn.setMinimumHeight(24)
             btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.setToolTip(VM_ACTION_TOOLTIPS[action_key])
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
@@ -82,7 +82,7 @@ class DetailPanel(QWidget):
         action_layout.addWidget(sep)
 
         self._console_btn = QPushButton(get_icon("console"), tr("Console"))
-        self._console_btn.setFixedHeight(24)
+        self._console_btn.setMinimumHeight(24)
         self._console_btn.setObjectName("accentBtn")
         self._console_btn.setToolTip(tr("Open SPICE/VNC console"))
         self._console_btn.clicked.connect(self._on_vm_console)
