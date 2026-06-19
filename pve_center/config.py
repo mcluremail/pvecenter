@@ -74,7 +74,7 @@ def _ask_password(mode="enter"):
     from .ui.theme import Color
     dialog = QDialog()
     dialog.setWindowTitle(tr("PVE Center — Authorization"))
-    dialog.setFixedSize(380, 160)
+    dialog.setMinimumSize(380, 160)
 
     layout = QVBoxLayout(dialog)
 
@@ -200,7 +200,7 @@ def load_config():
             from .ui.i18n import tr
             dlg = QDialog()
             dlg.setWindowTitle(tr("Security"))
-            dlg.setFixedSize(480, 140)
+            dlg.setMinimumSize(480, 140)
             l = QVBoxLayout(dlg)
             l.addWidget(QLabel(tr("Tokens are encrypted in nodes.enc. Delete nodes.json "
                                    "(source file with plaintext tokens)?")))

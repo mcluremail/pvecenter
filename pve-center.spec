@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.8
+Version:       1.1.9
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,11 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.9-1
+- L1: setFixedSize -> setMinimumSize on 3 QDialogs (password dialog,
+  security dialog, add_server_dialog) — dialogs now resizable for long
+  translations and DPI scaling.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.8-1
 - L6: vm_action_bar setFixedHeight(32) -> setMinimumHeight(32), action buttons
   setFixedHeight(24) -> setMinimumHeight(24) — bar adapts to DPI/font scaling.

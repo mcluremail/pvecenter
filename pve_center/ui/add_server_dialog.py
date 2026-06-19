@@ -14,7 +14,7 @@ class AddServerDialog(QDialog):
         self._context = context
         title_suffix = {"cluster": tr(" to cluster"), "standalone": tr(" as standalone host")}.get(context, "")
         self.setWindowTitle(tr("Add Server") + title_suffix)
-        self.setFixedSize(500, 420)
+        self.setMinimumSize(500, 420)
         self._token_data = None
         self._active_workers = set()
         self._build_ui()
