@@ -2033,7 +2033,7 @@ class DetailPanel(QWidget):
             self.info_label.setStyleSheet("font-size: 13px; color: #ef4444; padding: 40px 16px;")
             self.info_label.setText(
                 f"<div style='text-align: center;'>"
-                f"<span style='font-size: 22px; font-weight: 700;'>❌ {display_name} " + tr("is unavailable") + "</span>"
+                f"<span style='font-size: 22px; font-weight: 700;'>" + tr("❌ {} is unavailable").format(display_name) + "</span>"
                 f"<br><br>"
                 f"<span style='font-size: 14px; color: #dc2626;'>{reason}</span>"
                 f"</div>"

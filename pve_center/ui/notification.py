@@ -87,13 +87,13 @@ class NotificationManager:
     def host_status_changed(self, host_name, old_status, new_status):
         key = f"host:{host_name}"
         if new_status == "error" or new_status == "offline":
-            text = tr("is unavailable") + f" ❌ {host_name}"
+            text = tr("is unavailable ❌ {}").format(host_name)
             color = "#dc2626"
         elif old_status in ("error", "offline", "unknown") and new_status == "online":
-            text = tr("is back online") + f" ✅ {host_name}"
+            text = tr("is back online ✅ {}").format(host_name)
             color = "#16a34a"
         elif new_status == "online":
-            text = tr("is online") + f" 🟢 {host_name}"
+            text = tr("is online 🟢 {}").format(host_name)
             color = "#1f2937"
         else:
             text = f"🟡 {host_name} — {new_status}"
