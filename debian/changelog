@@ -1,3 +1,21 @@
+pve-center (1.1.3-1) unstable; urgency=medium
+
+  * i18n: add 213 missing Russian translations to ru.json.
+  * i18n: add 20-21 missing keys to ar/zh/fr/es.json.
+  * i18n: all 517 unique tr() call sites now have translations in all 5
+    languages (ru, ar, zh, fr, es).
+  * Previously missing keys included: Backup, Clone, Migrate, Snapshot, HA
+    state, Boot disk, EFI disk, SCSI controller, all VM action labels
+    (Start/Stop/Suspend/Reset/Reboot VM/Container), network I/O labels
+    (In/Out/Disk Read/Disk Write), VM creation dialog fields (BIOS, Bridge,
+    Bus, Cache, Chipset, Cores, Queues, Sockets, VGA, VLAN tag), security
+    labels (Set master password, Repeat password, Wrong password), error
+    messages (SPICE proxy error, Token creation error, VV file write error),
+    and many more.
+  * Bump _I18N_VERSION 2 -> 3 to force DB re-seed on next launch.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 17:00:00 +0300
+
 pve-center (1.1.2-1) unstable; urgency=medium
 
   * Fix QProgressBar OverflowError when storage/host reports used>0 but total=0.
