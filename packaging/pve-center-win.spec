@@ -1,16 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for Windows build of PVE Center.
 # Usage: pyinstaller packaging/pve-center-win.spec --noconfirm
+import os
+
+# SPECPATH is the directory containing this spec file (packaging/).
+# Project root is one level up.
+_root = os.path.dirname(SPECPATH)
 
 block_cipher = None
 
 a = Analysis(
-    ['pve_center/__main__.py'],
-    pathex=[],
+    [os.path.join(_root, 'pve_center', '__main__.py')],
+    pathex=[_root],
     binaries=[],
     datas=[
-        ('pve_center/ui/i18n/*.json', 'pve_center/ui/i18n'),
-        ('pve_center/ui/*.svg', 'pve_center/ui'),
+        (os.path.join(_root, 'pve_center', 'ui', 'i18n', '*.json'), 'pve_center/ui/i18n'),
+        (os.path.join(_root, 'pve_center', 'ui', '*.svg'), 'pve_center/ui'),
     ],
     hiddenimports=[
         'PySide6.QtCore',
