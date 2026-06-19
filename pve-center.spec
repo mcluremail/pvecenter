@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.0.4
+Version:       1.1.0
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,12 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.0-1
+- S3: decompose detail_panel.py (2509 lines) into detail_panel/ package with 7 modules.
+- Tab construction and populate logic extracted into _host_tabs.py, _storage_tabs.py, _vm_tabs.py.
+- Static helpers extracted into _table_utils.py, worker management into _worker_manager.py.
+- Constants and TabIndex enum in _constants.py. DetailPanel is now a thin coordinator (~300 lines).
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.0.4-1
 - Race condition fixes (R1/R2/R3): copy lists before iteration, atomic generation guard in soft_refresh.
 - M7: remove duplicate setStyleSheet/setDefaultAlignment calls on datacenter_summary.

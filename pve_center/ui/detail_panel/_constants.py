@@ -1,0 +1,55 @@
+from enum import IntEnum
+
+_HEADER_STYLE = "QHeaderView::section { padding-left: 4px; }"
+
+_MAX_WORKERS_DP = 8
+
+try:
+    import pyqtgraph as pg
+    pg.setConfigOption('background', 'w')
+    pg.setConfigOption('foreground', 'k')
+    _HAS_PG = True
+except ImportError:
+    pg = None
+    _HAS_PG = False
+
+
+class TabIndex(IntEnum):
+    MONITOR = 0
+    HARDWARE = 1
+    OPTIONS = 2
+    HISTORY = 3
+    HOST_VMS = 4
+    POOL_VMS = 5
+    SUMMARY = 6
+    STORAGES = 7
+    HOST_STORAGE = 8
+    STORAGE_DETAIL = 9
+    BACKUPS = 10
+    DISKS_VM = 11
+    ISO = 12
+    TEMPLATES = 13
+    NETWORK = 14
+    SERVICES = 15
+    HOST_DISKS = 16
+    SNAPSHOTS = 17
+
+
+def _fmt_pveversion(val):
+    val = str(val)
+    return val.split("/")[1] if "/" in val else val
+
+
+def _progress_style(value, max_val=100):
+    pct = int((value / max_val) * 100) if max_val else 0
+    if pct < 50:
+        color = "#22c55e"
+    elif pct < 80:
+        color = "#f59e0b"
+    else:
+        color = "#ef4444"
+    return (
+        f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
+        f"QProgressBar {{ border: 1px solid #d1d5db; border-radius: 3px;"
+        f" text-align: center; font-size: 11px; background: #f3f4f6; }}"
+    )

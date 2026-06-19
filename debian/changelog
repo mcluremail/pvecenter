@@ -1,3 +1,13 @@
+pve-center (1.1.0-1) unstable; urgency=medium
+
+  * S3: decompose detail_panel.py (2509 lines) into detail_panel/ package.
+  * Tab logic split into _host_tabs.py, _storage_tabs.py, _vm_tabs.py (controller classes).
+  * Static helpers in _table_utils.py, worker management in _worker_manager.py.
+  * Constants and TabIndex enum in _constants.py. DetailPanel is now a thin coordinator (~300 lines).
+  * Public API unchanged — mainwindow.py sees zero difference.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 14:00:00 +0300
+
 pve-center (1.0.4-1) unstable; urgency=medium
 
   * R1/R2/R3: defensive race condition fixes — copy lists before iteration, atomic generation guard in soft_refresh.
