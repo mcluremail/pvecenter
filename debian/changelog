@@ -1,3 +1,15 @@
+pve-center (1.1.4-1) unstable; urgency=medium
+
+  * i18n: split tr("Serial") into "Serial" (disk serial number column, e.g.
+    "Серийный номер") and "Serial port" (VM display type serial0, e.g.
+    "Последовательный порт") — same English word used in two unrelated
+    contexts in PVE.
+  * i18n: translate 6 identity keys (where value == key) in all 5 languages:
+    Direct sync, RAM (GiB), Unsafe, VM Generation ID, Write back,
+    Write through.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 18:00:00 +0300
+
 pve-center (1.1.3-1) unstable; urgency=medium
 
   * i18n: add 213 missing Russian translations to ru.json.

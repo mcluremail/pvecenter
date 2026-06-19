@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.3
+Version:       1.1.4
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,11 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.4-1
+- i18n: split tr("Serial") into "Serial" (disk serial number) and "Serial port" (display type).
+- i18n: translate 6 identity keys (Direct sync, RAM (GiB), Unsafe, VM Generation ID,
+  Write back, Write through) in all 5 languages.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.3-1
 - i18n: add 213 missing Russian translations to ru.json.
 - i18n: add 20-21 missing keys to ar/zh/fr/es.json.
