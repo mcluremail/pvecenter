@@ -1,3 +1,11 @@
+pve-center (1.0.3-1) unstable; urgency=medium
+
+  * O6: i18n translations moved from inline Python dicts to external JSON files (one per language).
+  * Only the active language is loaded into memory instead of all five.
+  * Translators can now edit a single JSON file without touching Python.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 12:40:00 +0300
+
 pve-center (1.0.2-1) unstable; urgency=medium
 
   * O1: debounced tree rebuild — intermediate updates (final=False) coalesce via 150ms QTimer instead of N full rebuilds.

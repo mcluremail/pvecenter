@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pvecenter"
-version = "1.0.2"
+version = "1.0.3"
 description = "Desktop client for Proxmox VE clusters"
 readme = "README.md"
 authors = [{ name = "Taurus McLure", email = "taurus@mclure.ru" }]
@@ -37,3 +37,6 @@ pvecenter = "pve_center.main:main"
 
 [tool.setuptools.packages.find]
 include = ["pve_center*"]
+
+[tool.setuptools.package-data]
+"pve_center.ui.i18n" = ["*.json"]

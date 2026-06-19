@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.0.2
+Version:       1.0.3
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,9 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.0.3-1
+- Move i18n translations from inline Python dicts to external JSON files.
+
 * Sun Jun 07 2026 Taurus McLure <taurus@mclure.ru> - 0.1.2-1
 - Clean release without diagnostic logging.
 
