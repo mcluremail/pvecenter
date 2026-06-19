@@ -1,3 +1,17 @@
+pve-center (1.0.1-1) unstable; urgency=medium
+
+  * Code audit fixes: executor.map workers (snapshots/disks), ClusterTasksWorker leak, freeze detector logging.
+  * i18n: 22 hardcoded Russian strings wrapped in tr(), translations added for 5 languages.
+  * Performance: O(1) dict lookup for nodes_cfg and all_vms (was O(N) linear scan, ~31+7 sites).
+  * QTreeWidgetItemIterator replaces recursion in update_node_statuses.
+  * Filter tables: debounce 200ms + lower-case cache + blockSignals.
+  * Table factory: _make_table consolidates 13 QTableWidget boilerplate blocks.
+  * Storage type explicit in ITEM_KEY_ROLE (was heuristic by dots/slashes).
+  * Column width fix: datacenter_summary reset resize modes before reconfigure.
+  * Removed dead watchdog timer, os.chdir side-effect, dead code comments.
+
+ -- Taurus McLure <taurus@mclure.ru>  Thu, 18 Jun 2026 22:00:00 +0300
+
 pve-center (1.0.0-1) unstable; urgency=medium
 
   * v1.0 — Multilingual release (EN, RU, ZH, FR, ES, AR).

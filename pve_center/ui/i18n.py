@@ -488,6 +488,23 @@ _RU = {
     # Yes/No for buttons
     "Yes": "Да",
     "No": "Нет",
+
+    "VM": "ВМ",
+    "on node": "на узле",
+    "This action is irreversible.": "Это действие необратимо.",
+    "All VM disks will be deleted.": "Все диски ВМ будут удалены.",
+    "It will be forcibly stopped and deleted.": "Она будет принудительно остановлена и удалена.",
+    "Creating VM...": "Создание ВМ...",
+    "Deleting VM {}...": "Удаление ВМ {}...",
+    "VM creation error: {}": "Ошибка создания ВМ: {}",
+    "VM deletion error: {}": "Ошибка удаления ВМ: {}",
+    "Config not found for {}": "Конфиг не найден для {}",
+    "Refresh token — {}": "Обновить токен — {}",
+    "Remove host «{}» from configuration?": "Удалить хост «{}» из конфигурации?",
+    "Remove cluster «{}» ({} records) from configuration?": "Удалить кластер «{}» ({} записей) из конфигурации?",
+    "Remove all {} cluster records from configuration?": "Удалить все {} кластерных записей из конфигурации?",
+    "Remove all {} standalone host records from configuration?": "Удалить все {} записей отдельных хостов из конфигурации?",
+    "Failed to delete tokens: {}. Configuration cleared.": "Не удалось удалить токены: {}. Конфигурация очищена.",
 }
 
 
@@ -996,6 +1013,23 @@ _AR = {
     'yes': 'نعم',
     'Yes': 'نعم',
     "OK": "موافق",
+
+    'VM': 'آلة افتراضية',
+    'on node': 'على العقدة',
+    'This action is irreversible.': 'هذا الإجراء لا يمكن التراجع عنه.',
+    'All VM disks will be deleted.': 'سيتم حذف جميع أقراص الآلة الافتراضية.',
+    'It will be forcibly stopped and deleted.': 'سيتم إيقافها قسراً وحذفها.',
+    'Creating VM...': 'إنشاء آلة افتراضية...',
+    'Deleting VM {}...': 'حذف الآلة الافتراضية {}...',
+    'VM creation error: {}': 'خطأ إنشاء آلة افتراضية: {}',
+    'VM deletion error: {}': 'خطأ حذف آلة افتراضية: {}',
+    'Config not found for {}': 'التكوين غير موجود لـ {}',
+    'Refresh token — {}': 'تحديث الرمز — {}',
+    'Remove host «{}» from configuration?': 'إزالة المضيف «{}» من التكوين؟',
+    'Remove cluster «{}» ({} records) from configuration?': 'إزالة الكتلة «{}» ({} سجل) من التكوين؟',
+    'Remove all {} cluster records from configuration?': 'إزالة جميع {} سجلات الكتلة من التكوين؟',
+    'Remove all {} standalone host records from configuration?': 'إزالة جميع {} سجلات المضيف المستقلة من التكوين؟',
+    'Failed to delete tokens: {}. Configuration cleared.': 'فشل حذف الرموز: {}. تم مسح التكوين.',
 }
 
 
@@ -1495,6 +1529,23 @@ _ZH = {
     'yes': '是',
     'Yes': '是',
     "OK": "确定",
+
+    'VM': '虚拟机',
+    'on node': '在节点',
+    'This action is irreversible.': '此操作不可撤销。',
+    'All VM disks will be deleted.': '所有虚拟机磁盘将被删除。',
+    'It will be forcibly stopped and deleted.': '它将被强制停止并删除。',
+    'Creating VM...': '正在创建虚拟机...',
+    'Deleting VM {}...': '正在删除虚拟机 {}...',
+    'VM creation error: {}': '创建虚拟机错误：{}',
+    'VM deletion error: {}': '删除虚拟机错误：{}',
+    'Config not found for {}': '找不到 {} 的配置',
+    'Refresh token — {}': '刷新令牌 — {}',
+    'Remove host «{}» from configuration?': '从配置中移除主机「{}」？',
+    'Remove cluster «{}» ({} records) from configuration?': '从配置中移除集群「{}」（{} 条记录）？',
+    'Remove all {} cluster records from configuration?': '从配置中移除所有 {} 条集群记录？',
+    'Remove all {} standalone host records from configuration?': '从配置中移除所有 {} 条独立主机记录？',
+    'Failed to delete tokens: {}. Configuration cleared.': '删除令牌失败：{}。配置已清除。',
 }
 
 
@@ -1994,6 +2045,23 @@ _FR = {
     'yes': 'oui',
     'Yes': 'Oui',
     "OK": "OK",
+
+    'VM': 'VM',
+    'on node': 'sur le nœud',
+    'This action is irreversible.': 'Cette action est irréversible.',
+    'All VM disks will be deleted.': 'Tous les disques de la VM seront supprimés.',
+    'It will be forcibly stopped and deleted.': 'Elle sera arrêtée de force et supprimée.',
+    'Creating VM...': 'Création de la VM...',
+    'Deleting VM {}...': 'Suppression de la VM {}...',
+    'VM creation error: {}': 'Erreur de création de VM : {}',
+    'VM deletion error: {}': 'Erreur de suppression de VM : {}',
+    'Config not found for {}': 'Configuration introuvable pour {}',
+    'Refresh token — {}': 'Actualiser le jeton — {}',
+    'Remove host «{}» from configuration?': 'Supprimer l\'hôte «{}» de la configuration ?',
+    'Remove cluster «{}» ({} records) from configuration?': 'Supprimer le cluster «{}» ({} enregistrements) de la configuration ?',
+    'Remove all {} cluster records from configuration?': 'Supprimer les {} enregistrements de cluster de la configuration ?',
+    'Remove all {} standalone host records from configuration?': 'Supprimer les {} enregistrements d\'hôtes autonomes de la configuration ?',
+    'Failed to delete tokens: {}. Configuration cleared.': 'Échec de la suppression des jetons : {}. Configuration effacée.',
 }
 
 
@@ -2493,6 +2561,23 @@ _ES = {
     'yes': 'sí',
     'Yes': 'Sí',
     "OK": "OK",
+
+    'VM': 'MV',
+    'on node': 'en el nodo',
+    'This action is irreversible.': 'Esta acción es irreversible.',
+    'All VM disks will be deleted.': 'Se eliminarán todos los discos de la MV.',
+    'It will be forcibly stopped and deleted.': 'Será detenida forzosamente y eliminada.',
+    'Creating MV...': 'Creando MV...',
+    'Deleting VM {}...': 'Eliminando MV {}...',
+    'VM creation error: {}': 'Error de creación de MV: {}',
+    'VM deletion error: {}': 'Error de eliminación de MV: {}',
+    'Config not found for {}': 'Configuración no encontrada para {}',
+    'Refresh token — {}': 'Actualizar token — {}',
+    'Remove host «{}» from configuration?': '¿Eliminar host «{}» de la configuración?',
+    'Remove cluster «{}» ({} records) from configuration?': '¿Eliminar clúster «{}» ({} registros) de la configuración?',
+    'Remove all {} cluster records from configuration?': '¿Eliminar los {} registros de clúster de la configuración?',
+    'Remove all {} standalone host records from configuration?': '¿Eliminar los {} registros de hosts independientes de la configuración?',
+    'Failed to delete tokens: {}. Configuration cleared.': 'Error al eliminar tokens: {}. Configuración borrada.',
 }
 
 

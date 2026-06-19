@@ -1,5 +1,6 @@
 import urllib3
 from .ui.i18n import tr
+from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 import traceback
 import logging
 import threading
@@ -716,14 +717,7 @@ class VmActionSignals(QObject):
 
 
 class VmActionWorker(QRunnable):
-    ACTION_NAMES = {
-        "start": tr("Start"),
-        "shutdown": tr("Shutdown"),
-        "stop": tr("Force stop"),
-        "reboot": tr("Reboot"),
-        "reset": tr("Reset"),
-        "resume": tr("Resume"),
-    }
+    ACTION_NAMES = VM_ACTION_MESSAGE_LABELS
 
     def __init__(self, host_cfg, node_name, vmid, vm_type, action):
         super().__init__()

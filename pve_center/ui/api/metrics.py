@@ -358,8 +358,11 @@ class HostSnapshotsWorker(QRunnable):
                 finally:
                     s.close()
 
+            # executor.map возвращает ленивый итератор — без list() futures не
+            # создаются и потоки не стартуют. Список результатов не нужен, но
+            # итератор должен быть материализован, чтобы воркеры запустились.
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-                executor.map(fetch_vm_snapshots, self.vms)
+                list(executor.map(fetch_vm_snapshots, self.vms))
 
             all_snapshots.sort(key=lambda s: (s.get("vmid", 0), s.get("snaptime", 0) or 0))
             try:
@@ -453,8 +456,11 @@ class StorageDisksWorker(QRunnable):
                 finally:
                     s.close()
 
+            # executor.map возвращает ленивый итератор — без list() futures не
+            # создаются и потоки не стартуют. Список результатов не нужен, но
+            # итератор должен быть материализован, чтобы воркеры запустились.
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-                executor.map(fetch_vm_config, self.all_vms)
+                list(executor.map(fetch_vm_config, self.all_vms))
 
             try:
                 self.signals.disks_ready.emit(self.storage_name, disks)

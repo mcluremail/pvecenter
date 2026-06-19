@@ -9,11 +9,14 @@ from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget, QTa
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from .hover import enable_row_hover
 from .icons import get_icon
-from .utils import status_text, format_uptime as _format_uptime
+from .utils import status_text, format_uptime as _format_uptime, build_cfg_index, build_vm_index, parse_pve_error
+from .vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_MESSAGE_LABELS, VM_ACTION_ICONS
 from .i18n import tr
 from ..config import save_ui_state, load_ui_state
 import json as _json
 from PySide6.QtGui import QColor, QBrush
+
+_HEADER_STYLE = "QHeaderView::section { padding-left: 4px; }"
 
 
 def _fmt_pveversion(val):
@@ -81,6 +84,8 @@ class DetailPanel(QWidget):
     def __init__(self, nodes_cfg):
         super().__init__()
         self.nodes_cfg = nodes_cfg
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+        self._vms_by_key = {}
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
@@ -113,20 +118,11 @@ class DetailPanel(QWidget):
         action_layout.setContentsMargins(4, 2, 4, 2)
         action_layout.setSpacing(4)
 
-        self._vm_actions = {
-            "start": tr("Start"),
-            "shutdown": tr("Shutdown"),
-            "reboot": tr("Reboot"),
-            "reset": tr("Reset"),
-            "stop": tr("Stop"),
-            "resume": tr("Resume"),
-        }
+        self._vm_actions = VM_ACTION_BUTTON_LABELS
         action_layout.addStretch()
-        _btn_icon_map = {"start": "start", "shutdown": "shutdown", "reboot": "reboot",
-                        "reset": "reset", "stop": "stop", "resume": "resume"}
         self._action_buttons = {}
         for action_key, label in self._vm_actions.items():
-            btn = QPushButton(get_icon(_btn_icon_map[action_key]), label)
+            btn = QPushButton(get_icon(VM_ACTION_ICONS[action_key]), label)
             btn.setFixedHeight(24)
             btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
@@ -172,7 +168,7 @@ class DetailPanel(QWidget):
 
         self.vm_summary_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-        self.vm_summary_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
+        self.vm_summary_table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
         self.vm_summary_table.setWordWrap(True)
         self.vm_summary_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.vm_summary_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -225,25 +221,12 @@ class DetailPanel(QWidget):
         self.tabs.addTab(self.history_tab, get_icon("history"), tr("History"))
 
         # --- Tab 4: Host VM table ---
-        self.host_vm_table = QTableWidget()
-        self.host_vm_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_vm_table.verticalHeader().hide()
-        self.host_vm_table.setColumnCount(5)
-        self.host_vm_table.setHorizontalHeaderLabels(
-            [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %"]
+        self.host_vm_table = self._make_table(
+            [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %"],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 50),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 55)],
         )
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.host_vm_table.setColumnWidth(1, 50)
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.host_vm_table.setColumnWidth(3, 70)
-        self.host_vm_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.host_vm_table.setColumnWidth(4, 55)
-        self.host_vm_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_vm_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_vm_table.setAlternatingRowColors(True)
-        enable_row_hover(self.host_vm_table)
         self.host_tab = QScrollArea()
         self.host_tab.setWidgetResizable(True)
         host_container = QWidget()
@@ -263,31 +246,12 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.POOL_VMS, False)
 
         # --- Tab 6: Host summary ---
-        self.datacenter_summary = QTableWidget()
-        self.datacenter_summary.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.datacenter_summary.verticalHeader().hide()
-        self.datacenter_summary.setColumnCount(6)
-        self.datacenter_summary.setHorizontalHeaderLabels([
-            tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")
-        ])
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.datacenter_summary.setColumnWidth(1, 70)
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.datacenter_summary.setColumnWidth(3, 55)
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.datacenter_summary.setColumnWidth(4, 80)
-        self.datacenter_summary.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
-        self.datacenter_summary.setColumnWidth(5, 85)
-        self.datacenter_summary.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.datacenter_summary.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.datacenter_summary.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.datacenter_summary.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.datacenter_summary.setAlternatingRowColors(True)
-        enable_row_hover(self.datacenter_summary)
+        self.datacenter_summary = self._make_table(
+            [tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 55),
+             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 85)],
+        )
         self.summary_tab = QScrollArea()
         self.summary_tab.setWidgetResizable(True)
         summary_container = QWidget()
@@ -299,32 +263,13 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.SUMMARY, False)
 
         # --- Tab 7: Storages overview ---
-        self.storage_table = QTableWidget()
-        self.storage_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_table.verticalHeader().hide()
-        self.storage_table.setColumnCount(7)
-        self.storage_table.setHorizontalHeaderLabels([
-            tr("Name"), tr("Type"), tr("Content"), tr("Cluster / Node"), tr("Used"), tr("Total"), tr("Usage")
-        ])
-        self.storage_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.storage_table.setColumnWidth(1, 65)
-        self.storage_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.storage_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.storage_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.storage_table.setColumnWidth(4, 70)
-        self.storage_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
-        self.storage_table.setColumnWidth(5, 70)
-        self.storage_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Interactive)
-        self.storage_table.setColumnWidth(6, 95)
-        self.storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_table.setAlternatingRowColors(True)
-        enable_row_hover(self.storage_table)
+        self.storage_table = self._make_table(
+            [tr("Name"), tr("Type"), tr("Content"), tr("Cluster / Node"), tr("Used"), tr("Total"), tr("Usage")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 95)],
+        )
         self.storage_tab = QScrollArea()
         self.storage_tab.setWidgetResizable(True)
         storage_container = QWidget()
@@ -336,31 +281,12 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.STORAGES, False)
 
         # --- Tab 8: Host storage ---
-        self.host_storage_table = QTableWidget()
-        self.host_storage_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_storage_table.verticalHeader().hide()
-        self.host_storage_table.setColumnCount(6)
-        self.host_storage_table.setHorizontalHeaderLabels([
-            tr("Name"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")
-        ])
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.host_storage_table.setColumnWidth(1, 65)
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.host_storage_table.setColumnWidth(3, 70)
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.host_storage_table.setColumnWidth(4, 70)
-        self.host_storage_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
-        self.host_storage_table.setColumnWidth(5, 95)
-        self.host_storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.host_storage_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.host_storage_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_storage_table.setAlternatingRowColors(True)
-        enable_row_hover(self.host_storage_table)
+        self.host_storage_table = self._make_table(
+            [tr("Name"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 95)],
+        )
         self.host_storage_tab_widget = QWidget()
         hs_layout = QVBoxLayout(self.host_storage_tab_widget)
         hs_layout.setContentsMargins(0, 0, 0, 0)
@@ -377,21 +303,10 @@ class DetailPanel(QWidget):
         self.storage_detail_name.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.storage_detail_layout.addWidget(self.storage_detail_name)
 
-        self.storage_detail_params = QTableWidget()
-        self.storage_detail_params.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_detail_params.verticalHeader().hide()
-        self.storage_detail_params.setColumnCount(2)
-        self.storage_detail_params.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
-        self.storage_detail_params.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_detail_params.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.storage_detail_params.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_detail_params.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_detail_params.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_detail_params.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_detail_params.setAlternatingRowColors(True)
-        enable_row_hover(self.storage_detail_params)
+        self.storage_detail_params = self._make_table(
+            [tr("Parameter"), tr("Value")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None)],
+        )
         self.storage_detail_layout.addWidget(self.storage_detail_params)
 
         self.storage_detail_bar = QProgressBar()
@@ -444,32 +359,13 @@ class DetailPanel(QWidget):
         self.storage_detail_nodes_label.setStyleSheet("font-weight: bold; margin-top: 8px;")
         self.storage_detail_layout.addWidget(self.storage_detail_nodes_label)
 
-        self.storage_detail_nodes_table = QTableWidget()
-        self.storage_detail_nodes_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_detail_nodes_table.verticalHeader().hide()
-        self.storage_detail_nodes_table.setColumnCount(6)
-        self.storage_detail_nodes_table.setHorizontalHeaderLabels([
-            tr("Node"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")
-        ])
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.storage_detail_nodes_table.setColumnWidth(1, 65)
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.storage_detail_nodes_table.setColumnWidth(3, 70)
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.storage_detail_nodes_table.setColumnWidth(4, 70)
-        self.storage_detail_nodes_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
-        self.storage_detail_nodes_table.setColumnWidth(5, 95)
-        self.storage_detail_nodes_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_detail_nodes_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_detail_nodes_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_detail_nodes_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_detail_nodes_table.setAlternatingRowColors(True)
-        self.storage_detail_nodes_table.setSortingEnabled(True)
-        enable_row_hover(self.storage_detail_nodes_table)
+        self.storage_detail_nodes_table = self._make_table(
+            [tr("Node"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 95)],
+            sortable=True,
+        )
         self.storage_detail_layout.addWidget(self.storage_detail_nodes_table)
 
         self.storage_detail_layout.addStretch()
@@ -477,30 +373,13 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.STORAGE_DETAIL, False)
 
         # --- Tab 10: Backups ---
-        self.storage_backups_table = QTableWidget()
-        self.storage_backups_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_backups_table.verticalHeader().hide()
-        self.storage_backups_table.setColumnCount(5)
-        self.storage_backups_table.setHorizontalHeaderLabels([
-            tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")
-        ])
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.storage_backups_table.setColumnWidth(1, 65)
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
-        self.storage_backups_table.setColumnWidth(2, 60)
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.storage_backups_table.setColumnWidth(3, 70)
-        self.storage_backups_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.storage_backups_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_backups_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_backups_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_backups_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_backups_table.setAlternatingRowColors(True)
-        self.storage_backups_table.setSortingEnabled(True)
-        enable_row_hover(self.storage_backups_table)
+        self.storage_backups_table = self._make_table(
+            [tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Interactive, 60), (QHeaderView.Interactive, 70),
+             (QHeaderView.Stretch, None)],
+            sortable=True,
+        )
         self.storage_backups_stack = QStackedWidget()
         self.storage_backups_loading = QLabel(tr("Loading..."))
         self.storage_backups_loading.setAlignment(Qt.AlignCenter)
@@ -519,29 +398,13 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.BACKUPS, False)
 
         # --- Tab 11: VM Disks ---
-        self.storage_disks_table = QTableWidget()
-        self.storage_disks_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_disks_table.verticalHeader().hide()
-        self.storage_disks_table.setColumnCount(5)
-        self.storage_disks_table.setHorizontalHeaderLabels([
-            tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")
-        ])
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.storage_disks_table.setColumnWidth(3, 55)
-        self.storage_disks_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.storage_disks_table.setColumnWidth(4, 70)
-        self.storage_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_disks_table.setAlternatingRowColors(True)
-        self.storage_disks_table.setSortingEnabled(True)
-        enable_row_hover(self.storage_disks_table)
+        self.storage_disks_table = self._make_table(
+            [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 55),
+             (QHeaderView.Interactive, 70)],
+            sortable=True,
+        )
         self.storage_disks_stack = QStackedWidget()
         self.storage_disks_loading = QLabel(tr("Loading..."))
         self.storage_disks_loading.setAlignment(Qt.AlignCenter)
@@ -560,28 +423,12 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.DISKS_VM, False)
 
         # --- Tab 12: ISO images ---
-        self.storage_iso_table = QTableWidget()
-        self.storage_iso_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_iso_table.verticalHeader().hide()
-        self.storage_iso_table.setColumnCount(4)
-        self.storage_iso_table.setHorizontalHeaderLabels([
-            tr("Volume"), tr("Format"), tr("Size"), tr("Modified")
-        ])
-        self.storage_iso_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_iso_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.storage_iso_table.setColumnWidth(1, 60)
-        self.storage_iso_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
-        self.storage_iso_table.setColumnWidth(2, 70)
-        self.storage_iso_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.storage_iso_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_iso_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_iso_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_iso_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_iso_table.setAlternatingRowColors(True)
-        self.storage_iso_table.setSortingEnabled(True)
-        enable_row_hover(self.storage_iso_table)
+        self.storage_iso_table = self._make_table(
+            [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
+             (QHeaderView.Interactive, 70), (QHeaderView.Stretch, None)],
+            sortable=True,
+        )
         self.storage_iso_stack = QStackedWidget()
         self.storage_iso_loading = QLabel(tr("Loading..."))
         self.storage_iso_loading.setAlignment(Qt.AlignCenter)
@@ -600,28 +447,12 @@ class DetailPanel(QWidget):
         self.tabs.setTabVisible(TabIndex.ISO, False)
 
         # --- Tab 13: Templates ---
-        self.storage_tpl_table = QTableWidget()
-        self.storage_tpl_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.storage_tpl_table.verticalHeader().hide()
-        self.storage_tpl_table.setColumnCount(4)
-        self.storage_tpl_table.setHorizontalHeaderLabels([
-            tr("Volume"), tr("Format"), tr("Size"), tr("Modified")
-        ])
-        self.storage_tpl_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.storage_tpl_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.storage_tpl_table.setColumnWidth(1, 60)
-        self.storage_tpl_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
-        self.storage_tpl_table.setColumnWidth(2, 70)
-        self.storage_tpl_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.storage_tpl_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.storage_tpl_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.storage_tpl_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.storage_tpl_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.storage_tpl_table.setAlternatingRowColors(True)
-        self.storage_tpl_table.setSortingEnabled(True)
-        enable_row_hover(self.storage_tpl_table)
+        self.storage_tpl_table = self._make_table(
+            [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
+             (QHeaderView.Interactive, 70), (QHeaderView.Stretch, None)],
+            sortable=True,
+        )
         self.storage_tpl_stack = QStackedWidget()
         self.storage_tpl_loading = QLabel(tr("Loading..."))
         self.storage_tpl_loading.setAlignment(Qt.AlignCenter)
@@ -643,29 +474,12 @@ class DetailPanel(QWidget):
         self.host_network_loading = QLabel(tr("Loading..."))
         self.host_network_loading.setAlignment(Qt.AlignCenter)
         self.host_network_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
-        self.host_network_table = QTableWidget()
-        self.host_network_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_network_table.verticalHeader().hide()
-        self.host_network_table.setColumnCount(5)
-        self.host_network_table.setHorizontalHeaderLabels([
-            tr("Interface"), tr("Type"), tr("State"), "Method", "CIDR"
-        ])
-        self.host_network_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_network_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.host_network_table.setColumnWidth(1, 65)
-        self.host_network_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
-        self.host_network_table.setColumnWidth(2, 75)
-        self.host_network_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.host_network_table.setColumnWidth(3, 70)
-        self.host_network_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.host_network_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_network_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.host_network_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.host_network_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_network_table.setAlternatingRowColors(True)
-        enable_row_hover(self.host_network_table)
+        self.host_network_table = self._make_table(
+            [tr("Interface"), tr("Type"), tr("State"), "Method", "CIDR"],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Interactive, 75), (QHeaderView.Interactive, 70),
+             (QHeaderView.Stretch, None)],
+        )
         self.host_network_stack = QStackedWidget()
         self.host_network_stack.addWidget(self.host_network_loading)
         self.host_network_stack.addWidget(self.host_network_table)
@@ -684,25 +498,11 @@ class DetailPanel(QWidget):
         self.host_services_loading = QLabel(tr("Loading..."))
         self.host_services_loading.setAlignment(Qt.AlignCenter)
         self.host_services_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
-        self.host_services_table = QTableWidget()
-        self.host_services_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_services_table.verticalHeader().hide()
-        self.host_services_table.setColumnCount(3)
-        self.host_services_table.setHorizontalHeaderLabels([
-            tr("Service"), tr("State"), tr("Description")
-        ])
-        self.host_services_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_services_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.host_services_table.setColumnWidth(1, 75)
-        self.host_services_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.host_services_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_services_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.host_services_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.host_services_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_services_table.setAlternatingRowColors(True)
-        enable_row_hover(self.host_services_table)
+        self.host_services_table = self._make_table(
+            [tr("Service"), tr("State"), tr("Description")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 75),
+             (QHeaderView.Stretch, None)],
+        )
         self.host_services_stack = QStackedWidget()
         self.host_services_stack.addWidget(self.host_services_loading)
         self.host_services_stack.addWidget(self.host_services_table)
@@ -721,28 +521,12 @@ class DetailPanel(QWidget):
         self.host_disks_loading = QLabel(tr("Loading..."))
         self.host_disks_loading.setAlignment(Qt.AlignCenter)
         self.host_disks_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
-        self.host_disks_table = QTableWidget()
-        self.host_disks_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_disks_table.verticalHeader().hide()
-        self.host_disks_table.setColumnCount(5)
-        self.host_disks_table.setHorizontalHeaderLabels([
-            tr("Device"), tr("Type"), tr("Model"), tr("Size"), tr("Serial")
-        ])
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.host_disks_table.setColumnWidth(1, 65)
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
-        self.host_disks_table.setColumnWidth(3, 70)
-        self.host_disks_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.host_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.host_disks_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.host_disks_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_disks_table.setAlternatingRowColors(True)
-        enable_row_hover(self.host_disks_table)
+        self.host_disks_table = self._make_table(
+            [tr("Device"), tr("Type"), tr("Model"), tr("Size"), tr("Serial")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Stretch, None)],
+        )
         self.host_disks_stack = QStackedWidget()
         self.host_disks_stack.addWidget(self.host_disks_loading)
         self.host_disks_stack.addWidget(self.host_disks_table)
@@ -761,28 +545,13 @@ class DetailPanel(QWidget):
         self.host_snapshots_loading = QLabel(tr("Loading..."))
         self.host_snapshots_loading.setAlignment(Qt.AlignCenter)
         self.host_snapshots_loading.setStyleSheet("color: #9ca3af; font-size: 14px;")
-        self.host_snapshots_table = QTableWidget()
-        self.host_snapshots_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.host_snapshots_table.verticalHeader().hide()
-        self.host_snapshots_table.setColumnCount(5)
-        self.host_snapshots_table.setHorizontalHeaderLabels([
-            tr("VM"), tr("Snapshot"), tr("Description"), tr("Created"), tr("Current")
-        ])
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.host_snapshots_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.host_snapshots_table.setColumnWidth(4, 65)
-        self.host_snapshots_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.host_snapshots_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-
-        self.host_snapshots_table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        self.host_snapshots_table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.host_snapshots_table.setAlternatingRowColors(True)
-        self.host_snapshots_table.setSortingEnabled(True)
-        enable_row_hover(self.host_snapshots_table)
+        self.host_snapshots_table = self._make_table(
+            [tr("VM"), tr("Snapshot"), tr("Description"), tr("Created"), tr("Current")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Interactive, 65)],
+            sortable=True,
+        )
         self.host_snapshots_stack = QStackedWidget()
         self.host_snapshots_stack.addWidget(self.host_snapshots_loading)
         self.host_snapshots_stack.addWidget(self.host_snapshots_table)
@@ -811,27 +580,7 @@ class DetailPanel(QWidget):
     # ------------------------------------------------------------------
     @staticmethod
     def _parse_pve_error(err):
-        if not err:
-            return ""
-        err_lower = err.lower()
-        if "permission check failed" in err_lower:
-            import re
-            m = re.search(r"Permission check failed\s*\(([^)]+)\)", err)
-            if m:
-                path = m.group(1)
-                return tr("PVE permission denied: {path}").format(path=path)
-            return tr("PVE permission denied")
-        if "403" in err_lower:
-            return tr("PVE permission denied (403)")
-        if "unauthorized" in err_lower or "401" in err_lower:
-            return tr("API token authorization error (401)")
-        if "resolve" in err_lower or "dns" in err_lower or "name or service not known" in err_lower:
-            return tr("Cannot resolve DNS name")
-        if "connection refused" in err_lower or "connection reset" in err_lower:
-            return tr("PVE API unavailable (connection refused)")
-        if "timeout" in err_lower:
-            return tr("Host not responding (timeout)")
-        return err
+        return parse_pve_error(err)
 
     def _run_worker(self, worker):
         if len(self._workers) >= _MAX_WORKERS_DP:
@@ -849,6 +598,7 @@ class DetailPanel(QWidget):
     def set_lists(self, all_nodes, all_vms, all_storages=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
+        self._vms_by_key = build_vm_index(all_vms)
         self.all_storages = all_storages or []
 
     def set_iso_catalog(self, iso_images):
@@ -859,7 +609,7 @@ class DetailPanel(QWidget):
             return
         vmid = self._last_vm_data.get("vmid")
         host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         if action in ("stop", "reset"):
@@ -880,11 +630,7 @@ class DetailPanel(QWidget):
         worker = VmActionWorker(cfg, node_name, vmid, vm_type, action)
         for btn in self._action_buttons.values():
             btn.setEnabled(False)
-        action_names = {
-            "start": tr("Start"), "shutdown": tr("Shutdown"), "stop": tr("Force stop"),
-            "reboot": tr("Reboot"), "reset": tr("Reset"), "resume": tr("Resume")
-        }
-        self.detail_label.setText(f"VM/CT: {vmid} — {action_names.get(action, action)}...")
+        self.detail_label.setText(f"VM/CT: {vmid} — {VM_ACTION_MESSAGE_LABELS.get(action, action)}...")
         worker.signals.action_result.connect(lambda msg: (
             self._on_action_finished(msg),
             self._refresh_after_action(),
@@ -931,7 +677,7 @@ class DetailPanel(QWidget):
         vm_type = self._last_vm_data.get("type", "qemu")
         vmid = self._last_vm_data.get("vmid")
         host_name = self._last_vm_data.get("host_name") or self._last_vm_data.get("node")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         node_name = self._last_vm_data.get("node") or host_name
@@ -959,7 +705,7 @@ class DetailPanel(QWidget):
         vmid = self._last_vm_data.get("vmid")
         vm_type = self._last_vm_data.get("type", "qemu")
         node_name = self._last_vm_data.get("node") or host_name
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         gen = self._generation
@@ -979,19 +725,61 @@ class DetailPanel(QWidget):
             if table.rowHeight(r) > max_height:
                 table.setRowHeight(r, max_height)
 
+    _FILTER_TEXT_ROLE = Qt.UserRole + 42
+
+    @staticmethod
+    def _make_table(headers, col_specs, sortable=False):
+        """Create a styled QTableWidget with standard appearance.
+        headers: list of column header strings.
+        col_specs: list of (QHeaderView.ResizeMode, width_or_None) per column.
+        """
+        table = QTableWidget()
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.verticalHeader().hide()
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        for col, (mode, width) in enumerate(col_specs):
+            table.horizontalHeader().setSectionResizeMode(col, mode)
+            if width is not None:
+                table.setColumnWidth(col, width)
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
+        table.setAlternatingRowColors(True)
+        if sortable:
+            table.setSortingEnabled(True)
+        enable_row_hover(table)
+        return table
+
     @staticmethod
     def _filter_table(table, text):
-        for row in range(table.rowCount()):
-            visible = False
-            for col in range(table.columnCount()):
-                item = table.item(row, col)
-                if item and text.lower() in item.text().lower():
-                    visible = True
-                    break
-            table.setRowHidden(row, not visible)
+        needle = text.lower()
+        sort_was = table.isSortingEnabled()
+        if sort_was:
+            table.setSortingEnabled(False)
+        table.blockSignals(True)
+        try:
+            for row in range(table.rowCount()):
+                visible = False
+                for col in range(table.columnCount()):
+                    item = table.item(row, col)
+                    if not item:
+                        continue
+                    cached = item.data(DetailPanel._FILTER_TEXT_ROLE)
+                    if cached is None:
+                        cached = item.text().lower()
+                        item.setData(DetailPanel._FILTER_TEXT_ROLE, cached)
+                    if needle in cached:
+                        visible = True
+                        break
+                table.setRowHidden(row, not visible)
+        finally:
+            table.blockSignals(False)
+            if sort_was:
+                table.setSortingEnabled(True)
 
     def _make_filterable_table(self, table):
         from PySide6.QtWidgets import QLineEdit
+        from PySide6.QtCore import QTimer
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1002,9 +790,14 @@ class DetailPanel(QWidget):
             "QLineEdit { font-size: 12px; padding: 4px 8px; border: 1px solid #d1d5db; "
             "border-radius: 3px; margin: 4px 4px 0 4px; }"
         )
-        search.textChanged.connect(lambda text: DetailPanel._filter_table(table, text))
+        debounce = QTimer()
+        debounce.setSingleShot(True)
+        debounce.setInterval(200)
+        debounce.timeout.connect(lambda: DetailPanel._filter_table(table, search.text()))
+        search.textChanged.connect(debounce.start)
         layout.addWidget(search)
         layout.addWidget(table)
+        container._filter_debounce = debounce
         return container
 
     def show_details(self, obj_type, obj_name, data):
@@ -1317,7 +1110,7 @@ class DetailPanel(QWidget):
             hosts = []
             for node in self.all_nodes:
                 host_name = node.get("host_name", "")
-                cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+                cfg = self._cfg_by_name.get(host_name)
                 if cfg and cfg.get("cluster") == self.current_obj_name:
                     hosts.append(node)
             self._update_cluster_summary_cells(hosts)
@@ -1334,9 +1127,8 @@ class DetailPanel(QWidget):
         elif self.current_obj_type == "vm":
             vm_data = self.current_obj_data
             if vm_data:
-                fresh = next((v for v in self.all_vms
-                              if v.get("vmid") == vm_data.get("vmid")
-                              and v.get("host_name") == (vm_data.get("host_name") or vm_data.get("node"))), None)
+                lookup_host = vm_data.get("host_name") or vm_data.get("node")
+                fresh = self._vms_by_key.get((lookup_host, vm_data.get("vmid")))
                 if fresh:
                     self.current_obj_data = fresh
                     self.hardware_widget.set_vm_status(fresh.get("status", ""))
@@ -1381,18 +1173,18 @@ class DetailPanel(QWidget):
         table.setHorizontalHeaderLabels([
             tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")
         ])
+        # Сбрасываем режимы для всех колонок сразу, иначе при переключении
+        # между 5-колоночной (_show_cluster_folder) и 6-колоночной
+        # конфигурацией Qt сохраняет старые режимы — ширина колонок "плывёт".
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
         table.setColumnWidth(1, 70)
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
         table.setColumnWidth(3, 55)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
         table.setColumnWidth(4, 80)
-        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
         table.setColumnWidth(5, 85)
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
+        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
             node_name = node.get("_display_name") or node.get("node", "?")
@@ -1409,7 +1201,7 @@ class DetailPanel(QWidget):
             table.setItem(i, 1, status_item)
 
             host_name = node.get("host_name", "")
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             address = cfg.get("host", "") if cfg else ""
             table.setItem(i, 2, QTableWidgetItem(address))
 
@@ -1457,7 +1249,7 @@ class DetailPanel(QWidget):
         clusters = {}
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if cl and cl not in (False, None, "Standalone"):
                 clusters.setdefault(cl, {"hosts": [], "nodes": set()})
@@ -1468,17 +1260,16 @@ class DetailPanel(QWidget):
         table = self.datacenter_summary
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels([tr("Cluster"), tr("Hosts"), tr("VMs"), tr("CPU %"), tr("RAM (GiB)")])
+        # Тот же сброс, что и в _populate_host_summary — иначе при возврате
+        # из 6-колоночной конфигурации 6-я колонка наследует Stretch.
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
         table.setColumnWidth(1, 65)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
         table.setColumnWidth(2, 65)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
         table.setColumnWidth(3, 55)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
         table.setColumnWidth(4, 85)
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
+        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
         table.setRowCount(max(len(clusters), 1))
         if not clusters:
             table.setSpan(0, 0, 1, 5)
@@ -1733,7 +1524,7 @@ class DetailPanel(QWidget):
         node_entry = filtered[0]
         node_name = node_entry.get("node", "")
         host_name = node_entry.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         self._storage_content_pending = {}
@@ -1848,7 +1639,7 @@ class DetailPanel(QWidget):
     def _fetch_host_network(self, host_name, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)
+        cfg = self._cfg_by_name.get(host_cfg_name)
         if not cfg:
             self.host_network_stack.widget(0).setText(tr("No data"))
             self.host_network_stack.setCurrentIndex(0)
@@ -1901,7 +1692,7 @@ class DetailPanel(QWidget):
     def _fetch_host_services(self, host_name, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)
+        cfg = self._cfg_by_name.get(host_cfg_name)
         if not cfg:
             self.host_services_stack.widget(0).setText(tr("No data"))
             self.host_services_stack.setCurrentIndex(0)
@@ -1967,7 +1758,7 @@ class DetailPanel(QWidget):
         node_entry = filtered[0]
         node_name = node_entry.get("node", "")
         host_name = node_entry.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         patched = self.storage_detail_tf_combo
@@ -2086,7 +1877,7 @@ class DetailPanel(QWidget):
     def _fetch_host_disks(self, host_name, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)
+        cfg = self._cfg_by_name.get(host_cfg_name)
         if not cfg:
             self.host_disks_stack.widget(0).setText(tr("No data"))
             self.host_disks_stack.setCurrentIndex(0)
@@ -2147,7 +1938,7 @@ class DetailPanel(QWidget):
     def _fetch_host_snapshots(self, host_name, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)
+        cfg = self._cfg_by_name.get(host_cfg_name)
         if not cfg:
             self.host_snapshots_stack.widget(0).setText(tr("No data"))
             self.host_snapshots_stack.setCurrentIndex(0)
@@ -2208,7 +1999,7 @@ class DetailPanel(QWidget):
         standalone = []
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if not cl or cl in (False, None, "Standalone"):
                 standalone.append(node)
@@ -2226,7 +2017,7 @@ class DetailPanel(QWidget):
         hosts = []
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster") == cluster_name:
                 hosts.append(node)
         self._populate_host_summary(hosts)
@@ -2281,7 +2072,7 @@ class DetailPanel(QWidget):
         self.host_snapshots_table.setRowCount(0)
 
         if host_data and host_data.get("status") != "error":
-            host_cfg = next((c for c in self.nodes_cfg if c["name"] == host_data.get("host_name", "")), None)
+            host_cfg = self._cfg_by_name.get(host_data.get("host_name", ""))
             address = host_cfg.get("host", "") if host_cfg else ""
             cpu_frac = host_data.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
@@ -2369,7 +2160,7 @@ class DetailPanel(QWidget):
     def _fetch_host_metrics(self, host_data):
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_cfg_name), None)
+        cfg = self._cfg_by_name.get(host_cfg_name)
         self.metrics_widget.show_disk_io(False)
         if not cfg:
             self.metrics_widget.clear_curves()
@@ -2419,7 +2210,7 @@ class DetailPanel(QWidget):
     def _load_iso_for_node(self, host_name, node_name):
         """Load ISO images available on a node and store in _iso_by_node."""
         self._iso_by_node[node_name] = set()
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         storages = [s for s in self.all_storages
@@ -2468,7 +2259,7 @@ class DetailPanel(QWidget):
         if detail_key not in self.details_cache:
             self.info_label.setText(tr("Loading detailed info..."))
             self.info_stack.setCurrentIndex(0)
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             if cfg:
                 node_name = vm_data.get("node") or host_name
                 vm_type = vm_data.get("type", "qemu")
@@ -2486,7 +2277,7 @@ class DetailPanel(QWidget):
         if detail_key not in self.config_cache:
             self.hardware_widget.set_hardware_data(None)
             self.options_widget.set_options_data(None)
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             if cfg:
                 vm_type = vm_data.get("type", "qemu")
                 from ..backend import VmConfigWorker
@@ -2514,7 +2305,7 @@ class DetailPanel(QWidget):
 
         if detail_key not in self.task_history_cache:
             self.task_history_widget.set_tasks([])
-            cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+            cfg = self._cfg_by_name.get(host_name)
             if cfg:
                 node_name = vm_data.get("node") or host_name
                 from ..backend import VmTaskHistoryWorker
@@ -2537,7 +2328,7 @@ class DetailPanel(QWidget):
             self.metrics_widget.update_curves(self.metrics_cache[cache_key])
             return
 
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         node_name = vm_data.get("node") or host_name
@@ -2567,7 +2358,7 @@ class DetailPanel(QWidget):
             return
         vmid = detail.get("vmid")
         detail_key = (vmid, host_name)
-        vm_data = next((v for v in self.all_vms if v.get("vmid") == vmid and v.get("host_name") == host_name), {})
+        vm_data = self._vms_by_key.get((host_name, vmid), {})
         if detail["status"] == "ok":
             self.details_cache[detail_key] = detail["data"]
             self._display_full_vm_info(vm_data, detail["data"])
@@ -2585,12 +2376,11 @@ class DetailPanel(QWidget):
 
     def _on_vm_config_change_requested(self, host_name, vmid_str, params):
         """Launches VmConfigUpdateWorker to save a parameter change."""
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         vmid = int(vmid_str)
-        vm = next((v for v in self.all_vms
-                   if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
+        vm = self._vms_by_key.get((host_name, vmid))
         node = vm.get("node") if vm else host_name
         vm_type = "qemu"
 
@@ -2633,7 +2423,7 @@ class DetailPanel(QWidget):
         """Reloads VM config after a change."""
         detail_key = (vmid, host_name)
         self.config_cache.pop(detail_key, None)
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if cfg and self._last_vm_data:
             node_name = self._last_vm_data.get("node") or host_name
             gen = self._generation

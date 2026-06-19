@@ -354,8 +354,3 @@ def seed_translations(lang: str, translations: dict[str, str]):
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("seed_translations(%s): %s", lang, e)
-
-
-# Dead code below (kept for reference):
-# def load_all_ui_state() -> dict[str, str]: ...
-# def delete_ui_state(key: str): ...

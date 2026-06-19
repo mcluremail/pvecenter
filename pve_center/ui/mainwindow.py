@@ -19,6 +19,7 @@ from .detail_panel import DetailPanel
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 from .icons import get_icon
 from .i18n import tr, set_language, get_language, supported_languages
+from .utils import build_cfg_index, build_vm_index
 logger = logging.getLogger(__name__)
 
 # Максимум одновременно работающих воркеров
@@ -36,6 +37,8 @@ class MainWindow(QMainWindow):
         theme.load()
 
         self.nodes_cfg = nodes_cfg or []
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+        self._vms_by_key = {}
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
@@ -51,7 +54,7 @@ class MainWindow(QMainWindow):
         self.tree_panel = TreePanel(self.nodes_cfg)
         self.detail_panel = DetailPanel(self.nodes_cfg)
         self.detail_panel.config_update_result.connect(
-            lambda msg: self._notifications.show(msg, error="Ошибка" in msg)
+            lambda msg: self._notifications.show(msg, error=tr("Error") in msg)
         )
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
@@ -157,12 +160,6 @@ class MainWindow(QMainWindow):
         self.refresh_timer.timeout.connect(self.soft_refresh)
         self.refresh_timer.start()
 
-        # Таймер watchdog — проверяет, жив ли event loop
-        self._watchdog_timer = QTimer(self)
-        self._watchdog_timer.setInterval(1000)
-        self._watchdog_timer.timeout.connect(lambda: None)
-        self._watchdog_timer.start()
-
         # Детектор зависания главного потока
         self._last_heartbeat = time.time()
         self._heartbeat_timer = QTimer(self)
@@ -195,6 +192,14 @@ class MainWindow(QMainWindow):
         при RuntimeError (уничтоженный виджет) или любом исключении в хендлере."""
         self._workers.discard(worker)
 
+    def _dedup_storages(self, new_storages, host_name, target_list):
+        for st in new_storages:
+            st["host_name"] = host_name
+            key = (st.get("storage"), st.get("node"), host_name)
+            if key not in self._seen_storage_keys:
+                self._seen_storage_keys.add(key)
+                target_list.append(st)
+
     # ------------------------------------------------------------
     # Добавление сервера
     # ------------------------------------------------------------
@@ -205,6 +210,7 @@ class MainWindow(QMainWindow):
             return
         cfg = dialog.get_config()
         self.nodes_cfg.append(cfg)
+        self._cfg_by_name[cfg.get("name", "")] = cfg
         save_config(self.nodes_cfg)
         self.refresh_data()
 
@@ -223,9 +229,9 @@ class MainWindow(QMainWindow):
         sel_node = dialog.get_node()
         ha_group = dialog.get_ha_group()
 
-        cfg = next((c for c in self.nodes_cfg if c["name"] == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
-            self.status_label.setText(f"Конфиг не найден для {host_name}")
+            self.status_label.setText(tr("Config not found for {}").format(host_name))
             return
 
         from ..backend import CreateVmWorker
@@ -237,60 +243,59 @@ class MainWindow(QMainWindow):
             self._discard_worker(w)
         ))
         worker.signals.vm_error.connect(lambda err, w=worker: (
-            self._notifications.show(f"Ошибка создания ВМ: {err}", error=True),
-            self.status_label.setText(f"Ошибка: {err}"),
+            self._notifications.show(tr("VM creation error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err)),
             self._discard_worker(w)
         ))
         self._run_worker(worker)
-        self.status_label.setText("Создание ВМ...")
+        self.status_label.setText(tr("Creating VM..."))
 
     # ------------------------------------------------------------
     # Удаление ВМ
     # ------------------------------------------------------------
     def _on_vm_delete_requested(self, host_name, node, vmid):
         # Найти ВМ по vmid + host_name
-        vm = next((v for v in self.all_vms
-                   if v.get("vmid") == vmid and v.get("host_name") == host_name), None)
+        vm = self._vms_by_key.get((host_name, vmid))
         vm_name = vm.get("name") if vm else f"VM {vmid}"
         vm_status = vm.get("status", "") if vm else ""
         is_running = vm_status == "running"
 
         # Найти конфиг хоста
-        cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
-            self._notifications.show(f"Конфиг не найден для {host_name}", error=True)
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
 
         # Диалог подтверждения
         dlg = QDialog(self)
-        dlg.setWindowTitle("Удаление ВМ")
+        dlg.setWindowTitle(tr("Delete VM"))
         dlg.setFixedSize(480, is_running and 280 or 240)
         layout = QVBoxLayout(dlg)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
         warning = QLabel(
-            f"<b>ВМ «{vm_name}» (VMID: {vmid})</b> на узле <b>{node}</b>"
+            f"<b>{tr('VM')} «{vm_name}» (VMID: {vmid})</b> {tr('on node')} <b>{node}</b>"
             "<br><br>"
-            "<span style='color:#c0392b;'>Это действие необратимо. "
-            "Все диски ВМ будут удалены.</span>"
+            f"<span style='color:#c0392b;'>{tr('This action is irreversible.')} "
+            f"{tr('All VM disks will be deleted.')}</span>"
         )
         warning.setWordWrap(True)
         layout.addWidget(warning)
 
         if is_running:
             run_warning = QLabel(
-                "<span style='color:#c0392b; font-weight:bold;'>ВМ запущена!</span>"
-                "<br>Она будет принудительно остановлена и удалена."
+                f"<span style='color:#c0392b; font-weight:bold;'>{tr('VM is running!')}</span>"
+                f"<br>{tr('It will be forcibly stopped and deleted.')}"
             )
             run_warning.setWordWrap(True)
             layout.addWidget(run_warning)
 
-        confirm_check = QCheckBox("Я подтверждаю удаление")
+        confirm_check = QCheckBox(tr("I confirm deletion"))
         layout.addWidget(confirm_check)
 
         if is_running:
-            force_check = QCheckBox("Принудительно остановить и удалить")
+            force_check = QCheckBox(tr("Force stop and delete"))
             force_check.setStyleSheet("color: #c0392b;")
             layout.addWidget(force_check)
 
@@ -299,11 +304,11 @@ class MainWindow(QMainWindow):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        delete_btn = QPushButton("Удалить")
+        delete_btn = QPushButton(tr("Delete"))
         delete_btn.setFixedWidth(120)
         delete_btn.setObjectName("dangerBtn")
         delete_btn.setEnabled(False)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.setDefault(True)
 
@@ -338,25 +343,25 @@ class MainWindow(QMainWindow):
             self._discard_worker(w)
         ))
         worker.signals.vm_error.connect(lambda err, w=worker: (
-            self._notifications.show(f"Ошибка удаления ВМ: {err}", error=True),
-            self.status_label.setText(f"Ошибка: {err}"),
+            self._notifications.show(tr("VM deletion error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err)),
             self._discard_worker(w)
         ))
         self._run_worker(worker)
-        self.status_label.setText(f"Удаление ВМ {vmid}...")
+        self.status_label.setText(tr("Deleting VM {}...").format(vmid))
 
     def _confirm_delete(self, text):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Удаление")
+        dlg.setWindowTitle(tr("Delete"))
         dlg.setFixedSize(420, 130)
         layout = QVBoxLayout(dlg)
         layout.addWidget(QLabel(text))
         layout.addStretch()
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        yes_btn = QPushButton("Да")
+        yes_btn = QPushButton(tr("Yes"))
         yes_btn.setFixedWidth(80)
-        no_btn = QPushButton("Нет")
+        no_btn = QPushButton(tr("No"))
         no_btn.setFixedWidth(80)
         no_btn.setDefault(True)
         btn_layout.addWidget(yes_btn)
@@ -370,21 +375,21 @@ class MainWindow(QMainWindow):
 
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":
-            text = f"Удалить хост «{item_name}» из конфигурации?"
+            text = tr("Remove host «{}» from configuration?").format(item_name)
             matched = [c for c in self.nodes_cfg if c.get("name") == item_name]
         elif item_type == "cluster":
             if not item_name:
                 return
             count = sum(1 for c in self.nodes_cfg if c.get("cluster") == item_name)
-            text = f"Удалить кластер «{item_name}» ({count} записей) из конфигурации?"
+            text = tr("Remove cluster «{}» ({} records) from configuration?").format(item_name, count)
             matched = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
         elif item_type == "section":
-            if item_name == "Кластеры":
+            if item_name == tr("Clusters"):
                 matched = [c for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone")]
-                text = f"Удалить все {len(matched)} кластерных записей из конфигурации?"
-            elif item_name == "Отдельные хосты":
+                text = tr("Remove all {} cluster records from configuration?").format(len(matched))
+            elif item_name == tr("Standalone hosts"):
                 matched = [c for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone")]
-                text = f"Удалить все {len(matched)} записей отдельных хостов из конфигурации?"
+                text = tr("Remove all {} standalone host records from configuration?").format(len(matched))
             else:
                 return
         else:
@@ -398,19 +403,21 @@ class MainWindow(QMainWindow):
                 errors.append(cfg.get("name", cfg.get("host", "?")))
         if errors:
             self._notifications.show(
-                f"Не удалось удалить токены: {', '.join(errors)}. "
-                f"Конфигурация очищена.", error=True)
+                tr("Failed to delete tokens: {}. Configuration cleared.").format(", ".join(errors)),
+                error=True
+            )
         self.nodes_cfg = [c for c in self.nodes_cfg if c not in matched]
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
 
     def _on_host_token_refresh(self, host_name):
-        cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+        cfg = self._cfg_by_name.get(host_name)
         if not cfg:
             return
         from .add_server_dialog import AddServerDialog
         dialog = AddServerDialog(self, "reconnect")
-        dialog.setWindowTitle(f"Обновить токен — {host_name}")
+        dialog.setWindowTitle(tr("Refresh token — {}").format(host_name))
         dialog.host_input.setText(cfg.get("host", ""))
         dialog.host_input.setEnabled(False)
         dialog.user_input.setText(cfg.get("user", "root@pam"))
@@ -425,6 +432,7 @@ class MainWindow(QMainWindow):
             if cfg.get("cluster_rep"):
                 new_cfg["cluster_rep"] = True
             self.nodes_cfg[idx] = new_cfg
+            self._cfg_by_name[host_name] = new_cfg
         save_config(self.nodes_cfg)
         self.refresh_data()
 
@@ -455,6 +463,7 @@ class MainWindow(QMainWindow):
         self.all_nodes.clear()
         self.all_vms.clear()
         self.all_storages.clear()
+        self._vms_by_key.clear()
         self.all_iso_images.clear()
         self.all_ha_groups.clear()
         self.all_pools.clear()
@@ -505,12 +514,8 @@ class MainWindow(QMainWindow):
                     self.all_vms[idx] = vm
                 else:
                     self.all_vms.append(vm)
-            for st in data.get("storages", []):
-                st["host_name"] = data["host"]
-                key = (st.get("storage"), st.get("node"), data["host"])
-                if key not in self._seen_storage_keys:
-                    self._seen_storage_keys.add(key)
-                    self.all_storages.append(st)
+                self._vms_by_key[vm_key] = vm
+            self._dedup_storages(data.get("storages", []), data["host"], self.all_storages)
             # Собираем уникальные имена пулов
             known = {p["poolid"] for p in self.all_pools if "poolid" in p}
             for pn in data.get("pool_names", []):
@@ -606,6 +611,7 @@ class MainWindow(QMainWindow):
                 self._soft_nodes.clear()
                 self._soft_vms.clear()
                 self._soft_storages.clear()
+                self._seen_storage_keys.clear()
             else:
                 return
         self._soft_refresh_running = True
@@ -620,6 +626,7 @@ class MainWindow(QMainWindow):
         self._soft_nodes.clear()
         self._soft_vms.clear()
         self._soft_storages.clear()
+        self._seen_storage_keys.clear()
         self._soft_counter = 0
         self._soft_had_errors = False
 
@@ -647,17 +654,7 @@ class MainWindow(QMainWindow):
             for vm in data["vms"]:
                 vm["host_name"] = data["host"]
                 self._soft_vms.append(vm)
-            # Дедупликация storages (как в on_worker_finished)
-            seen_soft_storage = set()
-            for st in self._soft_storages:
-                key = (st.get("storage"), st.get("node"), st.get("host_name"))
-                seen_soft_storage.add(key)
-            for st in data.get("storages", []):
-                st["host_name"] = data["host"]
-                key = (st.get("storage"), st.get("node"), data["host"])
-                if key not in seen_soft_storage:
-                    seen_soft_storage.add(key)
-                    self._soft_storages.append(st)
+            self._dedup_storages(data.get("storages", []), data["host"], self._soft_storages)
         else:
             self._soft_had_errors = True
             self._soft_nodes.append({
@@ -678,9 +675,11 @@ class MainWindow(QMainWindow):
                     self.all_nodes[:] = self._soft_nodes
                     self.all_vms[:] = self._soft_vms
                     self.all_storages[:] = self._soft_storages
+                    self._vms_by_key = build_vm_index(self.all_vms)
                     self.detail_panel.all_nodes[:] = self._soft_nodes
                     self.detail_panel.all_vms[:] = self._soft_vms
                     self.detail_panel.all_storages[:] = self._soft_storages
+                    self.detail_panel._vms_by_key = self._vms_by_key
                     self.detail_panel.refresh_current_view()
                     # Пробрасываем уже собранные на hard refresh пулы/HA —
                     # soft refresh не имеет ProxmoxAPI, пересобрать не может
@@ -706,7 +705,7 @@ class MainWindow(QMainWindow):
         if self._cached_tasks:
             self.tasks_widget.set_tasks(self._cached_tasks)
         elif not self._workers:
-            self.tasks_widget.set_placeholder("Загрузка задач...")
+            self.tasks_widget.set_placeholder(tr("Loading tasks..."))
         if not self.nodes_cfg or not self.all_nodes:
             return
 
@@ -724,7 +723,7 @@ class MainWindow(QMainWindow):
             if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
                 cfg = rep_cfg
             else:
-                cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+                cfg = self._cfg_by_name.get(host_name)
                 if cfg is None:
                     cfg = next((c for c in self.nodes_cfg
                                 if c["name"].split("@")[0] == pve_node), None)
@@ -745,15 +744,20 @@ class MainWindow(QMainWindow):
             )
         )
         worker.signals.tasks_error.connect(lambda err, w=worker: self._discard_worker(w))
-        # Запускаем в отдельном потоке, а не через QThreadPool — чтобы не блокировать
-        # слот пула на время join() внутри ClusterTasksWorker.run()
+        # finished подключается в _run_worker; но ClusterTasksWorker запускается
+        # через threading.Thread (а не QThreadPool), чтобы не блокировать слот
+        # пула на время join() внутри run(). Поэтому регистрируем в _workers
+        # вручную — иначе воркер не учтётся в MAX_WORKERS и утечёт при падении
+        # до emit.
+        if len(self._workers) >= MAX_WORKERS:
+            return
+        self._workers.add(worker)
+        worker.signals.finished.connect(lambda w=worker: self._discard_worker(w))
         t = threading.Thread(target=worker.run, daemon=True)
         t.start()
 
-    def _on_cluster_tasks_loaded(self, tasks, gen=None):
-        if gen is None:
-            logger.warning("_on_cluster_tasks_loaded вызван без gen — обрабатываем без защиты по поколению")
-            self._update_cluster_tasks_widget(tasks)
+    def _on_cluster_tasks_loaded(self, tasks, gen):
+        if gen != self._tasks_gen:
             return
         if gen != self._tasks_gen:
             return
@@ -920,7 +924,7 @@ class MainWindow(QMainWindow):
             now = time.time()
             elapsed = now - self._last_heartbeat
             if elapsed > 3:
-                print(f"\n=== FREEZE DETECTED: main thread unresponsive for {elapsed:.1f}s ===")
+                logger.error("=== FREEZE DETECTED: main thread unresponsive for %.1fs ===", elapsed)
                 for thread_id, frame in sys._current_frames().items():
                     name = ""
                     for t in threading.enumerate():
@@ -928,10 +932,11 @@ class MainWindow(QMainWindow):
                             name = t.name
                             break
                     if "MainThread" in name or name == "":
-                        import traceback
-                        print(f"Thread [{thread_id}] ({name}):")
-                        traceback.print_stack(frame)
-                print("=== END FREEZE REPORT ===\n")
+                        import io
+                        buf = io.StringIO()
+                        traceback.print_stack(frame, file=buf)
+                        logger.error("Thread [%s] (%s):\n%s", thread_id, name, buf.getvalue())
+                logger.error("=== END FREEZE REPORT ===")
 
     def _on_language_changed(self, idx):
         code = self._lang_combo.itemData(idx)
