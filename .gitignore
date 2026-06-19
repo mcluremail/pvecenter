@@ -13,6 +13,9 @@ debian/tmp/
 nodes.enc
 nodes.json
 .omo/
+audit_ui_*.md
+docs/audit_*.md
+docs/ux_proposals_*.md
 *.pyc
 __pycache__/
 venv/
