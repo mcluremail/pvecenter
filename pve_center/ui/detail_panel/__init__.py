@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QLabel, QWidget, QTabWidget, QPushButton,
 from PySide6.QtCore import Qt, Signal
 
 from ..utils import build_cfg_index, build_vm_index
-from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS
+from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
 from ..icons import get_icon
 from ..i18n import tr
 
@@ -67,6 +67,7 @@ class DetailPanel(QWidget):
             btn = QPushButton(get_icon(VM_ACTION_ICONS[action_key]), label)
             btn.setFixedHeight(24)
             btn.setObjectName("accentBtn" if action_key in ("start",) else "")
+            btn.setToolTip(VM_ACTION_TOOLTIPS[action_key])
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
@@ -80,6 +81,7 @@ class DetailPanel(QWidget):
         self._console_btn = QPushButton(get_icon("console"), tr("Console"))
         self._console_btn.setFixedHeight(24)
         self._console_btn.setObjectName("accentBtn")
+        self._console_btn.setToolTip(tr("Open SPICE/VNC console"))
         self._console_btn.clicked.connect(self._on_vm_console)
         action_layout.addWidget(self._console_btn)
 

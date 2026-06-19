@@ -1,3 +1,27 @@
+pve-center (1.1.5-1) unstable; urgency=medium
+
+  * H1: wrap hardcoded Russian status bar text "Хостов:/ВМ:/Обновлено:" and
+    "running..." in tr() — now translatable (was invisible to i18n).
+  * M4: add tooltips to all 6 VM action buttons + Console button explaining
+    ACPI vs hard reset vs force stop difference.
+  * M6: add accessibleName + toolTip to braille refresh spinner — screen
+    readers now announce "Refreshing data" instead of braille dots.
+  * M8: wrap int(vmid_text) in try/except ValueError — prevents uncaught
+    crash if user pastes invalid text bypassing QIntValidator.
+  * H3: add Refresh toolbar button (manual data refresh).
+  * H4: add keyboard shortcuts: Ctrl+R/F5 (refresh), Ctrl+Q (quit),
+    Ctrl+N (add server), Del (delete selected tree item).
+  * tree_panel.request_delete_current() — Del handler dispatches to
+    vm_delete_requested or host_remove_requested based on selection type.
+  * i18n: add 11 new keys to all 5 languages (ru, ar, zh, fr, es):
+    "Hosts: {ok}/{total}  VMs: {vms}  Updated: {ts}", "Send ACPI shutdown
+    signal to VM", "Send ACPI reboot signal to VM", "Hard reset VM
+    (unsaved data will be lost)", "Force stop VM (kill process, unsaved
+    data lost)", "Resume suspended VM", "Open SPICE/VNC console", "Refresh",
+    "Refresh data", "Refreshing data", "Data refresh in progress".
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 19:00:00 +0300
+
 pve-center (1.1.4-1) unstable; urgency=medium
 
   * i18n: split tr("Serial") into "Serial" (disk serial number column, e.g.

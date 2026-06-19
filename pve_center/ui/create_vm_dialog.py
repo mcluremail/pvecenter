@@ -526,7 +526,10 @@ class CreateVmDialog(QDialog):
         """Return dict of params for POST /nodes/{node}/qemu."""
         name = self.name_input.text().strip()
         vmid_text = self.vmid_line.text().strip()
-        vmid = int(vmid_text) if vmid_text else 0
+        try:
+            vmid = int(vmid_text) if vmid_text else 0
+        except ValueError:
+            vmid = 0
         bus = self.bus_combo.currentData()
         slot = 0
         disk_key = f"{bus}{slot}"

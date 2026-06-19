@@ -26,3 +26,12 @@ VM_ACTION_ICONS = {
     "stop": "stop",
     "resume": "resume",
 }
+
+VM_ACTION_TOOLTIPS = {
+    "start": tr("Start VM"),
+    "shutdown": tr("Send ACPI shutdown signal to VM"),
+    "reboot": tr("Send ACPI reboot signal to VM"),
+    "reset": tr("Hard reset VM (unsaved data will be lost)"),
+    "stop": tr("Force stop VM (kill process, unsaved data lost)"),
+    "resume": tr("Resume suspended VM"),
+}

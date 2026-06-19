@@ -705,6 +705,31 @@ class TreePanel(QWidget):
             return vm_key
         return item.data(0, ITEM_KEY_ROLE)
 
+    def request_delete_current(self):
+        """Trigger delete on currently selected item (for Del shortcut)."""
+        item = self.tree.currentItem()
+        if not item:
+            return
+        vm_key = item.data(0, VM_KEY_ROLE)
+        if vm_key is not None:
+            host_name, vmid, node = vm_key
+            self.vm_delete_requested.emit(host_name, node, vmid)
+            return
+        key = item.data(0, ITEM_KEY_ROLE)
+        if not key or not isinstance(key, tuple):
+            return
+        item_type = key[0]
+        item_name = key[1] if len(key) > 1 else ""
+        if item_type == "host":
+            host_name = key[2] if len(key) > 2 else ""
+            if not host_name:
+                host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+                host_name = host.get("host_name", "") if host else ""
+            if host_name:
+                self.host_remove_requested.emit("host", host_name)
+        elif item_type in ("cluster", "section"):
+            self.host_remove_requested.emit(item_type, item_name)
+
     def _on_item_clicked(self, item, column):
         self._nav_timer.stop()
 

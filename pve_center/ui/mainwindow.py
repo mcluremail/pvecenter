@@ -6,8 +6,9 @@ import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel, QDialog, QPushButton, QCheckBox,
-                               QComboBox)
-from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool
+                               QComboBox, QToolBar)
+from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSize
+from PySide6.QtGui import QShortcut, QKeySequence, QAction
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
 from ..config import save_config, save_tasks_cache, load_tasks_cache, save_ui_state, load_ui_state
@@ -101,6 +102,8 @@ class MainWindow(QMainWindow):
 
         self._refresh_spinner = QLabel("")
         self._refresh_spinner.setStyleSheet("color: #6b7280; padding-right: 8px;")
+        self._refresh_spinner.setAccessibleName(tr("Refreshing data"))
+        self._refresh_spinner.setToolTip(tr("Data refresh in progress"))
         self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
 
         self._lang_combo = QComboBox()
@@ -153,6 +156,21 @@ class MainWindow(QMainWindow):
 
         self.show()
         self.refresh_data()
+
+        self._toolbar = QToolBar()
+        self._toolbar.setMovable(False)
+        self._toolbar.setIconSize(QSize(16, 16))
+        refresh_action = QAction(get_icon("refresh"), tr("Refresh"), self)
+        refresh_action.setToolTip(tr("Refresh data") + " (Ctrl+R)")
+        refresh_action.triggered.connect(self.refresh_data)
+        self._toolbar.addAction(refresh_action)
+        self.addToolBar(self._toolbar)
+
+        QShortcut(QKeySequence("Ctrl+R"), self, activated=self.refresh_data)
+        QShortcut(QKeySequence("F5"), self, activated=self.refresh_data)
+        QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
+        QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self._on_add_server())
+        QShortcut(QKeySequence("Del"), self, activated=self.tree_panel.request_delete_current)
 
         # Таймер автообновления основных данных
         self.refresh_timer = QTimer(self)
@@ -885,7 +903,9 @@ class MainWindow(QMainWindow):
         hosts_total = len(self.all_nodes)
         vms_count = len(self.all_vms)
         self.status_label.setText(
-            f"Хостов: {hosts_ok}/{hosts_total}  ВМ: {vms_count}  Обновлено: {now_str}"
+            tr("Hosts: {ok}/{total}  VMs: {vms}  Updated: {ts}").format(
+                ok=hosts_ok, total=hosts_total, vms=vms_count, ts=now_str
+            )
         )
 
     def _do_first_selection(self):

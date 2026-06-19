@@ -59,7 +59,7 @@ class VmTaskHistoryWidget(QWidget):
             end_item = QTableWidgetItem(end_str)
             if not end_str:
                 end_item.setForeground(QColor("#f59e0b"))
-                end_item.setText("running...")
+                end_item.setText(tr("running..."))
             self.table.setItem(i, 1, end_item)
 
             status = task.get('status', '')
