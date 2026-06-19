@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.0
+Version:       1.1.1
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,12 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.1-1
+- Post-S3 cleanup: remove unused imports from detail_panel/ package (parse_pve_error,
+  save_ui_state, load_ui_state, get_icon, compact_table, set_cell_text, Signal,
+  VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, QPushButton, QSizePolicy, QHeaderView,
+  _fmt_pveversion) across 5 files.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.0-1
 - S3: decompose detail_panel.py (2509 lines) into detail_panel/ package with 7 modules.
 - Tab construction and populate logic extracted into _host_tabs.py, _storage_tabs.py, _vm_tabs.py.

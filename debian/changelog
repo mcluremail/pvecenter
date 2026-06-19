@@ -1,3 +1,15 @@
+pve-center (1.1.1-1) unstable; urgency=medium
+
+  * Post-S3 cleanup: remove unused imports from detail_panel/ package.
+  * Removed: parse_pve_error, save_ui_state, load_ui_state (__init__.py),
+    get_icon (_host_tabs, _storage_tabs, _vm_tabs),
+    compact_table (_storage_tabs), set_cell_text (_vm_tabs),
+    Signal, VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, QPushButton (_vm_tabs),
+    QSizePolicy (_storage_tabs), QHeaderView (_table_utils),
+    _fmt_pveversion (_host_tabs top-level — kept as local import).
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 15:00:00 +0300
+
 pve-center (1.1.0-1) unstable; urgency=medium
 
   * S3: decompose detail_panel.py (2509 lines) into detail_panel/ package.

@@ -2,13 +2,12 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (QTableWidgetItem, QProgressBar, QScrollArea, QWidget,
                                QVBoxLayout, QStackedWidget, QLabel, QComboBox,
-                               QSizePolicy, QHBoxLayout, QHeaderView)
+                               QHBoxLayout, QHeaderView)
 from PySide6.QtCore import Qt
 
 from ..i18n import tr
-from ..icons import get_icon
 from ._constants import _progress_style, _HAS_PG, TabIndex
-from ._table_utils import make_table, make_filterable_table, compact_table, format_volsize
+from ._table_utils import make_table, make_filterable_table, format_volsize
 
 _LOADING_STYLE = "color: #9ca3af; font-size: 14px;"
 

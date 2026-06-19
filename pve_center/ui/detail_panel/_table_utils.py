@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QWidget,
+from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QWidget,
                                QVBoxLayout, QLineEdit)
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QBrush

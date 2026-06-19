@@ -2,17 +2,16 @@ import traceback
 
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget,
                                QSizePolicy, QTableWidgetItem, QMessageBox,
-                               QPushButton, QHBoxLayout, QScrollArea,
+                               QHBoxLayout, QScrollArea,
                                QTableWidget, QHeaderView)
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 
 from ..i18n import tr
 from ..utils import status_text, format_uptime as _format_uptime, parse_pve_error
-from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_MESSAGE_LABELS, VM_ACTION_ICONS
-from ..icons import get_icon
+from ..vm_actions import VM_ACTION_MESSAGE_LABELS
 from ._constants import TabIndex
-from ._table_utils import compact_table, set_cell_text
+from ._table_utils import compact_table
 
 from ..widgets.vm_metrics_widget import VmMetricsWidget
 from ..widgets.vm_hardware_widget import VmHardwareWidget

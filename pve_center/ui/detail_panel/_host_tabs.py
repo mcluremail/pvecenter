@@ -7,7 +7,6 @@ from PySide6.QtGui import QColor, QBrush
 
 from ..i18n import tr
 from ..utils import status_text, format_uptime as _format_uptime
-from ..icons import get_icon
 from ._constants import _progress_style, TabIndex
 from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar
 
