@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.2.0
+Version:       1.2.1
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,13 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.1-1
+- Cross-platform config paths: %APPDATA%/pve-center on Windows,
+  ~/Library/Application Support/pve-center on macOS, XDG on Linux.
+- Cross-platform remote-viewer launch: search Program Files on Windows,
+  platform-aware install hint in error message.
+- Add Windows classifier to pyproject.toml.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.0-1
 - L3: replace hardcoded column widths with ResizeToContents for data columns
   in host_tabs (2 tables) and vm_pool_widget. Keep Stretch for name columns.

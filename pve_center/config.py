@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import base64
 import sqlite3
 import threading
@@ -13,9 +14,20 @@ def _base_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 def _config_dir():
-    """Возвращает ~/.config/pve-center/, создавая если нет."""
-    xdg = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-    d = os.path.join(xdg, "pve-center")
+    """Возвращает каталог конфигурации (создавая если нет).
+    Linux: $XDG_CONFIG_HOME/pve-center (по умолчанию ~/.config/pve-center)
+    Windows: %APPDATA%/pve-center
+    macOS: ~/Library/Application Support/pve-center
+    """
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        d = os.path.join(base, "pve-center")
+    elif sys.platform == "darwin":
+        home = os.path.expanduser("~")
+        d = os.path.join(home, "Library", "Application Support", "pve-center")
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+        d = os.path.join(xdg, "pve-center")
     os.makedirs(d, exist_ok=True)
     return d
 

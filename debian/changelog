@@ -1,3 +1,13 @@
+pve-center (1.2.1-1) unstable; urgency=medium
+
+  * Cross-platform config paths: %APPDATA%/pve-center on Windows,
+    ~/Library/Application Support/pve-center on macOS.
+  * Cross-platform remote-viewer launch: search Program Files on Windows,
+    platform-aware install hint in error message.
+  * Add Windows classifier to pyproject.toml.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
+
 pve-center (1.2.0-1) unstable; urgency=medium
 
   * L3: replace hardcoded column widths with ResizeToContents for data

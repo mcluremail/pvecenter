@@ -862,7 +862,7 @@ class VmConsoleWorker(QRunnable):
         self.signals = VmConsoleSignals()
 
     def run(self):
-        import os, tempfile, subprocess
+        import os, sys, tempfile, subprocess
         vv_path = None
         try:
             try:
@@ -922,8 +922,19 @@ class VmConsoleWorker(QRunnable):
                 return
 
             try:
+                if sys.platform == "win32":
+                    candidates = [
+                        os.path.join(os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+                                     "VirtViewer", "bin", "remote-viewer.exe"),
+                        os.path.join(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+                                     "VirtViewer", "bin", "remote-viewer.exe"),
+                        "remote-viewer.exe",
+                    ]
+                    rv_cmd = next((c for c in candidates if os.path.isfile(c)), candidates[-1])
+                else:
+                    rv_cmd = "remote-viewer"
                 proc = subprocess.Popen(
-                    ["remote-viewer", vv_path],
+                    [rv_cmd, vv_path],
                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
                 )
                 try:
@@ -960,9 +971,13 @@ class VmConsoleWorker(QRunnable):
                     threading.Thread(target=_cleanup, daemon=True).start()
             except FileNotFoundError:
                 try:
-                    self.signals.console_error.emit(
-                        tr("remote-viewer not found. Install virt-viewer:\n  apt install virt-viewer")
-                    )
+                    if sys.platform == "win32":
+                        hint = tr("remote-viewer not found. Download virt-viewer from:\n  https://virt-manager.org/download/")
+                    elif sys.platform == "darwin":
+                        hint = tr("remote-viewer not found. Install virt-viewer:\n  brew install virt-viewer")
+                    else:
+                        hint = tr("remote-viewer not found. Install virt-viewer:\n  apt install virt-viewer")
+                    self.signals.console_error.emit(hint)
                 except RuntimeError:
                     pass
                 if vv_path and os.path.exists(vv_path):
