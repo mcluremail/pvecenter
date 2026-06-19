@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.1
+Version:       1.1.2
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,12 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.2-1
+- Fix QProgressBar OverflowError when storage/host has used>0 but total=0.
+- Add safe_pct() helper in _table_utils.py with 0-100 clamping.
+- Replace 10 unsafe pct calculation sites in detail_panel/ and 2 in tree_panel.py.
+- Add clamping in vm_pool_widget.py for consistency.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.1-1
 - Post-S3 cleanup: remove unused imports from detail_panel/ package (parse_pve_error,
   save_ui_state, load_ui_state, get_icon, compact_table, set_cell_text, Signal,

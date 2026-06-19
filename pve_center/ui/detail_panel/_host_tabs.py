@@ -8,7 +8,7 @@ from PySide6.QtGui import QColor, QBrush
 from ..i18n import tr
 from ..utils import status_text, format_uptime as _format_uptime
 from ._constants import _progress_style, TabIndex
-from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar
+from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar, safe_pct
 
 _LOADING_STYLE = "color: #9ca3af; font-size: 14px;"
 
@@ -219,10 +219,10 @@ class HostTabs:
             table.setItem(i, 3, cpu_item)
 
             mem_bytes = node.get("mem", 0)
-            maxmem_bytes = node.get("maxmem", 1) or 1
+            maxmem_bytes = node.get("maxmem", 0) or 0
             mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2)
-            mem_pct = int((mem_bytes / maxmem_bytes) * 100) if maxmem_bytes else 0
+            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
+            mem_pct = safe_pct(mem_bytes, maxmem_bytes)
             ram_bar = QProgressBar()
             ram_bar.setRange(0, 100)
             ram_bar.setValue(mem_pct)
@@ -297,7 +297,7 @@ class HostTabs:
             mem_used = sum(h.get("mem", 0) for h in cl_data["hosts"])
             mem_total_gb = round(mem_total / (1024**3), 1)
             mem_used_gb = round(mem_used / (1024**3), 1)
-            mem_pct = int((mem_used / mem_total) * 100) if mem_total else 0
+            mem_pct = safe_pct(mem_used, mem_total)
             ram_bar = QProgressBar()
             ram_bar.setRange(0, 100)
             ram_bar.setValue(mem_pct)
@@ -492,10 +492,10 @@ class HostTabs:
                 content = ", ".join(content)
             table.setItem(i, 2, QTableWidgetItem(content))
             used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 1
-            used_gb = round(used / (1024**3), 1)
-            total_gb = round(total / (1024**3), 1)
-            pct = int((used / total) * 100) if total else 0
+            total = st.get("total", 0) or 0
+            used_gb = round(used / (1024**3), 1) if used else 0
+            total_gb = round(total / (1024**3), 1) if total else 0
+            pct = safe_pct(used, total)
             table.setItem(i, 3, QTableWidgetItem(f"{used_gb} GiB"))
             table.setItem(i, 4, QTableWidgetItem(f"{total_gb} GiB"))
             bar = QProgressBar()
@@ -608,10 +608,10 @@ class HostTabs:
                 update_progress_bar(old_bar, int(cpu_pct), f"{cpu_pct}%")
 
             mem_bytes = node.get("mem", 0)
-            maxmem_bytes = node.get("maxmem", 1) or 1
+            maxmem_bytes = node.get("maxmem", 0) or 0
             mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2)
-            mem_pct = int((mem_bytes / maxmem_bytes) * 100) if maxmem_bytes else 0
+            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
+            mem_pct = safe_pct(mem_bytes, maxmem_bytes)
             old_ram = table.cellWidget(r, 4)
             if isinstance(old_ram, QProgressBar):
                 update_progress_bar(old_ram, mem_pct, f"{mem_gb}/{maxmem_gb} GiB")

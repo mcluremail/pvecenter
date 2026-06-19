@@ -42,6 +42,10 @@ def _fmt_pveversion(val):
 
 def _progress_style(value, max_val=100):
     pct = int((value / max_val) * 100) if max_val else 0
+    if pct < 0:
+        pct = 0
+    elif pct > 100:
+        pct = 100
     if pct < 50:
         color = "#22c55e"
     elif pct < 80:

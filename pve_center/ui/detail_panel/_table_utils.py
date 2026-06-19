@@ -62,6 +62,13 @@ def compact_table(table, max_height=22):
             table.setRowHeight(r, max_height)
 
 
+def safe_pct(used, total):
+    if not total or total <= 0:
+        return 0
+    pct = int((used / total) * 100)
+    return max(0, min(100, pct))
+
+
 def set_cell_text(table, row, col, text, fg_color=None):
     item = table.item(row, col)
     if item is None:

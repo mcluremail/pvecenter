@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 
 from ..i18n import tr
 from ._constants import _progress_style, _HAS_PG, TabIndex
-from ._table_utils import make_table, make_filterable_table, format_volsize
+from ._table_utils import make_table, make_filterable_table, format_volsize, safe_pct
 
 _LOADING_STYLE = "color: #9ca3af; font-size: 14px;"
 
@@ -237,10 +237,10 @@ class StorageTabs:
             host_val = cluster if cluster else st.get("node", st.get("host_name", ""))
             table.setItem(i, 3, QTableWidgetItem(host_val))
             used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 1
-            used_gb = round(used / (1024**3), 1)
-            total_gb = round(total / (1024**3), 1)
-            pct = int((used / total) * 100) if total else 0
+            total = st.get("total", 0) or 0
+            used_gb = round(used / (1024**3), 1) if used else 0
+            total_gb = round(total / (1024**3), 1) if total else 0
+            pct = safe_pct(used, total)
             table.setItem(i, 4, QTableWidgetItem(f"{used_gb} GiB"))
             table.setItem(i, 5, QTableWidgetItem(f"{total_gb} GiB"))
             bar = QProgressBar()
@@ -322,9 +322,9 @@ class StorageTabs:
             content = ", ".join(content)
         total_used = sum(s.get("used", 0) or 0 for s in filtered)
         total_total = sum(s.get("total", 0) or 0 for s in filtered)
-        total_pct = int((total_used / total_total) * 100) if total_total else 0
-        used_gb = round(total_used / (1024**3), 1)
-        total_gb = round(total_total / (1024**3), 1)
+        total_pct = safe_pct(total_used, total_total)
+        used_gb = round(total_used / (1024**3), 1) if total_used else 0
+        total_gb = round(total_total / (1024**3), 1) if total_total else 0
         params = [
             (tr("Type"), st_type),
             (tr("Content"), content),
@@ -355,10 +355,10 @@ class StorageTabs:
                 sc = ", ".join(sc)
             panel.storage_detail_nodes_table.setItem(i, 2, QTableWidgetItem(sc))
             used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 1
-            u_gb = round(used / (1024**3), 1)
-            t_gb = round(total / (1024**3), 1)
-            pct = int((used / total) * 100) if total else 0
+            total = st.get("total", 0) or 0
+            u_gb = round(used / (1024**3), 1) if used else 0
+            t_gb = round(total / (1024**3), 1) if total else 0
+            pct = safe_pct(used, total)
             panel.storage_detail_nodes_table.setItem(i, 3, QTableWidgetItem(f"{u_gb} GiB"))
             panel.storage_detail_nodes_table.setItem(i, 4, QTableWidgetItem(f"{t_gb} GiB"))
             bar = QProgressBar()
@@ -673,9 +673,9 @@ class StorageTabs:
             return
         total_used = sum(s.get("used", 0) or 0 for s in filtered)
         total_total = sum(s.get("total", 0) or 0 for s in filtered)
-        total_pct = int((total_used / total_total) * 100) if total_total else 0
-        used_gb = round(total_used / (1024**3), 1)
-        total_gb = round(total_total / (1024**3), 1)
+        total_pct = safe_pct(total_used, total_total)
+        used_gb = round(total_used / (1024**3), 1) if total_used else 0
+        total_gb = round(total_total / (1024**3), 1) if total_total else 0
 
         panel._set_storage_param(tr("Used"), f"{used_gb} GiB")
         panel._set_storage_param(tr("Total"), f"{total_gb} GiB")
@@ -696,10 +696,10 @@ class StorageTabs:
             if st is None:
                 continue
             used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 1
-            u_gb = round(used / (1024**3), 1)
-            t_gb = round(total / (1024**3), 1)
-            pct = int((used / total) * 100) if total else 0
+            total = st.get("total", 0) or 0
+            u_gb = round(used / (1024**3), 1) if used else 0
+            t_gb = round(total / (1024**3), 1) if total else 0
+            pct = safe_pct(used, total)
             set_cell_text(node_table, r, 3, f"{u_gb} GiB")
             set_cell_text(node_table, r, 4, f"{t_gb} GiB")
             old_bar = node_table.cellWidget(r, 5)

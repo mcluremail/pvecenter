@@ -1,3 +1,18 @@
+pve-center (1.1.2-1) unstable; urgency=medium
+
+  * Fix QProgressBar OverflowError when storage/host reports used>0 but total=0.
+  * Pre-existing bug surfaced by S3 verification runtime test.
+  * Root cause: `total = st.get("total", 0) or 1` made the `if total else 0` guard
+    ineffective — when API returns total=0 with used>0, pct = used*100 overflowed
+    int32 (QProgressBar.setValue limit).
+  * Add safe_pct(used, total) helper in _table_utils.py with 0-100 clamping.
+  * Replace 10 unsafe pct calculation sites in detail_panel/ (_host_tabs.py,
+    _storage_tabs.py) and 2 in tree_panel.py.
+  * Add clamping in vm_pool_widget.py for consistency.
+  * Add clamping in _progress_style() in _constants.py for defense-in-depth.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 16:00:00 +0300
+
 pve-center (1.1.1-1) unstable; urgency=medium
 
   * Post-S3 cleanup: remove unused imports from detail_panel/ package.

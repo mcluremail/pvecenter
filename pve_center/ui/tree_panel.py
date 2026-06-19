@@ -27,8 +27,8 @@ def _node_tooltip(node):
     if isinstance(cpu, float):
         cpu = round(cpu * 100, 1)
     mem = node.get("mem", 0) or 0
-    maxmem = node.get("maxmem", 1) or 1
-    mem_pct = int((mem / maxmem) * 100) if maxmem else 0
+    maxmem = node.get("maxmem", 0) or 0
+    mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem else 0
     uptime = node.get("uptime", 0)
     uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
     return tr("CPU") + f": {cpu}%\n" + tr("RAM") + f": {mem_pct}%\n" + tr("Uptime") + f": {uptime_str}"
@@ -362,8 +362,8 @@ class TreePanel(QWidget):
         else:
             cpu_pct = cpu
         mem = vm.get("mem", 0) or 0
-        maxmem = vm.get("maxmem", 1) or 1
-        mem_pct = int((mem / maxmem) * 100) if maxmem else 0
+        maxmem = vm.get("maxmem", 0) or 0
+        mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem else 0
         status = vm.get("status", "")
         vm_item.setToolTip(0, tr("Status") + f": {status_text(status)}\n" + tr("CPU") + f": {cpu_pct}%\n" + tr("RAM") + f": {mem_pct}%")
         return vm_item

@@ -43,12 +43,12 @@ class VmPoolWidget(QWidget):
 
             maxdisk = vm.get("maxdisk", 0)
             disk = vm.get("disk", 0)
-            disk_pct = int((disk / maxdisk) * 100) if maxdisk > 0 else 0
+            disk_pct = int(max(0, min(100, (disk / maxdisk) * 100))) if maxdisk > 0 else 0
             self._set_progress(i, 2, disk_pct)
 
             maxmem = vm.get("maxmem", 0)
             mem = vm.get("mem", 0)
-            mem_pct = int((mem / maxmem) * 100) if maxmem > 0 else 0
+            mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem > 0 else 0
             self._set_progress(i, 3, mem_pct)
 
             cpu_fraction = vm.get("cpu", 0)
