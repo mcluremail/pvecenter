@@ -71,6 +71,7 @@ def _ask_password(mode="enter"):
     from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                    QLineEdit, QPushButton, QApplication)
     from .ui.i18n import tr
+    from .ui.theme import Color
     dialog = QDialog()
     dialog.setWindowTitle(tr("PVE Center — Authorization"))
     dialog.setFixedSize(380, 160)
@@ -95,7 +96,7 @@ def _ask_password(mode="enter"):
         confirm_input = None
 
     error_label = QLabel("")
-    error_label.setStyleSheet("color: #9ca3af;")
+    error_label.setStyleSheet(f"color: {Color.GRAY_400};")
     layout.addWidget(error_label)
 
     btn_layout = QHBoxLayout()

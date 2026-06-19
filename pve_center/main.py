@@ -13,14 +13,13 @@ logging.basicConfig(
 def main():
     app = QApplication(sys.argv)
 
+    from .ui.i18n import set_language
+    lang = load_ui_state("language") or "en"
+    set_language(lang)
+
     nodes_cfg = load_config()
     if nodes_cfg is None:
         return
-
-    # Initialize i18n from saved language preference
-    lang = load_ui_state("language") or "en"
-    from .ui.i18n import set_language
-    set_language(lang)
 
     from .ui.mainwindow import MainWindow
     window = MainWindow(nodes_cfg)
