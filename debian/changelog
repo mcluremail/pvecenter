@@ -1,3 +1,11 @@
+pve-center (1.2.2-1) unstable; urgency=medium
+
+  * Add PyInstaller spec for Windows build (packaging/pve-center-win.spec).
+  * Add build-windows job to GitHub Actions release workflow.
+  * Release now includes .zip for Windows alongside .deb, .rpm, .whl.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
+
 pve-center (1.2.1-1) unstable; urgency=medium
 
   * Cross-platform config paths: %APPDATA%/pve-center on Windows,

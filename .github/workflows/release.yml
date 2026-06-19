@@ -86,9 +86,31 @@ jobs:
           name: rpm-package
           path: artifacts/*.rpm
 
+  build-windows:
+    name: Build Windows .zip
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pyinstaller
+      - name: Build with PyInstaller
+        run: pyinstaller packaging/pve-center-win.spec --noconfirm
+      - name: Zip dist folder
+        shell: pwsh
+        run: Compress-Archive -Path dist/pvecenter/* -DestinationPath pvecenter-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: pvecenter-windows.zip
+
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-deb, build-rpm]
+    needs: [build-python, build-deb, build-rpm, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,7 +131,7 @@ jobs:
           body: |
             ## PVE Center ${{ github.ref_name }}
 
-            Скачать: `.deb` для Debian/Ubuntu, `.rpm` для Fedora/RHEL, `.tar.gz` / `.whl` для pip.
+            Скачать: `.deb` для Debian/Ubuntu, `.rpm` для Fedora/RHEL, `.zip` для Windows, `.tar.gz` / `.whl` для pip.
 
             Установка .deb:
             ```
@@ -123,6 +145,13 @@ jobs:
             sudo dnf install pve-center-*.rpm
             pip install proxmoxer
             sudo dnf install virt-viewer
+            ```
+
+            Установка Windows:
+            ```
+            Распакуйте .zip в любую папку, запустите pvecenter.exe.
+            Для консоли VM установите virt-viewer:
+            https://virt-manager.org/download/
             ```
 
             Установка через pip:

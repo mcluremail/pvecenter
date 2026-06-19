@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.2.1
+Version:       1.2.2
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,11 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.2-1
+- Add PyInstaller spec for Windows build (packaging/pve-center-win.spec).
+- Add build-windows job to GitHub Actions release workflow.
+- Release now includes .zip for Windows alongside .deb, .rpm, .whl.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.1-1
 - Cross-platform config paths: %APPDATA%/pve-center on Windows,
   ~/Library/Application Support/pve-center on macOS, XDG on Linux.
