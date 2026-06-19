@@ -759,7 +759,7 @@ class MainWindow(QMainWindow):
                     self._detect_status_changes(self._soft_nodes, self._soft_vms)
                     self._update_status_bar()
                 except Exception as exc:
-                    traceback.print_exc()
+                    logger.debug("soft_refresh error", exc_info=True)
                     self._notifications.show(
                         tr("Error: {err}").format(err=str(exc)[:100]),
                         error=True,

@@ -1,7 +1,6 @@
 import urllib3
 from .ui.i18n import tr
 from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
-import traceback
 import logging
 import threading
 from PySide6.QtCore import Signal, QRunnable, QObject
@@ -227,7 +226,7 @@ class FetchWorker(QRunnable):
                     for t in pool_threads:
                         t.join(timeout=10)
                 except Exception:
-                    traceback.print_exc()
+                    logger.debug("backend error", exc_info=True)
 
             def fetch_ha():
                 nonlocal ha_groups
@@ -256,7 +255,7 @@ class FetchWorker(QRunnable):
                             short = n["node"]
                             n["_display_name"] = f"{short}@{cluster_name}" if cluster_name else short
                 except Exception:
-                    traceback.print_exc()
+                    logger.debug("backend error", exc_info=True)
 
             phase1 = []
             phase1.append(threading.Thread(target=fetch_pools, daemon=True))
@@ -386,7 +385,7 @@ class FetchWorker(QRunnable):
                             vms = vms_local
                             storages = storages_local
                     except Exception:
-                        traceback.print_exc()
+                        logger.debug("backend error", exc_info=True)
 
                 standalone_thread = threading.Thread(target=fetch_standalone, daemon=True)
                 standalone_thread.start()
@@ -522,7 +521,7 @@ class VmDetailWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.detail_ready.emit({
                     "vmid": self.vmid,
@@ -575,7 +574,7 @@ class VmConfigWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.config_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -626,7 +625,7 @@ class VmConfigUpdateWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.config_update_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -673,7 +672,7 @@ class VmTaskHistoryWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.tasks_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -759,7 +758,7 @@ class VmActionWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.action_error.emit(str(e))
             except RuntimeError:
@@ -1058,7 +1057,7 @@ class CreateVmWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.vm_error.emit(str(e))
             except RuntimeError:
@@ -1103,7 +1102,7 @@ class DeleteVmWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("backend error", exc_info=True)
             try:
                 self.signals.vm_error.emit(str(e))
             except RuntimeError:

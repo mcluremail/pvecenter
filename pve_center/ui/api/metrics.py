@@ -1,11 +1,13 @@
 import requests
-import traceback
+import logging
 import urllib.parse
 import concurrent.futures
 import threading
 from PySide6.QtCore import QRunnable, QObject, Signal
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 # PVE API default port — keep in sync with backend.py
 PVE_PORT = 8006
@@ -77,7 +79,7 @@ class StorageMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:
@@ -125,7 +127,7 @@ class StorageContentListWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.error.emit(self.storage_name, self.content_type, str(e))
             except RuntimeError:
@@ -167,7 +169,7 @@ class StorageBackupWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.backups_error.emit(self.storage_name, str(e))
             except RuntimeError:
@@ -210,7 +212,7 @@ class HostNetworkWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.network_error.emit(self.node_name, str(e))
             except RuntimeError:
@@ -253,7 +255,7 @@ class HostServicesWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.services_error.emit(self.node_name, str(e))
             except RuntimeError:
@@ -296,7 +298,7 @@ class HostDisksWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.disks_error.emit(self.node_name, str(e))
             except RuntimeError:
@@ -370,7 +372,7 @@ class HostSnapshotsWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.snapshots_error.emit(self.node_name, str(e))
             except RuntimeError:
@@ -467,7 +469,7 @@ class StorageDisksWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.disks_error.emit(self.storage_name, str(e))
             except RuntimeError:
@@ -541,7 +543,7 @@ class HostMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:
@@ -601,7 +603,7 @@ class MetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            traceback.print_exc()
+            logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.error_occurred.emit(str(e))
             except RuntimeError:

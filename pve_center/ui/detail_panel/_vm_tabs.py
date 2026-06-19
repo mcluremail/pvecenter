@@ -1,4 +1,4 @@
-import traceback
+import logging
 
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget,
                                QSizePolicy, QTableWidgetItem, QMessageBox,
@@ -19,6 +19,8 @@ from ..widgets.vm_hardware_widget import VmHardwareWidget
 from ..widgets.vm_options_widget import VmOptionsWidget
 from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
 from ..widgets.vm_pool_widget import VmPoolWidget
+
+logger = logging.getLogger(__name__)
 
 
 class VMTabs:
@@ -520,7 +522,7 @@ class VMTabs:
 
             panel.info_stack.setCurrentIndex(1)
         except Exception as exc:
-            traceback.print_exc()
+            logger.debug("display_full_vm_info error", exc_info=True)
             self.panel.config_update_result.emit(
                 tr("Error: {err}").format(err=str(exc)[:100])
             )

@@ -1,4 +1,4 @@
-import traceback
+import logging
 
 from PySide6.QtWidgets import (QLabel, QWidget, QTabWidget, QPushButton,
                                QHBoxLayout, QVBoxLayout)
@@ -16,6 +16,8 @@ from ._host_tabs import HostTabs
 from ._storage_tabs import StorageTabs
 from ._vm_tabs import VMTabs
 from ._table_utils import set_cell_text
+
+logger = logging.getLogger(__name__)
 
 
 class DetailPanel(QWidget):
@@ -210,7 +212,7 @@ class DetailPanel(QWidget):
                 self._storage_tabs.show_storage_detail(obj_name, data)
 
         except Exception as exc:
-            traceback.print_exc()
+            logger.debug("show_details error", exc_info=True)
             self.config_update_result.emit(
                 tr("Error: {err}").format(err=str(exc)[:100])
             )
