@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.1.9
+Version:       1.2.0
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,13 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.0-1
+- L3: replace hardcoded column widths with ResizeToContents for data columns
+  in host_tabs (2 tables) and vm_pool_widget. Keep Stretch for name columns.
+  cluster_tasks_widget keeps Interactive (user-persisted widths).
+- L4: remove manual [:50] truncation of disk model string in host_disks_table
+  (Stretch column handles display).
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.1.9-1
 - L1: setFixedSize -> setMinimumSize on 3 QDialogs (password dialog,
   security dialog, add_server_dialog) — dialogs now resizable for long
