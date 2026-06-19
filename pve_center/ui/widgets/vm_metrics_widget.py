@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QComboBox, QHBoxLayout, QLabel
 from PySide6.QtCore import Signal
 from ..i18n import tr
+from ..theme import Color
 
 try:
     import pyqtgraph as pg
@@ -56,7 +57,7 @@ class VmMetricsWidget(QWidget):
             self.plot.setLabel('left', '%')
             self.plot.showGrid(x=True, y=True)
             self.plot.enableAutoRange(axis='y')
-            self.curve = self.plot.plot([], [], pen=pg.mkPen('#374151', width=2))
+            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
             self.plot.setMouseEnabled(x=False, y=False)
             self._legend = self.plot.addLegend()
             self._layout.addWidget(self.plot, 1)
@@ -161,8 +162,8 @@ class VmMetricsWidget(QWidget):
         label_in = tr("In") if title == tr("Network traffic") else tr("Read")
         label_out = tr("Out") if title == tr("Network traffic") else tr("Write")
         self.plot.plot([d['time'] for d in data1], [d['value'] / div for d in data1],
-                       pen=pg.mkPen('#374151', width=2), name=label_in)
+                       pen=pg.mkPen(Color.SLATE_900, width=2), name=label_in)
         self.plot.plot([d['time'] for d in data2], [d['value'] / div for d in data2],
-                       pen=pg.mkPen('#9ca3af', width=2), name=label_out)
+                       pen=pg.mkPen(Color.GRAY_400, width=2), name=label_out)
         self.plot.setTitle(title)
         self.plot.setLabel('left', unit)

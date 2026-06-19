@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBox
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
 from ..i18n import tr
+from ..theme import Color
 
 
 class VmPoolWidget(QWidget):
@@ -78,15 +79,15 @@ class VmPoolWidget(QWidget):
     @staticmethod
     def _pstyle(pct):
         if pct < 50:
-            color = "#22c55e"
+            color = Color.STATUS_OK
         elif pct < 80:
-            color = "#f59e0b"
+            color = Color.STATUS_WARN
         else:
-            color = "#ef4444"
+            color = Color.STATUS_ERR
         return (
             f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
-            f"QProgressBar {{ border: 1px solid #d1d5db; border-radius: 3px;"
-            f" text-align: center; font-size: 11px; background: #f3f4f6; }}"
+            f"QProgressBar {{ border: 1px solid {Color.D1_D5_DB}; border-radius: 3px;"
+            f" text-align: center; font-size: 11px; background: {Color.GRAY_100}; }}"
         )
 
     @staticmethod

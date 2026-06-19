@@ -6,10 +6,11 @@ from PySide6.QtWidgets import (QTableWidgetItem, QProgressBar, QScrollArea, QWid
 from PySide6.QtCore import Qt
 
 from ..i18n import tr
+from ..theme import Color
 from ._constants import _progress_style, _HAS_PG, TabIndex
 from ._table_utils import make_table, make_filterable_table, format_volsize, safe_pct
 
-_LOADING_STYLE = "color: #9ca3af; font-size: 14px;"
+_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
 
 def _loading_label():
@@ -92,7 +93,7 @@ class StorageTabs:
             panel.storage_plot_widget.setMouseEnabled(x=False, y=False)
             panel.storage_plot_widget.setFixedHeight(220)
             panel.storage_plot_curve = panel.storage_plot_widget.plot(
-                [], [], pen=pg.mkPen('#374151', width=2)
+                [], [], pen=pg.mkPen(Color.SLATE_900, width=2)
             )
             sd_plot_layout = QVBoxLayout(panel.storage_detail_plot)
             sd_plot_layout.setContentsMargins(0, 0, 0, 0)

@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QCheckBox, QFormLayout, QMessageBox)
 from PySide6.QtCore import Qt
 from .i18n import tr
+from .theme import Color
 
 
 class VmConfigEditorDialog(QDialog):
@@ -67,11 +68,11 @@ class VmConfigEditorDialog(QDialog):
             if key.rstrip("0123456789") in ("net", "ide", "sata", "scsi", "virtio"):
                 if key.rstrip("0123456789") not in ("ide",) or key != "ide2":
                     hint = QLabel(tr("Format: model=MAC,bridge=vmbr0,tag=10"))
-                    hint.setStyleSheet("color: #6b7280; font-size: 11px;")
+                    hint.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
                     form.addRow("", hint)
             elif key.rstrip("0123456789") == "efidisk":
                 hint = QLabel(tr("Format: storage:size,format=qcow2"))
-                hint.setStyleSheet("color: #6b7280; font-size: 11px;")
+                hint.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
                 form.addRow("", hint)
 
         elif field_type == "readonly":
@@ -79,7 +80,7 @@ class VmConfigEditorDialog(QDialog):
             self._editor.setTextInteractionFlags(Qt.TextSelectableByMouse)
             form.addRow(tr("Read only:"), self._editor)
             warning = QLabel(tr("This parameter cannot be changed via API"))
-            warning.setStyleSheet("color: #d97706; font-size: 11px;")
+            warning.setStyleSheet(f"color: {Color.WARNING}; font-size: 11px;")
             form.addRow(warning)
 
         else:

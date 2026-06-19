@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
 from ..i18n import tr
+from ..theme import Color
 
 
 class VmTaskHistoryWidget(QWidget):
@@ -58,18 +59,18 @@ class VmTaskHistoryWidget(QWidget):
                 end_str = ''
             end_item = QTableWidgetItem(end_str)
             if not end_str:
-                end_item.setForeground(QColor("#f59e0b"))
+                end_item.setForeground(QColor(Color.STATUS_WARN))
                 end_item.setText(tr("running..."))
             self.table.setItem(i, 1, end_item)
 
             status = task.get('status', '')
             status_item = QTableWidgetItem(status)
             if status == 'OK':
-                status_item.setForeground(QColor("#22c55e"))
+                status_item.setForeground(QColor(Color.STATUS_OK))
             elif status == 'RUNNING':
-                status_item.setForeground(QColor("#f59e0b"))
+                status_item.setForeground(QColor(Color.STATUS_WARN))
             else:
-                status_item.setForeground(QColor("#ef4444"))
+                status_item.setForeground(QColor(Color.STATUS_ERR))
             self.table.setItem(i, 2, status_item)
 
             user = task.get('user', '')

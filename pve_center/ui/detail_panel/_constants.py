@@ -1,4 +1,5 @@
 from enum import IntEnum
+from ..theme import Color
 
 _HEADER_STYLE = "QHeaderView::section { padding-left: 4px; }"
 
@@ -47,13 +48,13 @@ def _progress_style(value, max_val=100):
     elif pct > 100:
         pct = 100
     if pct < 50:
-        color = "#22c55e"
+        color = Color.STATUS_OK
     elif pct < 80:
-        color = "#f59e0b"
+        color = Color.STATUS_WARN
     else:
-        color = "#ef4444"
+        color = Color.STATUS_ERR
     return (
         f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
-        f"QProgressBar {{ border: 1px solid #d1d5db; border-radius: 3px;"
-        f" text-align: center; font-size: 11px; background: #f3f4f6; }}"
+        f"QProgressBar {{ border: 1px solid {Color.D1_D5_DB}; border-radius: 3px;"
+        f" text-align: center; font-size: 11px; background: {Color.GRAY_100}; }}"
     )

@@ -8,6 +8,7 @@ from ..utils import build_cfg_index, build_vm_index
 from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
 from ..icons import get_icon
 from ..i18n import tr
+from ..theme import Color
 
 from ._constants import TabIndex
 from ._worker_manager import WorkerManager
@@ -75,7 +76,7 @@ class DetailPanel(QWidget):
         sep = QWidget()
         sep.setFixedWidth(1)
         sep.setFixedHeight(18)
-        sep.setStyleSheet("background: #dde1e7;")
+        sep.setStyleSheet(f"background: {Color.BORDER};")
         action_layout.addWidget(sep)
 
         self._console_btn = QPushButton(get_icon("console"), tr("Console"))

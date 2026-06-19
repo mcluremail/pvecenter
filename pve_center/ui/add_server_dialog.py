@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
 from PySide6.QtCore import Qt, QThreadPool
 from ..backend import TokenCreationWorker
 from .i18n import tr
+from .theme import Color
 
 
 class AddServerDialog(QDialog):
@@ -52,7 +53,7 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(self.pwd_input, 2, 1)
 
         info_label = QLabel(tr("An API token will be created for the specified user"))
-        info_label.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info_label.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
         self.auth_btn = QPushButton(tr("Get token"))
@@ -70,12 +71,12 @@ class AddServerDialog(QDialog):
         token_grid.addWidget(self.token_name_label, 0, 1)
 
         self.token_value_label = QLabel("—")
-        self.token_value_label.setStyleSheet("font-family: monospace; color: #22c55e;")
+        self.token_value_label.setStyleSheet(f"font-family: monospace; color: {Color.STATUS_OK};")
         token_grid.addWidget(QLabel(tr("Value:")), 1, 0)
         token_grid.addWidget(self.token_value_label, 1, 1)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #6b7280;")
+        self.status_label.setStyleSheet(f"color: {Color.GRAY_500};")
         token_grid.addWidget(self.status_label, 2, 0, 1, 2)
 
         layout.addWidget(token_group)
@@ -124,18 +125,18 @@ class AddServerDialog(QDialog):
         password = self.pwd_input.text()
 
         if not host:
-            self._set_status(tr("Enter host"), "#ef4444")
+            self._set_status(tr("Enter host"), Color.STATUS_ERR)
             return
         if not user:
-            self._set_status(tr("Enter user"), "#ef4444")
+            self._set_status(tr("Enter user"), Color.STATUS_ERR)
             return
         if not password:
-            self._set_status(tr("Enter password"), "#ef4444")
+            self._set_status(tr("Enter password"), Color.STATUS_ERR)
             return
 
         self.auth_btn.setEnabled(False)
         self.auth_btn.setText(tr("Connecting..."))
-        self._set_status(tr("Connecting and creating token..."), "#6b7280")
+        self._set_status(tr("Connecting and creating token..."), Color.GRAY_500)
 
         worker = TokenCreationWorker(host, user, password)
         self._active_workers.add(worker)
@@ -150,7 +151,7 @@ class AddServerDialog(QDialog):
         self._token_data = result
         self.token_name_label.setText(result["token_name"])
         self.token_value_label.setText(result["token_value"])
-        self._set_status(tr("Token created"), "#22c55e")
+        self._set_status(tr("Token created"), Color.STATUS_OK)
         self.auth_btn.setEnabled(True)
         self.auth_btn.setText(tr("Update token"))
         self.add_btn.setEnabled(True)
@@ -159,13 +160,13 @@ class AddServerDialog(QDialog):
             self.name_input.setText(self.host_input.text().strip())
 
     def _on_token_error(self, error):
-        self._set_status(error, "#ef4444")
+        self._set_status(error, Color.STATUS_ERR)
         self.auth_btn.setEnabled(True)
         self.auth_btn.setText(tr("Get token"))
         self._token_data = None
         self.add_btn.setEnabled(False)
 
-    def _set_status(self, text, color="#6b7280"):
+    def _set_status(self, text, color=Color.GRAY_500):
         self.status_label.setText(text)
         self.status_label.setStyleSheet(f"color: {color};")
 

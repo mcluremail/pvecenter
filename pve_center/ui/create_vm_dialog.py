@@ -7,6 +7,7 @@ from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from ..config import save_ui_state, load_ui_state
 from .i18n import tr
+from .theme import Color
 import json as _json
 
 VM_SETTINGS_KEY = "create_vm_settings"
@@ -515,7 +516,7 @@ class CreateVmDialog(QDialog):
         name = self.name_input.text().strip()
         if not name:
             self.name_input.setFocus()
-            self.name_input.setStyleSheet("border: 1px solid #ef4444;")
+            self.name_input.setStyleSheet(f"border: 1px solid {Color.STATUS_ERR};")
             return
         self.name_input.setStyleSheet("")
         self.create_btn.setEnabled(False)

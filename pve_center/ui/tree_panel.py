@@ -12,6 +12,7 @@ from .icons import get_icon, init_icons, make_loading_icon
 from ..config import save_ui_state, load_ui_state
 from .utils import status_text, format_uptime as _format_uptime, build_cfg_index, build_vm_index, build_node_index
 from .i18n import tr
+from .theme import Color
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2
@@ -84,7 +85,7 @@ class TreePanel(QWidget):
         self._empty_label = QLabel(tr("No servers added.\nPress + to add"))
         self._empty_label.setAlignment(Qt.AlignCenter)
         self._empty_label.setWordWrap(True)
-        self._empty_label.setStyleSheet("color: #9ca3af; font-size: 13px; padding: 40px 20px;")
+        self._empty_label.setStyleSheet(f"color: {Color.GRAY_400}; font-size: 13px; padding: 40px 20px;")
         layout.addWidget(self._empty_label)
 
         self.tree = QTreeWidget()
@@ -135,7 +136,7 @@ class TreePanel(QWidget):
             menu.setStyleSheet(
                 "QMenu { font-size: 12px; padding: 2px; }"
                 "QMenu::item { padding: 4px 12px; }"
-                "QMenu::item:selected { background: #e5e7eb; }"
+                f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
             )
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
@@ -155,7 +156,7 @@ class TreePanel(QWidget):
         menu.setStyleSheet(
             "QMenu { font-size: 12px; padding: 2px; }"
             "QMenu::item { padding: 4px 12px; }"
-            "QMenu::item:selected { background: #e5e7eb; }"
+            f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
         )
 
         if item_type == "host":
@@ -227,10 +228,10 @@ class TreePanel(QWidget):
         btn.setFixedSize(20, 20)
         btn.setFocusPolicy(Qt.NoFocus)
         btn.setStyleSheet(
-            "QPushButton { border: 1px solid #cbd5e1; border-radius: 3px; "
-            "background: #f1f5f9; font-size: 13px; font-weight: bold; "
-            "color: #475569; padding: 0; outline: none; }"
-            "QPushButton:hover { background: #e2e8f0; border-color: #94a3b8; color: #334155; }"
+            f"QPushButton {{ border: 1px solid {Color.SLATE_300}; border-radius: 3px; "
+            f"background: {Color.SLATE_100}; font-size: 13px; font-weight: bold; "
+            f"color: {Color.SLATE_500}; padding: 0; outline: none; }}"
+            f"QPushButton:hover {{ background: {Color.SLATE_200}; border-color: {Color.SLATE_400}; color: {Color.SLATE_700}; }}"
         )
         btn.setToolTip(tr("Add host to") + f' "{label}"')
         btn.clicked.connect(lambda checked, c=ctx: self.add_server_requested_context.emit(c))

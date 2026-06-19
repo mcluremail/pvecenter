@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QListWidget, QListWidgetItem)
 from PySide6.QtCore import Qt
 from .i18n import tr
+from .theme import Color
 
 
 NET_MODELS = ["virtio", "e1000", "rtl8139", "vmxnet3"]
@@ -100,7 +101,7 @@ class VmNetworkEditorDialog(QDialog):
 
         if running:
             warn = QLabel(tr("On a running VM only the VLAN tag can be changed"))
-            warn.setStyleSheet("color: #d97706; font-size: 11px;")
+            warn.setStyleSheet(f"color: {Color.WARNING}; font-size: 11px;")
             warn.setWordWrap(True)
             layout.addWidget(warn)
 
@@ -231,7 +232,7 @@ class VmCdromEditorDialog(QDialog):
         layout.addLayout(form)
 
         info = QLabel(tr("ISO images are loaded from node storage"))
-        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -312,7 +313,7 @@ class VmDiskEditorDialog(QDialog):
         layout.addLayout(form)
 
         info = QLabel(tr("Disk size, storage and format cannot be changed here"))
-        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -366,7 +367,7 @@ class VmBootEditorDialog(QDialog):
         layout.addWidget(header)
 
         info = QLabel(tr("Move devices between available and boot order"))
-        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -604,7 +605,7 @@ class VmStartupEditorDialog(QDialog):
         layout.addLayout(form)
 
         info = QLabel(tr("Lower number starts earlier"))
-        info.setStyleSheet("color: #6b7280; font-size: 11px;")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 

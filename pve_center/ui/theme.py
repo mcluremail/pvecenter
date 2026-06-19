@@ -44,10 +44,31 @@ class Color:
     ACCENT_LIGHT = "#e8f0fe"
     ACCENT_GREEN = "#16a34a"
 
-    # Статусы
     SUCCESS     = "#16a34a"
     WARNING     = "#d97706"
     DANGER      = "#dc2626"
+
+    STATUS_OK    = "#22c55e"
+    STATUS_WARN  = "#f59e0b"
+    STATUS_ERR   = "#ef4444"
+
+    GRAY_400    = "#9ca3af"
+    GRAY_500    = "#6b7280"
+    GRAY_200    = "#e5e7eb"
+    GRAY_100    = "#f3f4f6"
+    SLATE_100   = "#f1f5f9"
+    SLATE_200   = "#e2e8f0"
+    SLATE_300   = "#cbd5e1"
+    SLATE_400   = "#94a3b8"
+    SLATE_500   = "#475569"
+    SLATE_700   = "#334155"
+    SLATE_800   = "#1f2937"
+    SLATE_900   = "#374151"
+    D1_D5_DB    = "#d1d5db"
+
+    WARN_ROW_BG = "#fef3c7"
+    OK_ROW_BG   = "#bbf7d0"
+    ERROR_RED   = "#c0392b"
 
     # Hover / selection
     HOVER       = "#e8edf4"

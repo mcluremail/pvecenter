@@ -5,6 +5,7 @@ from PySide6.QtGui import QColor, QBrush
 
 from ..hover import enable_row_hover
 from ..i18n import tr
+from ..theme import Color
 from ._constants import _HEADER_STYLE
 
 _FILTER_TEXT_ROLE = Qt.UserRole + 42
@@ -95,8 +96,8 @@ def make_filterable_table(table):
     search = QLineEdit()
     search.setPlaceholderText(tr("Filter"))
     search.setStyleSheet(
-        "QLineEdit { font-size: 12px; padding: 4px 8px; border: 1px solid #d1d5db; "
-        "border-radius: 3px; margin: 4px 4px 0 4px; }"
+        f"QLineEdit {{ font-size: 12px; padding: 4px 8px; border: 1px solid {Color.D1_D5_DB}; "
+        f"border-radius: 3px; margin: 4px 4px 0 4px; }}"
     )
     debounce = QTimer()
     debounce.setSingleShot(True)

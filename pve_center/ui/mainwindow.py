@@ -14,6 +14,7 @@ from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_ho
 from ..config import save_config, save_tasks_cache, load_tasks_cache, save_ui_state, load_ui_state
 import json as _json
 from . import theme
+from .theme import Color
 from .notification import NotificationManager
 from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
@@ -101,7 +102,7 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.status_label)
 
         self._refresh_spinner = QLabel("")
-        self._refresh_spinner.setStyleSheet("color: #6b7280; padding-right: 8px;")
+        self._refresh_spinner.setStyleSheet(f"color: {Color.GRAY_500}; padding-right: 8px;")
         self._refresh_spinner.setAccessibleName(tr("Refreshing data"))
         self._refresh_spinner.setToolTip(tr("Data refresh in progress"))
         self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
@@ -109,11 +110,11 @@ class MainWindow(QMainWindow):
         self._lang_combo = QComboBox()
         self._lang_combo.setFixedWidth(110)
         self._lang_combo.setStyleSheet(
-            "QComboBox { font-size: 12px; border: 1px solid #cbd5e1; border-radius: 3px; "
-            "padding: 1px 4px; background: #f1f5f9; color: #334155; }"
-            "QComboBox:hover { border-color: #94a3b8; background: #e2e8f0; }"
-            "QComboBox::drop-down { border: none; width: 16px; }"
-            "QComboBox QAbstractItemView { font-size: 12px; }"
+            f"QComboBox {{ font-size: 12px; border: 1px solid {Color.SLATE_300}; border-radius: 3px; "
+            f"padding: 1px 4px; background: {Color.SLATE_100}; color: {Color.SLATE_700}; }}"
+            f"QComboBox:hover {{ border-color: {Color.SLATE_400}; background: {Color.SLATE_200}; }}"
+            f"QComboBox::drop-down {{ border: none; width: 16px; }}"
+            f"QComboBox QAbstractItemView {{ font-size: 12px; }}"
         )
         self._lang_combo.blockSignals(True)
         current_lang = get_language()
@@ -295,7 +296,7 @@ class MainWindow(QMainWindow):
         warning = QLabel(
             f"<b>{tr('VM')} «{vm_name}» (VMID: {vmid})</b> {tr('on node')} <b>{node}</b>"
             "<br><br>"
-            f"<span style='color:#c0392b;'>{tr('This action is irreversible.')} "
+            f"<span style='color:{Color.ERROR_RED};'>{tr('This action is irreversible.')} "
             f"{tr('All VM disks will be deleted.')}</span>"
         )
         warning.setWordWrap(True)
@@ -303,7 +304,7 @@ class MainWindow(QMainWindow):
 
         if is_running:
             run_warning = QLabel(
-                f"<span style='color:#c0392b; font-weight:bold;'>{tr('VM is running!')}</span>"
+                f"<span style='color:{Color.ERROR_RED}; font-weight:bold;'>{tr('VM is running!')}</span>"
                 f"<br>{tr('It will be forcibly stopped and deleted.')}"
             )
             run_warning.setWordWrap(True)
@@ -314,7 +315,7 @@ class MainWindow(QMainWindow):
 
         if is_running:
             force_check = QCheckBox(tr("Force stop and delete"))
-            force_check.setStyleSheet("color: #c0392b;")
+            force_check.setStyleSheet(f"color: {Color.ERROR_RED};")
             layout.addWidget(force_check)
 
         layout.addStretch()

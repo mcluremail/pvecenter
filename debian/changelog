@@ -1,3 +1,21 @@
+pve-center (1.1.6-1) unstable; urgency=medium
+
+  * M1: replace ~30 hardcoded QColor("#hex") with Color.* constants from
+    theme.py across _host_tabs, _vm_tabs, _constants, _storage_tabs,
+    vm_task_history_widget, cluster_tasks_widget, vm_pool_widget,
+    vm_metrics_widget.
+  * M2: replace ~20 inline setStyleSheet hex colors with Color.* across
+    mainwindow, tree_panel, add_server_dialog, create_vm_dialog,
+    detail_panel/__init__, _table_utils, vm_config_editor_dialog,
+    vm_device_editors, notification.
+  * theme.py: extend Color class with STATUS_OK/WARN/ERR, GRAY_*,
+    SLATE_*, D1_D5_DB, WARN_ROW_BG, OK_ROW_BG, ERROR_RED constants for
+    Tailwind palette used in tables/widgets (existing SUCCESS/DANGER/
+    WARNING preserved for notifications/QSS).
+  * No visual change — all hex values preserved via new Color constants.
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 20:00:00 +0300
+
 pve-center (1.1.5-1) unstable; urgency=medium
 
   * H1: wrap hardcoded Russian status bar text "Хостов:/ВМ:/Обновлено:" and

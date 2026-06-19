@@ -5,6 +5,7 @@ from PySide6.QtGui import QColor
 from ..hover import enable_row_hover
 from ...config import save_ui_state, load_ui_state
 from ..i18n import tr
+from ..theme import Color
 import json as _json
 
 TASK_COL_WIDTHS_KEY = "task_col_widths"
@@ -204,7 +205,7 @@ class ClusterTasksWidget(QWidget):
             if end_ts:
                 item1.setData(Qt.UserRole, float(end_ts))
             if not end_str:
-                item1.setForeground(QColor("#f59e0b"))
+                item1.setForeground(QColor(Color.STATUS_WARN))
                 item1.setText(tr("running..."))
             self.table.setItem(i, 1, item1)
 
@@ -237,11 +238,11 @@ class ClusterTasksWidget(QWidget):
             item5 = QTableWidgetItem(status[:30] + '…' if len(status) > 30 else status)
             item5.setToolTip(status if len(status) > 30 else '')
             if status == 'OK':
-                item5.setForeground(QColor("#22c55e"))
+                item5.setForeground(QColor(Color.STATUS_OK))
             elif status == 'RUNNING':
-                item5.setForeground(QColor("#f59e0b"))
+                item5.setForeground(QColor(Color.STATUS_WARN))
             else:
-                item5.setForeground(QColor("#ef4444"))
+                item5.setForeground(QColor(Color.STATUS_ERR))
             self.table.setItem(i, 5, item5)
 
         self.table.resizeRowsToContents()
@@ -270,7 +271,7 @@ class ClusterTasksWidget(QWidget):
         self.table.setRowCount(0)
         self.table.setRowCount(1)
         item = QTableWidgetItem(text)
-        item.setForeground(QColor("#6b7280"))
+        item.setForeground(QColor(Color.GRAY_500))
         self.table.setItem(0, 4, item)
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)

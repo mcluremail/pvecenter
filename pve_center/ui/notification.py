@@ -3,12 +3,13 @@ import sys
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
 from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
 from .i18n import tr
+from .theme import Color
 
 
 class FadeToast(QWidget):
     """Fading notification in the top-right corner of the parent."""
 
-    def __init__(self, parent, text, color="#1f2937", offset_y=12):
+    def __init__(self, parent, text, color=Color.SLATE_800, offset_y=12):
         super().__init__(parent)
         self._text = text
         self._bg_color = color
@@ -67,11 +68,11 @@ class FadeToast(QWidget):
 
     def _copy_to_clipboard(self):
         QApplication.clipboard().setText(self._text)
-        self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", "color: #bbf7d0;"))
+        self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.OK_ROW_BG};"))
         QTimer.singleShot(400, self._restore_color)
 
     def _restore_color(self):
-        self.label.setStyleSheet(self.label.styleSheet().replace("color: #bbf7d0;", "color: white;"))
+        self.label.setStyleSheet(self.label.styleSheet().replace(f"color: {Color.OK_ROW_BG};", "color: white;"))
 
     def _start_fade(self):
         self._fade_anim.start()
@@ -88,16 +89,16 @@ class NotificationManager:
         key = f"host:{host_name}"
         if new_status == "error" or new_status == "offline":
             text = tr("is unavailable ❌ {}").format(host_name)
-            color = "#dc2626"
+            color = Color.DANGER
         elif old_status in ("error", "offline", "unknown") and new_status == "online":
             text = tr("is back online ✅ {}").format(host_name)
-            color = "#16a34a"
+            color = Color.SUCCESS
         elif new_status == "online":
             text = tr("is online 🟢 {}").format(host_name)
-            color = "#1f2937"
+            color = Color.SLATE_800
         else:
             text = f"🟡 {host_name} — {new_status}"
-            color = "#d97706"
+            color = Color.WARNING
         self._show(key, text, color)
 
     def vm_status_changed(self, vm_name, host_name, old_status, new_status):
@@ -105,7 +106,7 @@ class NotificationManager:
         status_labels = {"running": tr("Running"), "stopped": tr("Stopped"), "paused": tr("Paused")}
         ru = status_labels.get(new_status, new_status)
         status_icon = "🟢" if new_status == "running" else "🔴" if new_status == "stopped" else "🟡"
-        color = "#16a34a" if new_status == "running" else "#dc2626" if new_status == "stopped" else "#d97706"
+        color = Color.SUCCESS if new_status == "running" else Color.DANGER if new_status == "stopped" else Color.WARNING
         self._show(key, f"{status_icon} {vm_name} — {ru}", color)
 
     def _show(self, key, text, color):
@@ -123,5 +124,5 @@ class NotificationManager:
         toast.destroyed.connect(lambda k=key: self._active.pop(k, None))
 
     def show(self, text, error=False):
-        color = "#dc2626" if error else "#1f2937"
+        color = Color.DANGER if error else Color.SLATE_800
         self._show(text, text, color)

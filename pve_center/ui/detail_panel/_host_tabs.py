@@ -6,11 +6,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 
 from ..i18n import tr
+from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime
 from ._constants import _progress_style, TabIndex
 from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar, safe_pct
 
-_LOADING_STYLE = "color: #9ca3af; font-size: 14px;"
+_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
 
 def _loading_label():
@@ -194,11 +195,11 @@ class HostTabs:
             status = node.get("status", "unknown")
             status_item = QTableWidgetItem(f"● {status_text(status)}")
             if status == "online":
-                status_item.setForeground(QBrush(QColor("#22c55e")))
+                status_item.setForeground(QBrush(QColor(Color.STATUS_OK)))
             elif status == "offline":
-                status_item.setForeground(QBrush(QColor("#ef4444")))
+                status_item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
             else:
-                status_item.setForeground(QBrush(QColor("#f59e0b")))
+                status_item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
             table.setItem(i, 1, status_item)
 
             host_name = node.get("host_name", "")
@@ -355,12 +356,12 @@ class HostTabs:
             from ..utils import parse_pve_error
             err = host_data.get("error", "")
             reason = parse_pve_error(err)
-            panel.info_label.setStyleSheet("font-size: 13px; color: #ef4444; padding: 40px 16px;")
+            panel.info_label.setStyleSheet(f"font-size: 13px; color: {Color.STATUS_ERR}; padding: 40px 16px;")
             panel.info_label.setText(
                 f"<div style='text-align: center;'>"
                 f"<span style='font-size: 22px; font-weight: 700;'>" + tr("❌ {} is unavailable").format(display_name) + "</span>"
                 f"<br><br>"
-                f"<span style='font-size: 14px; color: #dc2626;'>{reason}</span>"
+                f"<span style='font-size: 14px; color: {Color.DANGER};'>{reason}</span>"
                 f"</div>"
             )
             panel.info_stack.setCurrentIndex(0)
@@ -447,11 +448,11 @@ class HostTabs:
             vm_status = str(vm.get("status", ""))
             vm_status_item = QTableWidgetItem(status_text(vm_status))
             if vm_status == "running":
-                vm_status_item.setForeground(QBrush(QColor("#22c55e")))
+                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_OK)))
             elif vm_status == "stopped":
-                vm_status_item.setForeground(QBrush(QColor("#ef4444")))
+                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
             else:
-                vm_status_item.setForeground(QBrush(QColor("#f59e0b")))
+                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
             panel.host_vm_table.setItem(i, 3, vm_status_item)
             cpu_val = vm.get("cpu", 0)
             if isinstance(cpu_val, float):
@@ -464,7 +465,7 @@ class HostTabs:
                 for c in range(5):
                     it = panel.host_vm_table.item(i, c)
                     if it:
-                        it.setBackground(QColor("#fef3c7"))
+                        it.setBackground(QColor(Color.WARN_ROW_BG))
                         it.setData(WARN_ROLE, True)
         compact_table(panel.host_vm_table)
         panel.host_vm_table.setSortingEnabled(True)
@@ -531,7 +532,7 @@ class HostTabs:
             status = host_data.get("status", "")
 
             panel._update_vm_summary_cell(tr("Status"), status_text(status),
-                "#22c55e" if status == "online" else "#ef4444" if status == "offline" else "#f59e0b")
+                Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN)
             panel._update_vm_summary_cell(tr("CPU"), f"{cpu_pct}%")
             panel._update_vm_summary_cell(tr("RAM (GiB)"), f"{mem_gb} / {maxmem_gb}")
             panel._update_vm_summary_cell(tr("Uptime"), _format_uptime(uptime))
@@ -560,7 +561,7 @@ class HostTabs:
             set_cell_text(table, r, 2, str(new_vm.get("node", new_vm.get("host_name", ""))))
 
             vm_status = str(new_vm.get("status", ""))
-            status_color = "#22c55e" if vm_status == "running" else "#ef4444" if vm_status == "stopped" else "#f59e0b"
+            status_color = Color.STATUS_OK if vm_status == "running" else Color.STATUS_ERR if vm_status == "stopped" else Color.STATUS_WARN
             set_cell_text(table, r, 3, vm_status, status_color)
 
             cpu_val = new_vm.get("cpu", 0)
@@ -575,13 +576,13 @@ class HostTabs:
                 it = table.item(r, c)
                 if it:
                     if warning:
-                        it.setBackground(QColor("#fef3c7"))
+                        it.setBackground(QColor(Color.WARN_ROW_BG))
                         it.setData(WARN_ROLE, True)
                     else:
                         was_warn = it.data(WARN_ROLE)
                         if was_warn:
                             it.setData(WARN_ROLE, None)
-                            it.setBackground(QColor("#f3f4f6") if r % 2 == 1 else QBrush())
+                            it.setBackground(QColor(Color.GRAY_100) if r % 2 == 1 else QBrush())
 
     def update_cluster_summary_cells(self, hosts):
         panel = self.panel
@@ -598,7 +599,7 @@ class HostTabs:
                 continue
 
             status = node.get("status", "unknown")
-            status_color = "#22c55e" if status == "online" else "#ef4444" if status == "offline" else "#f59e0b"
+            status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
             set_cell_text(table, r, 1, f"● {status}", status_color)
 
             cpu_frac = node.get("cpu", 0)

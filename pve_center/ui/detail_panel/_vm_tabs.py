@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 
 from ..i18n import tr
+from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime, parse_pve_error
 from ..vm_actions import VM_ACTION_MESSAGE_LABELS
 from ._constants import TabIndex
@@ -505,11 +506,11 @@ class VMTabs:
                 item = QTableWidgetItem(str(v))
                 if k == tr("Status"):
                     if status == "running":
-                        item.setForeground(QBrush(QColor("#22c55e")))
+                        item.setForeground(QBrush(QColor(Color.STATUS_OK)))
                     elif status == "stopped":
-                        item.setForeground(QBrush(QColor("#ef4444")))
+                        item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
                     else:
-                        item.setForeground(QBrush(QColor("#f59e0b")))
+                        item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
                 table.setItem(i, 1, item)
             table.resizeRowsToContents()
             compact_table(table, 22)
@@ -530,7 +531,7 @@ class VMTabs:
             return
 
         status = vm_data.get("status") or detail.get("status", "")
-        status_color = "#22c55e" if status == "running" else "#ef4444" if status == "stopped" else "#f59e0b"
+        status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
         panel._update_vm_summary_cell(tr("Status"), status_text(status), status_color)
 
         cpu_usage = vm_data.get("cpu") or detail.get("cpu", 0)
