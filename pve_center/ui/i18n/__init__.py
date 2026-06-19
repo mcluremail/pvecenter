@@ -68,7 +68,7 @@ def set_language(lang: str):
         if lang in _JSON_LANGS:
             _current_dict = _load_json(lang)
             from ...config import seed_translations
-            seed_translations(lang, _current_dict)
+            seed_translations(lang, _current_dict, version=_I18N_VERSION)
         else:
             _current_dict = {}
     logger.info("Language set to %s", lang)

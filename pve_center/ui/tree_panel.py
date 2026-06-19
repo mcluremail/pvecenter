@@ -582,7 +582,7 @@ class TreePanel(QWidget):
     def update_node_statuses(self, all_nodes, all_vms):
         vms_by_key = build_vm_index(all_vms)
         nodes_by_pair, nodes_by_host = build_node_index(all_nodes)
-        for node in all_nodes:
+        for node in list(all_nodes):
             hn = node.get("host_name", "")
             self._loading_hosts.discard(hn)
             if node.get("_is_cluster"):

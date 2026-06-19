@@ -1,3 +1,12 @@
+pve-center (1.0.4-1) unstable; urgency=medium
+
+  * R1/R2/R3: defensive race condition fixes — copy lists before iteration, atomic generation guard in soft_refresh.
+  * M7: remove duplicate setStyleSheet/setDefaultAlignment on datacenter_summary (already set via _make_table).
+  * Add missing 'Force stop' and 'Force stop VM {vmid}' translations to ru.json.
+  * seed_translations: forced re-seed when _I18N_VERSION changes (existing users get updated translations).
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 13:00:00 +0300
+
 pve-center (1.0.3-1) unstable; urgency=medium
 
   * O6: i18n translations moved from inline Python dicts to external JSON files (one per language).

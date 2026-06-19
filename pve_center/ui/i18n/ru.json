@@ -91,6 +91,8 @@
   "Filter": "Поиск",
   "Filter tasks...": "Поиск...",
   "Finnish": "Финская",
+  "Force stop": "Принудительно остановить",
+  "Force stop VM {vmid}? Unsaved data will be lost.": "Принудительно остановить VM {vmid}? Несохранённые данные будут потеряны.",
   "Force stop and delete": "Принудительно остановить и удалить",
   "Format": "Формат",
   "Format: model=MAC,bridge=vmbr0,tag=10": "Формат: модель=MAC,bridge=vmbr0,tag=10",

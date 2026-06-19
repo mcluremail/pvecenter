@@ -324,14 +324,27 @@ def load_ui_state(key: str) -> str | None:
 _translations_lock = _ui_state_lock
 
 
-def seed_translations(lang: str, translations: dict[str, str]):
+def seed_translations(lang: str, translations: dict[str, str], version: int = 0):
     """Insert a translation dictionary for a language if not already present.
     Only inserts rows where (lang, msgid) does not exist — does not overwrite
-    user modifications.
+    user modifications. When *version* is non-zero and differs from the stored
+    version, all built-in translations are replaced to pick up updates.
     """
     try:
         with _translations_lock:
             conn = _init_ui_db()
+            if version:
+                cur = conn.execute(
+                    "SELECT value FROM ui_state WHERE key = 'i18n_version'"
+                )
+                row = cur.fetchone()
+                stored = int(row[0]) if row else 0
+                if stored != version:
+                    conn.execute("DELETE FROM translations")
+                    conn.execute(
+                        "INSERT OR REPLACE INTO ui_state (key, value) VALUES ('i18n_version', ?)",
+                        (str(version),),
+                    )
             inserted = 0
             for msgid, msgstr in translations.items():
                 cur = conn.execute(

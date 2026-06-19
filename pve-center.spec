@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.0.3
+Version:       1.0.4
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,12 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.0.4-1
+- Race condition fixes (R1/R2/R3): copy lists before iteration, atomic generation guard in soft_refresh.
+- M7: remove duplicate setStyleSheet/setDefaultAlignment calls on datacenter_summary.
+- Add missing 'Force stop' translations to ru.json.
+- seed_translations: forced re-seed when i18n version changes.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.0.3-1
 - Move i18n translations from inline Python dicts to external JSON files.
 

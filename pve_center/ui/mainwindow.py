@@ -614,14 +614,16 @@ class MainWindow(QMainWindow):
                 self._seen_storage_keys.clear()
             else:
                 return
+        # Atomic guard: claim ownership before any nested event loop can fire.
         self._soft_refresh_running = True
         self._soft_refresh_active = True
+        my_gen = self._soft_gen + 1
+        self._soft_gen = my_gen
+        soft_gen = my_gen
         if not self._spin_timer.isActive():
             self._spin_timer.start()
         self._soft_refresh_start = now
         self.last_refresh_ts = now
-        self._soft_gen += 1
-        soft_gen = self._soft_gen
 
         self._soft_nodes.clear()
         self._soft_vms.clear()
@@ -768,10 +770,10 @@ class MainWindow(QMainWindow):
         save_tasks_cache(tasks)
         try:
             node_map = {}
-            for n in self.all_nodes:
+            for n in list(self.all_nodes):
                 node_map[n.get("node")] = n.get("_display_name") or n.get("node")
             vm_map = {}
-            for vm in self.all_vms:
+            for vm in list(self.all_vms):
                 vm_vmid = vm.get("vmid")
                 if vm_vmid is not None:
                     vm_map[int(vm_vmid)] = vm.get("name")

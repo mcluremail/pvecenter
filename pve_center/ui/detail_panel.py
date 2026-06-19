@@ -1183,8 +1183,6 @@ class DetailPanel(QWidget):
         table.setColumnWidth(3, 55)
         table.setColumnWidth(4, 80)
         table.setColumnWidth(5, 85)
-        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
             node_name = node.get("_display_name") or node.get("node", "?")
@@ -1268,8 +1266,6 @@ class DetailPanel(QWidget):
         table.setColumnWidth(2, 65)
         table.setColumnWidth(3, 55)
         table.setColumnWidth(4, 85)
-        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
         table.setRowCount(max(len(clusters), 1))
         if not clusters:
             table.setSpan(0, 0, 1, 5)
