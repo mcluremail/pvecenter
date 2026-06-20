@@ -10,12 +10,13 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 
 | Platform | Format | Link |
 |----------|--------|------|
+| Windows | .zip | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Linux (any) | pip | `pip install pvecenter` |
 | Debian / Ubuntu | .deb | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v1.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.0)
+Latest release: [v1.2.2](https://github.com/mcluremail/pvecenter/releases/tag/v1.2.2)
 
 ## Features
 
@@ -53,7 +54,7 @@ Latest release: [v1.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.0
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10+ (for pip/source install; not needed for Windows .zip)
 - PySide6
 - proxmoxer (not in Debian/Ubuntu repos — install via pip)
 - Proxmox VE (cluster or standalone host)
@@ -61,6 +62,12 @@ Latest release: [v1.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.0
 - virt-viewer (for SPICE console)
 
 ## Installation
+
+### Windows
+
+Download `pvecenter-windows.zip` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases), extract to any folder, run `pvecenter.exe`.
+
+For SPICE console, install [virt-viewer for Windows](https://virt-manager.org/download/).
 
 ### Via pip (PyPI)
 
@@ -114,16 +121,25 @@ sudo pacman -S virt-viewer
 
 # Fedora
 sudo dnf install virt-viewer
+
+# Windows
+# Download from https://virt-manager.org/download/
+
+# macOS
+brew install virt-viewer
 ```
 
 ## Usage
 
 ```bash
+# Windows
+# Extract .zip, run pvecenter.exe
+
 # If installed via pip or .deb:
 pvecenter
 
 # From local repository:
-./run.py
+./run
 # or
 python -m pve_center.main
 ```
@@ -160,25 +176,25 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 | `main.py` | Entry point |
 | `backend.py` | API client, token management, worker threads |
 | `config.py` | Encryption and configuration loading |
-| `run.py` | Launch script |
-| `ui/i18n.py` | Translation module (tr()) |
+| `run` | Launch script |
+| `ui/i18n/` | Translation module (tr()), JSON translation files |
 | `ui/mainwindow.py` | Main window |
 | `ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
-| `ui/detail_panel.py` | VM detail panel |
+| `ui/detail_panel/` | VM detail panel (package) |
 | `ui/add_server_dialog.py` | Add server dialog |
 | `ui/create_vm_dialog.py` | Create VM dialog |
-| `ui/vm_config_display.py` | VM config formatters and labels |
+| `ui/vm_config_editor_dialog.py` | VM config editor dialog |
 | `ui/vm_device_editors.py` | Specialized device editors |
 | `ui/widgets/` | Widget modules |
-| `ui/widgets/cluster_tasks_widget.py` | Cluster task history |
-| `ui/widgets/vm_hardware_widget.py` | VM hardware tab |
-| `ui/widgets/vm_options_widget.py` | VM options tab |
-| `ui/widgets/vm_metrics_widget.py` | VM metrics charts |
 | `ui/api/` | API workers (RRD data, storage content) |
+| `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
 
 ## Language switching
 
-The interface language is stored in `~/.config/pve-center/tasks_cache.sqlite` (`ui_state` table, key `language`).
+The interface language is stored in the app config directory (`ui_state` table, key `language`):
+- Linux: `~/.config/pve-center/tasks_cache.sqlite`
+- Windows: `%APPDATA%/pve-center/tasks_cache.sqlite`
+- macOS: `~/Library/Application Support/pve-center/tasks_cache.sqlite`
 
 Supported languages:
 - English (en)
