@@ -115,6 +115,11 @@ class TreePanel(QWidget):
 
         self.setLayout(layout)
 
+    def set_servers(self, nodes_cfg):
+        self.nodes_cfg = nodes_cfg
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+        self._build_tree()
+
     def _toggle_expand(self):
         self._toggled = not self._toggled
         if self._toggled:

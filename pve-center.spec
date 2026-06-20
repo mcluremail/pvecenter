@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.2.2
+Version:       1.3.0
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,11 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.3.0-1
+- Add config export/import (File menu). Encrypted nodes.enc can be
+  transferred between computers — solves orphan token accumulation when
+  using app on multiple machines. Import merges by host+user.
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.2.2-1
 - Add PyInstaller spec for Windows build (packaging/pve-center-win.spec).
 - Add build-windows job to GitHub Actions release workflow.

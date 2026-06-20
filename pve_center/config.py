@@ -232,9 +232,49 @@ def load_config():
         return config
 
 
-# ------------------------------------------------------------
-# SQLite кэш задач
-# ------------------------------------------------------------
+def export_config(dest_path: str) -> bool:
+    base = _config_dir()
+    enc_path = os.path.join(base, ENC_FILE)
+    if not os.path.exists(enc_path):
+        return False
+    import shutil
+    shutil.copy2(enc_path, dest_path)
+    return True
+
+
+def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
+    global _password
+    if not os.path.exists(src_path):
+        return None
+
+    from PySide6.QtWidgets import QMessageBox
+    from .ui.i18n import tr
+    while True:
+        password = _ask_password("enter")
+        if password is None:
+            return None
+        try:
+            imported = _decrypt_from_file(src_path, password)
+            break
+        except Exception:
+            QMessageBox.warning(None, tr("Error"),
+                                 tr("Wrong password. Try again."))
+
+    if not merge:
+        _password = password
+        save_config(imported)
+        return imported
+
+    current = load_config()
+    if current is None:
+        current = []
+    current_map = {(c.get("host"), c.get("user")): c for c in current}
+    for imp_cfg in imported:
+        key = (imp_cfg.get("host"), imp_cfg.get("user"))
+        current_map[key] = imp_cfg
+    merged = list(current_map.values())
+    save_config(merged)
+    return merged
 
 _tasks_cache_lock = threading.Lock()
 

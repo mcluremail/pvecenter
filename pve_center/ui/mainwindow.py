@@ -6,12 +6,13 @@ import logging
 from PySide6.QtWidgets import (QMainWindow, QSplitter,
                                QHBoxLayout, QVBoxLayout, QWidget,
                                QMessageBox, QLabel, QDialog, QPushButton, QCheckBox,
-                               QComboBox, QToolBar)
+                               QComboBox, QToolBar, QFileDialog)
 from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSize
 from PySide6.QtGui import QShortcut, QKeySequence, QAction
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
-from ..config import save_config, save_tasks_cache, load_tasks_cache, save_ui_state, load_ui_state
+from ..config import (save_config, save_tasks_cache, load_tasks_cache,
+                      save_ui_state, load_ui_state, export_config, import_config)
 import json as _json
 from . import theme
 from .theme import Color
@@ -169,6 +170,17 @@ class MainWindow(QMainWindow):
         self._toolbar.addAction(refresh_action)
         self.addToolBar(self._toolbar)
 
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu(tr("&File"))
+
+        export_action = QAction(tr("Export configuration..."), self)
+        export_action.triggered.connect(self._on_export_config)
+        file_menu.addAction(export_action)
+
+        import_action = QAction(tr("Import configuration..."), self)
+        import_action.triggered.connect(self._on_import_config)
+        file_menu.addAction(import_action)
+
         QShortcut(QKeySequence("Ctrl+R"), self, activated=self.refresh_data)
         QShortcut(QKeySequence("F5"), self, activated=self.refresh_data)
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
@@ -220,6 +232,36 @@ class MainWindow(QMainWindow):
             if key not in self._seen_storage_keys:
                 self._seen_storage_keys.add(key)
                 target_list.append(st)
+
+    def _on_export_config(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("Export configuration"), "pve-center-nodes.enc",
+            tr("Encrypted config (*.enc);;All files (*.*)"))
+        if not path:
+            return
+        if export_config(path):
+            QMessageBox.information(self, tr("Export"),
+                                    tr("Configuration exported to:\n{path}").format(path=path))
+        else:
+            QMessageBox.warning(self, tr("Export"),
+                                 tr("No encrypted configuration found. "
+                                    "Add at least one server first."))
+
+    def _on_import_config(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("Import configuration"), "",
+            tr("Encrypted config (*.enc);;All files (*.*)"))
+        if not path:
+            return
+        merged = import_config(path, merge=True)
+        if merged is None:
+            return
+        self.nodes_config = merged
+        if hasattr(self, 'tree_panel'):
+            self.tree_panel.set_servers(merged)
+        QMessageBox.information(self, tr("Import"),
+                                tr("Configuration imported ({count} hosts).").format(
+                                    count=len(merged)))
 
     # ------------------------------------------------------------
     # Добавление сервера
