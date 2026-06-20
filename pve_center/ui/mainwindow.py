@@ -161,9 +161,11 @@ class MainWindow(QMainWindow):
         self.show()
         self.refresh_data()
 
+        from PySide6.QtWidgets import QToolButton
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
         self._toolbar.setIconSize(QSize(16, 16))
+        self._toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         add_action = QAction(get_icon("add"), tr("Add server"), self)
         add_action.setToolTip(tr("Add server") + " (Ctrl+N)")
