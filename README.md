@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v1.2.2](https://github.com/mcluremail/pvecenter/releases/tag/v1.2.2)
+Latest release: [v1.4.0](https://github.com/mcluremail/pvecenter/releases/tag/v1.4.0)
 
 ## Features
 
@@ -44,6 +44,9 @@ Latest release: [v1.2.2](https://github.com/mcluremail/pvecenter/releases/tag/v1
 - Config stored in encrypted `nodes.enc`, safe to commit to git
 
 **Interface**
+- Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
+- Hardware/Options tabs with section grouping and device type icons
+- Task history with colored status badges
 - Multi-language UI (English, Russian, Arabic, Chinese, French, Spanish)
 - Background auto-refresh every 20 seconds without losing selection or tabs
 - Toast notifications on host/VM status changes
@@ -51,6 +54,7 @@ Latest release: [v1.2.2](https://github.com/mcluremail/pvecenter/releases/tag/v1
 - Fast startup: parallel data loading, cluster summary and status bar in seconds
 - Persistence: window geometry, splitter positions, create-VM settings, expanded tree nodes saved between sessions
 - Cluster task cache in SQLite — tasks visible instantly on next launch
+- Configuration export/import — transfer encrypted config between computers
 
 ## Requirements
 
