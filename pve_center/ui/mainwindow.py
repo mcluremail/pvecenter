@@ -164,22 +164,32 @@ class MainWindow(QMainWindow):
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
         self._toolbar.setIconSize(QSize(16, 16))
+
+        add_action = QAction(get_icon("add"), tr("Add server"), self)
+        add_action.setToolTip(tr("Add server") + " (Ctrl+N)")
+        add_action.triggered.connect(lambda: self._on_add_server())
+        self._toolbar.addAction(add_action)
+
+        self._toolbar.addSeparator()
+
         refresh_action = QAction(get_icon("refresh"), tr("Refresh"), self)
         refresh_action.setToolTip(tr("Refresh data") + " (Ctrl+R)")
         refresh_action.triggered.connect(self.refresh_data)
         self._toolbar.addAction(refresh_action)
-        self.addToolBar(self._toolbar)
 
-        menubar = self.menuBar()
-        file_menu = menubar.addMenu(tr("&File"))
+        self._toolbar.addSeparator()
 
-        export_action = QAction(tr("Export configuration..."), self)
+        export_action = QAction(get_icon("export"), tr("Export configuration"), self)
+        export_action.setToolTip(tr("Export configuration"))
         export_action.triggered.connect(self._on_export_config)
-        file_menu.addAction(export_action)
+        self._toolbar.addAction(export_action)
 
-        import_action = QAction(tr("Import configuration..."), self)
+        import_action = QAction(get_icon("import"), tr("Import configuration"), self)
+        import_action.setToolTip(tr("Import configuration"))
         import_action.triggered.connect(self._on_import_config)
-        file_menu.addAction(import_action)
+        self._toolbar.addAction(import_action)
+
+        self.addToolBar(self._toolbar)
 
         QShortcut(QKeySequence("Ctrl+R"), self, activated=self.refresh_data)
         QShortcut(QKeySequence("F5"), self, activated=self.refresh_data)

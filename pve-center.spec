@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.3.0
+Version:       1.3.1
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,10 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.3.1-1
+- Move export/import from File menu to toolbar. Add Add Server button
+  and separators to toolbar. Remove menu bar (not enough items for menu).
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.3.0-1
 - Add config export/import (File menu). Encrypted nodes.enc can be
   transferred between computers — solves orphan token accumulation when

@@ -274,6 +274,18 @@ _SVG_TEMPLATES = {
 
 _icons = None
 
+_EXPORT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<path d="M7 1.5 L7 9" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<polyline points="4.5,4 7,1.5 9.5,4" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 9.5 L3 12 L11 12 L11 9.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
+_IMPORT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<path d="M7 5 L7 12.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
+<polyline points="4.5,10 7,12.5 9.5,10" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 2 L3 5 L11 5 L11 2" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -315,4 +327,6 @@ def init_icons():
         "stop": _make_icon(_STOP.format(c=_C, c2=_C2)),
         "console": _make_icon(_CONSOLE.format(c=_C, c2=_C2)),
         "resume": _make_icon(_RESUME.format(c=_C, c2=_C2)),
+        "export": _make_icon(_EXPORT.format(c=_C, c2=_C2), 14),
+        "import": _make_icon(_IMPORT.format(c=_C, c2=_C2), 14),
     }
