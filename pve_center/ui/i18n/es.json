@@ -414,6 +414,7 @@
   "Storage:": "Almacenamiento:",
   "Storage: {title}": "Almacenamiento: {title}",
   "Summary": "Resumen",
+  "Suspend": "Suspender",
   "Suspend Container": "Suspender contenedor",
   "Suspend VM": "Suspender VM",
   "Suspend VM {vmid}?": "¿Suspender VM {vmid}?",

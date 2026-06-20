@@ -413,6 +413,7 @@
   "Storage:": "存储：",
   "Storage: {title}": "存储：{title}",
   "Summary": "摘要",
+  "Suspend": "挂起",
   "Suspend Container": "挂起容器",
   "Suspend VM": "挂起虚拟机",
   "Suspend VM {vmid}?": "挂起VM {vmid}？",

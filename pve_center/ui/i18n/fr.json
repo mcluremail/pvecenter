@@ -413,6 +413,7 @@
   "Storage:": "Stockage :",
   "Storage: {title}": "Stockage : {title}",
   "Summary": "Résumé",
+  "Suspend": "Suspendre",
   "Suspend Container": "Suspendre le conteneur",
   "Suspend VM": "Suspendre la VM",
   "Suspend VM {vmid}?": "Suspendre la VM {vmid} ?",
