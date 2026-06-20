@@ -64,12 +64,15 @@ class VmTaskHistoryWidget(QWidget):
             self.table.setItem(i, 1, end_item)
 
             status = task.get('status', '')
-            status_item = QTableWidgetItem(status)
+            status_item = QTableWidgetItem()
             if status == 'OK':
+                status_item.setText("● " + tr("OK"))
                 status_item.setForeground(QColor(Color.STATUS_OK))
             elif status == 'RUNNING':
+                status_item.setText("● " + tr("running..."))
                 status_item.setForeground(QColor(Color.STATUS_WARN))
             else:
+                status_item.setText("● " + status)
                 status_item.setForeground(QColor(Color.STATUS_ERR))
             self.table.setItem(i, 2, status_item)
 

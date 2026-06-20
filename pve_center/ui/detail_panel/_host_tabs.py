@@ -407,27 +407,25 @@ class HostTabs:
             maxmem_bytes = host_data.get("maxmem", 0)
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime = host_data.get("uptime", 0)
+            status = host_data.get("status", "")
+            status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
-            table = panel.vm_summary_table
-            params = [
-                (tr("Host name"), host_data.get("node", "")),
-                (tr("Status"), status_text(host_data.get("status", ""))),
-                (tr("Address"), address),
-                (tr("PVE version"), _fmt_pveversion(host_data.get("pveversion", "?"))),
-                ("QEMU", host_data.get("qemu", "?")),
-                (tr("Kernel"), host_data.get("kernel", "?")),
-                ("LXC", host_data.get("lxctype", "?")),
-                (tr("CPU %"), f"{cpu_pct}%"),
-                (tr("RAM (GiB)"), f"{mem_gb} / {maxmem_gb}"),
-                (tr("Uptime"), _format_uptime(uptime)),
-            ]
-            table.setRowCount(len(params))
-            for i, (k, v) in enumerate(params):
-                table.setItem(i, 0, QTableWidgetItem(k))
-                table.setItem(i, 1, QTableWidgetItem(str(v)))
-            table.resizeRowsToContents()
-            compact_table(table, 22)
-            panel.info_stack.setCurrentIndex(1)
+            html = (
+                f"<table cellpadding='3' style='font-size: 12px;'>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Host name')}</td><td>{host_data.get('node', '')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Status')}</td><td style='color:{status_color};'>{'● ' + status_text(status)}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Address')}</td><td>{address}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('PVE version')}</td><td>{_fmt_pveversion(host_data.get('pveversion', '?'))}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>QEMU</td><td>{host_data.get('qemu', '?')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Kernel')}</td><td>{host_data.get('kernel', '?')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>LXC</td><td>{host_data.get('lxctype', '?')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('CPU %')}</td><td>{cpu_pct}%</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('RAM (GiB)')}</td><td>{mem_gb} / {maxmem_gb}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Uptime')}</td><td>{_format_uptime(uptime)}</td></tr>"
+                f"</table>"
+            )
+            panel.info_label.setText(html)
+            panel.info_stack.setCurrentIndex(0)
         else:
             panel.info_label.setText(tr("No data"))
             panel.info_stack.setCurrentIndex(0)
@@ -534,12 +532,18 @@ class HostTabs:
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime = host_data.get("uptime", 0)
             status = host_data.get("status", "")
+            status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
-            panel._update_vm_summary_cell(tr("Status"), status_text(status),
-                Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN)
-            panel._update_vm_summary_cell(tr("CPU"), f"{cpu_pct}%")
-            panel._update_vm_summary_cell(tr("RAM (GiB)"), f"{mem_gb} / {maxmem_gb}")
-            panel._update_vm_summary_cell(tr("Uptime"), _format_uptime(uptime))
+            html = (
+                f"<table cellpadding='3' style='font-size: 12px;'>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Status')}</td><td style='color:{status_color};'>{'● ' + status_text(status)}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('CPU %')}</td><td>{cpu_pct}%</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('RAM (GiB)')}</td><td>{mem_gb} / {maxmem_gb}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Uptime')}</td><td>{_format_uptime(uptime)}</td></tr>"
+                f"</table>"
+            )
+            panel.info_label.setText(html)
+            panel.info_stack.setCurrentIndex(0)
 
         WARN_ROLE = Qt.UserRole + 10
         vmid_role = Qt.UserRole + 30

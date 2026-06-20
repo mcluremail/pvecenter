@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QColor
 from ..hover import enable_row_hover
 from ..vm_config_display import get_options_rows, get_editor_spec, OPT_DEFAULTS
 from ..vm_config_editor_dialog import VmConfigEditorDialog
@@ -7,10 +8,15 @@ from ..vm_device_editors import (VmBootEditorDialog,
                                  VmBootdiskEditorDialog,
                                  VmStartupEditorDialog)
 from ..i18n import tr
+from ..theme import Color
 from ..detail_panel._table_utils import set_empty_placeholder
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
+_SECTION_ROLE = Qt.UserRole + 102
+
+_SECTION_BG = f"{Color.GRAY_100}"
+_SECTION_FG = f"{Color.TEXT_SEC}"
 
 
 class VmOptionsWidget(QWidget):
@@ -28,7 +34,8 @@ class VmOptionsWidget(QWidget):
         self.table.verticalHeader().hide()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.table.setAlternatingRowColors(True)
@@ -51,12 +58,34 @@ class VmOptionsWidget(QWidget):
         if not rows:
             set_empty_placeholder(self.table, 2)
             return
-        for i, (key, label, value) in enumerate(rows):
+        for row_data in rows:
+            key, label, value, section = row_data
+            i = self.table.rowCount()
             self.table.insertRow(i)
-            item = QTableWidgetItem(label)
-            item.setData(_KEY_ROLE, key)
-            self.table.setItem(i, 0, item)
-            self.table.setItem(i, 1, QTableWidgetItem(value))
+            if key == "__section__":
+                item = QTableWidgetItem(label)
+                item.setData(_SECTION_ROLE, True)
+                f = QFont()
+                f.setBold(True)
+                f.setPointSize(10)
+                item.setFont(f)
+                item.setForeground(QColor(_SECTION_FG))
+                item.setBackground(QColor(_SECTION_BG))
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable & ~Qt.ItemIsEnabled)
+                self.table.setItem(i, 0, item)
+                val_item = QTableWidgetItem("")
+                val_item.setBackground(QColor(_SECTION_BG))
+                val_item.setFlags(Qt.NoItemFlags)
+                self.table.setItem(i, 1, val_item)
+            else:
+                item = QTableWidgetItem(label)
+                item.setData(_KEY_ROLE, key)
+                self.table.setItem(i, 0, item)
+                val_item = QTableWidgetItem(value)
+                f = QFont()
+                f.setBold(True)
+                val_item.setFont(f)
+                self.table.setItem(i, 1, val_item)
         self.table.resizeRowsToContents()
         for r in range(self.table.rowCount()):
             if self.table.rowHeight(r) > 22:
@@ -66,7 +95,7 @@ class VmOptionsWidget(QWidget):
         if not (self._host_name and self._vmid):
             return
         item = self.table.item(row, 0)
-        if not item:
+        if not item or item.data(_SECTION_ROLE):
             return
         raw_key = item.data(_KEY_ROLE)
         if not raw_key:

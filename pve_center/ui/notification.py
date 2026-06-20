@@ -14,7 +14,7 @@ class FadeToast(QWidget):
         self._text = text
         self._bg_color = color
 
-        flags = Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint
+        flags = Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint
         if sys.platform.startswith("linux"):
             flags |= Qt.X11BypassWindowManagerHint
         self.setWindowFlags(flags)

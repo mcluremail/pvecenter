@@ -3,7 +3,7 @@ import logging
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget,
                                QSizePolicy, QTableWidgetItem, QMessageBox,
                                QHBoxLayout, QScrollArea,
-                               QTableWidget, QHeaderView)
+                               QTableWidget, QHeaderView, QGridLayout)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QBrush
 
@@ -12,9 +12,10 @@ from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime, parse_pve_error
 from ..vm_actions import VM_ACTION_MESSAGE_LABELS
 from ._constants import TabIndex
-from ._table_utils import compact_table
+from ._table_utils import compact_table, safe_pct
 
 from ..widgets.vm_metrics_widget import VmMetricsWidget
+from ..widgets.metric_card import MetricCard
 from ..widgets.vm_hardware_widget import VmHardwareWidget
 from ..widgets.vm_options_widget import VmOptionsWidget
 from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
@@ -34,56 +35,47 @@ class VMTabs:
         monitor_widget = QWidget()
         monitor_layout = QVBoxLayout(monitor_widget)
         monitor_layout.setContentsMargins(0, 0, 0, 0)
+        monitor_layout.setSpacing(8)
 
         panel.info_stack = QStackedWidget()
 
         panel.info_label = QLabel()
         panel.info_label.setWordWrap(True)
         panel.info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        panel.info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
+        panel.info_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         panel.info_stack.addWidget(panel.info_label)
 
-        panel.vm_summary_table = self._build_vm_summary_table()
-        panel.info_stack.addWidget(panel.vm_summary_table)
+        cards_widget = QWidget()
+        cards_layout = QGridLayout(cards_widget)
+        cards_layout.setContentsMargins(0, 0, 0, 0)
+        cards_layout.setSpacing(8)
 
-        panel.info_stack.setFixedWidth(320)
-        panel.info_stack.setMinimumHeight(260)
-        panel.info_stack.setMaximumHeight(340)
-        panel.vm_summary_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        panel.card_cpu = MetricCard(tr("CPU"), "—", show_progress=True)
+        panel.card_ram = MetricCard(tr("RAM"), "—", show_progress=True)
+        panel.card_disk = MetricCard(tr("Disk"), "—", show_progress=True)
+        panel.card_net = MetricCard(tr("Network"), "—")
+        panel.card_uptime = MetricCard(tr("Uptime"), "—")
+        panel.card_status = MetricCard(tr("Status"), "—")
+
+        cards_layout.addWidget(panel.card_status, 0, 0)
+        cards_layout.addWidget(panel.card_cpu, 0, 1)
+        cards_layout.addWidget(panel.card_ram, 0, 2)
+        cards_layout.addWidget(panel.card_disk, 1, 0)
+        cards_layout.addWidget(panel.card_net, 1, 1)
+        cards_layout.addWidget(panel.card_uptime, 1, 2)
+
+        panel.info_stack.addWidget(cards_widget)
+        panel.info_stack.setCurrentIndex(0)
+
+        monitor_layout.addWidget(panel.info_stack)
 
         panel.metrics_widget = VmMetricsWidget()
-        panel.metrics_widget.setMinimumHeight(260)
-        panel.metrics_widget.setMaximumHeight(340)
+        panel.metrics_widget.setMinimumHeight(200)
         panel.metrics_widget.timeframe_changed.connect(panel._on_timeframe_changed)
-
-        middle = QHBoxLayout()
-        middle.setContentsMargins(0, 0, 8, 0)
-        middle.addWidget(panel.info_stack)
-        middle.addWidget(panel.metrics_widget, 1)
-        monitor_layout.addLayout(middle)
-        monitor_layout.addStretch()
+        monitor_layout.addWidget(panel.metrics_widget, 1)
 
         tab.setWidget(monitor_widget)
         return tab
-
-    def _build_vm_summary_table(self):
-        from PySide6.QtWidgets import QTableWidget, QHeaderView
-        from ._constants import _HEADER_STYLE
-        from ..hover import enable_row_hover
-        table = QTableWidget()
-        table.setEditTriggers(QTableWidget.NoEditTriggers)
-        table.verticalHeader().hide()
-        table.setColumnCount(2)
-        table.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
-        table.setWordWrap(True)
-        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        table.setAlternatingRowColors(True)
-        enable_row_hover(table)
-        return table
 
     def build_hardware_tab(self):
         panel = self.panel
@@ -456,9 +448,7 @@ class VMTabs:
         try:
             vmid = basic.get("vmid") or detail.get("vmid", "?")
             name = basic.get("name") or detail.get("name", "")
-            vm_type = basic.get("type") or detail.get("type", "")
             status = basic.get("status") or detail.get("status", "")
-            pool = basic.get("pool") or tr("None")
 
             def safe_int(val): return int(val) if isinstance(val, (int, float)) else 0
 
@@ -466,6 +456,7 @@ class VMTabs:
             mem_used_bytes = safe_int(detail.get("mem"))
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
+            mem_pct = safe_pct(mem_used_bytes, maxmem_bytes)
 
             cpus = detail.get("cpus") or basic.get("cpus") or 0
             cpu_usage = basic.get("cpu") or detail.get("cpu", 0)
@@ -475,6 +466,7 @@ class VMTabs:
             disk_used_bytes = safe_int(detail.get("disk"))
             maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
             disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
+            disk_pct = safe_pct(disk_used_bytes, maxdisk_bytes)
 
             netin = detail.get("netin", 0)
             netout = detail.get("netout", 0)
@@ -483,42 +475,33 @@ class VMTabs:
 
             uptime = detail.get("uptime") or basic.get("uptime", "")
             tags = basic.get("tags") or detail.get("tags") or ""
+            ha = basic.get("hastate") or detail.get("hastate", "")
 
-            ha = detail.get("hastate", tr("Unknown"))
-            running_qemu = detail.get("running-qemu", "")
+            panel.detail_label.setText(tr("VM/CT: {name}").format(name=name or vmid))
 
-            table = panel.vm_summary_table
-            params = [
-                (tr("Name"), name),
-                (tr("Type"), vm_type.upper()),
-                (tr("Status"), status_text(status)),
-                (tr("Pool"), str(pool)),
-                (tr("Tags"), tags or '-'),
-                (tr("CPU Cores"), cpus),
-                (tr("CPU usage (%)"), f"{cpu_usage}%"),
-                (tr("RAM (GiB)"), f"{mem_used_gb} / {maxmem_gb}"),
-                (tr("Disk (GiB)"), f"{disk_used_gb} / {maxdisk_gb}"),
-                (tr("Net in (MB)"), netin_mb),
-                (tr("Net out (MB)"), netout_mb),
-                (tr("Uptime"), _format_uptime(uptime) if uptime else ''),
-                (tr("HA state"), str(ha)),
-            ]
-            if running_qemu:
-                params.append((tr("QEMU version"), running_qemu))
-            table.setRowCount(len(params))
-            for i, (k, v) in enumerate(params):
-                table.setItem(i, 0, QTableWidgetItem(k))
-                item = QTableWidgetItem(str(v))
-                if k == tr("Status"):
-                    if status == "running":
-                        item.setForeground(QBrush(QColor(Color.STATUS_OK)))
-                    elif status == "stopped":
-                        item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
-                    else:
-                        item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
-                table.setItem(i, 1, item)
-            table.resizeRowsToContents()
-            compact_table(table, 22)
+            panel.card_status.set_value(status_text(status))
+            status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
+            panel.card_status.set_value_color(status_color)
+            if ha and ha not in ("", "ignored"):
+                panel.card_status.set_subtitle(f"HA: {ha}")
+            else:
+                panel.card_status.set_subtitle("")
+
+            panel.card_cpu.set_value(f"{cpu_usage}%")
+            panel.card_cpu.set_subtitle(f"{cpus} {tr('cores')}")
+            panel.card_cpu.set_progress(cpu_usage)
+
+            panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
+            panel.card_ram.set_progress(mem_pct)
+
+            panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
+            panel.card_disk.set_progress(disk_pct)
+
+            panel.card_net.set_value(f"↓ {netin_mb} MB")
+            panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
+
+            panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
+            panel.card_uptime.set_subtitle(f"{tr('Tags')}: {tags}" if tags else "")
 
             panel.info_stack.setCurrentIndex(1)
         except Exception as exc:
@@ -540,12 +523,14 @@ class VMTabs:
 
         status = vm_data.get("status") or detail.get("status", "")
         status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
-        panel._update_vm_summary_cell(tr("Status"), status_text(status), status_color)
+        panel.card_status.set_value(status_text(status))
+        panel.card_status.set_value_color(status_color)
 
         cpu_usage = vm_data.get("cpu") or detail.get("cpu", 0)
         if isinstance(cpu_usage, float):
             cpu_usage = round(cpu_usage * 100, 1)
-        panel._update_vm_summary_cell(tr("CPU usage (%)"), f"{cpu_usage}%")
+        panel.card_cpu.set_value(f"{cpu_usage}%")
+        panel.card_cpu.set_progress(cpu_usage)
 
         def safe_int(val): return int(val) if isinstance(val, (int, float)) else 0
 
@@ -553,23 +538,25 @@ class VMTabs:
         mem_used_bytes = safe_int(detail.get("mem"))
         maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
         mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
-        panel._update_vm_summary_cell(tr("RAM (GiB)"), f"{mem_used_gb} / {maxmem_gb}")
+        panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
+        panel.card_ram.set_progress(safe_pct(mem_used_bytes, maxmem_bytes))
 
         maxdisk_bytes = safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
         disk_used_bytes = safe_int(detail.get("disk"))
         maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
         disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
-        panel._update_vm_summary_cell(tr("Disk (GiB)"), f"{disk_used_gb} / {maxdisk_gb}")
+        panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
+        panel.card_disk.set_progress(safe_pct(disk_used_bytes, maxdisk_bytes))
 
         netin = detail.get("netin", 0)
         netout = detail.get("netout", 0)
         netin_mb = round(netin / (1024*1024), 2) if netin else 0
         netout_mb = round(netout / (1024*1024), 2) if netout else 0
-        panel._update_vm_summary_cell(tr("Net in (MB)"), str(netin_mb))
-        panel._update_vm_summary_cell(tr("Net out (MB)"), str(netout_mb))
+        panel.card_net.set_value(f"↓ {netin_mb} MB")
+        panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
 
         uptime = detail.get("uptime") or vm_data.get("uptime", "")
-        panel._update_vm_summary_cell(tr("Uptime"), _format_uptime(uptime) if uptime else '')
+        panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
 
     def update_pool_cells(self):
         panel = self.panel

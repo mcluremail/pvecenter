@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       1.3.1
+Version:       1.4.0
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -42,6 +42,20 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Fri Jun 20 2026 Taurus McLure <taurus@mclure.ru> - 1.4.0-1
+- Redesign Monitoring tab: 3x2 MetricCard grid (Status/CPU/RAM/Disk/Net/Uptime)
+  with progress bars + expanding chart. Replace flat parameter table.
+- Hardware tab: section headers (Identity/CPU/Memory/System/Network/Storage)
+  with bold values and device type icons (disk/network/iso/vm/hardware).
+- Options tab: section headers (OS/Boot/Display/System/Hotplug/Behaviour/Misc)
+  with bold values.
+- History tab: colored circle status badges (green OK / yellow running /
+  red error).
+- Host monitoring: HTML-formatted info panel with colored status.
+- Fix toast positioning (Qt.Tool -> Qt.ToolTip to prevent WM centering).
+- Fix hastate reading from basic (cluster/resources) not detail (status/current).
+- Section label i18n in 5 languages (Identity/OS/Display/Behaviour/Misc).
+
 * Fri Jun 19 2026 Taurus McLure <taurus@mclure.ru> - 1.3.1-1
 - Move export/import from File menu to toolbar. Add Add Server button
   and separators to toolbar. Remove menu bar (not enough items for menu).

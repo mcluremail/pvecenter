@@ -619,6 +619,26 @@ def get_editor_spec(key):
 # ---------------------------------------------------------------------------
 
 
+_HW_SECTION_LABELS = {
+    "identity": lambda: tr("Identity"),
+    "cpu": lambda: tr("CPU"),
+    "memory": lambda: tr("Memory"),
+    "system": lambda: tr("System"),
+    "network": lambda: tr("Network"),
+    "storage": lambda: tr("Storage"),
+}
+
+_OPT_SECTION_LABELS = {
+    "os": lambda: tr("OS"),
+    "boot": lambda: tr("Boot"),
+    "video": lambda: tr("Display"),
+    "system": lambda: tr("System"),
+    "hotplug": lambda: tr("Hotplug"),
+    "behaviour": lambda: tr("Behaviour"),
+    "misc": lambda: tr("Misc"),
+}
+
+
 def get_hardware_rows(config_data, detail_data=None):
     config = dict(config_data) if config_data else {}
     for key, default in HW_DEFAULTS.items():
@@ -626,18 +646,23 @@ def get_hardware_rows(config_data, detail_data=None):
             config[key] = default
     rows = []
     seen = set()
-    for _section_name, keys in _HW_SECTIONS:
+    for section_name, keys in _HW_SECTIONS:
+        section_label = _HW_SECTION_LABELS.get(section_name, lambda: section_name)()
+        rows.append(("__section__", section_label, "", section_name))
+        has_items = False
         for key in keys:
             if key in config:
                 seen.add(key)
                 label = HW_LABELS.get(key) or _device_label(key)
                 value = format_value(key, config[key])
-                rows.append((key, label, value))
+                rows.append((key, label, value, section_name))
+        if not has_items:
+            pass
     if detail_data:
         rm = detail_data.get("running-machine")
         if rm:
             label = HW_LABELS.get("running-machine", "running-machine")
-            rows.append(("running-machine", label, rm))
+            rows.append(("running-machine", label, rm, "system"))
     return rows
 
 
@@ -654,20 +679,23 @@ def get_options_rows(config_data):
     for _section_name, keys in _OPT_SECTIONS:
         for key in keys:
             opt_keys.add(key)
-    # Collect extra keys not in any section
     extra = set()
     for key in config:
         if key not in hw_keys and key not in SERVICE_KEYS and key not in opt_keys:
             extra.add(key)
     rows = []
-    for _section_name, keys in _OPT_SECTIONS:
+    for section_name, keys in _OPT_SECTIONS:
+        section_label = _OPT_SECTION_LABELS.get(section_name, lambda: section_name)()
+        rows.append(("__section__", section_label, "", section_name))
         for key in keys:
             if key in config:
                 label = HW_LABELS.get(key) or _device_label(key)
                 formatted = format_value(key, config[key])
-                rows.append((key, label, formatted))
-    for key in sorted(extra):
-        label = HW_LABELS.get(key) or _device_label(key)
-        formatted = format_value(key, config[key])
-        rows.append((key, label, formatted))
+                rows.append((key, label, formatted, section_name))
+    if extra:
+        rows.append(("__section__", _OPT_SECTION_LABELS.get("misc", lambda: tr("Misc"))(), "", "misc"))
+        for key in sorted(extra):
+            label = HW_LABELS.get(key) or _device_label(key)
+            formatted = format_value(key, config[key])
+            rows.append((key, label, formatted, "misc"))
     return rows
