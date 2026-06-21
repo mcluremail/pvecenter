@@ -4,23 +4,17 @@ import re
 
 from .i18n import tr
 
-STATUS_RU = {
-    "running": "running",
-    "stopped": "stopped",
-    "paused": "paused",
-    "error": "error",
-    "offline": "offline",
-    "online": "online",
-    "unknown": "unknown",
-    "mounted": "mounted",
-}
+_STATUS_KEYS = frozenset((
+    "running", "stopped", "paused", "error",
+    "offline", "online", "unknown", "mounted",
+))
 
 
 def status_text(s):
     """Return human-readable status for display.
     tr() translates the status label to the current language.
     """
-    return tr(STATUS_RU.get(s, s))
+    return tr(s if s in _STATUS_KEYS else (s or "unknown"))
 
 
 def format_uptime(seconds):
@@ -67,26 +61,6 @@ def build_node_index(all_nodes):
         if hn not in by_host:
             by_host[hn] = n
     return by_pair, by_host
-
-
-def find_vm(all_vms, host_name, vmid, _cache=None):
-    """Find VM by (host_name, vmid). Uses cache dict if provided.
-    Callers should pass a pre-built cache via build_vm_index for O(1) lookup.
-    """
-    if _cache is not None:
-        return _cache.get((host_name, vmid))
-    return next((v for v in all_vms
-                 if v.get("host_name") == host_name and v.get("vmid") == vmid), None)
-
-
-def find_node_cfg(nodes_cfg, host_name, _cache=()):
-    """Find node config by host name. Uses cache dict if provided.
-    _cache is a {name: cfg} dict; if empty (default), falls back to linear scan.
-    Callers should pass a pre-built cache via build_cfg_index for O(1) lookup.
-    """
-    if _cache:
-        return _cache.get(host_name)
-    return next((c for c in nodes_cfg if c.get("name") == host_name), None)
 
 
 def parse_pve_error(err):

@@ -32,22 +32,12 @@ def _config_dir():
     return d
 
 def _migrate_if_needed(name):
-    """Переносит файл из _base_dir() в _config_dir(), если он есть только в старом месте.
-    После переноса — если в _base_dir() не осталось наших файлов, удаляет пустую директорию."""
+    """Переносит файл из _base_dir() в _config_dir(), если он есть только в старом месте."""
     src = os.path.join(_base_dir(), name)
     dst = os.path.join(_config_dir(), name)
     if os.path.exists(src) and not os.path.exists(dst):
         import shutil
         shutil.move(src, dst)
-    # Чистим пустую старую директорию, если там не осталось наших файлов
-    for leftover in (SALT_FILE, ENC_FILE, CONFIG_JSON):
-        if os.path.exists(os.path.join(_base_dir(), leftover)):
-            return
-    try:
-        if os.path.isdir(_base_dir()) and not os.listdir(_base_dir()):
-            os.rmdir(_base_dir())
-    except OSError:
-        pass
 
 def _derive_key(password: str, salt: bytes) -> bytes:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -265,6 +255,9 @@ def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
         save_config(imported)
         return imported
 
+    # Запоминаем пароль импортируемого файла — это новый мастер-пароль
+    # для объединённого конфига. save_config использует _password для шифрования.
+    cache_password(password)
     current = load_config()
     if current is None:
         current = []

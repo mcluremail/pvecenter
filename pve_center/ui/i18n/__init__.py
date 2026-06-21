@@ -90,15 +90,3 @@ def tr(text: str) -> str:
     if _current_lang == "en":
         return text
     return _current_dict.get(text, text)
-
-
-def get_builtin_dict(lang: str) -> dict:
-    """Return the built-in dictionary for a language, or empty dict.
-    Loads from JSON on demand; the result is not cached beyond the
-    already-loaded current language.
-    """
-    if lang == _current_lang:
-        return dict(_current_dict)
-    if lang in _JSON_LANGS:
-        return _load_json(lang)
-    return {}

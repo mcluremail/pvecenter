@@ -6,7 +6,7 @@ from ..hover import enable_row_hover
 from ...config import save_ui_state, load_ui_state
 from ..i18n import tr
 from ..theme import Color
-import json as _json
+import json
 
 TASK_COL_WIDTHS_KEY = "task_col_widths"
 
@@ -280,14 +280,14 @@ class ClusterTasksWidget(QWidget):
 
     def _save_column_widths(self):
         widths = [self.table.columnWidth(c) for c in range(self.table.columnCount())]
-        save_ui_state(TASK_COL_WIDTHS_KEY, _json.dumps(widths))
+        save_ui_state(TASK_COL_WIDTHS_KEY, json.dumps(widths))
 
     def _restore_column_widths(self):
         raw = load_ui_state(TASK_COL_WIDTHS_KEY)
         if not raw:
             return
         try:
-            widths = _json.loads(raw)
+            widths = json.loads(raw)
             if isinstance(widths, list) and len(widths) == self.table.columnCount():
                 for c, w in enumerate(widths):
                     self.table.setColumnWidth(c, w)

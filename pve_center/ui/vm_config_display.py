@@ -294,11 +294,6 @@ FIELD_TYPES = {
     "args": "string",
 }
 
-# Reverse map: from raw PVE value to form widget value
-FIELD_REVERSE = {
-    "bool": lambda v: v in (1, "1", True),
-}
-
 # Ordered groups for options tab
 _OPT_SECTIONS = [
     ("os",           ["ostype"]),
@@ -649,15 +644,12 @@ def get_hardware_rows(config_data, detail_data=None):
     for section_name, keys in _HW_SECTIONS:
         section_label = _HW_SECTION_LABELS.get(section_name, lambda: section_name)()
         rows.append(("__section__", section_label, "", section_name))
-        has_items = False
         for key in keys:
             if key in config:
                 seen.add(key)
                 label = HW_LABELS.get(key) or _device_label(key)
                 value = format_value(key, config[key])
                 rows.append((key, label, value, section_name))
-        if not has_items:
-            pass
     if detail_data:
         rm = detail_data.get("running-machine")
         if rm:

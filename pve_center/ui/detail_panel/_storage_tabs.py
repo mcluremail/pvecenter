@@ -8,16 +8,9 @@ from PySide6.QtCore import Qt
 from ..i18n import tr
 from ..theme import Color
 from ._constants import _progress_style, _HAS_PG, TabIndex
-from ._table_utils import make_table, make_filterable_table, format_volsize, safe_pct, set_empty_placeholder
-
-_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
-
-
-def _loading_label():
-    lbl = QLabel(tr("Loading..."))
-    lbl.setAlignment(Qt.AlignCenter)
-    lbl.setStyleSheet(_LOADING_STYLE)
-    return lbl
+from ._table_utils import (make_table, make_filterable_table, format_volsize,
+                           safe_pct, set_empty_placeholder, set_cell_text,
+                           update_progress_bar, loading_label)
 
 
 class StorageTabs:
@@ -131,7 +124,7 @@ class StorageTabs:
         )
         panel.storage_backups_table = table
         stack = QStackedWidget()
-        loading = _loading_label()
+        loading = loading_label()
         stack.addWidget(loading)
         stack.addWidget(make_filterable_table(table))
         stack.setCurrentIndex(0)
@@ -157,7 +150,7 @@ class StorageTabs:
         )
         panel.storage_disks_table = table
         stack = QStackedWidget()
-        loading = _loading_label()
+        loading = loading_label()
         stack.addWidget(loading)
         stack.addWidget(make_filterable_table(table))
         stack.setCurrentIndex(0)
@@ -182,7 +175,7 @@ class StorageTabs:
         )
         panel.storage_iso_table = table
         stack = QStackedWidget()
-        loading = _loading_label()
+        loading = loading_label()
         stack.addWidget(loading)
         stack.addWidget(make_filterable_table(table))
         stack.setCurrentIndex(0)
@@ -207,7 +200,7 @@ class StorageTabs:
         )
         panel.storage_tpl_table = table
         stack = QStackedWidget()
-        loading = _loading_label()
+        loading = loading_label()
         stack.addWidget(loading)
         stack.addWidget(make_filterable_table(table))
         stack.setCurrentIndex(0)
@@ -660,7 +653,6 @@ class StorageTabs:
 
     def update_storage_cells(self):
         panel = self.panel
-        from ._table_utils import set_cell_text, update_progress_bar
         storage_name = panel.current_obj_name
         data = panel.current_obj_data or {}
         cluster = data.get("cluster")

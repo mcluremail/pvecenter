@@ -24,6 +24,10 @@ from ..widgets.vm_pool_widget import VmPoolWidget
 logger = logging.getLogger(__name__)
 
 
+def _safe_int(val):
+    return int(val) if isinstance(val, (int, float)) else 0
+
+
 class VMTabs:
     def __init__(self, panel):
         self.panel = panel
@@ -385,7 +389,7 @@ class VMTabs:
         vmid = int(vmid_str)
         vm = panel._vms_by_key.get((host_name, vmid))
         node = vm.get("node") if vm else host_name
-        vm_type = "qemu"
+        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
 
         from ...backend import VmConfigUpdateWorker
         worker = VmConfigUpdateWorker(cfg, node, vmid, params, vm_type)
@@ -431,9 +435,10 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if cfg and panel._last_vm_data:
             node_name = panel._last_vm_data.get("node") or host_name
+            vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
             gen = panel._generation
             from ...backend import VmConfigWorker
-            worker = VmConfigWorker(cfg, node_name, vmid, "qemu")
+            worker = VmConfigWorker(cfg, node_name, vmid, vm_type)
             worker.signals.config_ready.connect(
                 lambda vid, c, g=gen, h=host_name, w=worker: (
                     self.on_config_loaded(vid, c, g, h),
@@ -450,10 +455,8 @@ class VMTabs:
             name = basic.get("name") or detail.get("name", "")
             status = basic.get("status") or detail.get("status", "")
 
-            def safe_int(val): return int(val) if isinstance(val, (int, float)) else 0
-
-            maxmem_bytes = safe_int(detail.get("maxmem") or basic.get("maxmem"))
-            mem_used_bytes = safe_int(detail.get("mem"))
+            maxmem_bytes = _safe_int(detail.get("maxmem") or basic.get("maxmem"))
+            mem_used_bytes = _safe_int(detail.get("mem"))
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
             mem_pct = safe_pct(mem_used_bytes, maxmem_bytes)
@@ -462,8 +465,8 @@ class VMTabs:
             cpu_usage = basic.get("cpu") or detail.get("cpu", 0)
             if isinstance(cpu_usage, float): cpu_usage = round(cpu_usage * 100, 1)
 
-            maxdisk_bytes = safe_int(detail.get("maxdisk") or basic.get("maxdisk"))
-            disk_used_bytes = safe_int(detail.get("disk"))
+            maxdisk_bytes = _safe_int(detail.get("maxdisk") or basic.get("maxdisk"))
+            disk_used_bytes = _safe_int(detail.get("disk"))
             maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
             disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
             disk_pct = safe_pct(disk_used_bytes, maxdisk_bytes)
@@ -532,17 +535,15 @@ class VMTabs:
         panel.card_cpu.set_value(f"{cpu_usage}%")
         panel.card_cpu.set_progress(cpu_usage)
 
-        def safe_int(val): return int(val) if isinstance(val, (int, float)) else 0
-
-        maxmem_bytes = safe_int(detail.get("maxmem") or vm_data.get("maxmem"))
-        mem_used_bytes = safe_int(detail.get("mem"))
+        maxmem_bytes = _safe_int(detail.get("maxmem") or vm_data.get("maxmem"))
+        mem_used_bytes = _safe_int(detail.get("mem"))
         maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
         mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
         panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
         panel.card_ram.set_progress(safe_pct(mem_used_bytes, maxmem_bytes))
 
-        maxdisk_bytes = safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
-        disk_used_bytes = safe_int(detail.get("disk"))
+        maxdisk_bytes = _safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
+        disk_used_bytes = _safe_int(detail.get("disk"))
         maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
         disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
         panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")

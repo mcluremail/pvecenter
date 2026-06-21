@@ -956,8 +956,6 @@ class VmConsoleWorker(QRunnable):
                         return
                 except subprocess.TimeoutExpired:
                     logger.info("remote-viewer started (pid=%d)", proc.pid)
-                    # remote-viewer detached — следим за процессом в фоне,
-                    # удалим .vv после его завершения
                     def _cleanup():
                         try:
                             proc.wait()
@@ -985,6 +983,17 @@ class VmConsoleWorker(QRunnable):
                         os.unlink(vv_path)
                     except OSError:
                         pass
+                return
+            except OSError:
+                if vv_path and os.path.exists(vv_path):
+                    try:
+                        os.unlink(vv_path)
+                    except OSError:
+                        pass
+                try:
+                    self.signals.console_error.emit(tr("Failed to launch remote-viewer"))
+                except RuntimeError:
+                    pass
                 return
 
             try:

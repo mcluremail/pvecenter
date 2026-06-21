@@ -5,8 +5,8 @@ from PySide6.QtCore import Signal, Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QAction
 from collections import defaultdict
 from datetime import timedelta
-
-import re as _re
+import json
+import re
 
 from .icons import get_icon, init_icons, make_loading_icon
 from .vm_actions import VM_ACTION_ICONS
@@ -650,7 +650,7 @@ class TreePanel(QWidget):
     @staticmethod
     def _strip_count(text):
         """Remove VM count suffix like '[3/5]' for stable paths."""
-        return _re.sub(r'\s+\[\d+/\d+\]$', '', text)
+        return re.sub(r'\s+\[\d+/\d+\]$', '', text)
 
     def _save_expanded_state(self):
         paths = []
@@ -663,11 +663,9 @@ class TreePanel(QWidget):
                 collect_paths(item.child(i), current)
         for i in range(self.tree.topLevelItemCount()):
             collect_paths(self.tree.topLevelItem(i))
-        import json
         save_ui_state("expandedTreePaths", json.dumps(paths))
 
     def _restore_expanded_state(self):
-        import json
         raw = load_ui_state("expandedTreePaths")
         if not raw:
             return

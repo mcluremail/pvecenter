@@ -13,7 +13,7 @@ from PySide6.QtGui import QShortcut, QKeySequence, QAction
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
 from ..config import (save_config, save_tasks_cache, load_tasks_cache,
                       save_ui_state, load_ui_state, export_config, import_config)
-import json as _json
+import json
 from . import theme
 from .theme import Color
 from .notification import NotificationManager
@@ -88,8 +88,8 @@ class MainWindow(QMainWindow):
 
         # Сохраняем позиции сплиттера при изменении
         def _save_splitter():
-            save_ui_state("splitter_h", _json.dumps(self.h_splitter.sizes()))
-            save_ui_state("splitter_v", _json.dumps(self.v_splitter.sizes()))
+            save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
+            save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
         self.h_splitter.splitterMoved.connect(_save_splitter)
         self.v_splitter.splitterMoved.connect(_save_splitter)
 
@@ -268,9 +268,9 @@ class MainWindow(QMainWindow):
         merged = import_config(path, merge=True)
         if merged is None:
             return
-        self.nodes_config = merged
-        if hasattr(self, 'tree_panel'):
-            self.tree_panel.set_servers(merged)
+        self.nodes_cfg = merged
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+        self.tree_panel.set_servers(merged)
         QMessageBox.information(self, tr("Import"),
                                 tr("Configuration imported ({count} hosts).").format(
                                     count=len(merged)))
@@ -887,8 +887,6 @@ class MainWindow(QMainWindow):
     def _on_cluster_tasks_loaded(self, tasks, gen):
         if gen != self._tasks_gen:
             return
-        if gen != self._tasks_gen:
-            return
         self._update_cluster_tasks_widget(tasks)
 
     def _update_cluster_tasks_widget(self, tasks):
@@ -950,7 +948,7 @@ class MainWindow(QMainWindow):
         raw = load_ui_state("window_geometry")
         if raw:
             try:
-                geo = _json.loads(raw)
+                geo = json.loads(raw)
                 if isinstance(geo, list) and len(geo) == 4:
                     self.setGeometry(*geo)
             except (TypeError, ValueError):
@@ -961,12 +959,12 @@ class MainWindow(QMainWindow):
         raw = load_ui_state("saved_key")
         if raw:
             try:
-                val = _json.loads(raw)
+                val = json.loads(raw)
                 if isinstance(val, list):
                     self._saved_key = tuple(val)
                 else:
                     self._saved_key = val
-            except (TypeError, ValueError, _json.JSONDecodeError):
+            except (TypeError, ValueError, json.JSONDecodeError):
                 pass
         raw = load_ui_state("saved_tab")
         if raw:
@@ -983,7 +981,7 @@ class MainWindow(QMainWindow):
         raw = load_ui_state("splitter_h")
         if raw:
             try:
-                vals = _json.loads(raw)
+                vals = json.loads(raw)
                 if isinstance(vals, list):
                     self.h_splitter.setSizes([int(x) for x in vals])
             except (TypeError, ValueError):
@@ -993,7 +991,7 @@ class MainWindow(QMainWindow):
         raw = load_ui_state("splitter_v")
         if raw:
             try:
-                vals = _json.loads(raw)
+                vals = json.loads(raw)
                 if isinstance(vals, list):
                     self.v_splitter.setSizes([int(x) for x in vals])
             except (TypeError, ValueError):
@@ -1104,13 +1102,13 @@ class MainWindow(QMainWindow):
         self.tree_panel.save_state()
         # Сохраняем состояние окна
         geo = self.geometry()
-        save_ui_state("window_geometry", _json.dumps([geo.x(), geo.y(), geo.width(), geo.height()]))
+        save_ui_state("window_geometry", json.dumps([geo.x(), geo.y(), geo.width(), geo.height()]))
         save_ui_state("window_maximized", "1" if self.isMaximized() else "0")
         key = self.tree_panel.get_current_item_key()
         if key:
-            save_ui_state("saved_key", _json.dumps(key))
+            save_ui_state("saved_key", json.dumps(key))
         save_ui_state("saved_tab", str(self.detail_panel.tabs.currentIndex()))
         save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
-        save_ui_state("splitter_h", _json.dumps(self.h_splitter.sizes()))
-        save_ui_state("splitter_v", _json.dumps(self.v_splitter.sizes()))
+        save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
+        save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
         super().closeEvent(event)

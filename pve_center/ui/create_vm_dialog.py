@@ -8,7 +8,7 @@ from PySide6.QtCore import QRegularExpression
 from ..config import save_ui_state, load_ui_state
 from .i18n import tr
 from .theme import Color
-import json as _json
+import json
 
 VM_SETTINGS_KEY = "create_vm_settings"
 
@@ -100,7 +100,6 @@ class CreateVmDialog(QDialog):
         self.setWindowTitle(tr("Create Virtual Machine"))
         self.setMinimumSize(700, 400)
         self.setMaximumWidth(780)
-        self._nodes = nodes or []
         self._nodes = sorted(nodes or [], key=lambda n: (not n.get("_is_cluster", False),
                                         (n.get("_display_name") or n.get("node", "")).lower()))
         self._storages = storages or []
@@ -129,14 +128,14 @@ class CreateVmDialog(QDialog):
             "start": int(self.start_check.isChecked()),
             "agent": int(self.agent_check.isChecked()),
         }
-        save_ui_state(VM_SETTINGS_KEY, _json.dumps(data))
+        save_ui_state(VM_SETTINGS_KEY, json.dumps(data))
 
     def _restore_settings(self):
         raw = load_ui_state(VM_SETTINGS_KEY)
         if not raw:
             return
         try:
-            data = _json.loads(raw)
+            data = json.loads(raw)
         except (TypeError, ValueError):
             return
         if data.get("cores"):
@@ -477,7 +476,7 @@ class CreateVmDialog(QDialog):
         self._update_ha_combo(host_name)
 
     def _on_bios_changed(self, text):
-        is_ovmf = text == tr("OVMF (UEFI)")
+        is_ovmf = self.bios_combo.currentData() == "ovmf"
         self.efi_label.setVisible(is_ovmf)
         self.efi_storage_combo.setVisible(is_ovmf)
         if is_ovmf and self.chipset_combo.currentData() != "q35":

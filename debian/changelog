@@ -1,3 +1,17 @@
+pve-center (1.4.1-1) unstable; urgency=medium
+
+  * Fix: config import not applied (nodes_cfg vs nodes_config typo)
+  * Fix: import_config(merge=True) could write plaintext instead of encrypted
+  * Fix: VM metrics chart broke when switching between CPU/RAM and Network/Disk
+  * Fix: VM config editor hardcoded vm_type=qemu, broke LXC container editing
+  * Fix: host VMs table empty when host_data dict was empty
+  * Fix: .vv file leaked in /tmp on remote-viewer launch failure
+  * Cleanup: remove dead code (find_vm, FIELD_REVERSE, get_builtin_dict, has_items)
+  * Cleanup: consolidate _LOADING_STYLE and _pstyle duplicates
+  * Cleanup: standardize imports (json alias, local imports → top-level)
+
+ -- Taurus McLure <taurus@example.com>  Fri, 20 Jun 2026 00:00:00 +0300
+
 pve-center (1.4.0-1) unstable; urgency=medium
 
   * Redesign Monitoring tab: 3x2 MetricCard grid with progress bars +

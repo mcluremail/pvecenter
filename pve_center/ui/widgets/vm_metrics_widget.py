@@ -89,10 +89,8 @@ class VmMetricsWidget(QWidget):
     def clear_curves(self):
         self._cached_data = None
         if self._has_plot:
-            self.curve.setData([], [])
-
-    def set_ram_range(self, max_bytes):
-        pass
+            self.plot.clear()
+            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
 
     def update_curves(self, metrics_dict):
         self._cached_data = metrics_dict
@@ -104,12 +102,15 @@ class VmMetricsWidget(QWidget):
         metric = self.metric_combo.currentText()
         data = self._cached_data
 
+        self.plot.clear()
+        if self._legend:
+            self._legend.clear()
+        self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
+
         if metric == tr("CPU"):
             cpu = data.get('cpu', [])
             if cpu:
                 self.curve.setData([d['time'] for d in cpu], [d['value'] for d in cpu])
-            else:
-                self.curve.setData([], [])
             self.plot.setTitle(tr("CPU, %"))
             self.plot.setLabel('left', '%')
 
@@ -121,30 +122,24 @@ class VmMetricsWidget(QWidget):
                 maxmem = data.get('maxmem', 0)
                 if maxmem > 0:
                     self.plot.setYRange(0, (maxmem / (1024**3)) * 1.05)
-            else:
-                self.curve.setData([], [])
             self.plot.setTitle(tr("RAM, GiB"))
             self.plot.setLabel('left', 'GiB')
 
         elif metric == tr("Network"):
             netin = data.get('netin', [])
             netout = data.get('netout', [])
-            self._format_and_set(netin, netout, tr("Network traffic"), "B")
+            self._render_dual(netin, netout, tr("Network traffic"), "B")
 
         elif metric == tr("Disk"):
             diskread = data.get('diskread', [])
             diskwrite = data.get('diskwrite', [])
-            self._format_and_set(diskread, diskwrite, tr("Disk I/O"), "B")
+            self._render_dual(diskread, diskwrite, tr("Disk I/O"), "B")
 
-    def _format_and_set(self, data1, data2, title, default_unit):
+    def _render_dual(self, data1, data2, title, default_unit):
         all_data = data1 + data2
+        self.plot.setTitle(title)
         if not all_data:
-            self.curve.setData([], [])
-            self.plot.setTitle(title)
             self.plot.setLabel('left', default_unit)
-            self.plot.clear()
-            if self._legend:
-                self._legend.clear()
             return
         max_val = max(abs(d['value']) for d in all_data)
         if max_val < 1024:
@@ -156,14 +151,10 @@ class VmMetricsWidget(QWidget):
         else:
             unit, div = 'GB', 1024**3
 
-        self.plot.clear()
-        if self._legend:
-            self._legend.clear()
         label_in = tr("In") if title == tr("Network traffic") else tr("Read")
         label_out = tr("Out") if title == tr("Network traffic") else tr("Write")
         self.plot.plot([d['time'] for d in data1], [d['value'] / div for d in data1],
                        pen=pg.mkPen(Color.SLATE_900, width=2), name=label_in)
         self.plot.plot([d['time'] for d in data2], [d['value'] / div for d in data2],
                        pen=pg.mkPen(Color.GRAY_400, width=2), name=label_out)
-        self.plot.setTitle(title)
         self.plot.setLabel('left', unit)

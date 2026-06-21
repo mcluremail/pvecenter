@@ -9,16 +9,9 @@ from ..i18n import tr
 from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime
 from ._constants import _progress_style, TabIndex
-from ._table_utils import make_table, compact_table, set_cell_text, update_progress_bar, safe_pct, set_empty_placeholder
-
-_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
-
-
-def _loading_label():
-    lbl = QLabel(tr("Loading..."))
-    lbl.setAlignment(Qt.AlignCenter)
-    lbl.setStyleSheet(_LOADING_STYLE)
-    return lbl
+from ._table_utils import (make_table, compact_table, set_cell_text,
+                           update_progress_bar, safe_pct, set_empty_placeholder,
+                           loading_label)
 
 
 class HostTabs:
@@ -57,7 +50,7 @@ class HostTabs:
         return widget
 
     def build_network_tab(self):
-        loading = _loading_label()
+        loading = loading_label()
         table = make_table(
             [tr("Interface"), tr("Type"), tr("State"), "Method", "CIDR"],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
@@ -81,7 +74,7 @@ class HostTabs:
         return tab
 
     def build_services_tab(self):
-        loading = _loading_label()
+        loading = loading_label()
         table = make_table(
             [tr("Service"), tr("State"), tr("Description")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 75),
@@ -104,7 +97,7 @@ class HostTabs:
         return tab
 
     def build_host_disks_tab(self):
-        loading = _loading_label()
+        loading = loading_label()
         table = make_table(
             [tr("Device"), tr("Type"), tr("Model"), tr("Size"), tr("Serial")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
@@ -128,7 +121,7 @@ class HostTabs:
         return tab
 
     def build_snapshots_tab(self):
-        loading = _loading_label()
+        loading = loading_label()
         table = make_table(
             [tr("VM"), tr("Snapshot"), tr("Description"), tr("Created"), tr("Current")],
             [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
@@ -153,8 +146,7 @@ class HostTabs:
         return tab
 
     def build_summary_tab(self):
-        from ._table_utils import make_table as _mt
-        table = _mt(
+        table = make_table(
             [tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
              (QHeaderView.Stretch, None), (QHeaderView.Interactive, 55),
@@ -179,7 +171,6 @@ class HostTabs:
         table.setHorizontalHeaderLabels([
             tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")
         ])
-        from PySide6.QtWidgets import QHeaderView
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -263,7 +254,6 @@ class HostTabs:
         table = panel.datacenter_summary
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels([tr("Cluster"), tr("Hosts"), tr("VMs"), tr("CPU %"), tr("RAM (GiB)")])
-        from PySide6.QtWidgets import QHeaderView
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -431,9 +421,10 @@ class HostTabs:
             panel.info_stack.setCurrentIndex(0)
             return
 
+        host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
         vms_of_host = [vm for vm in panel.all_vms
                        if vm.get("node") == host_name
-                       and vm.get("host_name") == (host_data.get("host_name") if host_data else host_name)]
+                       and vm.get("host_name") == host_cfg_name]
         panel.host_vm_table.setSortingEnabled(False)
         if not vms_of_host:
             set_empty_placeholder(panel.host_vm_table, 5)

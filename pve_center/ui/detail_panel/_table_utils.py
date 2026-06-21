@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QWidget,
-                               QVBoxLayout, QLineEdit)
+                               QVBoxLayout, QLineEdit, QLabel)
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QBrush
 
@@ -9,6 +9,15 @@ from ..theme import Color
 from ._constants import _HEADER_STYLE
 
 _FILTER_TEXT_ROLE = Qt.UserRole + 42
+
+_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
+
+
+def loading_label():
+    lbl = QLabel(tr("Loading..."))
+    lbl.setAlignment(Qt.AlignCenter)
+    lbl.setStyleSheet(_LOADING_STYLE)
+    return lbl
 
 
 def make_table(headers, col_specs, sortable=False):
