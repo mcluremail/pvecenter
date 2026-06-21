@@ -110,15 +110,18 @@ class NotificationManager:
         self._show(key, f"{status_icon} {vm_name} — {ru}", color)
 
     def _show(self, key, text, color):
-        existing = self._active.get(key)
+        existing = self._active.pop(key, None)
         if existing:
             existing._fade_timer.stop()
             existing._fade_anim.stop()
             existing.deleteLater()
         offset_y = 12
-        for k, t in self._active.items():
-            if t is not None and t.isVisible():
-                offset_y += t.height() + 8
+        for t in self._active.values():
+            try:
+                if t.isVisible():
+                    offset_y += t.height() + 8
+            except RuntimeError:
+                pass
         toast = FadeToast(self.parent, text, color, offset_y=offset_y)
         self._active[key] = toast
         toast.destroyed.connect(lambda k=key: self._active.pop(k, None))
