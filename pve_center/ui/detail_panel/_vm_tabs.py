@@ -223,17 +223,16 @@ class VMTabs:
             return
         host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
         vmid = panel._last_vm_data.get("vmid")
-        vm_type = panel._last_vm_data.get("type", "qemu")
+        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
         node_name = panel._last_vm_data.get("node") or host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        gen = panel._generation
         panel._workers_mgr.cancel_detail_worker()
         from ...backend import VmDetailWorker
         worker = VmDetailWorker(cfg, node_name, vmid, vm_type)
-        worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (
-            self.on_detail_loaded(d, g, h),
+        worker.signals.detail_ready.connect(lambda d, w=worker: (
+            self.on_action_detail_loaded(d, host_name),
             panel._workers_mgr.discard_worker(w)
         ))
         panel._workers_mgr.current_worker = worker
@@ -359,6 +358,23 @@ class VMTabs:
         cache_key = (vmid, host_name, timeframe)
         panel.metrics_cache[cache_key] = metrics_dict
         panel.metrics_widget.update_curves(metrics_dict)
+
+    def on_action_detail_loaded(self, detail, host_name):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        if detail.get("status") != "ok":
+            return
+        vmid = detail.get("vmid")
+        data = detail["data"]
+        vm_data = panel._vms_by_key.get((host_name, vmid), {})
+        merged = {**vm_data, **data}
+        panel._last_vm_data = merged
+        self.update_action_buttons(merged)
+        self.update_vm_cells(merged)
+        detail_key = (vmid, host_name)
+        panel.details_cache[detail_key] = data
+        self.display_full_vm_info(merged, data)
 
     def on_detail_loaded(self, detail, gen, host_name):
         panel = self.panel
