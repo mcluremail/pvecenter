@@ -40,8 +40,9 @@ Latest release: [v2.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v2
 
 **Security & Audit**
 - User-bound API tokens: created automatically when adding a server, actual operator visible in PVE audit log
-- Token encryption: master password + PBKDF2 (600,000 iterations) + Fernet (AES-256)
-- Config stored in encrypted `nodes.enc`, safe to commit to git
+- Token storage: system keyring (KWallet / GNOME Keyring / Windows Credential Manager)
+- Node config stored in SQLite database, no plaintext tokens on disk
+- Config export/import: encrypted bundle with password (PBKDF2 + Fernet)
 
 **Interface**
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
@@ -54,7 +55,6 @@ Latest release: [v2.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v2
 - Fast startup: parallel data loading, cluster summary and status bar in seconds
 - Persistence: window geometry, splitter positions, create-VM settings, expanded tree nodes saved between sessions
 - Cluster task cache in SQLite — tasks visible instantly on next launch
-- Configuration export/import — transfer encrypted config between computers
 
 ## Requirements
 
@@ -87,7 +87,7 @@ git clone https://github.com/mcluremail/pvecenter.git
 cd pvecenter
 python -m venv venv
 source venv/bin/activate
-pip install PySide6 proxmoxer requests pyqtgraph cryptography
+pip install PySide6 proxmoxer requests pyqtgraph cryptography keyring
 ```
 
 ### .deb package (Debian / Ubuntu)
@@ -150,14 +150,13 @@ python -m pve_center.main
 
 ### First run
 
-1. Launch the application. A master password setup window will appear.
-2. Create and enter a master password. It will be requested at each startup.
-3. Click `[+]` in the tree panel (on the "Clusters" or "Standalone hosts" folder).
-4. In the dialog that opens, enter:
+1. Launch the application.
+2. Click `[+]` in the tree panel (on the "Clusters" or "Standalone hosts" folder).
+3. In the dialog that opens, enter:
    - **Host address** (FQDN or IP)
    - **User** (e.g., `root@pam`)
    - **User password**
-5. The API token is created automatically. The application connects to the host and starts monitoring.
+4. The API token is created automatically and stored in the system keyring. The application connects to the host and starts monitoring.
 
 For a cluster, adding a single node is sufficient — others are discovered dynamically via `/cluster/resources`.
 
@@ -169,9 +168,10 @@ For a cluster, adding a single node is sufficient — others are discovered dyna
 | proxmoxer | Proxmox VE API client |
 | requests | HTTP library |
 | pyqtgraph | Charts and plotting |
-| cryptography | PBKDF2 + Fernet encryption |
+| cryptography | PBKDF2 + Fernet encryption (export/import bundle) |
+| keyring | System keyring for token storage |
 
-For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` are available from Debian/Ubuntu repos. `proxmoxer` is installed via pip (not in repos).
+For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` are available from Debian/Ubuntu repos. `proxmoxer` and `keyring` are installed via pip (not in repos).
 
 ### Project structure
 
@@ -179,7 +179,7 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 |------|---------|
 | `main.py` | Entry point |
 | `backend.py` | API client, token management, worker threads |
-| `config.py` | Encryption and configuration loading |
+| `config.py` | Keyring, SQLite config storage, export/import |
 | `run` | Launch script |
 | `ui/i18n/` | Translation module (tr()), JSON translation files |
 | `ui/mainwindow.py` | Main window |
@@ -195,10 +195,10 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 
 ## Language switching
 
-The interface language is stored in the app config directory (`ui_state` table, key `language`):
-- Linux: `~/.config/pve-center/tasks_cache.sqlite`
-- Windows: `%APPDATA%/pve-center/tasks_cache.sqlite`
-- macOS: `~/Library/Application Support/pve-center/tasks_cache.sqlite`
+The interface language is stored in the app config database (`ui_state` table, key `language`):
+- Linux: `~/.config/pve-center/config.sqlite`
+- Windows: `%APPDATA%/pve-center/config.sqlite`
+- macOS: `~/Library/Application Support/pve-center/config.sqlite`
 
 Supported languages:
 - English (en)
