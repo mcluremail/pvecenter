@@ -576,5 +576,6 @@
   "Trust SSL certificate": "الثقة بشهادة SSL",
   "Accept self-signed certificates. Uncheck for CA-issued certs.": "قبول الشهادات الموقعة ذاتيًا. قم بإلغاء التحديد للشهادات الصادرة عن CA.",
   "trusted": "موثوق",
-  "untrusted": "غير موثوق"
+  "untrusted": "غير موثوق",
+  "SSL certificate": "شهادة SSL"
 }

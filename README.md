@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.2.2](https://github.com/mcluremail/pvecenter/releases/tag/v2.2.2)
+Latest release: [v2.2.3](https://github.com/mcluremail/pvecenter/releases/tag/v2.2.3)
 
 ## Features
 

@@ -1,3 +1,10 @@
+pve-center (2.2.3-1) unstable; urgency=medium
+
+  * Show SSL certificate trust state in host detail panel info table
+    (between Address and PVE version rows)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 19:30:00 +0300
+
 pve-center (2.2.2-1) unstable; urgency=medium
 
   * Fix: SSL trust toggle in host context menu now shows explicit state

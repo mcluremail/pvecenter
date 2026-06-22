@@ -577,5 +577,6 @@
   "Trust SSL certificate": "Confiar en el certificado SSL",
   "Accept self-signed certificates. Uncheck for CA-issued certs.": "Aceptar certificados autofirmados. Desmarcar para certificados de CA.",
   "trusted": "confiado",
-  "untrusted": "no confiado"
+  "untrusted": "no confiado",
+  "SSL certificate": "Certificado SSL"
 }
