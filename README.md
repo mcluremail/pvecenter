@@ -61,7 +61,7 @@ Latest release: [v2.3.0](https://github.com/mcluremail/pvecenter/releases/tag/v2
 
 ## Requirements
 
-- Python 3.10+ (for pip/source install; not needed for Windows .zip)
+- Python 3.10+ (for pip/source install; not needed for Windows .zip or installer)
 - PySide6
 - proxmoxer (not in Debian/Ubuntu repos — install via pip)
 - Proxmox VE (cluster or standalone host)
@@ -144,7 +144,8 @@ brew install virt-viewer
 
 ```bash
 # Windows
-# Extract .zip, run pvecenter.exe
+# Portable: Extract .zip, run pvecenter.exe
+# Installer: Run pvecenter-*-setup.exe
 
 # If installed via pip or .deb:
 pvecenter
@@ -185,20 +186,27 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 | File | Purpose |
 |------|---------|
 | `main.py` | Entry point |
-| `backend.py` | API client, token management, worker threads |
+| `backend.py` | API client, token management, VM actions, migrate/clone workers |
 | `config.py` | Keyring, SQLite config storage, export/import |
 | `run` | Launch script |
 | `ui/i18n/` | Translation module (tr()), JSON translation files |
 | `ui/mainwindow.py` | Main window |
 | `ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
-| `ui/detail_panel/` | VM detail panel (package) |
-| `ui/add_server_dialog.py` | Add server dialog |
+| `ui/detail_panel/` | VM/host detail panel (package) |
+| `ui/add_server_dialog.py` | Add server dialog (with SSL trust toggle) |
 | `ui/create_vm_dialog.py` | Create VM dialog |
+| `ui/migrate_vm_dialog.py` | VM migration dialog |
+| `ui/clone_vm_dialog.py` | VM cloning dialog |
 | `ui/vm_config_editor_dialog.py` | VM config editor dialog |
 | `ui/vm_device_editors.py` | Specialized device editors |
+| `ui/vm_actions.py` | VM power action labels and confirmation |
+| `ui/about_dialog.py` | About dialog |
+| `ui/icons.py` | SVG icon registry |
 | `ui/widgets/` | Widget modules |
 | `ui/api/` | API workers (RRD data, storage content) |
 | `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
+| `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
+| `.github/workflows/release.yml` | CI: build deb/rpm/zip/installer, create release |
 
 ## Language switching
 
