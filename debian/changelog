@@ -1,3 +1,16 @@
+pve-center (2.0.0-1) unstable; urgency=medium
+
+  * BREAKING: master password removed, tokens now stored in system keyring
+  * Config storage migrated from nodes.enc/nodes.json to config.sqlite
+  * keyring library added as dependency (KWallet/GNOME Keyring/Windows Credential Manager)
+  * Each node's token_value stored as separate keyring secret (pve-center://node:{name})
+  * Export/import: encrypted bundle with password (includes tokens)
+  * DB migration: tasks_cache.sqlite auto-renamed to config.sqlite
+  * Node removal now cleans up keyring entries
+  * i18n: 4 new keys in 5 languages
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 00:00:00 +0300
+
 pve-center (1.5.0-1) unstable; urgency=medium
 
   * About dialog with version, author, license, source link

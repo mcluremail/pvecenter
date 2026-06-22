@@ -4,21 +4,26 @@ import sys
 import base64
 import sqlite3
 import threading
+import logging
 
-SALT_FILE = "nodes.salt"
-ENC_FILE = "nodes.enc"
-CONFIG_JSON = "nodes.json"
-TASKS_DB = "tasks_cache.sqlite"
+logger = logging.getLogger(__name__)
+
+CONFIG_DB = "config.sqlite"
+_OLD_DB = "tasks_cache.sqlite"
+_OLD_ENC = "nodes.enc"
+_OLD_SALT = "nodes.salt"
+_OLD_JSON = "nodes.json"
+
+_KEYRING_SERVICE = "pve-center"
+_DB_LOCK = threading.Lock()
+
+# ── paths ──────────────────────────────────────────────────────
 
 def _base_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
+
 def _config_dir():
-    """Возвращает каталог конфигурации (создавая если нет).
-    Linux: $XDG_CONFIG_HOME/pve-center (по умолчанию ~/.config/pve-center)
-    Windows: %APPDATA%/pve-center
-    macOS: ~/Library/Application Support/pve-center
-    """
     if sys.platform == "win32":
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
         d = os.path.join(base, "pve-center")
@@ -31,13 +36,177 @@ def _config_dir():
     os.makedirs(d, exist_ok=True)
     return d
 
-def _migrate_if_needed(name):
-    """Переносит файл из _base_dir() в _config_dir(), если он есть только в старом месте."""
+
+def _migrate_file(name):
     src = os.path.join(_base_dir(), name)
     dst = os.path.join(_config_dir(), name)
     if os.path.exists(src) and not os.path.exists(dst):
         import shutil
         shutil.move(src, dst)
+
+
+def _db_path():
+    return os.path.join(_config_dir(), CONFIG_DB)
+
+
+# ── keyring ────────────────────────────────────────────────────
+
+_keyring_available: bool | None = None
+
+
+def _get_keyring():
+    global _keyring_available
+    if _keyring_available is False:
+        return None
+    try:
+        import keyring as _kr
+        _kr.get_keyring()
+        _keyring_available = True
+        return _kr
+    except Exception:
+        _keyring_available = False
+        return None
+
+
+def _keyring_key(name: str) -> str:
+    return f"node:{name}"
+
+
+def _save_token(name: str, token_value: str):
+    kr = _get_keyring()
+    if kr is None:
+        logger.warning("keyring not available, token for %s not saved", name)
+        return
+    try:
+        kr.set_password(_KEYRING_SERVICE, _keyring_key(name), token_value)
+    except Exception as e:
+        logger.error("keyring set_password failed for %s: %s", name, e)
+
+
+def _load_token(name: str) -> str | None:
+    kr = _get_keyring()
+    if kr is None:
+        return None
+    try:
+        return kr.get_password(_KEYRING_SERVICE, _keyring_key(name))
+    except Exception as e:
+        logger.error("keyring get_password failed for %s: %s", name, e)
+        return None
+
+
+def _delete_token(name: str):
+    kr = _get_keyring()
+    if kr is None:
+        return
+    try:
+        kr.delete_password(_KEYRING_SERVICE, _keyring_key(name))
+    except Exception:
+        pass
+
+
+# ── sqlite init ─────────────────────────────────────────────────
+
+def _init_db():
+    path = _db_path()
+    conn = sqlite3.connect(path, timeout=5)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS nodes (
+            name TEXT PRIMARY KEY,
+            data TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE TABLE IF NOT EXISTS tasks_cache (id INTEGER PRIMARY KEY, data TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS translations (
+            lang  TEXT NOT NULL,
+            msgid TEXT NOT NULL,
+            msgstr TEXT NOT NULL,
+            PRIMARY KEY (lang, msgid)
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+def _migrate_old_db():
+    """tasks_cache.sqlite → config.sqlite"""
+    old = os.path.join(_config_dir(), _OLD_DB)
+    new = _db_path()
+    if not os.path.exists(old):
+        return
+    if os.path.exists(new):
+        return
+    try:
+        import shutil
+        shutil.move(old, new)
+        logger.info("migrated %s → %s", _OLD_DB, CONFIG_DB)
+    except Exception as e:
+        logger.warning("db migration failed: %s", e)
+
+
+# ── nodes config (public API) ───────────────────────────────────
+
+_NODE_FIELDS = ("name", "host", "user", "token_name", "cluster", "cluster_rep", "skip")
+
+
+def load_config() -> list[dict]:
+    """Load nodes from sqlite, attach token_value from keyring.
+    Returns list of node dicts (never None — no password dialog needed)."""
+    for fn in (_OLD_DB,):
+        _migrate_file(fn)
+    _migrate_old_db()
+
+    with _DB_LOCK:
+        conn = _init_db()
+        cur = conn.execute("SELECT data FROM nodes")
+        rows = cur.fetchall()
+        conn.close()
+
+    config = []
+    for (raw,) in rows:
+        try:
+            cfg = json.loads(raw)
+        except Exception:
+            continue
+        name = cfg.get("name", "")
+        if name:
+            token = _load_token(name)
+            cfg["token_value"] = token or ""
+        config.append(cfg)
+    return config
+
+
+def save_config(config_list: list[dict]):
+    """Save nodes to sqlite, token_value to keyring."""
+    with _DB_LOCK:
+        conn = _init_db()
+        # replace all
+        conn.execute("DELETE FROM nodes")
+        for cfg in config_list:
+            name = cfg.get("name", "")
+            if not name:
+                continue
+            # store everything except token_value
+            store = {k: v for k, v in cfg.items() if k != "token_value"}
+            conn.execute("INSERT OR REPLACE INTO nodes (name, data) VALUES (?, ?)",
+                         (name, json.dumps(store, ensure_ascii=False)))
+            # token_value → keyring
+            token_value = cfg.get("token_value")
+            if token_value:
+                _save_token(name, token_value)
+        conn.commit()
+        conn.close()
+
+
+def delete_node_tokens(names: list[str]):
+    """Delete token secrets from keyring for given node names."""
+    for name in names:
+        _delete_token(name)
+
+
+# ── encrypted bundle (export/import) ────────────────────────────
 
 def _derive_key(password: str, salt: bytes) -> bytes:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -45,45 +214,41 @@ def _derive_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=600_000)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
-def _encrypt_to_file(config_list, password, enc_path):
+
+def _encrypt_bundle(data: list[dict], password: str) -> bytes:
     from cryptography.fernet import Fernet
     salt = os.urandom(16)
     key = _derive_key(password, salt)
-    plain = json.dumps(config_list, ensure_ascii=False, indent=2).encode()
+    plain = json.dumps(data, ensure_ascii=False, indent=2).encode()
     token = Fernet(key).encrypt(plain)
-    with open(enc_path, "wb") as fh:
-        fh.write(salt + token)
+    return salt + token
 
-def _decrypt_from_file(enc_path, password):
+
+def _decrypt_bundle(raw: bytes, password: str) -> list[dict]:
     from cryptography.fernet import Fernet
-    with open(enc_path, "rb") as fh:
-        data = fh.read()
-    salt, token = data[:16], data[16:]
+    salt, token = raw[:16], raw[16:]
     key = _derive_key(password, salt)
     plain = Fernet(key).decrypt(token)
     return json.loads(plain.decode())
 
-# ------------------------------------------------------------
-# Password dialog (lazy import PySide6 to keep CLI importable)
-# ------------------------------------------------------------
+
 def _ask_password(mode="enter"):
-    """Show password input dialog.
+    """Show password input dialog for export/import bundle.
     mode='enter' — existing password, mode='set' — set new password.
     Returns password or None (cancelled)."""
     from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                   QLineEdit, QPushButton, QApplication)
+                                   QLineEdit, QPushButton)
     from .ui.i18n import tr
     from .ui.theme import Color
     dialog = QDialog()
-    dialog.setWindowTitle(tr("PVE Center — Authorization"))
+    dialog.setWindowTitle(tr("PVE Center — Password"))
     dialog.setMinimumSize(380, 160)
-
     layout = QVBoxLayout(dialog)
 
     if mode == "set":
-        layout.addWidget(QLabel(tr("Set master password to encrypt tokens:")))
+        layout.addWidget(QLabel(tr("Set password to encrypt configuration:")))
     else:
-        layout.addWidget(QLabel(tr("Enter master password:")))
+        layout.addWidget(QLabel(tr("Enter password:")))
 
     pwd_input = QLineEdit()
     pwd_input.setEchoMode(QLineEdit.Password)
@@ -132,135 +297,44 @@ def _ask_password(mode="enter"):
         return result[0]
     return None
 
-_password = None  # кешированный мастер-пароль
-
-
-def cache_password(pwd):
-    global _password
-    _password = pwd
-
-
-def save_config(config_list):
-    """Сохраняет конфигурацию, используя кешированный мастер-пароль (если есть)."""
-    global _password
-    for fn in (SALT_FILE, ENC_FILE, CONFIG_JSON):
-        _migrate_if_needed(fn)
-    base = _config_dir()
-    enc_path = os.path.join(base, ENC_FILE)
-    json_path = os.path.join(base, CONFIG_JSON)
-
-    if _password:
-        _encrypt_to_file(config_list, _password, enc_path)
-        if os.path.exists(json_path):
-            os.remove(json_path)
-    else:
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(config_list, f, ensure_ascii=False, indent=2)
-
-
-# ------------------------------------------------------------
-# Public API
-# ------------------------------------------------------------
-def load_config():
-    """Загружает конфигурацию. При необходимости показывает диалог пароля.
-    Возвращает список узлов или None (отмена)."""
-    global _password
-    for fn in (SALT_FILE, ENC_FILE, CONFIG_JSON):
-        _migrate_if_needed(fn)
-    base = _config_dir()
-    enc_path = os.path.join(base, ENC_FILE)
-
-    if os.path.exists(enc_path):
-        while True:
-            password = _ask_password("enter")
-            if password is None:
-                return None
-            cache_password(password)
-            try:
-                return _decrypt_from_file(enc_path, password)
-            except Exception:
-                from PySide6.QtWidgets import QMessageBox
-                from .ui.i18n import tr
-                QMessageBox.warning(None, tr("Error"),
-                                     tr("Wrong password. Try again."))
-    else:
-        json_path = os.path.join(base, CONFIG_JSON)
-        if not os.path.exists(json_path):
-            return []
-        with open(json_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        # Проверяем, есть ли токены
-        has_tokens = any(cfg.get("token_value") for cfg in config)
-        if has_tokens:
-            password = _ask_password("set")
-            if password is None:
-                return config
-            cache_password(password)
-            _encrypt_to_file(config, password, enc_path)
-            from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
-                                           QLabel, QPushButton)
-            from .ui.i18n import tr
-            dlg = QDialog()
-            dlg.setWindowTitle(tr("Security"))
-            dlg.setMinimumSize(480, 140)
-            l = QVBoxLayout(dlg)
-            l.addWidget(QLabel(tr("Tokens are encrypted in nodes.enc. Delete nodes.json "
-                                   "(source file with plaintext tokens)?")))
-            l.addStretch()
-            bl = QHBoxLayout()
-            bl.addStretch()
-            yes_b = QPushButton(tr("Yes"))
-            no_b = QPushButton(tr("No"))
-            no_b.setDefault(True)
-            bl.addWidget(yes_b)
-            bl.addWidget(no_b)
-            l.addLayout(bl)
-            yes_b.clicked.connect(dlg.accept)
-            no_b.clicked.connect(dlg.reject)
-            if dlg.exec() == QDialog.Accepted:
-                os.remove(json_path)
-        return config
-
 
 def export_config(dest_path: str) -> bool:
-    base = _config_dir()
-    enc_path = os.path.join(base, ENC_FILE)
-    if not os.path.exists(enc_path):
+    """Export all nodes (with token_value) as encrypted bundle."""
+    config = load_config()
+    if not config:
         return False
-    import shutil
-    shutil.copy2(enc_path, dest_path)
+    password = _ask_password("set")
+    if password is None:
+        return False
+    raw = _encrypt_bundle(config, password)
+    with open(dest_path, "wb") as f:
+        f.write(raw)
     return True
 
 
 def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
-    global _password
+    """Import encrypted bundle, merge with existing config."""
+    from PySide6.QtWidgets import QMessageBox
+    from .ui.i18n import tr
     if not os.path.exists(src_path):
         return None
 
-    from PySide6.QtWidgets import QMessageBox
-    from .ui.i18n import tr
     while True:
         password = _ask_password("enter")
         if password is None:
             return None
         try:
-            imported = _decrypt_from_file(src_path, password)
+            imported = _decrypt_bundle(open(src_path, "rb").read(), password)
             break
         except Exception:
             QMessageBox.warning(None, tr("Error"),
                                  tr("Wrong password. Try again."))
 
     if not merge:
-        _password = password
         save_config(imported)
         return imported
 
-    # Запоминаем пароль импортируемого файла — это новый мастер-пароль
-    # для объединённого конфига. save_config использует _password для шифрования.
-    cache_password(password)
     current = load_config()
-    if current is None:
-        current = []
     current_map = {(c.get("host"), c.get("user")): c for c in current}
     for imp_cfg in imported:
         key = (imp_cfg.get("host"), imp_cfg.get("user"))
@@ -269,116 +343,76 @@ def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
     save_config(merged)
     return merged
 
+
+# ── tasks cache ─────────────────────────────────────────────────
+
 _tasks_cache_lock = threading.Lock()
-
-
-def _tasks_db_path():
-    return os.path.join(_config_dir(), TASKS_DB)
-
-
-def _init_tasks_db():
-    path = _tasks_db_path()
-    conn = sqlite3.connect(path, timeout=5)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("CREATE TABLE IF NOT EXISTS tasks_cache (id INTEGER PRIMARY KEY, data TEXT)")
-    conn.commit()
-    return conn
 
 
 def save_tasks_cache(tasks: list[dict]):
     try:
         data = json.dumps(tasks, ensure_ascii=False, default=str)
         with _tasks_cache_lock:
-            conn = _init_tasks_db()
+            conn = _init_db()
             conn.execute("INSERT OR REPLACE INTO tasks_cache (id, data) VALUES (1, ?)", (data,))
             conn.commit()
             conn.close()
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("save_tasks_cache: %s", e)
+        logger.warning("save_tasks_cache: %s", e)
 
 
 def load_tasks_cache() -> list[dict]:
     try:
         with _tasks_cache_lock:
-            conn = _init_tasks_db()
+            conn = _init_db()
             cur = conn.execute("SELECT data FROM tasks_cache WHERE id = 1")
             row = cur.fetchone()
             conn.close()
             if row:
                 return json.loads(row[0])
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("load_tasks_cache: %s", e)
+        logger.warning("load_tasks_cache: %s", e)
     return []
 
 
-# ------------------------------------------------------------
-# UI State — key-value store для сохранения состояния интерфейса
-# ------------------------------------------------------------
+# ── ui state ────────────────────────────────────────────────────
 
 _ui_state_lock = threading.Lock()
-
-
-def _init_ui_db():
-    path = _tasks_db_path()  # один файл, вторая таблица
-    conn = sqlite3.connect(path, timeout=5)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS translations (
-            lang  TEXT NOT NULL,
-            msgid TEXT NOT NULL,
-            msgstr TEXT NOT NULL,
-            PRIMARY KEY (lang, msgid)
-        )
-    """)
-    conn.commit()
-    return conn
 
 
 def save_ui_state(key: str, value: str):
     try:
         with _ui_state_lock:
-            conn = _init_ui_db()
+            conn = _init_db()
             conn.execute("INSERT OR REPLACE INTO ui_state (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
             conn.close()
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("save_ui_state(%s): %s", key, e)
+        logger.warning("save_ui_state(%s): %s", key, e)
 
 
 def load_ui_state(key: str) -> str | None:
     try:
         with _ui_state_lock:
-            conn = _init_ui_db()
+            conn = _init_db()
             cur = conn.execute("SELECT value FROM ui_state WHERE key = ?", (key,))
             row = cur.fetchone()
             conn.close()
             return row[0] if row else None
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("load_ui_state(%s): %s", key, e)
+        logger.warning("load_ui_state(%s): %s", key, e)
         return None
 
 
-# ------------------------------------------------------------
-# Translations — bulk insert helper
-# ------------------------------------------------------------
+# ── translations ────────────────────────────────────────────────
 
 _translations_lock = _ui_state_lock
 
 
 def seed_translations(lang: str, translations: dict[str, str], version: int = 0):
-    """Insert a translation dictionary for a language if not already present.
-    Only inserts rows where (lang, msgid) does not exist — does not overwrite
-    user modifications. When *version* is non-zero and differs from the stored
-    version, all built-in translations are replaced to pick up updates.
-    """
     try:
         with _translations_lock:
-            conn = _init_ui_db()
+            conn = _init_db()
             if version:
                 cur = conn.execute(
                     "SELECT value FROM ui_state WHERE key = 'i18n_version'"
@@ -406,10 +440,6 @@ def seed_translations(lang: str, translations: dict[str, str], version: int = 0)
             conn.commit()
             conn.close()
             if inserted:
-                import logging
-                logging.getLogger(__name__).info(
-                    "Seeded %d translations for %s", inserted, lang
-                )
+                logger.info("Seeded %d translations for %s", inserted, lang)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("seed_translations(%s): %s", lang, e)
+        logger.warning("seed_translations(%s): %s", lang, e)

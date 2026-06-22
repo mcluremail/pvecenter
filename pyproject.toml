@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pvecenter"
-version = "1.5.0"
+version = "2.0.0"
 description = "Desktop client for Proxmox VE clusters"
 readme = "README.md"
 authors = [{ name = "Taurus McLure", email = "taurus@mclure.ru" }]
@@ -27,6 +27,7 @@ dependencies = [
     "requests>=2.28",
     "pyqtgraph>=0.12",
     "cryptography>=39.0",
+    "keyring>=24.0",
 ]
 
 [project.urls]

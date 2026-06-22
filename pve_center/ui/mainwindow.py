@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
                                     tr("Configuration exported to:\n{path}").format(path=path))
         else:
             QMessageBox.warning(self, tr("Export"),
-                                 tr("No encrypted configuration found. "
+                                 tr("No servers to export. "
                                     "Add at least one server first."))
 
     def _on_import_config(self):
@@ -529,6 +529,8 @@ class MainWindow(QMainWindow):
         self.nodes_cfg = [c for c in self.nodes_cfg if c not in matched]
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         save_config(self.nodes_cfg)
+        from ..config import delete_node_tokens
+        delete_node_tokens([c.get("name", "") for c in matched])
         self.refresh_data()
 
     def _on_host_token_refresh(self, host_name):

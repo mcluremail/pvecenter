@@ -18,8 +18,6 @@ def main():
     set_language(lang)
 
     nodes_cfg = load_config()
-    if nodes_cfg is None:
-        return
 
     from .ui.mainwindow import MainWindow
     window = MainWindow(nodes_cfg)
