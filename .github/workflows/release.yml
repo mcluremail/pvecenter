@@ -131,12 +131,13 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
+          $distDir = Resolve-Path "dist/pvecenter"
           $nsisPath = "C:\Program Files (x86)\NSIS"
           if (Test-Path "$nsisPath\makensis.exe") {
-            & "$nsisPath\makensis.exe" /DVERSION=$version /DDISTDIR=dist/pvecenter packaging/pve-center-installer.nsi
+            & "$nsisPath\makensis.exe" /DVERSION=$version /DDISTDIR="$distDir" packaging/pve-center-installer.nsi
           } else {
             $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
-            makensis /DVERSION=$version /DDISTDIR=dist/pvecenter packaging/pve-center-installer.nsi
+            makensis /DVERSION=$version /DDISTDIR="$distDir" packaging/pve-center-installer.nsi
           }
       - name: Rename installer
         shell: pwsh

@@ -24,7 +24,7 @@ a = Analysis(
     ],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=['pyqtgraph.opengl', 'OpenGL'],
     cipher=block_cipher,
     noarchive=False,
 )
