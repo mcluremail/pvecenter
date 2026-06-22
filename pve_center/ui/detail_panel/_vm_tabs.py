@@ -1,7 +1,7 @@
 import logging
 
 from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget,
-                               QSizePolicy, QTableWidgetItem, QMessageBox,
+                               QSizePolicy, QTableWidgetItem,
                                QHBoxLayout, QScrollArea,
                                QTableWidget, QHeaderView, QGridLayout)
 from PySide6.QtCore import Qt
@@ -10,7 +10,7 @@ from PySide6.QtGui import QColor, QBrush
 from ..i18n import tr
 from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime, parse_pve_error
-from ..vm_actions import VM_ACTION_MESSAGE_LABELS
+from ..vm_actions import VM_ACTION_MESSAGE_LABELS, confirm_vm_action
 from ._constants import TabIndex
 from ._table_utils import compact_table, safe_pct
 
@@ -126,21 +126,8 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        if action in ("stop", "reset", "shutdown", "reboot", "suspend"):
-            msgs = {
-                "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
-                "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
-                "shutdown": tr("Send ACPI shutdown to VM {vmid}?").format(vmid=vmid),
-                "reboot": tr("Send ACPI reboot to VM {vmid}?").format(vmid=vmid),
-                "suspend": tr("Suspend VM {vmid}?").format(vmid=vmid),
-            }
-            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], parent=panel)
-            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
-            msg.addButton(tr("No"), QMessageBox.NoRole)
-            msg.setDefaultButton(yes)
-            msg.exec()
-            if msg.clickedButton() != yes:
-                return
+        if not confirm_vm_action(action, vmid, parent=panel):
+            return
         node_name = panel._last_vm_data.get("node") or host_name
         vm_type = panel._last_vm_data.get("type", "qemu")
         from ...backend import VmActionWorker

@@ -35,3 +35,29 @@ VM_ACTION_TOOLTIPS = {
     "stop": tr("Force stop VM (kill process, unsaved data lost)"),
     "resume": tr("Resume suspended VM"),
 }
+
+_CONFIRM_ACTIONS = ("stop", "reset", "shutdown", "reboot", "suspend")
+
+_CONFIRM_MESSAGES = {
+    "stop": "Force stop VM {vmid}? Unsaved data will be lost.",
+    "reset": "Force reset VM {vmid}?",
+    "shutdown": "Send ACPI shutdown to VM {vmid}?",
+    "reboot": "Send ACPI reboot to VM {vmid}?",
+    "suspend": "Suspend VM {vmid}?",
+}
+
+
+def confirm_vm_action(action, vmid, parent=None):
+    """Show confirmation dialog for destructive VM actions.
+    Returns True if user confirmed, False if cancelled or action doesn't need confirmation.
+    """
+    if action not in _CONFIRM_ACTIONS:
+        return True
+    from PySide6.QtWidgets import QMessageBox
+    msg_text = tr(_CONFIRM_MESSAGES[action]).format(vmid=vmid)
+    msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msg_text, parent=parent)
+    yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+    msg.addButton(tr("No"), QMessageBox.NoRole)
+    msg.setDefaultButton(yes)
+    msg.exec()
+    return msg.clickedButton() == yes

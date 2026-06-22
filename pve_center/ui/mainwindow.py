@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSize
 from PySide6.QtGui import QShortcut, QKeySequence, QAction
 
 from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
+from .vm_actions import confirm_vm_action
 from ..config import (save_config, save_tasks_cache, load_tasks_cache,
                       save_ui_state, load_ui_state, export_config, import_config)
 import json
@@ -455,22 +456,8 @@ class MainWindow(QMainWindow):
             return
         vm = self._vms_by_key.get((host_name, vmid))
         vm_type = (vm.get("type", "qemu") if vm else "qemu")
-        if action in ("stop", "reset", "shutdown", "reboot", "suspend"):
-            msgs = {
-                "stop": tr("Force stop VM {vmid}? Unsaved data will be lost.").format(vmid=vmid),
-                "reset": tr("Force reset VM {vmid}?").format(vmid=vmid),
-                "shutdown": tr("Send ACPI shutdown to VM {vmid}?").format(vmid=vmid),
-                "reboot": tr("Send ACPI reboot to VM {vmid}?").format(vmid=vmid),
-                "suspend": tr("Suspend VM {vmid}?").format(vmid=vmid),
-            }
-            from PySide6.QtWidgets import QMessageBox
-            msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msgs[action], parent=self)
-            yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
-            msg.addButton(tr("No"), QMessageBox.NoRole)
-            msg.setDefaultButton(yes)
-            msg.exec()
-            if msg.clickedButton() != yes:
-                return
+        if not confirm_vm_action(action, vmid, parent=self):
+            return
         from ..backend import VmActionWorker
         worker = VmActionWorker(cfg, node, vmid, vm_type, action)
         worker.signals.action_result.connect(lambda msg: (
