@@ -137,6 +137,11 @@ def _migrate_old_db():
     if not os.path.exists(old):
         return
     if os.path.exists(new):
+        try:
+            os.remove(old)
+            logger.info("removed orphaned %s", _OLD_DB)
+        except Exception:
+            pass
         return
     try:
         import shutil
@@ -180,24 +185,24 @@ def load_config() -> list[dict]:
 
 def save_config(config_list: list[dict]):
     """Save nodes to sqlite, token_value to keyring."""
+    tokens = []
     with _DB_LOCK:
         conn = _init_db()
-        # replace all
         conn.execute("DELETE FROM nodes")
         for cfg in config_list:
             name = cfg.get("name", "")
             if not name:
                 continue
-            # store everything except token_value
             store = {k: v for k, v in cfg.items() if k != "token_value"}
             conn.execute("INSERT OR REPLACE INTO nodes (name, data) VALUES (?, ?)",
                          (name, json.dumps(store, ensure_ascii=False)))
-            # token_value → keyring
             token_value = cfg.get("token_value")
             if token_value:
-                _save_token(name, token_value)
+                tokens.append((name, token_value))
         conn.commit()
         conn.close()
+    for name, token_value in tokens:
+        _save_token(name, token_value)
 
 
 def delete_node_tokens(names: list[str]):
@@ -303,6 +308,15 @@ def export_config(dest_path: str) -> bool:
     config = load_config()
     if not config:
         return False
+    missing = [c.get("name", "?") for c in config if not c.get("token_value")]
+    if missing:
+        from PySide6.QtWidgets import QMessageBox
+        from .ui.i18n import tr
+        QMessageBox.warning(
+            None, tr("Export"),
+            tr("Tokens missing for {count} host(s): {names}. They will not be included in the export.").format(
+                count=len(missing), names=", ".join(missing[:5]))
+        )
     password = _ask_password("set")
     if password is None:
         return False

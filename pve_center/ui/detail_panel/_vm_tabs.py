@@ -250,10 +250,10 @@ class VMTabs:
         self.show_vm_metrics(vm_data)
 
         if detail_key not in panel.details_cache:
-            panel.info_label.setText(tr("Loading detailed info..."))
-            panel.info_stack.setCurrentIndex(0)
             cfg = panel._cfg_by_name.get(host_name)
             if cfg:
+                panel.info_label.setText(tr("Loading detailed info..."))
+                panel.info_stack.setCurrentIndex(0)
                 node_name = vm_data.get("node") or host_name
                 vm_type = vm_data.get("type", "qemu")
                 from ...backend import VmDetailWorker
@@ -261,6 +261,9 @@ class VMTabs:
                 worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (self.on_detail_loaded(d, g, h), panel._workers_mgr.discard_worker(w)))
                 panel._workers_mgr.current_worker = worker
                 panel._workers_mgr.run_worker(worker)
+            else:
+                panel.info_label.setText(tr("Server configuration not found for {host}").format(host=host_name))
+                panel.info_stack.setCurrentIndex(0)
         else:
             self.display_full_vm_info(vm_data, panel.details_cache[detail_key])
 

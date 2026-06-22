@@ -1,3 +1,13 @@
+pve-center (2.0.3-1) unstable; urgency=medium
+
+  * save_config: keyring D-Bus calls moved outside _DB_LOCK (prevent blocking)
+  * _migrate_old_db: remove orphaned tasks_cache.sqlite if config.sqlite exists
+  * export_config: warn user when tokens missing (keyring unavailable)
+  * VM detail: show error message instead of "Loading..." forever when cfg not found
+  * i18n: 2 new keys in 5 languages
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 14:00:00 +0300
+
 pve-center (2.0.2-1) unstable; urgency=medium
 
   * Fix: VM detail info not loading after adding host
