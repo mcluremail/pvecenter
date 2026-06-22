@@ -169,6 +169,8 @@ class HostTabs:
     def populate_host_summary(self, hosts):
         panel = self.panel
         table = panel.datacenter_summary
+        table.clearSpans()
+        table.clearContents()
         table.setColumnCount(6)
         table.setHorizontalHeaderLabels([
             tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")
@@ -261,6 +263,8 @@ class HostTabs:
         for cl in clusters.values():
             cl["vms"] = [vm for vm in panel.all_vms if vm.get("node") in cl["nodes"]]
         table = panel.datacenter_summary
+        table.clearSpans()
+        table.clearContents()
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels([tr("Cluster"), tr("Hosts"), tr("VMs"), tr("CPU %"), tr("RAM (GiB)")])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)

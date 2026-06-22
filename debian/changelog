@@ -1,3 +1,11 @@
+pve-center (2.1.2-1) unstable; urgency=medium
+
+  * Fix: cluster summary showing ghost progressbar + missing host
+    (table not cleared between cluster_folder (5 cols + span) and
+    cluster view (6 cols) — stale cellWidgets and spans leaked)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 17:00:00 +0300
+
 pve-center (2.1.1-1) unstable; urgency=medium
 
   * Fix: host info collapsed from 10 fields to 4 after soft refresh
