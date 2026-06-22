@@ -12,7 +12,14 @@ except ImportError:
     pg = None
     _HAS_PG = False
 
-METRICS = [tr("CPU"), tr("RAM"), tr("Network"), tr("Disk")]
+_METRIC_KEYS = [("cpu", "CPU"), ("ram", "RAM"), ("net", "Network"), ("disk", "Disk")]
+
+
+def _metric_label(key):
+    for k, label in _METRIC_KEYS:
+        if k == key:
+            return tr(label)
+    return key
 
 
 class VmMetricsWidget(QWidget):
@@ -31,9 +38,10 @@ class VmMetricsWidget(QWidget):
         top = QHBoxLayout()
         top.addWidget(QLabel(tr("Metric") + ":"))
         self.metric_combo = QComboBox()
-        self.metric_combo.addItems(METRICS)
-        self.metric_combo.setCurrentText(tr("CPU"))
-        self.metric_combo.currentTextChanged.connect(self._on_metric_changed)
+        for key, _ in _METRIC_KEYS:
+            self.metric_combo.addItem(_metric_label(key), key)
+        self.metric_combo.setCurrentIndex(0)
+        self.metric_combo.currentIndexChanged.connect(self._on_metric_changed)
         top.addWidget(self.metric_combo)
         top.addSpacing(16)
         top.addWidget(QLabel(tr("Interval") + ":"))
@@ -65,26 +73,29 @@ class VmMetricsWidget(QWidget):
         else:
             self._layout.addWidget(QLabel(tr("PyQtGraph not installed. Charts unavailable.")))
 
-    def _on_metric_changed(self, metric):
-        self.metric_changed.emit(metric)
+    def _on_metric_changed(self):
+        key = self.metric_combo.currentData()
+        self.metric_changed.emit(key)
         self._render_current_metric()
 
     def show_disk_io(self, visible=True):
         self._disk_visible = visible
-        expected = list(METRICS) if visible else [m for m in METRICS if m != tr("Disk")]
-        current = self.metric_combo.currentText()
-        items = [self.metric_combo.itemText(i) for i in range(self.metric_combo.count())]
-        if items == expected:
+        current_key = self.metric_combo.currentData()
+        expected_keys = [k for k, _ in _METRIC_KEYS if visible or k != "disk"]
+        current_keys = [self.metric_combo.itemData(i) for i in range(self.metric_combo.count())]
+        if current_keys == expected_keys:
             return
         self.metric_combo.blockSignals(True)
         self.metric_combo.clear()
-        self.metric_combo.addItems(expected)
+        for key in expected_keys:
+            self.metric_combo.addItem(_metric_label(key), key)
         self.metric_combo.blockSignals(False)
-        if current in expected:
-            self.metric_combo.setCurrentText(current)
+        if current_key in expected_keys:
+            idx = expected_keys.index(current_key)
         else:
-            self.metric_combo.setCurrentText(tr("CPU"))
-            self.metric_changed.emit(tr("CPU"))
+            idx = 0
+        self.metric_combo.setCurrentIndex(idx)
+        self._on_metric_changed()
 
     def clear_curves(self):
         self._cached_data = None
@@ -99,7 +110,7 @@ class VmMetricsWidget(QWidget):
     def _render_current_metric(self):
         if not self._has_plot or self._cached_data is None:
             return
-        metric = self.metric_combo.currentText()
+        metric = self.metric_combo.currentData()
         data = self._cached_data
 
         self.plot.clear()
@@ -107,14 +118,14 @@ class VmMetricsWidget(QWidget):
             self._legend.clear()
         self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
 
-        if metric == tr("CPU"):
+        if metric == "cpu":
             cpu = data.get('cpu', [])
             if cpu:
                 self.curve.setData([d['time'] for d in cpu], [d['value'] for d in cpu])
             self.plot.setTitle(tr("CPU, %"))
             self.plot.setLabel('left', '%')
 
-        elif metric == tr("RAM"):
+        elif metric == "ram":
             mem = data.get('mem', [])
             if mem:
                 self.curve.setData([d['time'] for d in mem],
@@ -125,12 +136,12 @@ class VmMetricsWidget(QWidget):
             self.plot.setTitle(tr("RAM, GiB"))
             self.plot.setLabel('left', 'GiB')
 
-        elif metric == tr("Network"):
+        elif metric == "net":
             netin = data.get('netin', [])
             netout = data.get('netout', [])
             self._render_dual(netin, netout, tr("Network traffic"), "B")
 
-        elif metric == tr("Disk"):
+        elif metric == "disk":
             diskread = data.get('diskread', [])
             diskwrite = data.get('diskwrite', [])
             self._render_dual(diskread, diskwrite, tr("Disk I/O"), "B")

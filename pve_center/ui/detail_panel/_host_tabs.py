@@ -8,6 +8,7 @@ from PySide6.QtGui import QColor, QBrush
 from ..i18n import tr
 from ..theme import Color
 from ..utils import status_text, format_uptime as _format_uptime
+from ..icons import get_icon
 from ._constants import _progress_style, TabIndex
 from ._table_utils import (make_table, compact_table, set_cell_text,
                            update_progress_bar, safe_pct, set_empty_placeholder,
@@ -20,10 +21,11 @@ class HostTabs:
 
     def build_host_vm_tab(self):
         table = make_table(
-            [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %"],
+            [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %", tr("RAM"), tr("Disk"), tr("Uptime")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 50),
              (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
-             (QHeaderView.Interactive, 55)],
+             (QHeaderView.Interactive, 55), (QHeaderView.Interactive, 80),
+             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 80)],
         )
         self.panel.host_vm_table = table
         tab = QScrollArea()
@@ -181,7 +183,16 @@ class HostTabs:
         table.setRowCount(len(hosts))
         for i, node in enumerate(hosts):
             node_name = node.get("_display_name") or node.get("node", "?")
-            table.setItem(i, 0, QTableWidgetItem(node_name))
+            host_name = node.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            if cfg and cfg.get("cluster_rep"):
+                node_name = "★ " + node_name
+            name_item = QTableWidgetItem(node_name)
+            if cfg and cfg.get("cluster_rep"):
+                f = name_item.font()
+                f.setBold(True)
+                name_item.setFont(f)
+            table.setItem(i, 0, name_item)
 
             status = node.get("status", "unknown")
             status_item = QTableWidgetItem(f"● {status_text(status)}")
@@ -193,8 +204,6 @@ class HostTabs:
                 status_item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
             table.setItem(i, 1, status_item)
 
-            host_name = node.get("host_name", "")
-            cfg = panel._cfg_by_name.get(host_name)
             address = cfg.get("host", "") if cfg else ""
             table.setItem(i, 2, QTableWidgetItem(address))
 
@@ -427,13 +436,14 @@ class HostTabs:
                        and vm.get("host_name") == host_cfg_name]
         panel.host_vm_table.setSortingEnabled(False)
         if not vms_of_host:
-            set_empty_placeholder(panel.host_vm_table, 5)
+            set_empty_placeholder(panel.host_vm_table, 8)
             panel.host_vm_table.setSortingEnabled(True)
             return
         panel.host_vm_table.setRowCount(len(vms_of_host))
         WARN_ROLE = Qt.UserRole + 10
         for i, vm in enumerate(vms_of_host):
             name_item = QTableWidgetItem(str(vm.get("name", "")))
+            name_item.setIcon(get_icon("vm", vm.get("status")))
             name_item.setData(Qt.UserRole + 30, vm.get("vmid"))
             panel.host_vm_table.setItem(i, 0, name_item)
             panel.host_vm_table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
@@ -453,9 +463,31 @@ class HostTabs:
             else:
                 cpu = cpu_val
             panel.host_vm_table.setItem(i, 4, QTableWidgetItem(str(cpu)))
+            mem = vm.get("mem", 0) or 0
+            maxmem = vm.get("maxmem", 0) or 0
+            if maxmem:
+                mem_pct = round(mem / maxmem * 100, 1)
+                mem_gb = round(mem / (1024**3), 2)
+                maxmem_gb = round(maxmem / (1024**3), 2)
+                ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
+            else:
+                ram_str = "—"
+            panel.host_vm_table.setItem(i, 5, QTableWidgetItem(ram_str))
+            disk = vm.get("disk", 0) or 0
+            maxdisk = vm.get("maxdisk", 0) or 0
+            if maxdisk:
+                disk_gb = round(disk / (1024**3), 2)
+                maxdisk_gb = round(maxdisk / (1024**3), 2)
+                disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
+            else:
+                disk_str = "—"
+            panel.host_vm_table.setItem(i, 6, QTableWidgetItem(disk_str))
+            uptime = vm.get("uptime", 0)
+            uptime_str = _format_uptime(uptime) if uptime else "—"
+            panel.host_vm_table.setItem(i, 7, QTableWidgetItem(uptime_str))
             warning = (isinstance(cpu_val, float) and cpu_val >= 0.9) or vm_status == "stopped"
             if warning:
-                for c in range(5):
+                for c in range(8):
                     it = panel.host_vm_table.item(i, c)
                     if it:
                         it.setBackground(QColor(Color.WARN_ROW_BG))
@@ -479,7 +511,9 @@ class HostTabs:
         table = panel.host_storage_table
         table.setRowCount(len(storages))
         for i, st in enumerate(storages):
-            table.setItem(i, 0, QTableWidgetItem(st.get("storage", st.get("id", ""))))
+            name_item = QTableWidgetItem(st.get("storage", st.get("id", "")))
+            name_item.setIcon(get_icon("storage"))
+            table.setItem(i, 0, name_item)
             table.setItem(i, 1, QTableWidgetItem(st.get("type", "")))
             content = st.get("content", "")
             if isinstance(content, list):
@@ -660,7 +694,9 @@ class HostTabs:
         table = self.panel.host_network_table
         table.setRowCount(len(interfaces))
         for i, iface in enumerate(interfaces):
-            table.setItem(i, 0, QTableWidgetItem(iface.get("iface", "")))
+            iface_item = QTableWidgetItem(iface.get("iface", ""))
+            iface_item.setIcon(get_icon("network"))
+            table.setItem(i, 0, iface_item)
             table.setItem(i, 1, QTableWidgetItem(iface.get("type", "")))
             state = iface.get("active", 0)
             state_str = tr("on") if state == 1 else tr("off")
@@ -715,7 +751,9 @@ class HostTabs:
         table = self.panel.host_services_table
         table.setRowCount(len(services))
         for i, svc in enumerate(services):
-            table.setItem(i, 0, QTableWidgetItem(svc.get("name", "")))
+            name_item = QTableWidgetItem(svc.get("name", ""))
+            name_item.setIcon(get_icon("services"))
+            table.setItem(i, 0, name_item)
             state = svc.get("state", "")
             table.setItem(i, 1, QTableWidgetItem(state))
             table.setItem(i, 2, QTableWidgetItem(svc.get("desc", "")))
@@ -777,7 +815,9 @@ class HostTabs:
         for i, d in enumerate(unique):
             model = d.get("model", "")
             devpath = d.get("devpath", "")
-            table.setItem(i, 0, QTableWidgetItem(devpath))
+            dev_item = QTableWidgetItem(devpath)
+            dev_item.setIcon(get_icon("disk"))
+            table.setItem(i, 0, dev_item)
             table.setItem(i, 1, QTableWidgetItem(d.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(str(model)))
             table.setItem(i, 3, QTableWidgetItem(format_volsize(d.get("size", 0))))

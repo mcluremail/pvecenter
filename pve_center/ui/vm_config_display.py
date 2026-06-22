@@ -195,6 +195,10 @@ def is_disk_key(key):
     return pfx in ("virtio", "scsi", "sata") or (pfx == "ide" and key != "ide2")
 
 
+def is_tpm_key(key):
+    return _key_prefix(key) == "tpmstate"
+
+
 # PVE defaults for keys absent from config API (hardware tab)
 HW_DEFAULTS = {
     "cores": 1,

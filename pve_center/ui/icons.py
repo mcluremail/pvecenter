@@ -182,6 +182,15 @@ _TEMPLATE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape
 <rect x="4" y="8.5" width="6" height="3" rx="0.5" fill="{c2}" stroke="{c}" stroke-width="0.8"/>
 </svg>"""
 
+_TPM = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="2" y="3" width="10" height="8" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<rect x="4" y="5" width="2" height="2" fill="{c2}"/>
+<rect x="7" y="5" width="2" height="2" fill="{c2}"/>
+<rect x="4" y="8" width="2" height="2" fill="{c2}"/>
+<rect x="7" y="8" width="2" height="2" fill="{c2}"/>
+<line x1="10" y1="6" x2="12" y2="6" stroke="{c}" stroke-width="1" stroke-linecap="round"/>
+</svg>"""
+
 _EXPAND = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
 <polyline points="1,4 1,1 4,1" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="8,1 11,1 11,4" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -320,6 +329,7 @@ def init_icons():
         "backup": _make_icon(_BACKUP.format(c=_C, c2=_C2)),
         "iso": _make_icon(_ISO.format(c=_C, c2=_C2)),
         "template": _make_icon(_TEMPLATE.format(c=_C, c2=_C2)),
+        "tpm": _make_icon(_TPM.format(c=_C, c2=_C2)),
         "network": _make_icon(_NETWORK.format(c=_C, c2=_C2)),
         "services": _make_icon(_SERVICES.format(c=_C, c2=_C2)),
         "snapshot": _make_icon(_SNAPSHOT.format(c=_C, c2=_C2)),

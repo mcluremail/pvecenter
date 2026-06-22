@@ -3,7 +3,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor
 from ..hover import enable_row_hover
 from ..vm_config_display import (get_hardware_rows, get_editor_spec,
-                                 HW_DEFAULTS, is_net_key, is_cdrom_key, is_disk_key)
+                                 HW_DEFAULTS, is_net_key, is_cdrom_key, is_disk_key,
+                                 is_tpm_key)
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 from ..vm_device_editors import (VmNetworkEditorDialog, VmCdromEditorDialog,
                                  VmDiskEditorDialog)
@@ -96,6 +97,8 @@ class VmHardwareWidget(QWidget):
                     icon = get_icon("network")
                 elif is_cdrom_key(key):
                     icon = get_icon("iso")
+                elif is_tpm_key(key):
+                    icon = get_icon("tpm")
                 elif section == "identity":
                     icon = get_icon("vm")
                 elif section in ("cpu", "memory"):

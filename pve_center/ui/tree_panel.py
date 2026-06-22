@@ -680,8 +680,6 @@ class TreePanel(QWidget):
             current = path + "|" + label if path else label
             if current in saved_paths:
                 item.setExpanded(True)
-            else:
-                item.setExpanded(False)
             for i in range(item.childCount()):
                 match_and_expand(item.child(i), current)
         for i in range(self.tree.topLevelItemCount()):

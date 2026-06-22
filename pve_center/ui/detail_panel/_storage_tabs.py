@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 
 from ..i18n import tr
 from ..theme import Color
+from ..icons import get_icon
 from ._constants import _progress_style, _HAS_PG, TabIndex
 from ._table_utils import (make_table, make_filterable_table, format_volsize,
                            safe_pct, set_empty_placeholder, set_cell_text,
@@ -224,7 +225,9 @@ class StorageTabs:
             return
         table.setRowCount(len(storages))
         for i, st in enumerate(storages):
-            table.setItem(i, 0, QTableWidgetItem(st.get("storage", st.get("id", ""))))
+            name_item = QTableWidgetItem(st.get("storage", st.get("id", "")))
+            name_item.setIcon(get_icon("storage"))
+            table.setItem(i, 0, name_item)
             table.setItem(i, 1, QTableWidgetItem(st.get("type", "")))
             content = st.get("content", "")
             if isinstance(content, list):
@@ -474,7 +477,7 @@ class StorageTabs:
         for ct, items in pending.items():
             if ct == "iso" and items:
                 panel.storage_iso_stack.setCurrentIndex(1)
-                self.populate_content_table(panel.storage_iso_table, items)
+                self.populate_content_table(panel.storage_iso_table, items, "iso")
                 panel._iso_volids = {v.get("volid", "") for v in items if v.get("volid")}
             elif ct == "iso":
                 panel.storage_iso_stack.widget(0).setText(tr("No data"))
@@ -482,16 +485,19 @@ class StorageTabs:
                 panel.storage_iso_table.setRowCount(0)
             elif ct in ("vztmpl", "snippets") and items:
                 panel.storage_tpl_stack.setCurrentIndex(1)
-                self.populate_content_table(panel.storage_tpl_table, items)
+                self.populate_content_table(panel.storage_tpl_table, items, "template")
             elif ct in ("vztmpl", "snippets"):
                 panel.storage_tpl_stack.widget(0).setText(tr("No data"))
                 panel.storage_tpl_stack.setCurrentIndex(0)
                 panel.storage_tpl_table.setRowCount(0)
 
-    def populate_content_table(self, table, items):
+    def populate_content_table(self, table, items, icon_type=None):
         table.setRowCount(len(items))
         for i, vol in enumerate(items):
-            table.setItem(i, 0, QTableWidgetItem(vol.get("volid", "")))
+            volid_item = QTableWidgetItem(vol.get("volid", ""))
+            if icon_type:
+                volid_item.setIcon(get_icon(icon_type))
+            table.setItem(i, 0, volid_item)
             table.setItem(i, 1, QTableWidgetItem(vol.get("format", "")))
             table.setItem(i, 2, QTableWidgetItem(format_volsize(vol.get("size", 0))))
             ctime = vol.get("ctime")
@@ -592,7 +598,9 @@ class StorageTabs:
         table = self.panel.storage_backups_table
         table.setRowCount(len(backups))
         for i, b in enumerate(backups):
-            table.setItem(i, 0, QTableWidgetItem(f"VM {b.get('vmid', '')}"))
+            vm_item = QTableWidgetItem(f"VM {b.get('vmid', '')}")
+            vm_item.setIcon(get_icon("backup"))
+            table.setItem(i, 0, vm_item)
             table.setItem(i, 1, QTableWidgetItem(b.get("subtype") or b.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
             size = b.get("size", 0) or 0
@@ -641,7 +649,9 @@ class StorageTabs:
         table = self.panel.storage_disks_table
         table.setRowCount(len(disks))
         for i, d in enumerate(disks):
-            table.setItem(i, 0, QTableWidgetItem(str(d.get("vmid", ""))))
+            vmid_item = QTableWidgetItem(str(d.get("vmid", "")))
+            vmid_item.setIcon(get_icon("disk"))
+            table.setItem(i, 0, vmid_item)
             table.setItem(i, 1, QTableWidgetItem(d.get("vm_name", "")))
             table.setItem(i, 2, QTableWidgetItem(d.get("volid", "")))
             table.setItem(i, 3, QTableWidgetItem(d.get("bus", "")))

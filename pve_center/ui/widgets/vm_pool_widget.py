@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBox
 from PySide6.QtCore import Qt
 from ..hover import enable_row_hover
 from ..i18n import tr
+from ..icons import get_icon
 from ..detail_panel._constants import _progress_style
 from ..detail_panel._table_utils import set_empty_placeholder
 from ..theme import Color
@@ -39,7 +40,9 @@ class VmPoolWidget(QWidget):
             return
         self.table.setRowCount(len(vms))
         for i, vm in enumerate(vms):
-            self.table.setItem(i, 0, QTableWidgetItem(str(vm.get("name", ""))))
+            name_item = QTableWidgetItem(str(vm.get("name", "")))
+            name_item.setIcon(get_icon("vm", vm.get("status")))
+            self.table.setItem(i, 0, name_item)
             self.table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
 
             maxdisk = vm.get("maxdisk", 0)
