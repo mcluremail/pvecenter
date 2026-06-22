@@ -1,3 +1,10 @@
+pve-center (1.4.2-1) unstable; urgency=medium
+
+  * Fix: FadeToast RuntimeError (C++ object deleted before Python ref cleared)
+  * Fix: VM action buttons not updating after start/stop/shutdown
+
+ -- Taurus McLure <taurus@example.com>  Fri, 20 Jun 2026 12:00:00 +0300
+
 pve-center (1.4.1-1) unstable; urgency=medium
 
   * Fix: config import not applied (nodes_cfg vs nodes_config typo)
