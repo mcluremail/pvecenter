@@ -1,3 +1,14 @@
+pve-center (2.1.1-1) unstable; urgency=medium
+
+  * Fix: host info collapsed from 10 fields to 4 after soft refresh
+    (update_host_cells was rewriting full HTML with reduced version)
+  * Fix: VM disk always showing 0/empty (PVE API returns disk=0 for QEMU)
+    Show disk size instead, real usage only for LXC containers
+  * Fix: cluster summary ★ prefix breaking update_cluster_summary_cells lookup
+  * i18n: 1 new key in 5 languages
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 16:00:00 +0300
+
 pve-center (2.1.0-1) unstable; urgency=medium
 
   * Tree: preserve expanded state on rebuild (don't collapse unsaved items)

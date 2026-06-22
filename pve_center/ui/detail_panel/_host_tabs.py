@@ -475,10 +475,14 @@ class HostTabs:
             panel.host_vm_table.setItem(i, 5, QTableWidgetItem(ram_str))
             disk = vm.get("disk", 0) or 0
             maxdisk = vm.get("maxdisk", 0) or 0
+            vm_type = vm.get("type", "qemu")
             if maxdisk:
-                disk_gb = round(disk / (1024**3), 2)
                 maxdisk_gb = round(maxdisk / (1024**3), 2)
-                disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
+                if vm_type == "lxc" and disk:
+                    disk_gb = round(disk / (1024**3), 2)
+                    disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
+                else:
+                    disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
             panel.host_vm_table.setItem(i, 6, QTableWidgetItem(disk_str))
@@ -549,6 +553,9 @@ class HostTabs:
         is_online = host_data.get("status") != "error"
 
         if is_online:
+            from ._constants import _fmt_pveversion
+            host_cfg = panel._cfg_by_name.get(host_cfg_name)
+            address = host_cfg.get("host", "") if host_cfg else ""
             cpu_frac = host_data.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
             mem_bytes = host_data.get("mem", 0)
@@ -561,7 +568,13 @@ class HostTabs:
 
             html = (
                 f"<table cellpadding='3' style='font-size: 12px;'>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Host name')}</td><td>{host_data.get('node', '')}</td></tr>"
                 f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Status')}</td><td style='color:{status_color};'>{'● ' + status_text(status)}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Address')}</td><td>{address}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('PVE version')}</td><td>{_fmt_pveversion(host_data.get('pveversion', '?'))}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>QEMU</td><td>{host_data.get('qemu', '?')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Kernel')}</td><td>{host_data.get('kernel', '?')}</td></tr>"
+                f"<tr><td style='color:{Color.TEXT_SEC};'>LXC</td><td>{host_data.get('lxctype', '?')}</td></tr>"
                 f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('CPU %')}</td><td>{cpu_pct}%</td></tr>"
                 f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('RAM (GiB)')}</td><td>{mem_gb} / {maxmem_gb}</td></tr>"
                 f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Uptime')}</td><td>{_format_uptime(uptime)}</td></tr>"
@@ -626,7 +639,7 @@ class HostTabs:
             name_item = table.item(r, 0)
             if name_item is None:
                 continue
-            node_name = name_item.text()
+            node_name = name_item.text().replace("★ ", "").strip()
             node = node_by_name.get(node_name)
             if node is None:
                 continue

@@ -47,8 +47,15 @@ class VmPoolWidget(QWidget):
 
             maxdisk = vm.get("maxdisk", 0)
             disk = vm.get("disk", 0)
-            disk_pct = int(max(0, min(100, (disk / maxdisk) * 100))) if maxdisk > 0 else 0
-            self._set_progress(i, 2, disk_pct)
+            vm_type = vm.get("type", "qemu")
+            if vm_type == "lxc" and disk and maxdisk:
+                disk_pct = int(max(0, min(100, (disk / maxdisk) * 100)))
+                self._set_progress(i, 2, disk_pct)
+            elif maxdisk:
+                disk_gb = round(maxdisk / (1024**3), 1)
+                disk_item = QTableWidgetItem(f"{disk_gb} GiB")
+                disk_item.setFlags(Qt.ItemIsEnabled)
+                self.table.setItem(i, 2, disk_item)
 
             maxmem = vm.get("maxmem", 0)
             mem = vm.get("mem", 0)

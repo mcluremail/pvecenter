@@ -474,8 +474,16 @@ class VMTabs:
             maxdisk_bytes = _safe_int(detail.get("maxdisk") or basic.get("maxdisk"))
             disk_used_bytes = _safe_int(detail.get("disk"))
             maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
-            disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
-            disk_pct = safe_pct(disk_used_bytes, maxdisk_bytes)
+            vm_type = (detail.get("type") or basic.get("type", "qemu"))
+            if vm_type == "lxc" and disk_used_bytes:
+                disk_used_gb = round(disk_used_bytes / (1024**3), 2)
+                disk_pct = safe_pct(disk_used_bytes, maxdisk_bytes)
+                panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
+                panel.card_disk.set_progress(disk_pct)
+            else:
+                panel.card_disk.set_value(f"{maxdisk_gb} {tr('GiB')}")
+                panel.card_disk.set_progress(0)
+                panel.card_disk.set_subtitle(tr("Size (usage unavailable)"))
 
             netin = detail.get("netin", 0)
             netout = detail.get("netout", 0)
@@ -502,9 +510,6 @@ class VMTabs:
 
             panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
             panel.card_ram.set_progress(mem_pct)
-
-            panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
-            panel.card_disk.set_progress(disk_pct)
 
             panel.card_net.set_value(f"↓ {netin_mb} MB")
             panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
@@ -551,9 +556,15 @@ class VMTabs:
         maxdisk_bytes = _safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
         disk_used_bytes = _safe_int(detail.get("disk"))
         maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
-        disk_used_gb = round(disk_used_bytes / (1024**3), 2) if disk_used_bytes else 0
-        panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
-        panel.card_disk.set_progress(safe_pct(disk_used_bytes, maxdisk_bytes))
+        vm_type = detail.get("type") or vm_data.get("type", "qemu")
+        if vm_type == "lxc" and disk_used_bytes:
+            disk_used_gb = round(disk_used_bytes / (1024**3), 2)
+            panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
+            panel.card_disk.set_progress(safe_pct(disk_used_bytes, maxdisk_bytes))
+        else:
+            panel.card_disk.set_value(f"{maxdisk_gb} {tr('GiB')}")
+            panel.card_disk.set_progress(0)
+            panel.card_disk.set_subtitle(tr("Size (usage unavailable)"))
 
         netin = detail.get("netin", 0)
         netout = detail.get("netout", 0)
