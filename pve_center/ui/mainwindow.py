@@ -283,6 +283,7 @@ class MainWindow(QMainWindow):
         self.nodes_cfg = merged
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.tree_panel.set_servers(merged)
+        self.detail_panel.update_nodes_cfg(merged)
         QMessageBox.information(self, tr("Import"),
                                 tr("Configuration imported ({count} hosts).").format(
                                     count=len(merged)))
@@ -299,6 +300,7 @@ class MainWindow(QMainWindow):
         self.nodes_cfg.append(cfg)
         self._cfg_by_name[cfg.get("name", "")] = cfg
         self.tree_panel.set_servers(self.nodes_cfg)
+        self.detail_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
 
@@ -530,6 +532,7 @@ class MainWindow(QMainWindow):
         self.nodes_cfg = [c for c in self.nodes_cfg if c not in matched]
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.tree_panel.set_servers(self.nodes_cfg)
+        self.detail_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         from ..config import delete_node_tokens
         delete_node_tokens([c.get("name", "") for c in matched])
@@ -558,6 +561,7 @@ class MainWindow(QMainWindow):
             self.nodes_cfg[idx] = new_cfg
             self._cfg_by_name[host_name] = new_cfg
         self.tree_panel.set_servers(self.nodes_cfg)
+        self.detail_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
 

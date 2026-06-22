@@ -162,6 +162,10 @@ class DetailPanel(QWidget):
         self._vms_by_key = build_vm_index(all_vms)
         self.all_storages = all_storages or []
 
+    def update_nodes_cfg(self, nodes_cfg):
+        self.nodes_cfg = nodes_cfg
+        self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+
     def set_iso_catalog(self, iso_images):
         self._all_iso_catalog = iso_images or {}
 

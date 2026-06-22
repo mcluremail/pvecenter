@@ -1,3 +1,10 @@
+pve-center (2.0.2-1) unstable; urgency=medium
+
+  * Fix: VM detail info not loading after adding host
+    (detail_panel._cfg_by_name was stale — workers got empty token_value)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 13:00:00 +0300
+
 pve-center (2.0.1-1) unstable; urgency=medium
 
   * Fix: newly added cluster host not loading until restart
