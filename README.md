@@ -10,13 +10,13 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 
 | Platform | Format | Link |
 |----------|--------|------|
-| Windows | .zip | [Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Windows | .zip / .exe installer | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Linux (any) | pip | `pip install pvecenter` |
 | Debian / Ubuntu | .deb | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.2.3](https://github.com/mcluremail/pvecenter/releases/tag/v2.2.3)
+Latest release: [v2.3.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.3.0)
 
 ## Features
 
@@ -34,6 +34,8 @@ Latest release: [v2.2.3](https://github.com/mcluremail/pvecenter/releases/tag/v2
 **Management**
 - Power actions for QEMU and LXC: Start, Shutdown, Reboot, Reset, Stop, Resume
 - Create Virtual Machines: dialog with CPU, RAM, disk, network settings — right from the node context menu
+- Migrate QEMU VMs between cluster nodes (with local disks option)
+- Clone QEMU VMs and LXC containers (full or linked, target node, storage selection)
 - SPICE console (requires virt-viewer)
 - Delete host with API token removal on the server
 - Token recreation via context menu
@@ -70,7 +72,11 @@ Latest release: [v2.2.3](https://github.com/mcluremail/pvecenter/releases/tag/v2
 
 ### Windows
 
-Download `pvecenter-windows.zip` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases), extract to any folder, run `pvecenter.exe`.
+Download `pvecenter-windows.zip` or `pvecenter-*-setup.exe` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases).
+
+**Portable:** Extract `.zip` to any folder, run `pvecenter.exe`.
+
+**Installer:** Run `pvecenter-*-setup.exe` — multilingual NSIS installer (English, Russian, Arabic, French, Spanish, Chinese). Creates Start Menu and Desktop shortcuts, registers uninstaller.
 
 For SPICE console, install [virt-viewer for Windows](https://virt-manager.org/download/).
 

@@ -1,3 +1,12 @@
+pve-center (2.3.0-1) unstable; urgency=medium
+
+  * Feature: VM migration within cluster (QEMU only, LXC not supported by PVE)
+  * Feature: VM cloning (QEMU + LXC) — full/linked, target node, storage
+  * Feature: Windows NSIS multilingual installer (en/ru/ar/fr/es/zh)
+  * New icons: migrate, clone
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 20:00:00 +0300
+
 pve-center (2.2.3-1) unstable; urgency=medium
 
   * Show SSL certificate trust state in host detail panel info table

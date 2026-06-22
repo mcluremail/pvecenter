@@ -45,6 +45,8 @@ class TreePanel(QWidget):
     vm_create_requested = Signal(str, str)
     vm_delete_requested = Signal(str, str, int)
     vm_action_requested = Signal(str, str, int, str)
+    vm_migrate_requested = Signal(str, str, int)
+    vm_clone_requested = Signal(str, str, int)
     console_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
@@ -168,6 +170,19 @@ class TreePanel(QWidget):
             )
             console_act.setEnabled(vm_status == "running")
             menu.addAction(console_act)
+            menu.addSeparator()
+            migrate_act = QAction(tr("Migrate"), self.tree)
+            migrate_act.setIcon(get_icon("migrate"))
+            migrate_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_migrate_requested.emit(hn, nd, vid)
+            )
+            menu.addAction(migrate_act)
+            clone_act = QAction(tr("Clone"), self.tree)
+            clone_act.setIcon(get_icon("clone"))
+            clone_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_clone_requested.emit(hn, nd, vid)
+            )
+            menu.addAction(clone_act)
             menu.addSeparator()
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(

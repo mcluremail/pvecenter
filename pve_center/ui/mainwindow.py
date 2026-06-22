@@ -71,6 +71,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
+        self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
+        self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.tree_panel.console_requested.connect(self._on_console_from_tree)
 
         self._notifications = NotificationManager(self)
@@ -496,6 +498,93 @@ class MainWindow(QMainWindow):
         worker.signals.console_ready.connect(lambda msg: self._notifications.show(msg))
         worker.signals.console_error.connect(lambda err: self._notifications.show(err, error=True))
         self._run_worker(worker)
+
+    def _get_cluster_nodes(self, host_name, current_node):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            return [n for n in self.all_nodes if n.get("node") != current_node]
+        cluster = cfg.get("cluster", "")
+        if not cluster or cluster in (False, None, "Standalone"):
+            return []
+        return [n for n in self.all_nodes
+                if n.get("node") != current_node
+                and n.get("host_name") == host_name]
+
+    def _on_vm_migrate(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        vm = self._vms_by_key.get((host_name, vmid))
+        vm_info = {
+            "name": vm.get("name", "") if vm else "",
+            "vmid": vmid,
+            "type": vm.get("type", "qemu") if vm else "qemu",
+            "node": node,
+        }
+        cluster_nodes = self._get_cluster_nodes(host_name, node)
+        from .migrate_vm_dialog import MigrateVMDialog
+        dialog = MigrateVMDialog(self, vm_info=vm_info,
+                                 cluster_nodes=cluster_nodes,
+                                 current_node=node)
+        if dialog.exec() != MigrateVMDialog.Accepted:
+            return
+        target = dialog.get_target()
+        if not target:
+            return
+        vm_type = vm_info["type"]
+        with_local_disks = dialog.get_with_local_disks()
+        from ..backend import MigrateVmWorker
+        worker = MigrateVmWorker(cfg, node, vmid, vm_type, target,
+                                 with_local_disks=with_local_disks)
+        worker.signals.vm_migrated.connect(lambda msg: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            QTimer.singleShot(2000, self.refresh_data)
+        ))
+        worker.signals.vm_error.connect(lambda err: (
+            self._notifications.show(tr("Migration error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err))
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Migrating VM {vmid}...").format(vmid=vmid))
+
+    def _on_vm_clone(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        vm = self._vms_by_key.get((host_name, vmid))
+        vm_info = {
+            "name": vm.get("name", "") if vm else "",
+            "vmid": vmid,
+            "type": vm.get("type", "qemu") if vm else "qemu",
+            "node": node,
+        }
+        cluster_nodes = self._get_cluster_nodes(host_name, node)
+        node_storages = [s for s in self.all_storages if s.get("node") == node]
+        from .clone_vm_dialog import CloneVMDialog
+        dialog = CloneVMDialog(self, vm_info=vm_info,
+                               cluster_nodes=cluster_nodes,
+                               current_node=node,
+                               storages=node_storages)
+        if dialog.exec() != CloneVMDialog.Accepted:
+            return
+        params = dialog.get_params()
+        vm_type = vm_info["type"]
+        from ..backend import CloneVmWorker
+        worker = CloneVmWorker(cfg, node, vmid, vm_type, params)
+        worker.signals.vm_cloned.connect(lambda msg: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            QTimer.singleShot(2000, self.refresh_data)
+        ))
+        worker.signals.vm_error.connect(lambda err: (
+            self._notifications.show(tr("Clone error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err))
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Cloning VM {vmid}...").format(vmid=vmid))
 
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":

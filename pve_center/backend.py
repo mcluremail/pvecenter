@@ -1147,3 +1147,151 @@ class DeleteVmWorker(QRunnable):
                 self.signals.finished.emit()
             except RuntimeError:
                 pass
+
+
+# ----------------------------------------------------------------------
+# MigrateVmWorker — migrate VM within cluster
+# ----------------------------------------------------------------------
+class MigrateVmSignals(QObject):
+    vm_migrated = Signal(str)
+    vm_error = Signal(str)
+    finished = Signal()
+
+
+class MigrateVmWorker(QRunnable):
+    """Migrate QEMU VM or LXC container to another node in cluster.
+    QEMU: POST /nodes/{node}/qemu/{vmid}/migrate {target: ...}
+    LXC:  not supported by PVE API — emit error."""
+    def __init__(self, host_cfg, node_name, vmid, vm_type, target_node,
+                 with_local_disks=True):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.target_node = target_node
+        self.with_local_disks = with_local_disks
+        self.signals = MigrateVmSignals()
+
+    def run(self):
+        if self.vm_type == "lxc":
+            try:
+                self.signals.vm_error.emit(
+                    tr("Live migration of containers (LXC) is not supported by PVE")
+                )
+            except RuntimeError:
+                pass
+            return
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=120,
+            )
+            params = {"target": self.target_node}
+            if self.with_local_disks:
+                params["with-local-disks"] = 1
+            proxmox.nodes(self.node_name).qemu(self.vmid).migrate.post(**params)
+            msg = tr("VM {vmid} migration to {target} started").format(
+                vmid=self.vmid, target=self.target_node)
+            try:
+                self.signals.vm_migrated.emit(msg)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("migrate error", exc_info=True)
+            try:
+                self.signals.vm_error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
+# CloneVmWorker — clone QEMU VM or LXC container
+# ----------------------------------------------------------------------
+class CloneVmSignals(QObject):
+    vm_cloned = Signal(str)
+    vm_error = Signal(str)
+    finished = Signal()
+
+
+class CloneVmWorker(QRunnable):
+    """Clone QEMU VM or LXC container.
+    QEMU: POST /nodes/{node}/qemu/{vmid}/clone {newid, name, target, full, storage}
+    LXC:  POST /nodes/{node}/lxc/{vmid}/clone {newid, hostname, target, storage}"""
+    def __init__(self, host_cfg, node_name, vmid, vm_type, params):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.params = params
+        self.signals = CloneVmSignals()
+
+    def run(self):
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=120,
+            )
+
+            params = dict(self.params)
+            if not params.get("newid"):
+                params["newid"] = proxmox.cluster.nextid.get()
+
+            if self.vm_type == "lxc":
+                clone_params = {
+                    "newid": params["newid"],
+                    "target": params.get("target", self.node_name),
+                }
+                if params.get("name"):
+                    clone_params["hostname"] = params["name"]
+                if params.get("storage"):
+                    clone_params["storage"] = params["storage"]
+                if params.get("full"):
+                    clone_params["full"] = 1
+                proxmox.nodes(self.node_name).lxc(self.vmid).clone.post(**clone_params)
+            else:
+                clone_params = {
+                    "newid": params["newid"],
+                    "target": params.get("target", self.node_name),
+                }
+                if params.get("name"):
+                    clone_params["name"] = params["name"]
+                if params.get("full"):
+                    clone_params["full"] = 1
+                if params.get("storage"):
+                    clone_params["storage"] = params["storage"]
+                proxmox.nodes(self.node_name).qemu(self.vmid).clone.post(**clone_params)
+
+            newid = params.get("newid", "?")
+            msg = tr("VM {vmid} cloned to {newid} on {target}").format(
+                vmid=self.vmid, newid=newid,
+                target=params.get("target", self.node_name))
+            try:
+                self.signals.vm_cloned.emit(msg)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("clone error", exc_info=True)
+            try:
+                self.signals.vm_error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
