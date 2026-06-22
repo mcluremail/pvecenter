@@ -123,19 +123,21 @@ jobs:
           pip install pyinstaller
       - name: Build with PyInstaller
         run: pyinstaller packaging/pve-center-win.spec --noconfirm
-      - name: Download NSIS
+      - name: Install NSIS via Chocolatey
         shell: pwsh
         run: |
-          $nsisUrl = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10.zip/download"
-          Invoke-WebRequest -Uri $nsisUrl -OutFile nsis.zip -MaximumRedirection 10
-          Expand-Archive -Path nsis.zip -DestinationPath nsis
+          choco install nsis -y --no-progress
       - name: Build installer with NSIS
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          $env:VERSION = $version
-          $env:PATH = "nsis;" + $env:PATH
-          makensis /DVERSION=$version packaging/pve-center-installer.nsi
+          $nsisPath = "C:\Program Files (x86)\NSIS"
+          if (Test-Path "$nsisPath\makensis.exe") {
+            & "$nsisPath\makensis.exe" /DVERSION=$version packaging/pve-center-installer.nsi
+          } else {
+            $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
+            makensis /DVERSION=$version packaging/pve-center-installer.nsi
+          }
       - name: Rename installer
         shell: pwsh
         run: |
