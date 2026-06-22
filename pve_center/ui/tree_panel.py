@@ -213,11 +213,14 @@ class TreePanel(QWidget):
                 menu.addSeparator()
                 trust_cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
                 trust_ssl_current = bool(trust_cfg.get("trust_ssl", True)) if trust_cfg else True
-                trust_action = QAction(tr("Trust SSL certificate"), self.tree)
-                trust_action.setCheckable(True)
-                trust_action.setChecked(trust_ssl_current)
+                if trust_ssl_current:
+                    trust_action = QAction(tr("Trust SSL certificate") + " — " + tr("trusted"), self.tree)
+                    trust_action.setIcon(get_icon("lock"))
+                else:
+                    trust_action = QAction(tr("Trust SSL certificate") + " — " + tr("untrusted"), self.tree)
+                    trust_action.setIcon(get_icon("unlock"))
                 trust_action.triggered.connect(
-                    lambda checked, hn=host_name: self.host_trust_ssl_changed.emit(hn, checked)
+                    lambda checked, hn=host_name: self.host_trust_ssl_changed.emit(hn, not trust_ssl_current)
                 )
                 menu.addAction(trust_action)
 

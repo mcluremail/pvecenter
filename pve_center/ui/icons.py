@@ -301,6 +301,18 @@ _ABOUT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-re
 <rect x="6.3" y="5.5" width="1.4" height="5" rx="0.4" fill="{c2}"/>
 </svg>"""
 
+_LOCK = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="3" y="6.5" width="8" height="6" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<path d="M4.5 6.5 L4.5 4.5 A2.5 2.5 0 0 1 9.5 4.5 L9.5 6.5" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+<circle cx="7" cy="9.5" r="0.8" fill="{c2}"/>
+</svg>"""
+
+_UNLOCK = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="3" y="6.5" width="8" height="6" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<path d="M4.5 6.5 L4.5 4.5 A2.5 2.5 0 0 1 11 4.5 L11 6" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+<circle cx="7" cy="9.5" r="0.8" fill="{c2}"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -346,4 +358,6 @@ def init_icons():
         "export": _make_icon(_EXPORT.format(c=_C, c2=_C2), 14),
         "import": _make_icon(_IMPORT.format(c=_C, c2=_C2), 14),
         "about": _make_icon(_ABOUT.format(c=_C, c2=_C2), 14),
+        "lock": _make_icon(_LOCK.format(c=_C, c2=_C2), 14),
+        "unlock": _make_icon(_UNLOCK.format(c=_C, c2=_C2), 14),
     }

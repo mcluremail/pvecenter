@@ -1,3 +1,11 @@
+pve-center (2.2.2-1) unstable; urgency=medium
+
+  * Fix: SSL trust toggle in host context menu now shows explicit state
+    with lock/unlock icon and "trusted"/"untrusted" label instead of
+    ambiguous checkable action
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 19:00:00 +0300
+
 pve-center (2.2.1-1) unstable; urgency=medium
 
   * Fix: invert trust_ssl logic — checkbox ON = accept cert (verify=False),

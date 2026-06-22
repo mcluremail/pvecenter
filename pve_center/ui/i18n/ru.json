@@ -627,5 +627,7 @@
   "— none —": "— нет —",
   "❌ {} is unavailable": "❌ {} недоступен",
   "Trust SSL certificate": "Доверять SSL-сертификату",
-  "Accept self-signed certificates. Uncheck for CA-issued certs.": "Принимать самоподписанные сертификаты. Снимите для сертификатов от CA."
+  "Accept self-signed certificates. Uncheck for CA-issued certs.": "Принимать самоподписанные сертификаты. Снимите для сертификатов от CA.",
+  "trusted": "доверяем",
+  "untrusted": "не доверяем"
 }

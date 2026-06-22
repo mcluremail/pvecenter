@@ -574,5 +574,7 @@
   "— none —": "— 无 —",
   "❌ {} is unavailable": "❌ {} 不可用",
   "Trust SSL certificate": "信任 SSL 证书",
-  "Accept self-signed certificates. Uncheck for CA-issued certs.": "接受自签名证书。取消勾选以用于 CA 颁发的证书。"
+  "Accept self-signed certificates. Uncheck for CA-issued certs.": "接受自签名证书。取消勾选以用于 CA 颁发的证书。",
+  "trusted": "已信任",
+  "untrusted": "未信任"
 }
