@@ -1,3 +1,11 @@
+pve-center (2.3.1-1) unstable; urgency=medium
+
+  * Fix: Windows build — add hidden imports for proxmoxer.backends,
+    proxmoxer.tools, keyring.backends (lazy imports missed by PyInstaller)
+  * Fix: add PySide6.QtSvg to hidden imports (QSvgRenderer in icons.py)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 21:30:00 +0300
+
 pve-center (2.3.0-1) unstable; urgency=medium
 
   * Feature: VM migration within cluster (QEMU only, LXC not supported by PVE)
