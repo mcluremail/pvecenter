@@ -1,3 +1,12 @@
+pve-center (1.5.0-1) unstable; urgency=medium
+
+  * About dialog with version, author, license, source link
+  * Toolbar: About button (info icon)
+  * Refactor: extract VM action confirm dialog to shared helper (C5)
+  * i18n: 6 new keys in 5 languages (About, Author, License, Source, etc.)
+
+ -- Taurus McLure <taurus@example.com>  Sat, 21 Jun 2026 00:00:00 +0300
+
 pve-center (1.4.2-1) unstable; urgency=medium
 
   * Fix: FadeToast RuntimeError (C++ object deleted before Python ref cleared)

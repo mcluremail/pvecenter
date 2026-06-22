@@ -192,6 +192,13 @@ class MainWindow(QMainWindow):
         import_action.triggered.connect(self._on_import_config)
         self._toolbar.addAction(import_action)
 
+        self._toolbar.addSeparator()
+
+        about_action = QAction(get_icon("about"), tr("About"), self)
+        about_action.setToolTip(tr("About"))
+        about_action.triggered.connect(self._on_about)
+        self._toolbar.addAction(about_action)
+
         self.addToolBar(self._toolbar)
 
         QShortcut(QKeySequence("Ctrl+R"), self, activated=self.refresh_data)
@@ -245,6 +252,10 @@ class MainWindow(QMainWindow):
             if key not in self._seen_storage_keys:
                 self._seen_storage_keys.add(key)
                 target_list.append(st)
+
+    def _on_about(self):
+        from .about_dialog import AboutDialog
+        AboutDialog(self).exec()
 
     def _on_export_config(self):
         path, _ = QFileDialog.getSaveFileName(

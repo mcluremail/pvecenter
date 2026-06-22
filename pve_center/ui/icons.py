@@ -286,6 +286,12 @@ _IMPORT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-r
 <path d="M3 2 L3 5 L11 5 L11 2" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
+_ABOUT = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="7" cy="7" r="5.5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<circle cx="7" cy="3.8" r="0.9" fill="{c2}"/>
+<rect x="6.3" y="5.5" width="1.4" height="5" rx="0.4" fill="{c2}"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -329,4 +335,5 @@ def init_icons():
         "resume": _make_icon(_RESUME.format(c=_C, c2=_C2)),
         "export": _make_icon(_EXPORT.format(c=_C, c2=_C2), 14),
         "import": _make_icon(_IMPORT.format(c=_C, c2=_C2), 14),
+        "about": _make_icon(_ABOUT.format(c=_C, c2=_C2), 14),
     }
