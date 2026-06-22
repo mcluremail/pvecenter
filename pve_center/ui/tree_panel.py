@@ -41,6 +41,7 @@ class TreePanel(QWidget):
     add_server_requested_context = Signal(str)
     host_remove_requested = Signal(str, str)
     host_token_refresh_requested = Signal(str)
+    host_trust_ssl_changed = Signal(str, bool)
     vm_create_requested = Signal(str, str)
     vm_delete_requested = Signal(str, str, int)
     vm_action_requested = Signal(str, str, int, str)
@@ -209,6 +210,16 @@ class TreePanel(QWidget):
                 refresh_action.setIcon(get_icon("refresh"))
                 refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
                 menu.addAction(refresh_action)
+                menu.addSeparator()
+                trust_cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
+                trust_ssl_current = bool(trust_cfg.get("trust_ssl", False)) if trust_cfg else False
+                trust_action = QAction(tr("Trust SSL certificate"), self.tree)
+                trust_action.setCheckable(True)
+                trust_action.setChecked(trust_ssl_current)
+                trust_action.triggered.connect(
+                    lambda checked, hn=host_name: self.host_trust_ssl_changed.emit(hn, checked)
+                )
+                menu.addAction(trust_action)
 
         elif item_type == "cluster":
             cl_hosts = [c for c in self.nodes_cfg if c.get("cluster") == item_name]

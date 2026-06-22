@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 PVE_PORT = 8006
 
 
+def _verify_ssl(cfg):
+    """Return verify_ssl value from host config.
+    trust_ssl=True → verify_ssl=True, else False."""
+    return bool(cfg.get("trust_ssl", False))
+
+
 def _check_response(resp):
     """Check HTTP response and extract error body from PVE JSON."""
     if not resp.ok:
@@ -52,7 +58,7 @@ class StorageMetricsWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
@@ -108,13 +114,13 @@ class StorageContentListWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
             headers = {"Authorization": auth_token}
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
-            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=False, timeout=60)
+            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=_verify_ssl(self.host_cfg), timeout=60)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -155,13 +161,13 @@ class StorageBackupWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
             headers = {"Authorization": auth_token}
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
-            resp = session.get(url, headers=headers, params={"content": "backup"}, verify=False, timeout=60)
+            resp = session.get(url, headers=headers, params={"content": "backup"}, verify=_verify_ssl(self.host_cfg), timeout=60)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -196,7 +202,7 @@ class HostNetworkWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
@@ -204,7 +210,7 @@ class HostNetworkWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/network")
-            resp = session.get(url, headers=headers, verify=False, timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -239,7 +245,7 @@ class HostServicesWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
@@ -247,7 +253,7 @@ class HostServicesWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/services")
-            resp = session.get(url, headers=headers, verify=False, timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -282,7 +288,7 @@ class HostDisksWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
@@ -290,7 +296,7 @@ class HostDisksWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/disks/list")
-            resp = session.get(url, headers=headers, verify=False, timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -342,10 +348,10 @@ class HostSnapshotsWorker(QRunnable):
                     return
                 s = requests.Session()
                 try:
-                    s.verify = False
+                    s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(self.node_name, safe="")
                     url = f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/snapshot"
-                    r = s.get(url, headers=headers, verify=False, timeout=10)
+                    r = s.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
                     _check_response(r)
                     data = r.json().get("data", [])
                     for snap in data:
@@ -417,12 +423,12 @@ class StorageDisksWorker(QRunnable):
                     return
                 s = requests.Session()
                 try:
-                    s.verify = False
+                    s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(vm_node, safe="")
                     vm_type = vm.get("type", "qemu")
                     r = s.get(
                         f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/config",
-                        headers=headers, verify=False, timeout=10
+                        headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10
                     )
                     _check_response(r)
                     config = r.json().get("data", {})
@@ -511,7 +517,7 @@ class HostMetricsWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
@@ -570,7 +576,7 @@ class MetricsWorker(QRunnable):
     def run(self):
         session = requests.Session()
         try:
-            session.verify = False
+            session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!"
                 f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"

@@ -572,5 +572,6 @@
   "year": "an",
   "yes": "oui",
   "— none —": "— aucun —",
-  "❌ {} is unavailable": "❌ {} est indisponible"
+  "❌ {} is unavailable": "❌ {} est indisponible",
+  "Trust SSL certificate": "Faire confiance au certificat SSL"
 }

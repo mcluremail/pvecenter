@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.host_remove_requested.connect(self._on_host_remove)
         self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
+        self.tree_panel.host_trust_ssl_changed.connect(self._on_host_trust_ssl)
         self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
@@ -548,6 +549,7 @@ class MainWindow(QMainWindow):
         dialog.host_input.setText(cfg.get("host", ""))
         dialog.host_input.setEnabled(False)
         dialog.user_input.setText(cfg.get("user", "root@pam"))
+        dialog.trust_ssl_cb.setChecked(bool(cfg.get("trust_ssl", False)))
         if dialog.exec() != AddServerDialog.Accepted:
             return
         new_cfg = dialog.get_config()
@@ -565,9 +567,14 @@ class MainWindow(QMainWindow):
         save_config(self.nodes_cfg)
         self.refresh_data()
 
-    # ------------------------------------------------------------
-    # Ручное обновление (кнопка "Обновить")
-    # ------------------------------------------------------------
+    def _on_host_trust_ssl(self, host_name, trust_ssl):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        cfg["trust_ssl"] = bool(trust_ssl)
+        save_config(self.nodes_cfg)
+        self.tree_panel.set_servers(self.nodes_cfg)
+        self.refresh_data()
     def refresh_data(self):
         # Отменяем все pending soft_refresh — их результаты устарели
         self._soft_gen += 1

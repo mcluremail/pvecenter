@@ -572,5 +572,6 @@
   "year": "年",
   "yes": "是",
   "— none —": "— 无 —",
-  "❌ {} is unavailable": "❌ {} 不可用"
+  "❌ {} is unavailable": "❌ {} 不可用",
+  "Trust SSL certificate": "信任 SSL 证书"
 }

@@ -11,17 +11,24 @@ logger = logging.getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
+def _verify_ssl(cfg):
+    """Return verify_ssl value from node/host config.
+    trust_ssl=True (default for backward compat) → verify_ssl=True.
+    trust_ssl=False or missing → verify_ssl=False (accept self-signed)."""
+    return bool(cfg.get("trust_ssl", False))
+
+
 # ----------------------------------------------------------------------
 # Create API token for PVE Center
 # ----------------------------------------------------------------------
 PVE_PORT = 8006
 
 
-def _pve_ticket_auth(host, user, password):
+def _pve_ticket_auth(host, user, password, verify=False):
     import requests as rq
     url = f"https://{host}:{PVE_PORT}/api2/json/access/ticket"
     resp = rq.post(url, data={"username": user, "password": password},
-                   verify=False, timeout=15)
+                   verify=verify, timeout=15)
     resp.raise_for_status()
     data = resp.json().get("data", {})
     return {
@@ -30,7 +37,7 @@ def _pve_ticket_auth(host, user, password):
     }
 
 
-def create_admin_token(host, user, password):
+def create_admin_token(host, user, password, trust_ssl=False):
     """Create an API token for the specified PVE user.
     The token is created on behalf of the user — PVE audit shows
     the real operator, and permissions match their roles.
@@ -39,6 +46,7 @@ def create_admin_token(host, user, password):
         host: PVE host address
         user: existing PVE user (root@pam, user@ipa, ...)
         password: user's password
+        trust_ssl: verify SSL certificate (default False)
 
     Returns:
         dict with token_name, token_value, user fields
@@ -47,13 +55,14 @@ def create_admin_token(host, user, password):
     import requests as rq
     import secrets as sec
     import string as str_mod
+    verify = bool(trust_ssl)
 
     try:
-        ticket_data = _pve_ticket_auth(host, user, password)
+        ticket_data = _pve_ticket_auth(host, user, password, verify=verify)
         ticket = ticket_data["ticket"]
         csrf = ticket_data["csrf"]
         sess = rq.Session()
-        sess.verify = False
+        sess.verify = verify
         sess.headers.update({
             "Cookie": f"PVEAuthCookie={ticket}",
             "CSRFPreventionToken": csrf,
@@ -91,7 +100,7 @@ def create_admin_token(host, user, password):
             vr = rq.get(
                 f"https://{host}:{PVE_PORT}/api2/json/cluster/resources",
                 headers={"Authorization": auth_header},
-                verify=False, timeout=10,
+                verify=verify, timeout=10,
             )
             if vr.status_code != 200:
                 logger.warning("verify FAILED: %s", vr.text[:200])
@@ -121,16 +130,18 @@ class TokenCreationSignals(QObject):
 
 class TokenCreationWorker(QRunnable):
     """Создаёт API-токен в фоновом потоке, не блокируя UI."""
-    def __init__(self, host, user, password):
+    def __init__(self, host, user, password, trust_ssl=False):
         super().__init__()
         self.host = host
         self.user = user
         self.password = password
+        self.trust_ssl = trust_ssl
         self.signals = TokenCreationSignals()
 
     def run(self):
         try:
-            result = create_admin_token(self.host, self.user, self.password)
+            result = create_admin_token(self.host, self.user, self.password,
+                                        trust_ssl=self.trust_ssl)
             if "error" in result:
                 try:
                     self.signals.token_error.emit(result["error"])
@@ -171,7 +182,7 @@ class FetchWorker(QRunnable):
                 user=self.node_cfg["user"],
                 token_name=self.node_cfg["token_name"],
                 token_value=self.node_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.node_cfg),
                 timeout=15
             )
 
@@ -505,7 +516,7 @@ class VmDetailWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=10
             )
             if self.vm_type == "qemu":
@@ -562,7 +573,7 @@ class VmConfigWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=10
             )
             if self.vm_type == "qemu":
@@ -613,7 +624,7 @@ class VmConfigUpdateWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=10,
             )
             if self.vm_type == "qemu":
@@ -663,7 +674,7 @@ class VmTaskHistoryWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=10
             )
             tasks = proxmox.nodes(self.node_name).tasks.get(vmid=self.vmid, limit=self.limit)
@@ -696,7 +707,7 @@ def delete_host_token(host_cfg):
             user=host_cfg["user"],
             token_name=host_cfg["token_name"],
             token_value=host_cfg["token_value"],
-            verify_ssl=False,
+            verify_ssl=_verify_ssl(host_cfg),
             timeout=10,
         )
         userid = host_cfg["user"]
@@ -734,7 +745,7 @@ class VmActionWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=10,
             )
             if self.vm_type == "qemu":
@@ -801,7 +812,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
                         user=host_cfg["user"],
                         token_name=host_cfg["token_name"],
                         token_value=host_cfg["token_value"],
-                        verify_ssl=False,
+                        verify_ssl=_verify_ssl(host_cfg),
                         timeout=10
                     )
                     tasks = proxmox.nodes(node_name).tasks.get(limit=100)
@@ -871,7 +882,7 @@ class VmConsoleWorker(QRunnable):
                     user=self.host_cfg["user"],
                     token_name=self.host_cfg["token_name"],
                     token_value=self.host_cfg["token_value"],
-                    verify_ssl=False,
+                    verify_ssl=_verify_ssl(self.host_cfg),
                     timeout=10
                 )
                 endpoint = (proxmox.nodes(self.node_name).lxc if self.vm_type == "lxc"
@@ -1037,7 +1048,7 @@ class CreateVmWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=30,
             )
 
@@ -1115,7 +1126,7 @@ class DeleteVmWorker(QRunnable):
                 user=self.host_cfg["user"],
                 token_name=self.host_cfg["token_name"],
                 token_value=self.host_cfg["token_value"],
-                verify_ssl=False,
+                verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=30,
             )
 

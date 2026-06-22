@@ -573,5 +573,6 @@
   "year": "año",
   "yes": "sí",
   "— none —": "— ninguno —",
-  "❌ {} is unavailable": "❌ {} no está disponible"
+  "❌ {} is unavailable": "❌ {} no está disponible",
+  "Trust SSL certificate": "Confiar en el certificado SSL"
 }

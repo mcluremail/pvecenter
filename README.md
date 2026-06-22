@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v2.1.2)
+Latest release: [v2.2.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.2.0)
 
 ## Features
 
@@ -43,6 +43,7 @@ Latest release: [v2.1.2](https://github.com/mcluremail/pvecenter/releases/tag/v2
 - Token storage: system keyring (KWallet / GNOME Keyring / Windows Credential Manager)
 - Node config stored in SQLite database, no plaintext tokens on disk
 - Config export/import: encrypted bundle with password (PBKDF2 + Fernet)
+- SSL certificate validation: per-host toggle (trust / self-signed)
 
 **Interface**
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts

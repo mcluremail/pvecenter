@@ -56,8 +56,11 @@ class AddServerDialog(QDialog):
         info_label.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
+        self.trust_ssl_cb = QCheckBox(tr("Trust SSL certificate"))
+        conn_grid.addWidget(self.trust_ssl_cb, 4, 0, 1, 2)
+
         self.auth_btn = QPushButton(tr("Get token"))
-        conn_grid.addWidget(self.auth_btn, 4, 0, 1, 2)
+        conn_grid.addWidget(self.auth_btn, 5, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
         layout.addWidget(conn_group)
@@ -138,7 +141,8 @@ class AddServerDialog(QDialog):
         self.auth_btn.setText(tr("Connecting..."))
         self._set_status(tr("Connecting and creating token..."), Color.GRAY_500)
 
-        worker = TokenCreationWorker(host, user, password)
+        worker = TokenCreationWorker(host, user, password,
+                                     trust_ssl=self.trust_ssl_cb.isChecked())
         self._active_workers.add(worker)
         worker.signals.token_ready.connect(self._on_token_ready)
         worker.signals.token_error.connect(self._on_token_error)
@@ -181,6 +185,7 @@ class AddServerDialog(QDialog):
             "user": self._token_data["user"],
             "token_name": self._token_data["token_name"],
             "token_value": self._token_data["token_value"],
+            "trust_ssl": self.trust_ssl_cb.isChecked(),
         }
 
         if self.cluster_rep_cb.isChecked():

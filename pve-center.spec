@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       2.1.2
+Version:       2.2.0
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 

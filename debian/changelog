@@ -1,3 +1,13 @@
+pve-center (2.2.0-1) unstable; urgency=medium
+
+  * Feature: per-host SSL certificate validation toggle
+    - Add "Trust SSL certificate" checkbox in add-server dialog
+    - Add checkable "Trust SSL certificate" action in host context menu
+    - All ProxmoxAPI and requests calls honor trust_ssl from node config
+    - Default: do not trust (accept self-signed, backward compatible)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 18:00:00 +0300
+
 pve-center (2.1.2-1) unstable; urgency=medium
 
   * Fix: cluster summary showing ghost progressbar + missing host

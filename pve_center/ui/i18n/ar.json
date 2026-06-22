@@ -572,5 +572,6 @@
   "year": "سنة",
   "yes": "نعم",
   "— none —": "— لا شيء —",
-  "❌ {} is unavailable": "❌ {} غير متاح"
+  "❌ {} is unavailable": "❌ {} غير متاح",
+  "Trust SSL certificate": "الثقة بشهادة SSL"
 }

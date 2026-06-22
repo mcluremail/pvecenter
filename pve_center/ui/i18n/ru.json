@@ -625,5 +625,6 @@
   "year": "год",
   "yes": "да",
   "— none —": "— нет —",
-  "❌ {} is unavailable": "❌ {} недоступен"
+  "❌ {} is unavailable": "❌ {} недоступен",
+  "Trust SSL certificate": "Доверять SSL-сертификату"
 }
