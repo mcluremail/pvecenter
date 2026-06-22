@@ -143,7 +143,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          Move-Item pvecenter-setup.exe "pvecenter-${version}-setup.exe" -Force
+          Move-Item packaging/pvecenter-setup.exe "pvecenter-${version}-setup.exe" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
