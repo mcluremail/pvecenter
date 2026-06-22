@@ -57,6 +57,8 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
         self.trust_ssl_cb = QCheckBox(tr("Trust SSL certificate"))
+        self.trust_ssl_cb.setChecked(True)
+        self.trust_ssl_cb.setToolTip(tr("Accept self-signed certificates. Uncheck for CA-issued certs."))
         conn_grid.addWidget(self.trust_ssl_cb, 4, 0, 1, 2)
 
         self.auth_btn = QPushButton(tr("Get token"))

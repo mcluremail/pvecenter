@@ -14,9 +14,10 @@ PVE_PORT = 8006
 
 
 def _verify_ssl(cfg):
-    """Return verify_ssl value from host config.
-    trust_ssl=True → verify_ssl=True, else False."""
-    return bool(cfg.get("trust_ssl", False))
+    """Return verify_ssl value for requests.
+    trust_ssl=True (default) → accept cert, verify_ssl=False.
+    trust_ssl=False → strict verification, verify_ssl=True."""
+    return not bool(cfg.get("trust_ssl", True))
 
 
 def _check_response(resp):

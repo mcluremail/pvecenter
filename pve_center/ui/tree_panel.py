@@ -212,7 +212,7 @@ class TreePanel(QWidget):
                 menu.addAction(refresh_action)
                 menu.addSeparator()
                 trust_cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
-                trust_ssl_current = bool(trust_cfg.get("trust_ssl", False)) if trust_cfg else False
+                trust_ssl_current = bool(trust_cfg.get("trust_ssl", True)) if trust_cfg else True
                 trust_action = QAction(tr("Trust SSL certificate"), self.tree)
                 trust_action.setCheckable(True)
                 trust_action.setChecked(trust_ssl_current)

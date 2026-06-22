@@ -549,7 +549,7 @@ class MainWindow(QMainWindow):
         dialog.host_input.setText(cfg.get("host", ""))
         dialog.host_input.setEnabled(False)
         dialog.user_input.setText(cfg.get("user", "root@pam"))
-        dialog.trust_ssl_cb.setChecked(bool(cfg.get("trust_ssl", False)))
+        dialog.trust_ssl_cb.setChecked(bool(cfg.get("trust_ssl", True)))
         if dialog.exec() != AddServerDialog.Accepted:
             return
         new_cfg = dialog.get_config()

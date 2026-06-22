@@ -12,10 +12,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def _verify_ssl(cfg):
-    """Return verify_ssl value from node/host config.
-    trust_ssl=True (default for backward compat) → verify_ssl=True.
-    trust_ssl=False or missing → verify_ssl=False (accept self-signed)."""
-    return bool(cfg.get("trust_ssl", False))
+    """Return verify_ssl value for requests/proxmoxer.
+    trust_ssl=True (default) → accept cert, verify_ssl=False.
+    trust_ssl=False → strict verification, verify_ssl=True."""
+    return not bool(cfg.get("trust_ssl", True))
 
 
 # ----------------------------------------------------------------------

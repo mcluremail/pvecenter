@@ -1,3 +1,12 @@
+pve-center (2.2.1-1) unstable; urgency=medium
+
+  * Fix: invert trust_ssl logic — checkbox ON = accept cert (verify=False),
+    checkbox OFF = strict verification (verify=True). Default: ON (backward
+    compatible). Previous v2.2.0 had it backwards.
+  * Add tooltip explaining checkbox meaning
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 18:30:00 +0300
+
 pve-center (2.2.0-1) unstable; urgency=medium
 
   * Feature: per-host SSL certificate validation toggle
