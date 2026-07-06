@@ -2,8 +2,8 @@ from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
+    QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -14,6 +14,20 @@ from PySide6.QtWidgets import (
 from ..backend import TokenCreationWorker
 from .i18n import tr
 from .theme import Color
+
+
+def _section_title(text):
+    lbl = QLabel(text)
+    lbl.setObjectName("sectionTitle")
+    return lbl
+
+
+def _section_sep():
+    sep = QFrame()
+    sep.setObjectName("sectionSep")
+    sep.setFrameShape(QFrame.HLine)
+    sep.setFixedHeight(1)
+    return sep
 
 
 class AddServerDialog(QDialog):
@@ -41,9 +55,13 @@ class AddServerDialog(QDialog):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
 
-        conn_group = QGroupBox(tr("Connection"))
-        conn_grid = QGridLayout(conn_group)
+        layout.addWidget(_section_title(tr("Connection")))
+
+        conn_grid = QGridLayout()
+        conn_grid.setHorizontalSpacing(12)
+        conn_grid.setVerticalSpacing(8)
 
         conn_grid.addWidget(QLabel(tr("Host:")), 0, 0)
         self.host_input = QLineEdit()
@@ -62,7 +80,7 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(self.pwd_input, 2, 1)
 
         info_label = QLabel(tr("An API token will be created for the specified user"))
-        info_label.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        info_label.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 12px;")
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
         self.trust_ssl_cb = QCheckBox(tr("Trust SSL certificate"))
@@ -74,10 +92,14 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(self.auth_btn, 5, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
-        layout.addWidget(conn_group)
+        layout.addLayout(conn_grid)
+        layout.addWidget(_section_sep())
 
-        token_group = QGroupBox(tr("Token"))
-        token_grid = QGridLayout(token_group)
+        layout.addWidget(_section_title(tr("Token")))
+
+        token_grid = QGridLayout()
+        token_grid.setHorizontalSpacing(12)
+        token_grid.setVerticalSpacing(8)
 
         self.token_name_label = QLabel("—")
         self.token_name_label.setStyleSheet("font-family: monospace;")
@@ -90,13 +112,17 @@ class AddServerDialog(QDialog):
         token_grid.addWidget(self.token_value_label, 1, 1)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet(f"color: {Color.GRAY_500};")
+        self.status_label.setStyleSheet(f"color: {Color.TEXT_SEC};")
         token_grid.addWidget(self.status_label, 2, 0, 1, 2)
 
-        layout.addWidget(token_group)
+        layout.addLayout(token_grid)
+        layout.addWidget(_section_sep())
 
-        node_group = QGroupBox(tr("Node settings"))
-        node_grid = QGridLayout(node_group)
+        layout.addWidget(_section_title(tr("Node settings")))
+
+        node_grid = QGridLayout()
+        node_grid.setHorizontalSpacing(12)
+        node_grid.setVerticalSpacing(8)
 
         node_grid.addWidget(QLabel(tr("Name:")), 0, 0)
         self.name_input = QLineEdit()
@@ -111,10 +137,13 @@ class AddServerDialog(QDialog):
         self.cluster_rep_cb = QCheckBox(tr("This is a cluster representative"))
         node_grid.addWidget(self.cluster_rep_cb, 2, 0, 1, 2)
 
-        layout.addWidget(node_group)
+        layout.addLayout(node_grid)
+
+        layout.addStretch()
 
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton(tr("Add"))
+        self.add_btn.setObjectName("accentBtn")
         self.add_btn.setEnabled(False)
         self.add_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton(tr("Cancel"))
