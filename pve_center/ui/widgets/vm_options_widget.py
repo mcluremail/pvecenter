@@ -14,8 +14,8 @@ _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101
 _SECTION_ROLE = Qt.UserRole + 102
 
-_SECTION_BG = f"{Color.GRAY_100}"
-_SECTION_FG = f"{Color.TEXT_SEC}"
+_SECTION_BG = "transparent"
+_SECTION_FG = f"{Color.TEXT_DIM}"
 
 
 class VmOptionsWidget(QWidget):
@@ -36,8 +36,12 @@ class VmOptionsWidget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
-        self.table.setAlternatingRowColors(True)
+        self.table.setAlternatingRowColors(False)
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet(
+            f"QTableWidget {{ border: none; background: transparent; }}"
+            f"QTableWidget::item {{ padding: 6px 8px; border-bottom: 1px solid {Color.BORDER_LIGHT}; }}"
+        )
         enable_row_hover(self.table)
         self.table.cellDoubleClicked.connect(self._on_double_click)
 
@@ -62,11 +66,11 @@ class VmOptionsWidget(QWidget):
             i = self.table.rowCount()
             self.table.insertRow(i)
             if key == "__section__":
-                item = QTableWidgetItem(label)
+                item = QTableWidgetItem(label.upper())
                 item.setData(_SECTION_ROLE, True)
                 f = QFont()
                 f.setBold(True)
-                f.setPointSize(10)
+                f.setPointSize(9)
                 item.setFont(f)
                 item.setForeground(QColor(_SECTION_FG))
                 item.setBackground(QColor(_SECTION_BG))
@@ -76,19 +80,20 @@ class VmOptionsWidget(QWidget):
                 val_item.setBackground(QColor(_SECTION_BG))
                 val_item.setFlags(Qt.NoItemFlags)
                 self.table.setItem(i, 1, val_item)
+                self.table.setRowHeight(i, 28)
             else:
                 item = QTableWidgetItem(label)
                 item.setData(_KEY_ROLE, key)
                 self.table.setItem(i, 0, item)
                 val_item = QTableWidgetItem(value)
                 f = QFont()
-                f.setBold(True)
+                f.setWeight(QFont.DemiBold)
                 val_item.setFont(f)
                 self.table.setItem(i, 1, val_item)
         self.table.resizeRowsToContents()
         for r in range(self.table.rowCount()):
-            if self.table.rowHeight(r) > 22:
-                self.table.setRowHeight(r, 22)
+            if self.table.rowHeight(r) > 28:
+                self.table.setRowHeight(r, 28)
 
     def _on_double_click(self, row, col):
         if not (self._host_name and self._vmid):
