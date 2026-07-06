@@ -2,14 +2,14 @@ from enum import IntEnum
 
 from ..theme import Color
 
-_HEADER_STYLE = "QHeaderView::section { padding-left: 4px; }"
+_HEADER_STYLE = "QHeaderView::section { padding: 6px 8px; border: none; border-bottom: 1px solid #f0f1f4; }"
 
 _MAX_WORKERS_DP = 8
 
 try:
     import pyqtgraph as pg
-    pg.setConfigOption('background', 'w')
-    pg.setConfigOption('foreground', 'k')
+    pg.setConfigOption('background', '#fafafa')
+    pg.setConfigOption('foreground', '#6b7280')
     _HAS_PG = True
 except ImportError:
     pg = None
@@ -56,6 +56,6 @@ def _progress_style(value, max_val=100):
         color = Color.STATUS_ERR
     return (
         f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
-        f"QProgressBar {{ border: 1px solid {Color.D1_D5_DB}; border-radius: 3px;"
+        f"QProgressBar {{ border: none; border-radius: 3px;"
         f" text-align: center; font-size: 11px; background: {Color.GRAY_100}; }}"
     )

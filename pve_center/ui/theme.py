@@ -27,19 +27,19 @@ class Color:
     """Цвета темы — светлая."""
 
     # Фоны
-    BG          = "#f6f8fa"
+    BG          = "#fafafa"
     PANEL       = "#ffffff"
-    RAISED      = "#f0f2f5"
-    ALT_ROW     = "#f0f4f8"
+    RAISED      = "#f4f5f7"
+    ALT_ROW     = "#f8f9fb"
 
     # Границы
-    BORDER      = "#dde1e7"
-    BORDER_LIGHT = "#eaedf2"
+    BORDER      = "#e5e7eb"
+    BORDER_LIGHT = "#f0f1f4"
 
     # Текст
     TEXT        = "#181c26"
-    TEXT_SEC    = "#5f6c80"
-    TEXT_DIM    = "#8b96a8"
+    TEXT_SEC    = "#6b7280"
+    TEXT_DIM    = "#9ca3af"
     DISABLED    = "#b0b8c4"
 
     # Акцент
@@ -148,86 +148,129 @@ def _build_qss() -> str:
         color: {Color.TEXT};
     }}
 
+    /* ── Header bar ── */
+    QToolBar {{
+        background: {Color.PANEL};
+        border: none;
+        border-bottom: 1px solid {Color.BORDER_LIGHT};
+        spacing: 4px;
+        padding: 4px 12px;
+    }}
+    QToolBar::separator {{
+        width: 1px;
+        background: {Color.BORDER_LIGHT};
+        margin: 4px 4px;
+    }}
+    QToolButton {{
+        border: none;
+        border-radius: 6px;
+        padding: 4px 8px;
+        background: transparent;
+        color: {Color.TEXT_SEC};
+        font-size: 13px;
+    }}
+    QToolButton:hover {{
+        background: {Color.RAISED};
+        color: {Color.TEXT};
+    }}
+    QToolButton:pressed {{
+        background: {Color.ALT_ROW};
+    }}
+    QToolButton:checked {{
+        background: {Color.ACCENT_LIGHT};
+        color: {Color.ACCENT};
+    }}
+
     /* ── Дерево навигации ── */
     QTreeWidget {{
         font-size: 13px;
-        alternate-background-color: {Color.ALT_ROW};
+        alternate-background-color: transparent;
         border: none;
         outline: none;
+        background: {Color.PANEL};
     }}
     QTreeWidget::item {{
-        padding: 2px 4px;
-        min-height: 20px;
+        padding: 3px 4px;
+        min-height: 22px;
+        border-left: 2px solid transparent;
     }}
     QTreeWidget::item:hover {{
-        background: {Color.HOVER};
+        background: {Color.RAISED};
     }}
     QTreeWidget::item:selected {{
-        background: {Color.SELECTED};
-        color: {Color.TEXT};
+        background: {Color.ACCENT_LIGHT};
+        color: {Color.ACCENT};
+        border-left-color: {Color.ACCENT};
+        font-weight: 500;
     }}
     QTreeView::branch {{
         background: transparent;
     }}
 
-    /* ── Таблицы данных (monospace) ── */
+    /* ── Таблицы данных ── */
     QTableWidget {{
-        font-family: "{mono}", "Noto Sans Mono", monospace;
+        font-family: "{ui}", "Cantarell", "sans-serif";
         font-size: 13px;
         background: {Color.PANEL};
         alternate-background-color: {Color.ALT_ROW};
-        gridline-color: transparent;
+        gridline-color: {Color.BORDER_LIGHT};
         border: 1px solid {Color.BORDER};
+        border-radius: 8px;
     }}
     QTableWidget::item {{
-        padding: 2px 4px;
+        padding: 4px 8px;
+    }}
+    QTableWidget::item:hover {{
+        background: {Color.RAISED};
     }}
     QTableWidget::item:selected {{
-        background: {Color.SELECTED};
+        background: {Color.ACCENT_LIGHT};
         color: {Color.TEXT};
     }}
 
     QHeaderView::section {{
         font-family: "{ui}", "Cantarell", "sans-serif";
         font-weight: 600;
-        padding: 4px 6px;
+        padding: 6px 8px;
         background-color: transparent;
         border: none;
-        border-bottom: 1px solid {Color.BORDER};
-        font-size: 13px;
-        color: {Color.TEXT_SEC};
+        border-bottom: 1px solid {Color.BORDER_LIGHT};
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: {Color.TEXT_DIM};
     }}
     QHeaderView::section:hover {{
-        color: {Color.ACCENT};
+        color: {Color.TEXT_SEC};
     }}
     QTableCornerButton::section {{
         background: transparent;
         border: none;
-        border-bottom: 1px solid {Color.BORDER};
+        border-bottom: 1px solid {Color.BORDER_LIGHT};
     }}
 
-    /* ── Вкладки ── */
+    /* ── Вкладки (segmented control) ── */
     QTabWidget::pane {{
         border: none;
         border-top: 1px solid {Color.BORDER};
-        background: {Color.RAISED};
-        padding: 8px;
+        background: {Color.BG};
+        padding: 20px 24px;
     }}
     QTabBar {{
-        margin-left: 4px;
-        background: {Color.PANEL};
+        margin-left: 0;
+        background: transparent;
     }}
     QTabBar::tab {{
-        padding: 6px 14px;
+        padding: 10px 16px;
         font-size: 13px;
         color: {Color.TEXT_SEC};
         border: none;
         border-bottom: 2px solid transparent;
-        margin-right: 2px;
+        margin-right: 0;
+        font-weight: 500;
     }}
     QTabBar::tab:hover {{
         color: {Color.TEXT};
-        border-bottom-color: {Color.BORDER};
     }}
     QTabBar::tab:selected {{
         color: {Color.ACCENT};
@@ -237,31 +280,32 @@ def _build_qss() -> str:
 
     /* ── Прогресс-бар ── */
     QProgressBar {{
-        border: 1px solid {Color.BORDER};
+        border: none;
         border-radius: 3px;
         text-align: center;
-        height: 16px;
-        background: {Color.ALT_ROW};
-        font-size: 13px;
-        color: {Color.TEXT};
+        height: 6px;
+        background: {Color.GRAY_100};
+        font-size: 11px;
+        color: transparent;
     }}
     QProgressBar::chunk {{
         background-color: {Color.ACCENT};
-        border-radius: 2px;
+        border-radius: 3px;
     }}
 
     /* ── Кнопки ── */
     QPushButton {{
-        padding: 4px 14px;
+        padding: 7px 14px;
         font-size: 13px;
         border: 1px solid {Color.BORDER};
-        border-radius: 4px;
-        background: {Color.RAISED};
+        border-radius: 6px;
+        background: {Color.PANEL};
         color: {Color.TEXT};
+        font-weight: 500;
     }}
     QPushButton:hover {{
-        background: {Color.HOVER};
-        border-color: {Color.BORDER};
+        background: {Color.RAISED};
+        border-color: {Color.TEXT_DIM};
     }}
     QPushButton:pressed {{
         background: {Color.ALT_ROW};
@@ -269,6 +313,7 @@ def _build_qss() -> str:
     QPushButton:disabled {{
         color: {Color.DISABLED};
         background: {Color.ALT_ROW};
+        border-color: {Color.BORDER_LIGHT};
     }}
 
     /* ── Диалоги ── */
@@ -560,7 +605,63 @@ def _build_qss() -> str:
         font-size: 13px;
         background: {Color.PANEL};
         border: 1px solid {Color.BORDER};
-        border-radius: 3px;
+        border-radius: 6px;
+    }}
+
+    /* ── Title block (заголовок объекта) ── */
+    QLabel#titleMain {{
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: {Color.TEXT};
+    }}
+    QLabel#titleSub {{
+        font-size: 13px;
+        color: {Color.TEXT_SEC};
+    }}
+
+    /* ── Карточки метрик ── */
+    QFrame#metricCard {{
+        background: {Color.PANEL};
+        border: 1px solid {Color.BORDER};
+        border-radius: 10px;
+    }}
+
+    /* ── Список карточек ── */
+    QFrame#cardList {{
+        background: {Color.PANEL};
+        border: 1px solid {Color.BORDER};
+        border-radius: 10px;
+    }}
+    QFrame#cardRow {{
+        border: none;
+        border-bottom: 1px solid {Color.BORDER_LIGHT};
+    }}
+    QFrame#cardRow:last {{
+        border-bottom: none;
+    }}
+    QFrame#cardRow:hover {{
+        background: {Color.RAISED};
+    }}
+
+    /* ── Key-value секции (Hardware/Options) ── */
+    QLabel#kvSectionHead {{
+        font-size: 12px;
+        font-weight: 600;
+        color: {Color.TEXT_DIM};
+        letter-spacing: 0.05em;
+    }}
+    QFrame#kvSeparator {{
+        background: {Color.BORDER_LIGHT};
+        max-height: 1px;
+    }}
+
+    /* ── Status bar ── */
+    QStatusBar {{
+        background: {Color.PANEL};
+        border-top: 1px solid {Color.BORDER_LIGHT};
+        font-size: 12px;
+        color: {Color.TEXT_SEC};
     }}
 """
 

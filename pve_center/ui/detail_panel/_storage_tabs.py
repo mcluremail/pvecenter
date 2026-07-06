@@ -276,6 +276,8 @@ class StorageTabs:
     def show_storage_folder(self):
         panel = self.panel
         panel.detail_label.setText(tr("Storage"))
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.STORAGES, True)
@@ -303,7 +305,9 @@ class StorageTabs:
             title = f"{storage_name} ({host_name_filter})"
         else:
             title = storage_name
-        panel.detail_label.setText(tr("Storage: {title}").format(title=title))
+        panel.detail_label.setText(title)
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.OPTIONS, False)

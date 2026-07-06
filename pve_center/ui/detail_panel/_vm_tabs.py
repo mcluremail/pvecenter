@@ -225,7 +225,9 @@ class VMTabs:
 
     def show_vm_info_init(self, vm_name, vm_data, gen):
         panel = self.panel
-        panel.detail_label.setText(tr("VM/CT: {name}").format(name=vm_name))
+        panel.detail_label.setText(vm_name)
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel._last_vm_data = vm_data
         panel.tabs.setTabVisible(TabIndex.MONITOR, True)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, True)
@@ -490,7 +492,18 @@ class VMTabs:
             tags = basic.get("tags") or detail.get("tags") or ""
             ha = basic.get("hastate") or detail.get("hastate", "")
 
-            panel.detail_label.setText(tr("VM/CT: {name}").format(name=name or vmid))
+            panel.detail_label.setText(f"{name or vmid}")
+
+            subtitle_parts = [status_text(status)]
+            if cpus:
+                subtitle_parts.append(f"{cpus} {tr('cores')}")
+            if maxmem_gb:
+                subtitle_parts.append(f"{maxmem_gb} {tr('GiB')} RAM")
+            uptime_str = _format_uptime(uptime) if uptime else ""
+            if uptime_str:
+                subtitle_parts.append(f"{uptime_str} {tr('uptime')}")
+            panel.detail_sublabel.setText(" · ".join(subtitle_parts))
+            panel.detail_sublabel.setVisible(True)
 
             panel.card_status.set_value(status_text(status))
             status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
@@ -581,6 +594,8 @@ class VMTabs:
     def show_pool_info(self, pool_name):
         panel = self.panel
         panel.detail_label.setText(tr("Pool: {name}").format(name=pool_name))
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.OPTIONS, False)

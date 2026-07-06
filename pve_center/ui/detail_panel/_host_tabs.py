@@ -33,6 +33,28 @@ class HostTabs:
     def __init__(self, panel):
         self.panel = panel
 
+    @staticmethod
+    def _host_subtitle(host_data, host_name):
+        parts = []
+        if not host_data:
+            return parts
+        status = host_data.get("status", "")
+        parts.append(status_text(status))
+        pve_ver = host_data.get("pveversion", "")
+        if pve_ver:
+            parts.append("pve " + pve_ver.split("-")[0] if "-" in pve_ver else "pve " + pve_ver)
+        cpu = host_data.get("cpu", 0)
+        if isinstance(cpu, float):
+            parts.append(f"{round(cpu * 100, 1)}% CPU")
+        mem = host_data.get("mem", 0)
+        maxmem = host_data.get("maxmem", 0)
+        if maxmem:
+            parts.append(f"{round(mem / (1024**3), 1)}/{round(maxmem / (1024**3), 0)} GiB")
+        uptime = host_data.get("uptime", 0)
+        if uptime:
+            parts.append(_format_uptime(uptime) + " " + tr("uptime"))
+        return parts
+
     def build_host_vm_tab(self):
         table = make_table(
             [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %", tr("RAM"), tr("Disk"), tr("Uptime")],
@@ -260,6 +282,8 @@ class HostTabs:
     def show_cluster_folder(self, name):
         panel = self.panel
         panel.detail_label.setText(tr("Clusters"))
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
@@ -333,6 +357,8 @@ class HostTabs:
     def show_standalone_folder(self, name):
         panel = self.panel
         panel.detail_label.setText(tr("Standalone hosts"))
+        panel.detail_sublabel.setText("")
+        panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.SUMMARY, True)
@@ -348,7 +374,11 @@ class HostTabs:
 
     def show_cluster(self, cluster_name):
         panel = self.panel
-        panel.detail_label.setText(tr("Cluster: {name}").format(name=cluster_name))
+        panel.detail_label.setText(cluster_name)
+        hosts_count = len(hosts)
+        running = sum(1 for h in hosts if h.get("status") == "online")
+        panel.detail_sublabel.setText(f"{hosts_count} {tr('hosts')} · {running} {tr('online')}")
+        panel.detail_sublabel.setVisible(True)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
@@ -367,7 +397,9 @@ class HostTabs:
         panel = self.panel
         node = next((n for n in panel.all_nodes if n.get("node") == host_name), None)
         display_name = node.get("_display_name") if node else host_name
-        panel.detail_label.setText(tr("Host: {name}").format(name=display_name))
+        panel.detail_label.setText(display_name)
+        panel.detail_sublabel.setText(" · ".join(self._host_subtitle(host_data, host_name)))
+        panel.detail_sublabel.setVisible(True)
 
         if host_data and host_data.get("status") == "error":
             from ..utils import parse_pve_error
