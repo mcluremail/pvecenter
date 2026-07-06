@@ -1,3 +1,12 @@
+pve-center (2.3.2-1) unstable; urgency=medium
+
+  * Fix: resolve fonts dynamically via QFontDatabase, drop hardcoded Terminus
+  * Chore: move AUDIT_2026-06-20.md to docs/, expand .gitignore
+  * CI: add ci.yml (ruff check, Python 3.10/3.11/3.12 matrix)
+  * CI: add ruff.toml + lint autofixes (55 issues fixed)
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 12:00:00 +0300
+
 pve-center (2.3.1-1) unstable; urgency=medium
 
   * Fix: Windows build — add hidden imports for proxmoxer.backends,
