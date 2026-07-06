@@ -49,6 +49,7 @@ Latest release: [v2.5.0](https://github.com/mcluremail/pvecenter/releases/tag/v2
 
 **Interface**
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
+- CardList widget — list views as card rows (Host VMs, Cluster Summary, Storage Overview) with status dots, filter, double-click editing
 - Hardware/Options tabs with section grouping and device type icons
 - Task history with colored status badges
 - Multi-language UI (English, Russian, Arabic, Chinese, French, Spanish)
@@ -205,7 +206,7 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 | `pve_center/ui/icons.py` | SVG icon registry |
 | `pve_center/ui/notification.py` | Toast notifications |
 | `pve_center/ui/i18n/` | Translation module (tr()), JSON translation files |
-| `pve_center/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options) |
+| `pve_center/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options, card_list) |
 | `pve_center/ui/api/` | API workers (RRD data, storage content) |
 | `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
 | `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
