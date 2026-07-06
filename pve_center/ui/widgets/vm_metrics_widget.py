@@ -6,8 +6,8 @@ from ..theme import Color
 
 try:
     import pyqtgraph as pg
-    pg.setConfigOption('background', 'w')
-    pg.setConfigOption('foreground', 'k')
+    pg.setConfigOption('background', '#fafafa')
+    pg.setConfigOption('foreground', '#6b7280')
     _HAS_PG = True
 except ImportError:
     pg = None
@@ -64,9 +64,10 @@ class VmMetricsWidget(QWidget):
             date_axis = pg.DateAxisItem(orientation='bottom')
             self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title=tr("CPU, %"))
             self.plot.setLabel('left', '%')
-            self.plot.showGrid(x=True, y=True)
+            self.plot.showGrid(x=False, y=True, alpha=0.3)
             self.plot.enableAutoRange(axis='y')
-            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
+            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.ACCENT, width=2),
+                                        fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
             self.plot.setMouseEnabled(x=False, y=False)
             self._legend = self.plot.addLegend()
             self._layout.addWidget(self.plot, 1)
@@ -102,7 +103,8 @@ class VmMetricsWidget(QWidget):
         self._cached_data = None
         if self._has_plot:
             self.plot.clear()
-            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
+            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.ACCENT, width=2),
+                                        fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
 
     def update_curves(self, metrics_dict):
         self._cached_data = metrics_dict
@@ -117,7 +119,8 @@ class VmMetricsWidget(QWidget):
         self.plot.clear()
         if self._legend:
             self._legend.clear()
-        self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.SLATE_900, width=2))
+        self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.ACCENT, width=2),
+                                    fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
 
         if metric == "cpu":
             cpu = data.get('cpu', [])
@@ -166,7 +169,9 @@ class VmMetricsWidget(QWidget):
         label_in = tr("In") if title == tr("Network traffic") else tr("Read")
         label_out = tr("Out") if title == tr("Network traffic") else tr("Write")
         self.plot.plot([d['time'] for d in data1], [d['value'] / div for d in data1],
-                       pen=pg.mkPen(Color.SLATE_900, width=2), name=label_in)
+                       pen=pg.mkPen(Color.ACCENT, width=2), name=label_in,
+                       fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
         self.plot.plot([d['time'] for d in data2], [d['value'] / div for d in data2],
-                       pen=pg.mkPen(Color.GRAY_400, width=2), name=label_out)
+                       pen=pg.mkPen(Color.GRAY_400, width=2), name=label_out,
+                       fillLevel=0, fillBrush=pg.mkBrush(Color.GRAY_400 + "33"))
         self.plot.setLabel('left', unit)
