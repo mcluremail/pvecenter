@@ -1,12 +1,16 @@
 """
 Тема оформления PVE Center.
-Светлая. Noto Sans для интерфейса, Terminus для моноширинных данных.
+Светлая. Шрифты резолвятся из доступных в системе (Noto Sans / Terminus
+приоритетны, на Windows/под macOS подставляются системные аналоги).
 """
 
 import os
+import logging
 
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
+
+logger = logging.getLogger(__name__)
 
 
 def _app() -> QApplication:
@@ -83,9 +87,41 @@ class Color:
     SCROLLBAR_HANDLE = "#c0c6d0"
     SCROLLBAR_HOVER  = "#a4abb8"
 
-    # Шрифты
-    UI_FONT    = "Noto Sans"
-    MONO_FONT  = "Terminus"
+    # Шрифты — резолвятся из установленных в системе (см. _resolve_fonts ниже).
+    UI_FONT   = "Noto Sans"
+    MONO_FONT = "Noto Sans Mono"
+
+
+# ── Резолвинг шрифтов по доступности в системе ─────────────────────
+# Приоритетные кандидаты: первый найденный через QFontDatabase.hasFamily
+# используется как имя шрифта в QSS и app.setFont. На Windows/macOS
+# Noto-семейства обычно отсутствуют, и выбирается системный аналог.
+_UI_CANDIDATES = (
+    "Noto Sans", "Cantarell", "Segoe UI", "SF Pro Text", "Helvetica",
+)
+_MONO_CANDIDATES = (
+    "Terminus", "Noto Sans Mono", "Cascadia Code", "Consolas",
+    "Menlo", "DejaVu Sans Mono", "Liberation Mono",
+)
+
+
+def _pick_font(candidates):
+    """Вернуть первое доступное в системе имя шрифта, иначе последний из списка."""
+    db = QFontDatabase
+    for name in candidates:
+        try:
+            if db.hasFamily(name):
+                return name
+        except Exception:
+            pass
+    return candidates[-1]
+
+
+def _resolve_fonts():
+    """Резолвинг UI/MONO один раз при load(). Логирует выбранные имена."""
+    Color.UI_FONT = _pick_font(_UI_CANDIDATES)
+    Color.MONO_FONT = _pick_font(_MONO_CANDIDATES)
+    logger.info("theme fonts: ui=%s, mono=%s", Color.UI_FONT, Color.MONO_FONT)
 
 
 # ── Пути к SVG-индикаторам чекбокса ──
@@ -94,10 +130,20 @@ _CHECK_ON  = _CHECK_DIR + "/checkbox-checked.svg"
 _CHECK_OFF = _CHECK_DIR + "/checkbox-unchecked.svg"
 
 # ── QSS ────────────────────────────────────────────────────────────
+# QSS собирается функцией _build_qss() в load(), после того как
+# _resolve_fonts() подставит доступные имена шрифтов в Color.UI_FONT /
+# Color.MONO_FONT. До вызова load() QSS содержит пустую строку —
+# использовать app.setStyleSheet(QSS) напрямую нельзя.
 
-QSS = f"""
+QSS = ""
+
+
+def _build_qss() -> str:
+    ui = Color.UI_FONT
+    mono = Color.MONO_FONT
+    return f"""
     * {{
-        font-family: "{Color.UI_FONT}", "Cantarell", "sans-serif";
+        font-family: "{ui}", "Cantarell", "sans-serif";
         font-size: 14px;
         color: {Color.TEXT};
     }}
@@ -126,7 +172,7 @@ QSS = f"""
 
     /* ── Таблицы данных (monospace) ── */
     QTableWidget {{
-        font-family: "{Color.MONO_FONT}", "Noto Sans Mono", monospace;
+        font-family: "{mono}", "Noto Sans Mono", monospace;
         font-size: 13px;
         background: {Color.PANEL};
         alternate-background-color: {Color.ALT_ROW};
@@ -142,7 +188,7 @@ QSS = f"""
     }}
 
     QHeaderView::section {{
-        font-family: "{Color.UI_FONT}", "Cantarell", "sans-serif";
+        font-family: "{ui}", "Cantarell", "sans-serif";
         font-weight: 600;
         padding: 4px 6px;
         background-color: transparent;
@@ -510,7 +556,7 @@ QSS = f"""
         background: transparent;
     }}
     QPlainTextEdit {{
-        font-family: "{Color.MONO_FONT}", "Noto Sans Mono", monospace;
+        font-family: "{mono}", "Noto Sans Mono", monospace;
         font-size: 13px;
         background: {Color.PANEL};
         border: 1px solid {Color.BORDER};
@@ -524,9 +570,11 @@ QSS = f"""
 def load():
     """Устанавливает шрифты и таблицу стилей для приложения."""
     app = _app()
+    _resolve_fonts()
+    global QSS
+    QSS = _build_qss()
     app.setStyleSheet(QSS)
 
-    # UI шрифт (Noto Sans)
     ui_font = QFont(Color.UI_FONT, 14)
     ui_font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
     app.setFont(ui_font)
