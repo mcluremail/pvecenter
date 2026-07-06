@@ -67,7 +67,7 @@ class CardRow(QFrame):
         if title_key:
             self._title_label = QLabel(str(self._data.get(title_key, "")))
             self._title_label.setStyleSheet(f"font-weight: 500; color: {Color.TEXT};")
-            self._title_label.setMinimumWidth(80)
+            self._title_label.setMinimumWidth(120)
             layout.addWidget(self._title_label)
 
         fields = self._columns.get("fields", [])
