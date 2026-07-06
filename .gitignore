@@ -13,7 +13,9 @@ debian/tmp/
 nodes.enc
 nodes.json
 .omo/
+# личные рабочие документы (не пушим)
 audit_ui_*.md
+/AUDIT_*.md
 docs/audit_*.md
 docs/ux_proposals_*.md
 *.pyc
