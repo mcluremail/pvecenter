@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QHeaderView,
     QProgressBar,
@@ -23,9 +22,6 @@ from ._table_utils import (
     loading_label,
     make_table,
     safe_pct,
-    set_cell_text,
-    set_empty_placeholder,
-    update_progress_bar,
 )
 
 
@@ -50,21 +46,23 @@ class HostTabs:
         return parts
 
     def build_host_vm_tab(self):
-        table = make_table(
-            [tr("Name"), tr("Type"), tr("Node"), tr("Status"), "CPU %", tr("RAM"), tr("Disk"), tr("Uptime")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 50),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
-             (QHeaderView.Interactive, 55), (QHeaderView.Interactive, 80),
-             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 80)],
-        )
-        self.panel.host_vm_table = table
+        from ..widgets.card_list import CardList
+        columns = {
+            "key": "vmid",
+            "dot": "status",
+            "title": "name",
+            "fields": [
+                ("status_text", 70),
+                ("cpu_text", 55),
+                ("ram_text", 80),
+                ("disk_text", 80),
+                ("uptime_text", 80),
+            ],
+        }
+        self.panel.host_vm_list = CardList(columns)
         tab = QScrollArea()
         tab.setWidgetResizable(True)
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(table)
-        tab.setWidget(container)
+        tab.setWidget(self.panel.host_vm_list)
         return tab
 
     def build_host_storage_tab(self):
@@ -178,100 +176,73 @@ class HostTabs:
         return tab
 
     def build_summary_tab(self):
-        table = make_table(
-            [tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 55),
-             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 85)],
-        )
-        self.panel.datacenter_summary = table
+        from ..widgets.card_list import CardList
+        host_columns = {
+            "key": "node",
+            "dot": "status",
+            "title": "name",
+            "fields": [
+                ("status_text", 70),
+                ("address", 120),
+                ("cpu_text", 55),
+                ("ram_text", 80),
+                ("uptime_text", 85),
+            ],
+        }
+        self.panel.host_summary_list = CardList(host_columns)
+
+        cluster_columns = {
+            "key": "name",
+            "title": "name",
+            "fields": [
+                ("hosts_text", 70),
+                ("vms_text", 70),
+                ("cpu_text", 55),
+                ("ram_text", 80),
+            ],
+        }
+        self.panel.cluster_summary_list = CardList(cluster_columns)
+
+        from PySide6.QtWidgets import QStackedWidget
+        self.panel.summary_stack = QStackedWidget()
+        self.panel.summary_stack.addWidget(self.panel.host_summary_list)
+        self.panel.summary_stack.addWidget(self.panel.cluster_summary_list)
+
         tab = QScrollArea()
         tab.setWidgetResizable(True)
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(table)
-        tab.setWidget(container)
+        tab.setWidget(self.panel.summary_stack)
         return tab
-
-    # --- Populate / fetch logic ---
 
     def populate_host_summary(self, hosts):
         panel = self.panel
-        table = panel.datacenter_summary
-        table.clearSpans()
-        table.clearContents()
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels([
-            tr("Host"), tr("Status"), tr("Address"), tr("CPU %"), tr("RAM (GiB)"), tr("Uptime")
-        ])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        table.setRowCount(len(hosts))
-        for i, node in enumerate(hosts):
+        panel.summary_stack.setCurrentIndex(0)
+        card_items = []
+        for node in hosts:
             node_name = node.get("_display_name") or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster_rep"):
                 node_name = "★ " + node_name
-            name_item = QTableWidgetItem(node_name)
-            if cfg and cfg.get("cluster_rep"):
-                f = name_item.font()
-                f.setBold(True)
-                name_item.setFont(f)
-            table.setItem(i, 0, name_item)
-
             status = node.get("status", "unknown")
-            status_item = QTableWidgetItem(f"● {status_text(status)}")
-            if status == "online":
-                status_item.setForeground(QBrush(QColor(Color.STATUS_OK)))
-            elif status == "offline":
-                status_item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
-            else:
-                status_item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
-            table.setItem(i, 1, status_item)
-
-            address = cfg.get("host", "") if cfg else ""
-            table.setItem(i, 2, QTableWidgetItem(address))
-
             cpu_frac = node.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            cpu_bar = QProgressBar()
-            cpu_bar.setRange(0, 100)
-            cpu_bar.setValue(int(cpu_pct))
-            cpu_bar.setStyleSheet(_progress_style(int(cpu_pct)))
-            cpu_bar.setFormat(f"{cpu_pct}%")
-            table.setCellWidget(i, 3, cpu_bar)
-            cpu_item = QTableWidgetItem("")
-            cpu_item.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 3, cpu_item)
-
             mem_bytes = node.get("mem", 0)
             maxmem_bytes = node.get("maxmem", 0) or 0
             mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            mem_pct = safe_pct(mem_bytes, maxmem_bytes)
-            ram_bar = QProgressBar()
-            ram_bar.setRange(0, 100)
-            ram_bar.setValue(mem_pct)
-            ram_bar.setStyleSheet(_progress_style(mem_pct))
-            ram_bar.setFormat(f"{mem_gb}/{maxmem_gb} GiB")
-            table.setCellWidget(i, 4, ram_bar)
-            ram_item = QTableWidgetItem("")
-            ram_item.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 4, ram_item)
-
             uptime_sec = node.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
-            table.setItem(i, 5, QTableWidgetItem(uptime_str))
-
-        table.resizeRowsToContents()
-        compact_table(table, 24)
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            card_items.append({
+                "node": node.get("node", ""),
+                "name": node_name,
+                "status": status,
+                "status_text": status_text(status),
+                "address": cfg.get("host", "") if cfg else "",
+                "cpu_text": f"{cpu_pct}%",
+                "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
+                "uptime_text": uptime_str,
+            })
+        panel.host_summary_list.set_items(card_items)
 
     def show_cluster_folder(self, name):
         panel = self.panel
@@ -294,59 +265,25 @@ class HostTabs:
                 clusters[cl]["nodes"].add(node.get("node"))
         for cl in clusters.values():
             cl["vms"] = [vm for vm in panel.all_vms if vm.get("node") in cl["nodes"]]
-        table = panel.datacenter_summary
-        table.clearSpans()
-        table.clearContents()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels([tr("Cluster"), tr("Hosts"), tr("VMs"), tr("CPU %"), tr("RAM (GiB)")])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        table.setRowCount(max(len(clusters), 1))
-        if not clusters:
-            table.setSpan(0, 0, 1, 5)
-            empty = QTableWidgetItem(tr("No clusters configured"))
-            empty.setFlags(empty.flags() & ~Qt.ItemIsSelectable)
-            empty.setTextAlignment(Qt.AlignCenter)
-            table.setItem(0, 0, empty)
-        for i, (cl_name, cl_data) in enumerate(sorted(clusters.items(), key=lambda x: x[0].lower())):
-            table.setItem(i, 0, QTableWidgetItem(cl_name))
+        panel.summary_stack.setCurrentIndex(1)
+        cluster_items = []
+        for cl_name, cl_data in sorted(clusters.items(), key=lambda x: x[0].lower()):
             hosts_ok = sum(1 for h in cl_data["hosts"] if h.get("status") == "online")
-            table.setItem(i, 1, QTableWidgetItem(f"{hosts_ok}/{len(cl_data['hosts'])}"))
             vms_ok = sum(1 for v in cl_data["vms"] if v.get("status") == "running")
-            table.setItem(i, 2, QTableWidgetItem(f"{vms_ok}/{len(cl_data['vms'])}"))
             cpu_vals = [h.get("cpu", 0) for h in cl_data["hosts"] if isinstance(h.get("cpu"), float)]
             avg_cpu = round(sum(cpu_vals) / len(cpu_vals) * 100, 1) if cpu_vals else 0
-            cpu_bar = QProgressBar()
-            cpu_bar.setRange(0, 100)
-            cpu_bar.setValue(int(avg_cpu))
-            cpu_bar.setStyleSheet(_progress_style(int(avg_cpu)))
-            cpu_bar.setFormat(f"{avg_cpu}%")
-            table.setCellWidget(i, 3, cpu_bar)
-            ci = QTableWidgetItem("")
-            ci.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 3, ci)
             mem_total = sum(h.get("maxmem", 0) for h in cl_data["hosts"])
             mem_used = sum(h.get("mem", 0) for h in cl_data["hosts"])
             mem_total_gb = round(mem_total / (1024**3), 1)
             mem_used_gb = round(mem_used / (1024**3), 1)
-            mem_pct = safe_pct(mem_used, mem_total)
-            ram_bar = QProgressBar()
-            ram_bar.setRange(0, 100)
-            ram_bar.setValue(mem_pct)
-            ram_bar.setStyleSheet(_progress_style(mem_pct))
-            ram_bar.setFormat(f"{mem_used_gb}/{mem_total_gb} GiB")
-            table.setCellWidget(i, 4, ram_bar)
-            ri = QTableWidgetItem("")
-            ri.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 4, ri)
-        table.resizeRowsToContents()
-        for r in range(table.rowCount()):
-            if table.rowHeight(r) > 24:
-                table.setRowHeight(r, 24)
+            cluster_items.append({
+                "name": cl_name,
+                "hosts_text": f"{hosts_ok}/{len(cl_data['hosts'])}",
+                "vms_text": f"{vms_ok}/{len(cl_data['vms'])}",
+                "cpu_text": f"{avg_cpu}%",
+                "ram_text": f"{mem_used_gb}/{mem_total_gb} GiB",
+            })
+        panel.cluster_summary_list.set_items(cluster_items)
 
     def show_standalone_folder(self, name):
         panel = self.panel
@@ -499,35 +436,14 @@ class HostTabs:
         vms_of_host = [vm for vm in panel.all_vms
                        if vm.get("node") == host_name
                        and vm.get("host_name") == host_cfg_name]
-        panel.host_vm_table.setSortingEnabled(False)
-        if not vms_of_host:
-            set_empty_placeholder(panel.host_vm_table, 8)
-            panel.host_vm_table.setSortingEnabled(True)
-            return
-        panel.host_vm_table.setRowCount(len(vms_of_host))
-        WARN_ROLE = Qt.UserRole + 10
-        for i, vm in enumerate(vms_of_host):
-            name_item = QTableWidgetItem(str(vm.get("name", "")))
-            name_item.setIcon(get_icon("vm", vm.get("status")))
-            name_item.setData(Qt.UserRole + 30, vm.get("vmid"))
-            panel.host_vm_table.setItem(i, 0, name_item)
-            panel.host_vm_table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
-            panel.host_vm_table.setItem(i, 2, QTableWidgetItem(str(vm.get("node", vm.get("host_name", "")))))
+        card_items = []
+        for vm in vms_of_host:
             vm_status = str(vm.get("status", ""))
-            vm_status_item = QTableWidgetItem(status_text(vm_status))
-            if vm_status == "running":
-                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_OK)))
-            elif vm_status == "stopped":
-                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_ERR)))
-            else:
-                vm_status_item.setForeground(QBrush(QColor(Color.STATUS_WARN)))
-            panel.host_vm_table.setItem(i, 3, vm_status_item)
             cpu_val = vm.get("cpu", 0)
             if isinstance(cpu_val, float):
-                cpu = round(cpu_val * 100, 1)
+                cpu_str = str(round(cpu_val * 100, 1))
             else:
-                cpu = cpu_val
-            panel.host_vm_table.setItem(i, 4, QTableWidgetItem(str(cpu)))
+                cpu_str = str(cpu_val)
             mem = vm.get("mem", 0) or 0
             maxmem = vm.get("maxmem", 0) or 0
             if maxmem:
@@ -537,7 +453,6 @@ class HostTabs:
                 ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
             else:
                 ram_str = "—"
-            panel.host_vm_table.setItem(i, 5, QTableWidgetItem(ram_str))
             disk = vm.get("disk", 0) or 0
             maxdisk = vm.get("maxdisk", 0) or 0
             vm_type = vm.get("type", "qemu")
@@ -550,19 +465,19 @@ class HostTabs:
                     disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
-            panel.host_vm_table.setItem(i, 6, QTableWidgetItem(disk_str))
             uptime = vm.get("uptime", 0)
             uptime_str = _format_uptime(uptime) if uptime else "—"
-            panel.host_vm_table.setItem(i, 7, QTableWidgetItem(uptime_str))
-            warning = (isinstance(cpu_val, float) and cpu_val >= 0.9) or vm_status == "stopped"
-            if warning:
-                for c in range(8):
-                    it = panel.host_vm_table.item(i, c)
-                    if it:
-                        it.setBackground(QColor(Color.WARN_ROW_BG))
-                        it.setData(WARN_ROLE, True)
-        compact_table(panel.host_vm_table)
-        panel.host_vm_table.setSortingEnabled(True)
+            card_items.append({
+                "vmid": vm.get("vmid"),
+                "name": str(vm.get("name", "")),
+                "status": vm_status,
+                "status_text": status_text(vm_status),
+                "cpu_text": cpu_str,
+                "ram_text": ram_str,
+                "disk_text": disk_str,
+                "uptime_text": uptime_str,
+            })
+        panel.host_vm_list.set_items(card_items)
 
         host_storages = [s for s in panel.all_storages
                          if s.get("node") == host_name
@@ -657,89 +572,83 @@ class HostTabs:
 
             panel.info_stack.setCurrentIndex(1)
 
-        WARN_ROLE = Qt.UserRole + 10
-        vmid_role = Qt.UserRole + 30
         vms_of_host = [vm for vm in panel.all_vms
                        if vm.get("node") == host_name
                        and vm.get("host_name") == host_cfg_name]
-        fresh_by_vmid = {vm.get("vmid"): vm for vm in vms_of_host}
-
-        table = panel.host_vm_table
-        for r in range(table.rowCount()):
-            name_item = table.item(r, 0)
-            if name_item is None:
-                continue
-            vmid = name_item.data(vmid_role)
-            if vmid is None:
-                continue
-            new_vm = fresh_by_vmid.get(vmid)
-            if new_vm is None:
-                continue
-
-            name_item.setText(str(new_vm.get("name", "")))
-            set_cell_text(table, r, 1, str(new_vm.get("type", "")))
-            set_cell_text(table, r, 2, str(new_vm.get("node", new_vm.get("host_name", ""))))
-
-            vm_status = str(new_vm.get("status", ""))
-            status_color = Color.STATUS_OK if vm_status == "running" else Color.STATUS_ERR if vm_status == "stopped" else Color.STATUS_WARN
-            set_cell_text(table, r, 3, vm_status, status_color)
-
-            cpu_val = new_vm.get("cpu", 0)
+        card_updates = []
+        for vm in vms_of_host:
+            vm_status = str(vm.get("status", ""))
+            cpu_val = vm.get("cpu", 0)
             if isinstance(cpu_val, float):
                 cpu_str = str(round(cpu_val * 100, 1))
             else:
                 cpu_str = str(cpu_val)
-            set_cell_text(table, r, 4, cpu_str)
-
-            warning = (isinstance(cpu_val, float) and cpu_val >= 0.9) or vm_status == "stopped"
-            for c in range(5):
-                it = table.item(r, c)
-                if it:
-                    if warning:
-                        it.setBackground(QColor(Color.WARN_ROW_BG))
-                        it.setData(WARN_ROLE, True)
-                    else:
-                        was_warn = it.data(WARN_ROLE)
-                        if was_warn:
-                            it.setData(WARN_ROLE, None)
-                            it.setBackground(QColor(Color.GRAY_100) if r % 2 == 1 else QBrush())
+            mem = vm.get("mem", 0) or 0
+            maxmem = vm.get("maxmem", 0) or 0
+            if maxmem:
+                mem_pct = round(mem / maxmem * 100, 1)
+                mem_gb = round(mem / (1024**3), 2)
+                maxmem_gb = round(maxmem / (1024**3), 2)
+                ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
+            else:
+                ram_str = "—"
+            disk = vm.get("disk", 0) or 0
+            maxdisk = vm.get("maxdisk", 0) or 0
+            vm_type = vm.get("type", "qemu")
+            if maxdisk:
+                maxdisk_gb = round(maxdisk / (1024**3), 2)
+                if vm_type == "lxc" and disk:
+                    disk_gb = round(disk / (1024**3), 2)
+                    disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
+                else:
+                    disk_str = f"{maxdisk_gb} GiB"
+            else:
+                disk_str = "—"
+            uptime = vm.get("uptime", 0)
+            uptime_str = _format_uptime(uptime) if uptime else "—"
+            card_updates.append({
+                "vmid": vm.get("vmid"),
+                "name": str(vm.get("name", "")),
+                "status": vm_status,
+                "status_text": status_text(vm_status),
+                "cpu_text": cpu_str,
+                "ram_text": ram_str,
+                "disk_text": disk_str,
+                "uptime_text": uptime_str,
+            })
+        panel.host_vm_list.update_all(card_updates)
 
     def update_cluster_summary_cells(self, hosts):
         panel = self.panel
-        table = panel.datacenter_summary
-        node_by_name = {n.get("node", ""): n for n in hosts}
-
-        for r in range(table.rowCount()):
-            name_item = table.item(r, 0)
-            if name_item is None:
-                continue
-            node_name = name_item.text().replace("★ ", "").strip()
-            node = node_by_name.get(node_name)
-            if node is None:
-                continue
-
+        if panel.summary_stack.currentIndex() != 0:
+            return
+        card_updates = []
+        for node in hosts:
+            node_name = node.get("_display_name") or node.get("node", "?")
+            host_name = node.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            if cfg and cfg.get("cluster_rep"):
+                node_name = "★ " + node_name
             status = node.get("status", "unknown")
-            status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
-            set_cell_text(table, r, 1, f"● {status}", status_color)
-
             cpu_frac = node.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            old_bar = table.cellWidget(r, 3)
-            if isinstance(old_bar, QProgressBar):
-                update_progress_bar(old_bar, int(cpu_pct), f"{cpu_pct}%")
-
             mem_bytes = node.get("mem", 0)
             maxmem_bytes = node.get("maxmem", 0) or 0
             mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            mem_pct = safe_pct(mem_bytes, maxmem_bytes)
-            old_ram = table.cellWidget(r, 4)
-            if isinstance(old_ram, QProgressBar):
-                update_progress_bar(old_ram, mem_pct, f"{mem_gb}/{maxmem_gb} GiB")
-
             uptime_sec = node.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else ''
-            set_cell_text(table, r, 5, uptime_str)
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            card_updates.append({
+                "node": node.get("node", ""),
+                "name": node_name,
+                "status": status,
+                "status_text": status_text(status),
+                "address": cfg.get("host", "") if cfg else "",
+                "cpu_text": f"{cpu_pct}%",
+                "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
+                "uptime_text": uptime_str,
+            })
+        panel.host_summary_list.update_all(card_updates)
 
     def fetch_host_network(self, host_name, host_data):
         panel = self.panel

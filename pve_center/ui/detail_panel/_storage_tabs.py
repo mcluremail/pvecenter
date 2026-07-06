@@ -35,21 +35,23 @@ class StorageTabs:
         self.panel = panel
 
     def build_storage_overview_tab(self):
-        table = make_table(
-            [tr("Name"), tr("Type"), tr("Content"), tr("Cluster / Node"), tr("Used"), tr("Total"), tr("Usage")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
-             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 70),
-             (QHeaderView.Interactive, 95)],
-        )
-        self.panel.storage_table = table
+        from ..widgets.card_list import CardList
+        columns = {
+            "key": "name",
+            "title": "name",
+            "fields": [
+                ("type_text", 65),
+                ("content_text", 100),
+                ("location_text", 120),
+                ("used_text", 70),
+                ("total_text", 70),
+                ("usage_text", 60),
+            ],
+        }
+        self.panel.storage_list = CardList(columns)
         tab = QScrollArea()
         tab.setWidgetResizable(True)
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(table)
-        tab.setWidget(container)
+        tab.setWidget(self.panel.storage_list)
         return tab
 
     def build_storage_detail_tab(self):
@@ -236,43 +238,29 @@ class StorageTabs:
     # --- Populate / fetch ---
 
     def populate_storage_table(self, storages):
-        table = self.panel.storage_table
-        if not storages:
-            set_empty_placeholder(table, 5)
-            return
-        table.setRowCount(len(storages))
-        for i, st in enumerate(storages):
-            name_item = QTableWidgetItem(st.get("storage", st.get("id", "")))
-            name_item.setIcon(get_icon("storage"))
-            table.setItem(i, 0, name_item)
-            table.setItem(i, 1, QTableWidgetItem(st.get("type", "")))
+        card_items = []
+        for st in storages:
+            name = st.get("storage", st.get("id", ""))
             content = st.get("content", "")
             if isinstance(content, list):
                 content = ", ".join(content)
-            table.setItem(i, 2, QTableWidgetItem(content))
             cluster = st.get("cluster")
-            host_val = cluster if cluster else st.get("node", st.get("host_name", ""))
-            table.setItem(i, 3, QTableWidgetItem(host_val))
+            location = cluster if cluster else st.get("node", st.get("host_name", ""))
             used = st.get("used", 0) or 0
             total = st.get("total", 0) or 0
             used_gb = round(used / (1024**3), 1) if used else 0
             total_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
-            table.setItem(i, 4, QTableWidgetItem(f"{used_gb} GiB"))
-            table.setItem(i, 5, QTableWidgetItem(f"{total_gb} GiB"))
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(pct)
-            bar.setStyleSheet(_progress_style(pct))
-            bar.setFormat(f"{pct}%")
-            table.setCellWidget(i, 6, bar)
-            bi = QTableWidgetItem("")
-            bi.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 6, bi)
-        table.resizeRowsToContents()
-        for r in range(table.rowCount()):
-            if table.rowHeight(r) > 24:
-                table.setRowHeight(r, 24)
+            card_items.append({
+                "name": name,
+                "type_text": st.get("type", ""),
+                "content_text": content,
+                "location_text": location,
+                "used_text": f"{used_gb} GiB",
+                "total_text": f"{total_gb} GiB",
+                "usage_text": f"{pct}%",
+            })
+        self.panel.storage_list.set_items(card_items)
 
     def show_storage_folder(self):
         panel = self.panel
