@@ -224,7 +224,7 @@ class MainWindow(QMainWindow):
         self._toolbar.addWidget(spacer)
 
         brand = QLabel("PVE Center")
-        brand.setStyleSheet(f"font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding-right: 8px;")
+        brand.setStyleSheet("font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding-right: 8px;")
         self._toolbar.addWidget(brand)
 
         self.addToolBar(self._toolbar)

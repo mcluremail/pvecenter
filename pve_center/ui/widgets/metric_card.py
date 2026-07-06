@@ -1,5 +1,5 @@
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QSizePolicy, QVBoxLayout
 
 from ..theme import Color
 
