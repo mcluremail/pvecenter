@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.3.1](https://github.com/mcluremail/pvecenter/releases/tag/v2.3.1)
+Latest release: [v2.3.2](https://github.com/mcluremail/pvecenter/releases/tag/v2.3.2)
 
 ## Features
 
@@ -153,7 +153,7 @@ pvecenter
 # From local repository:
 ./run
 # or
-python -m pve_center.main
+python -m pve_center
 ```
 
 ### First run
@@ -185,28 +185,32 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 
 | File | Purpose |
 |------|---------|
-| `main.py` | Entry point |
-| `backend.py` | API client, token management, VM actions, migrate/clone workers |
-| `config.py` | Keyring, SQLite config storage, export/import |
-| `run` | Launch script |
-| `ui/i18n/` | Translation module (tr()), JSON translation files |
-| `ui/mainwindow.py` | Main window |
-| `ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
-| `ui/detail_panel/` | VM/host detail panel (package) |
-| `ui/add_server_dialog.py` | Add server dialog (with SSL trust toggle) |
-| `ui/create_vm_dialog.py` | Create VM dialog |
-| `ui/migrate_vm_dialog.py` | VM migration dialog |
-| `ui/clone_vm_dialog.py` | VM cloning dialog |
-| `ui/vm_config_editor_dialog.py` | VM config editor dialog |
-| `ui/vm_device_editors.py` | Specialized device editors |
-| `ui/vm_actions.py` | VM power action labels and confirmation |
-| `ui/about_dialog.py` | About dialog |
-| `ui/icons.py` | SVG icon registry |
-| `ui/widgets/` | Widget modules |
-| `ui/api/` | API workers (RRD data, storage content) |
+| `pve_center/__main__.py` | Module entry (`python -m pve_center`) |
+| `pve_center/main.py` | Application entry point |
+| `pve_center/backend.py` | API client, token management, VM actions, migrate/clone workers |
+| `pve_center/config.py` | Keyring, SQLite config storage, export/import |
+| `pve_center/ui/mainwindow.py` | Main window |
+| `pve_center/ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
+| `pve_center/ui/detail_panel/` | VM/host detail panel (package) |
+| `pve_center/ui/add_server_dialog.py` | Add server dialog (with SSL trust toggle) |
+| `pve_center/ui/create_vm_dialog.py` | Create VM dialog |
+| `pve_center/ui/migrate_vm_dialog.py` | VM migration dialog |
+| `pve_center/ui/clone_vm_dialog.py` | VM cloning dialog |
+| `pve_center/ui/vm_config_editor_dialog.py` | VM config editor dialog |
+| `pve_center/ui/vm_device_editors.py` | Specialized device editors |
+| `pve_center/ui/vm_config_display.py` | VM config display widget |
+| `pve_center/ui/vm_actions.py` | VM power action labels and confirmation |
+| `pve_center/ui/about_dialog.py` | About dialog |
+| `pve_center/ui/theme.py` | Color constants, fonts, QSS theme |
+| `pve_center/ui/icons.py` | SVG icon registry |
+| `pve_center/ui/notification.py` | Toast notifications |
+| `pve_center/ui/i18n/` | Translation module (tr()), JSON translation files |
+| `pve_center/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options) |
+| `pve_center/ui/api/` | API workers (RRD data, storage content) |
 | `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
 | `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
-| `.github/workflows/release.yml` | CI: build deb/rpm/zip/installer, create release |
+| `.github/workflows/ci.yml` | CI: ruff lint on PR/push (Python 3.10/3.11/3.12) |
+| `.github/workflows/release.yml` | Release: build deb/rpm/zip/installer, create GitHub release |
 
 ## Language switching
 
