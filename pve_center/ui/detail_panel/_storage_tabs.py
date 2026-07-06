@@ -98,12 +98,13 @@ class StorageTabs:
                 axisItems={'bottom': date_axis}, title=tr("Fill level")
             )
             panel.storage_plot_widget.setLabel('left', 'GiB')
-            panel.storage_plot_widget.showGrid(x=True, y=True)
+            panel.storage_plot_widget.showGrid(x=False, y=True, alpha=0.3)
             panel.storage_plot_widget.enableAutoRange(axis='y')
             panel.storage_plot_widget.setMouseEnabled(x=False, y=False)
             panel.storage_plot_widget.setMinimumHeight(220)
             panel.storage_plot_curve = panel.storage_plot_widget.plot(
-                [], [], pen=pg.mkPen(Color.SLATE_900, width=2)
+                [], [], pen=pg.mkPen(Color.STATUS_WARN, width=2),
+                fillLevel=0, fillBrush=pg.mkBrush(Color.STATUS_WARN + "33")
             )
             sd_plot_layout = QVBoxLayout(panel.storage_detail_plot)
             sd_plot_layout.setContentsMargins(0, 0, 0, 0)
