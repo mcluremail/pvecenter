@@ -1,4 +1,4 @@
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -55,25 +55,31 @@ class AddServerDialog(QDialog):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
+        layout.setSpacing(16)
 
         layout.addWidget(_section_title(tr("Connection")))
 
         conn_grid = QGridLayout()
         conn_grid.setHorizontalSpacing(12)
-        conn_grid.setVerticalSpacing(8)
+        conn_grid.setVerticalSpacing(10)
 
-        conn_grid.addWidget(QLabel(tr("Host:")), 0, 0)
+        host_lbl = QLabel(tr("Host:"))
+        host_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(host_lbl, 0, 0)
         self.host_input = QLineEdit()
         self.host_input.setPlaceholderText("pve01.example.com")
         conn_grid.addWidget(self.host_input, 0, 1)
 
-        conn_grid.addWidget(QLabel(tr("User:")), 1, 0)
+        user_lbl = QLabel(tr("User:"))
+        user_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(user_lbl, 1, 0)
         self.user_input = QLineEdit()
         self.user_input.setPlaceholderText("username@realm (root@pam, user@ipa...)")
         conn_grid.addWidget(self.user_input, 1, 1)
 
-        conn_grid.addWidget(QLabel(tr("Password:")), 2, 0)
+        pwd_lbl = QLabel(tr("Password:"))
+        pwd_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(pwd_lbl, 2, 0)
         self.pwd_input = QLineEdit()
         self.pwd_input.setEchoMode(QLineEdit.Password)
         self.pwd_input.setPlaceholderText("••••••••")
@@ -92,6 +98,7 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(self.auth_btn, 5, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
+        conn_grid.setColumnStretch(1, 1)
         layout.addLayout(conn_grid)
         layout.addWidget(_section_sep())
 
@@ -99,22 +106,27 @@ class AddServerDialog(QDialog):
 
         token_grid = QGridLayout()
         token_grid.setHorizontalSpacing(12)
-        token_grid.setVerticalSpacing(8)
+        token_grid.setVerticalSpacing(10)
 
+        tn_lbl = QLabel(tr("Token name:"))
+        tn_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        token_grid.addWidget(tn_lbl, 0, 0)
         self.token_name_label = QLabel("—")
         self.token_name_label.setStyleSheet("font-family: monospace;")
-        token_grid.addWidget(QLabel(tr("Token name:")), 0, 0)
         token_grid.addWidget(self.token_name_label, 0, 1)
 
+        tv_lbl = QLabel(tr("Value:"))
+        tv_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        token_grid.addWidget(tv_lbl, 1, 0)
         self.token_value_label = QLabel("—")
         self.token_value_label.setStyleSheet(f"font-family: monospace; color: {Color.STATUS_OK};")
-        token_grid.addWidget(QLabel(tr("Value:")), 1, 0)
         token_grid.addWidget(self.token_value_label, 1, 1)
 
         self.status_label = QLabel("")
         self.status_label.setStyleSheet(f"color: {Color.TEXT_SEC};")
         token_grid.addWidget(self.status_label, 2, 0, 1, 2)
 
+        token_grid.setColumnStretch(1, 1)
         layout.addLayout(token_grid)
         layout.addWidget(_section_sep())
 
@@ -122,14 +134,18 @@ class AddServerDialog(QDialog):
 
         node_grid = QGridLayout()
         node_grid.setHorizontalSpacing(12)
-        node_grid.setVerticalSpacing(8)
+        node_grid.setVerticalSpacing(10)
 
-        node_grid.addWidget(QLabel(tr("Name:")), 0, 0)
+        name_lbl = QLabel(tr("Name:"))
+        name_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        node_grid.addWidget(name_lbl, 0, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText(tr("auto (first part of hostname)"))
         node_grid.addWidget(self.name_input, 0, 1)
 
-        node_grid.addWidget(QLabel(tr("Cluster:")), 1, 0)
+        cl_lbl = QLabel(tr("Cluster:"))
+        cl_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        node_grid.addWidget(cl_lbl, 1, 0)
         self.cluster_input = QLineEdit()
         self.cluster_input.setPlaceholderText(tr("cluster name (if applicable)"))
         node_grid.addWidget(self.cluster_input, 1, 1)
@@ -137,6 +153,7 @@ class AddServerDialog(QDialog):
         self.cluster_rep_cb = QCheckBox(tr("This is a cluster representative"))
         node_grid.addWidget(self.cluster_rep_cb, 2, 0, 1, 2)
 
+        node_grid.setColumnStretch(1, 1)
         layout.addLayout(node_grid)
 
         layout.addStretch()

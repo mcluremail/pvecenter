@@ -418,10 +418,11 @@ def _build_qss() -> str:
     /* ── Line Edit ── */
     QLineEdit {{
         border: 1px solid {Color.BORDER};
-        border-radius: 4px;
-        padding: 3px 6px;
+        border-radius: 6px;
+        padding: 6px 10px;
         font-size: 13px;
         background: {Color.PANEL};
+        min-height: 20px;
     }}
     QLineEdit:focus {{
         border-color: {Color.ACCENT};
