@@ -506,6 +506,7 @@ class VMTabs:
             panel.detail_sublabel.setVisible(True)
 
             panel.card_status.set_value(status_text(status))
+            panel.card_status.set_title(tr("Status"))
             status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
             panel.card_status.set_value_color(status_color)
             if ha and ha not in ("", "ignored"):
@@ -513,16 +514,21 @@ class VMTabs:
             else:
                 panel.card_status.set_subtitle("")
 
+            panel.card_cpu.set_title(tr("CPU"))
             panel.card_cpu.set_value(f"{cpu_usage}%")
             panel.card_cpu.set_subtitle(f"{cpus} {tr('cores')}")
             panel.card_cpu.set_progress(cpu_usage)
 
+            panel.card_ram.set_title(tr("RAM"))
             panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
             panel.card_ram.set_progress(mem_pct)
 
+            panel.card_disk.set_title(tr("Disk"))
+            panel.card_net.set_title(tr("Network"))
             panel.card_net.set_value(f"↓ {netin_mb} MB")
             panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
 
+            panel.card_uptime.set_title(tr("Uptime"))
             panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
             panel.card_uptime.set_subtitle(f"{tr('Tags')}: {tags}" if tags else "")
 

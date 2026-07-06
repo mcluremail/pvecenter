@@ -42,14 +42,8 @@ class HostTabs:
         parts.append(status_text(status))
         pve_ver = host_data.get("pveversion", "")
         if pve_ver:
-            parts.append("pve " + pve_ver.split("-")[0] if "-" in pve_ver else "pve " + pve_ver)
-        cpu = host_data.get("cpu", 0)
-        if isinstance(cpu, float):
-            parts.append(f"{round(cpu * 100, 1)}% CPU")
-        mem = host_data.get("mem", 0)
-        maxmem = host_data.get("maxmem", 0)
-        if maxmem:
-            parts.append(f"{round(mem / (1024**3), 1)}/{round(maxmem / (1024**3), 0)} GiB")
+            ver = pve_ver.split("/")[1] if "/" in pve_ver else pve_ver
+            parts.append("pve " + ver.split("-")[0] if "-" in ver else "pve " + ver)
         uptime = host_data.get("uptime", 0)
         if uptime:
             parts.append(_format_uptime(uptime) + " " + tr("uptime"))
@@ -448,34 +442,55 @@ class HostTabs:
         if host_data and host_data.get("status") != "error":
             from ._constants import _fmt_pveversion
             host_cfg = panel._cfg_by_name.get(host_data.get("host_name", ""))
-            address = host_cfg.get("host", "") if host_cfg else ""
             cpu_frac = host_data.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
             mem_bytes = host_data.get("mem", 0)
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_bytes = host_data.get("maxmem", 0)
+            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime = host_data.get("uptime", 0)
             status = host_data.get("status", "")
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
-            html = (
-                f"<table cellpadding='3' style='font-size: 12px;'>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Host name')}</td><td>{host_data.get('node', '')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Status')}</td><td style='color:{status_color};'>{'● ' + status_text(status)}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Address')}</td><td>{address}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('SSL certificate')}</td><td>{tr('trusted') if (host_cfg and host_cfg.get('trust_ssl', True)) else tr('untrusted')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('PVE version')}</td><td>{_fmt_pveversion(host_data.get('pveversion', '?'))}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>QEMU</td><td>{host_data.get('qemu', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Kernel')}</td><td>{host_data.get('kernel', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>LXC</td><td>{host_data.get('lxctype', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('CPU %')}</td><td>{cpu_pct}%</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('RAM (GiB)')}</td><td>{mem_gb} / {maxmem_gb}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Uptime')}</td><td>{_format_uptime(uptime)}</td></tr>"
-                f"</table>"
+            panel.card_status.set_title(tr("Status"))
+            panel.card_status.set_value(status_text(status))
+            panel.card_status.set_value_color(status_color)
+            panel.card_status.set_subtitle(
+                tr("PVE") + " " + _fmt_pveversion(host_data.get("pveversion", "?"))
             )
-            panel.info_label.setText(html)
-            panel.info_stack.setCurrentIndex(0)
+
+            panel.card_cpu.set_value(f"{cpu_pct}%")
+            cpu_sockets = host_data.get("sockets", "")
+            cpu_model = host_data.get("cpuinfo", "")
+            if cpu_sockets:
+                panel.card_cpu.set_subtitle(f"{cpu_sockets} {tr('sockets')}")
+            else:
+                panel.card_cpu.set_subtitle("")
+            panel.card_cpu.set_progress(cpu_pct)
+
+            panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
+            ram_pct = safe_pct(mem_bytes, maxmem_bytes)
+            panel.card_ram.set_progress(ram_pct)
+
+            vms_count = sum(1 for v in panel.all_vms if v.get("node") == host_name)
+            vms_running = sum(1 for v in panel.all_vms
+                              if v.get("node") == host_name and v.get("status") == "running")
+            panel.card_disk.set_title(tr("VMs"))
+            panel.card_disk.set_value(f"{vms_running}/{vms_count}")
+            panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
+            panel.card_disk.set_progress(0)
+
+            panel.card_net.set_title(tr("Uptime"))
+            panel.card_net.set_value(_format_uptime(uptime) if uptime else "—")
+            panel.card_net.set_subtitle("")
+
+            panel.card_uptime.set_title(tr("Address"))
+            address = host_cfg.get("host", "") if host_cfg else ""
+            panel.card_uptime.set_value(address)
+            ssl_state = tr("trusted") if (host_cfg and host_cfg.get("trust_ssl", True)) else tr("untrusted")
+            panel.card_uptime.set_subtitle(f"SSL {ssl_state}")
+
+            panel.info_stack.setCurrentIndex(1)
         else:
             panel.info_label.setText(tr("No data"))
             panel.info_stack.setCurrentIndex(0)
@@ -606,34 +621,42 @@ class HostTabs:
         if is_online:
             from ._constants import _fmt_pveversion
             host_cfg = panel._cfg_by_name.get(host_cfg_name)
-            address = host_cfg.get("host", "") if host_cfg else ""
             cpu_frac = host_data.get("cpu", 0)
             cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
             mem_bytes = host_data.get("mem", 0)
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_bytes = host_data.get("maxmem", 0)
+            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime = host_data.get("uptime", 0)
             status = host_data.get("status", "")
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
-            html = (
-                f"<table cellpadding='3' style='font-size: 12px;'>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Host name')}</td><td>{host_data.get('node', '')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Status')}</td><td style='color:{status_color};'>{'● ' + status_text(status)}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Address')}</td><td>{address}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('SSL certificate')}</td><td>{tr('trusted') if (host_cfg and host_cfg.get('trust_ssl', True)) else tr('untrusted')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('PVE version')}</td><td>{_fmt_pveversion(host_data.get('pveversion', '?'))}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>QEMU</td><td>{host_data.get('qemu', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Kernel')}</td><td>{host_data.get('kernel', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>LXC</td><td>{host_data.get('lxctype', '?')}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('CPU %')}</td><td>{cpu_pct}%</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('RAM (GiB)')}</td><td>{mem_gb} / {maxmem_gb}</td></tr>"
-                f"<tr><td style='color:{Color.TEXT_SEC};'>{tr('Uptime')}</td><td>{_format_uptime(uptime)}</td></tr>"
-                f"</table>"
+            panel.card_status.set_value(status_text(status))
+            panel.card_status.set_value_color(status_color)
+            panel.card_status.set_subtitle(
+                tr("PVE") + " " + _fmt_pveversion(host_data.get("pveversion", "?"))
             )
-            panel.info_label.setText(html)
-            panel.info_stack.setCurrentIndex(0)
+
+            panel.card_cpu.set_value(f"{cpu_pct}%")
+            panel.card_cpu.set_progress(cpu_pct)
+
+            panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
+            panel.card_ram.set_progress(safe_pct(mem_bytes, maxmem_bytes))
+
+            vms_count = sum(1 for v in panel.all_vms if v.get("node") == host_name)
+            vms_running = sum(1 for v in panel.all_vms
+                              if v.get("node") == host_name and v.get("status") == "running")
+            panel.card_disk.set_value(f"{vms_running}/{vms_count}")
+            panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
+
+            panel.card_net.set_value(_format_uptime(uptime) if uptime else "—")
+
+            address = host_cfg.get("host", "") if host_cfg else ""
+            panel.card_uptime.set_value(address)
+            ssl_state = tr("trusted") if (host_cfg and host_cfg.get("trust_ssl", True)) else tr("untrusted")
+            panel.card_uptime.set_subtitle(f"SSL {ssl_state}")
+
+            panel.info_stack.setCurrentIndex(1)
 
         WARN_ROLE = Qt.UserRole + 10
         vmid_role = Qt.UserRole + 30
