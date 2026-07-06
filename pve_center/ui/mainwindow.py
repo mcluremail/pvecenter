@@ -1,29 +1,49 @@
-import sys
-import time
-import threading
-import traceback
-import logging
-from PySide6.QtWidgets import (QMainWindow, QSplitter,
-                               QHBoxLayout, QVBoxLayout, QWidget,
-                               QMessageBox, QLabel, QDialog, QPushButton, QCheckBox,
-                               QComboBox, QToolBar, QFileDialog)
-from PySide6.QtCore import Qt, Slot, QTimer, QThreadPool, QSize
-from PySide6.QtGui import QShortcut, QKeySequence, QAction
-
-from ..backend import FetchWorker, ClusterTasksWorker, DeleteVmWorker, delete_host_token
-from .vm_actions import confirm_vm_action
-from ..config import (save_config, save_tasks_cache, load_tasks_cache,
-                      save_ui_state, load_ui_state, export_config, import_config)
 import json
+import logging
+import sys
+import threading
+import time
+import traceback
+
+from PySide6.QtCore import QSize, Qt, QThreadPool, QTimer, Slot
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..backend import ClusterTasksWorker, DeleteVmWorker, FetchWorker, delete_host_token
+from ..config import (
+    export_config,
+    import_config,
+    load_tasks_cache,
+    load_ui_state,
+    save_config,
+    save_tasks_cache,
+    save_ui_state,
+)
 from . import theme
-from .theme import Color
-from .notification import NotificationManager
-from .tree_panel import TreePanel
 from .detail_panel import DetailPanel
-from .widgets.cluster_tasks_widget import ClusterTasksWidget
+from .i18n import get_language, supported_languages, tr
 from .icons import get_icon
-from .i18n import tr, set_language, get_language, supported_languages
+from .notification import NotificationManager
+from .theme import Color
+from .tree_panel import TreePanel
 from .utils import build_cfg_index, build_vm_index
+from .vm_actions import confirm_vm_action
+from .widgets.cluster_tasks_widget import ClusterTasksWidget
+
 logger = logging.getLogger(__name__)
 
 # Максимум одновременно работающих воркеров
@@ -165,7 +185,6 @@ class MainWindow(QMainWindow):
         self.show()
         self.refresh_data()
 
-        from PySide6.QtWidgets import QToolButton
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
         self._toolbar.setIconSize(QSize(16, 16))
@@ -1188,7 +1207,8 @@ class MainWindow(QMainWindow):
             self.tree_panel.save_state()
             from PySide6.QtCore import QCoreApplication
             QCoreApplication.quit()
-            import os, sys
+            import os
+            import sys
             self_dir = os.path.dirname(os.path.abspath(__file__))          # ui/
             pkg_dir = os.path.dirname(self_dir)                            # pve_center/
             parent_dir = os.path.dirname(pkg_dir)                          # /home/taurus

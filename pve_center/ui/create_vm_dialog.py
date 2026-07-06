@@ -1,14 +1,26 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-                               QLabel, QLineEdit, QPushButton, QCheckBox,
-                               QComboBox, QSpinBox, QScrollArea,
-                               QWidget, QFrame)
-from PySide6.QtCore import Qt
+import json
+
+from PySide6.QtCore import QRegularExpression, Qt
 from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
-from PySide6.QtCore import QRegularExpression
-from ..config import save_ui_state, load_ui_state
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..config import load_ui_state, save_ui_state
 from .i18n import tr
 from .theme import Color
-import json
 
 VM_SETTINGS_KEY = "create_vm_settings"
 

@@ -1,7 +1,9 @@
 from datetime import datetime
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..theme import Color

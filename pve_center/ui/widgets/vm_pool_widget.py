@@ -1,11 +1,18 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget, QProgressBar
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QProgressBar,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..detail_panel._constants import _progress_style
+from ..detail_panel._table_utils import set_empty_placeholder
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..icons import get_icon
-from ..detail_panel._constants import _progress_style
-from ..detail_panel._table_utils import set_empty_placeholder
-from ..theme import Color
 
 
 class VmPoolWidget(QWidget):

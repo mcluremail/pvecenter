@@ -1,19 +1,30 @@
-from PySide6.QtWidgets import (QTreeWidget, QTreeWidgetItem, QVBoxLayout, QHBoxLayout,
-                               QWidget, QAbstractItemView, QPushButton, QMenu, QToolButton,
-                               QLabel, QTreeWidgetItemIterator)
-from PySide6.QtCore import Signal, Qt, QSize, QTimer
-from PySide6.QtGui import QIcon, QAction
-from collections import defaultdict
-from datetime import timedelta
 import json
 import re
+from collections import defaultdict
+from datetime import timedelta
 
-from .icons import get_icon, init_icons, make_loading_icon
-from .vm_actions import VM_ACTION_ICONS
-from ..config import save_ui_state, load_ui_state
-from .utils import status_text, format_uptime as _format_uptime, build_cfg_index, build_vm_index, build_node_index
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QToolButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QTreeWidgetItemIterator,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..config import load_ui_state, save_ui_state
 from .i18n import tr
+from .icons import get_icon, init_icons, make_loading_icon
 from .theme import Color
+from .utils import build_cfg_index, build_node_index, build_vm_index, status_text
+from .vm_actions import VM_ACTION_ICONS
 
 VM_KEY_ROLE = Qt.UserRole + 1
 ITEM_KEY_ROLE = Qt.UserRole + 2

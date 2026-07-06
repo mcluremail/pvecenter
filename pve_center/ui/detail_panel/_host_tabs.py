@@ -1,18 +1,32 @@
 from datetime import datetime
 
-from PySide6.QtWidgets import (QTableWidgetItem, QProgressBar, QScrollArea, QWidget,
-                               QVBoxLayout, QStackedWidget, QLabel, QHeaderView)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QBrush, QColor
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QProgressBar,
+    QScrollArea,
+    QStackedWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..i18n import tr
-from ..theme import Color
-from ..utils import status_text, format_uptime as _format_uptime
 from ..icons import get_icon
-from ._constants import _progress_style, TabIndex
-from ._table_utils import (make_table, compact_table, set_cell_text,
-                           update_progress_bar, safe_pct, set_empty_placeholder,
-                           loading_label)
+from ..theme import Color
+from ..utils import format_uptime as _format_uptime
+from ..utils import status_text
+from ._constants import TabIndex, _progress_style
+from ._table_utils import (
+    compact_table,
+    loading_label,
+    make_table,
+    safe_pct,
+    set_cell_text,
+    set_empty_placeholder,
+    update_progress_bar,
+)
 
 
 class HostTabs:
@@ -361,8 +375,8 @@ class HostTabs:
             reason = parse_pve_error(err)
             panel.info_label.setStyleSheet(f"font-size: 13px; color: {Color.STATUS_ERR}; padding: 40px 16px;")
             panel.info_label.setText(
-                f"<div style='text-align: center;'>"
-                f"<span style='font-size: 22px; font-weight: 700;'>" + tr("❌ {} is unavailable").format(display_name) + "</span>"
+                "<div style='text-align: center;'>"
+                "<span style='font-size: 22px; font-weight: 700;'>" + tr("❌ {} is unavailable").format(display_name) + "</span>"
                 f"<br><br>"
                 f"<span style='font-size: 14px; color: {Color.DANGER};'>{reason}</span>"
                 f"</div>"

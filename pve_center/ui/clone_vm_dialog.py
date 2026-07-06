@@ -1,9 +1,18 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-                               QLabel, QLineEdit, QPushButton, QCheckBox,
-                               QComboBox, QGroupBox, QSpinBox)
 from PySide6.QtGui import QIntValidator
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+)
+
 from .i18n import tr
-from .theme import Color
 
 
 class CloneVMDialog(QDialog):

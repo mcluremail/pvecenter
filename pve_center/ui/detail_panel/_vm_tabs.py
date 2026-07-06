@@ -1,25 +1,21 @@
 import logging
 
-from PySide6.QtWidgets import (QLabel, QStackedWidget, QVBoxLayout, QWidget,
-                               QSizePolicy, QTableWidgetItem,
-                               QHBoxLayout, QScrollArea,
-                               QTableWidget, QHeaderView, QGridLayout)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtWidgets import QGridLayout, QLabel, QScrollArea, QStackedWidget, QVBoxLayout, QWidget
 
 from ..i18n import tr
 from ..theme import Color
-from ..utils import status_text, format_uptime as _format_uptime, parse_pve_error
+from ..utils import format_uptime as _format_uptime
+from ..utils import parse_pve_error, status_text
 from ..vm_actions import VM_ACTION_MESSAGE_LABELS, confirm_vm_action
-from ._constants import TabIndex
-from ._table_utils import compact_table, safe_pct
-
-from ..widgets.vm_metrics_widget import VmMetricsWidget
 from ..widgets.metric_card import MetricCard
 from ..widgets.vm_hardware_widget import VmHardwareWidget
+from ..widgets.vm_metrics_widget import VmMetricsWidget
 from ..widgets.vm_options_widget import VmOptionsWidget
-from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
 from ..widgets.vm_pool_widget import VmPoolWidget
+from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
+from ._constants import TabIndex
+from ._table_utils import safe_pct
 
 logger = logging.getLogger(__name__)
 

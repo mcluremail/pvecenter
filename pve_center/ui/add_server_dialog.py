@@ -1,7 +1,16 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-                               QLabel, QLineEdit, QPushButton, QCheckBox,
-                               QMessageBox, QGroupBox)
-from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtCore import QThreadPool
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+)
+
 from ..backend import TokenCreationWorker
 from .i18n import tr
 from .theme import Color

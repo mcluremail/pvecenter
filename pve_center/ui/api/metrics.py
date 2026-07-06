@@ -1,10 +1,12 @@
-import requests
-import logging
-import urllib.parse
 import concurrent.futures
+import logging
 import threading
-from PySide6.QtCore import QRunnable, QObject, Signal
+import urllib.parse
+
+import requests
 import urllib3
+from PySide6.QtCore import QObject, QRunnable, Signal
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)

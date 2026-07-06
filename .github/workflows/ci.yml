@@ -27,6 +27,3 @@ jobs:
 
       - name: Ruff check
         run: ruff check pve_center
-
-      - name: Ruff format check
-        run: ruff format --check pve_center

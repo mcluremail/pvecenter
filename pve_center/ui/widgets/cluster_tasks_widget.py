@@ -1,12 +1,14 @@
+import json
 from datetime import datetime, timezone
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+
+from ...config import load_ui_state, save_ui_state
 from ..hover import enable_row_hover
-from ...config import save_ui_state, load_ui_state
 from ..i18n import tr
 from ..theme import Color
-import json
 
 TASK_COL_WIDTHS_KEY = "task_col_widths"
 

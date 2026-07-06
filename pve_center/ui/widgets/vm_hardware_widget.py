@@ -1,17 +1,30 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget, QMessageBox
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor
-from ..hover import enable_row_hover
-from ..vm_config_display import (get_hardware_rows, get_editor_spec,
-                                 HW_DEFAULTS, is_net_key, is_cdrom_key, is_disk_key,
-                                 is_tpm_key)
-from ..vm_config_editor_dialog import VmConfigEditorDialog
-from ..vm_device_editors import (VmNetworkEditorDialog, VmCdromEditorDialog,
-                                 VmDiskEditorDialog)
-from ..i18n import tr
-from ..theme import Color
-from ..icons import get_icon
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QMessageBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ..detail_panel._table_utils import set_empty_placeholder
+from ..hover import enable_row_hover
+from ..i18n import tr
+from ..icons import get_icon
+from ..theme import Color
+from ..vm_config_display import (
+    HW_DEFAULTS,
+    get_editor_spec,
+    get_hardware_rows,
+    is_cdrom_key,
+    is_disk_key,
+    is_net_key,
+    is_tpm_key,
+)
+from ..vm_config_editor_dialog import VmConfigEditorDialog
+from ..vm_device_editors import VmCdromEditorDialog, VmDiskEditorDialog, VmNetworkEditorDialog
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101

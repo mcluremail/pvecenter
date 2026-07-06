@@ -1,17 +1,33 @@
 from datetime import datetime
 
-from PySide6.QtWidgets import (QTableWidgetItem, QProgressBar, QScrollArea, QWidget,
-                               QVBoxLayout, QStackedWidget, QLabel, QComboBox,
-                               QHBoxLayout, QHeaderView)
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QProgressBar,
+    QScrollArea,
+    QStackedWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..i18n import tr
-from ..theme import Color
 from ..icons import get_icon
-from ._constants import _progress_style, _HAS_PG, TabIndex
-from ._table_utils import (make_table, make_filterable_table, format_volsize,
-                           safe_pct, set_empty_placeholder, set_cell_text,
-                           update_progress_bar, loading_label)
+from ..theme import Color
+from ._constants import _HAS_PG, TabIndex, _progress_style
+from ._table_utils import (
+    format_volsize,
+    loading_label,
+    make_filterable_table,
+    make_table,
+    safe_pct,
+    set_cell_text,
+    set_empty_placeholder,
+    update_progress_bar,
+)
 
 
 class StorageTabs:

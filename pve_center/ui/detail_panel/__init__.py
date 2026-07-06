@@ -1,21 +1,19 @@
 import logging
 
-from PySide6.QtWidgets import (QLabel, QWidget, QTabWidget, QPushButton,
-                               QHBoxLayout, QVBoxLayout)
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
+from ..i18n import tr
+from ..icons import get_icon
+from ..theme import Color
 from ..utils import build_cfg_index, build_vm_index
 from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
-from ..icons import get_icon
-from ..i18n import tr
-from ..theme import Color
-
 from ._constants import TabIndex
-from ._worker_manager import WorkerManager
 from ._host_tabs import HostTabs
 from ._storage_tabs import StorageTabs
-from ._vm_tabs import VMTabs
 from ._table_utils import set_cell_text
+from ._vm_tabs import VMTabs
+from ._worker_manager import WorkerManager
 
 logger = logging.getLogger(__name__)
 

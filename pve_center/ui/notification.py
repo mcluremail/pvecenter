@@ -1,7 +1,8 @@
 import sys
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QGraphicsOpacityEffect
-from PySide6.QtCore import QTimer, Qt, QPropertyAnimation, Property, QPoint
+from PySide6.QtCore import Property, QPoint, QPropertyAnimation, Qt, QTimer
+from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget
+
 from .i18n import tr
 from .theme import Color
 

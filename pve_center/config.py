@@ -1,10 +1,10 @@
-import json
-import os
-import sys
 import base64
-import sqlite3
-import threading
+import json
 import logging
+import os
+import sqlite3
+import sys
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -214,8 +214,8 @@ def delete_node_tokens(names: list[str]):
 # ── encrypted bundle (export/import) ────────────────────────────
 
 def _derive_key(password: str, salt: bytes) -> bytes:
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=600_000)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
@@ -241,8 +241,8 @@ def _ask_password(mode="enter"):
     """Show password input dialog for export/import bundle.
     mode='enter' — existing password, mode='set' — set new password.
     Returns password or None (cancelled)."""
-    from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                   QLineEdit, QPushButton)
+    from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
+
     from .ui.i18n import tr
     from .ui.theme import Color
     dialog = QDialog()
@@ -311,6 +311,7 @@ def export_config(dest_path: str) -> bool:
     missing = [c.get("name", "?") for c in config if not c.get("token_value")]
     if missing:
         from PySide6.QtWidgets import QMessageBox
+
         from .ui.i18n import tr
         QMessageBox.warning(
             None, tr("Export"),
@@ -329,6 +330,7 @@ def export_config(dest_path: str) -> bool:
 def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
     """Import encrypted bundle, merge with existing config."""
     from PySide6.QtWidgets import QMessageBox
+
     from .ui.i18n import tr
     if not os.path.exists(src_path):
         return None

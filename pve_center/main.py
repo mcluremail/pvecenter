@@ -1,6 +1,8 @@
-import sys
 import logging
+import sys
+
 from PySide6.QtWidgets import QApplication
+
 from .config import load_config, load_ui_state
 
 logging.basicConfig(

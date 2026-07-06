@@ -1,15 +1,14 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+
+from ..detail_panel._table_utils import set_empty_placeholder
 from ..hover import enable_row_hover
-from ..vm_config_display import get_options_rows, get_editor_spec, OPT_DEFAULTS
-from ..vm_config_editor_dialog import VmConfigEditorDialog
-from ..vm_device_editors import (VmBootEditorDialog,
-                                 VmBootdiskEditorDialog,
-                                 VmStartupEditorDialog)
 from ..i18n import tr
 from ..theme import Color
-from ..detail_panel._table_utils import set_empty_placeholder
+from ..vm_config_display import OPT_DEFAULTS, get_editor_spec, get_options_rows
+from ..vm_config_editor_dialog import VmConfigEditorDialog
+from ..vm_device_editors import VmBootdiskEditorDialog, VmBootEditorDialog, VmStartupEditorDialog
 
 _KEY_ROLE = Qt.UserRole + 100
 _READONLY_ROLE = Qt.UserRole + 101

@@ -1,7 +1,13 @@
-from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QWidget,
-                               QVBoxLayout, QLineEdit, QLabel)
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QBrush, QColor
+from PySide6.QtWidgets import (
+    QLabel,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..hover import enable_row_hover
 from ..i18n import tr

@@ -1,12 +1,20 @@
-import re
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                               QPushButton, QLineEdit, QSpinBox, QComboBox,
-                               QFormLayout, QMessageBox, QGroupBox,
-                               QListWidget, QListWidgetItem)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+)
+
 from .i18n import tr
 from .theme import Color
-
 
 NET_MODELS = ["virtio", "e1000", "rtl8139", "vmxnet3"]
 

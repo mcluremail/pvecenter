@@ -1,5 +1,5 @@
-from PySide6.QtCore import QEvent, Qt, QObject
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QBrush, QColor
 
 from .theme import Color
 

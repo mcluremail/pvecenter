@@ -1,4 +1,5 @@
 from enum import IntEnum
+
 from ..theme import Color
 
 _HEADER_STYLE = "QHeaderView::section { padding-left: 4px; }"

@@ -46,7 +46,7 @@ def _load_json(lang: str) -> dict[str, str]:
         logger.warning("i18n JSON not found: %s", path)
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
             logger.error("i18n JSON root is not an object: %s", path)

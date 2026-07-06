@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton,
-                                QHBoxLayout, QFrame)
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+
 from .i18n import tr
 from .theme import Color
 
@@ -16,7 +16,7 @@ class AboutDialog(QDialog):
         layout.setSpacing(16)
         layout.setContentsMargins(28, 24, 28, 20)
 
-        from .. import __version__, __author__, __license__
+        from .. import __author__, __license__, __version__
 
         title = QLabel("PVE Center")
         f = title.font()

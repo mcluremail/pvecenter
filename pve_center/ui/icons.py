@@ -1,7 +1,6 @@
-from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtGui import QPainter
 
 ICON_SIZE = 16
 _C = "#4b5563"

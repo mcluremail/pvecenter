@@ -4,8 +4,8 @@
 приоритетны, на Windows/под macOS подставляются системные аналоги).
 """
 
-import os
 import logging
+import os
 
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication

@@ -1,10 +1,12 @@
-import urllib3
-from .ui.i18n import tr
-from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 import logging
 import threading
-from PySide6.QtCore import Signal, QRunnable, QObject
+
+import urllib3
 from proxmoxer import ProxmoxAPI
+from PySide6.QtCore import QObject, QRunnable, Signal
+
+from .ui.i18n import tr
+from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +54,10 @@ def create_admin_token(host, user, password, trust_ssl=False):
         dict with token_name, token_value, user fields
         or dict with error field.
     """
-    import requests as rq
     import secrets as sec
     import string as str_mod
+
+    import requests as rq
     verify = bool(trust_ssl)
 
     try:
@@ -873,7 +876,10 @@ class VmConsoleWorker(QRunnable):
         self.signals = VmConsoleSignals()
 
     def run(self):
-        import os, sys, tempfile, subprocess
+        import os
+        import subprocess
+        import sys
+        import tempfile
         vv_path = None
         try:
             try:
@@ -1066,7 +1072,7 @@ class CreateVmWorker(QRunnable):
                         pass
                     return
 
-            result = proxmox.nodes(self.node_name).qemu.post(**params)
+            proxmox.nodes(self.node_name).qemu.post(**params)
             # POST /nodes/{node}/qemu returns UPID string, not {"data": {"vmid":...}}
             # vmid is now guaranteed in params (user-provided or nextid)
             vmid = params.get("vmid", "?")
