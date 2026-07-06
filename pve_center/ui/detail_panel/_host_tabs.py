@@ -374,6 +374,12 @@ class HostTabs:
 
     def show_cluster(self, cluster_name):
         panel = self.panel
+        hosts = []
+        for node in panel.all_nodes:
+            host_name = node.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            if cfg and cfg.get("cluster") == cluster_name:
+                hosts.append(node)
         panel.detail_label.setText(cluster_name)
         hosts_count = len(hosts)
         running = sum(1 for h in hosts if h.get("status") == "online")
@@ -385,12 +391,6 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.SUMMARY, True)
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, False)
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
-        hosts = []
-        for node in panel.all_nodes:
-            host_name = node.get("host_name", "")
-            cfg = panel._cfg_by_name.get(host_name)
-            if cfg and cfg.get("cluster") == cluster_name:
-                hosts.append(node)
         self.populate_host_summary(hosts)
 
     def show_host_info(self, host_name, host_data):
