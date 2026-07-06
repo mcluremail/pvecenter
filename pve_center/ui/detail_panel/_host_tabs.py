@@ -51,11 +51,11 @@ class HostTabs:
             "dot": "status",
             "title": "name",
             "fields": [
-                ("status_text", 70),
+                ("status_text", 90),
                 ("cpu_text", 55),
-                ("ram_text", 80),
-                ("disk_text", 80),
-                ("uptime_text", 80),
+                ("ram_text", 125),
+                ("disk_text", 115),
+                ("uptime_text", 125),
             ],
         }
         self.panel.host_vm_list = CardList(columns)
@@ -68,8 +68,8 @@ class HostTabs:
         table = make_table(
             [tr("Name"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
-             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 95)],
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100),
+             (QHeaderView.Interactive, 100), (QHeaderView.Interactive, 95)],
         )
         self.panel.host_storage_table = table
         widget = QWidget()
@@ -83,7 +83,7 @@ class HostTabs:
         table = make_table(
             [tr("Interface"), tr("Type"), tr("State"), "Method", "CIDR"],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Interactive, 75), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 50), (QHeaderView.Interactive, 75),
              (QHeaderView.Stretch, None)],
         )
         stack = QStackedWidget()
@@ -130,7 +130,7 @@ class HostTabs:
         table = make_table(
             [tr("Device"), tr("Type"), tr("Model"), tr("Size"), tr("Serial")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 90),
              (QHeaderView.Stretch, None)],
         )
         stack = QStackedWidget()
@@ -155,7 +155,7 @@ class HostTabs:
             [tr("VM"), tr("Snapshot"), tr("Description"), tr("Created"), tr("Current")],
             [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
              (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
-             (QHeaderView.Interactive, 65)],
+             (QHeaderView.Interactive, 50)],
             sortable=True,
         )
         stack = QStackedWidget()
@@ -181,11 +181,11 @@ class HostTabs:
             "dot": "status",
             "title": "name",
             "fields": [
-                ("status_text", 70),
-                ("address", 120),
+                ("status_text", 90),
+                ("address", 110),
                 ("cpu_text", 55),
-                ("ram_text", 80),
-                ("uptime_text", 85),
+                ("ram_text", 125),
+                ("uptime_text", 125),
             ],
         }
         self.panel.host_summary_list = CardList(host_columns)
@@ -197,7 +197,7 @@ class HostTabs:
                 ("hosts_text", 70),
                 ("vms_text", 70),
                 ("cpu_text", 55),
-                ("ram_text", 80),
+                ("ram_text", 125),
             ],
         }
         self.panel.cluster_summary_list = CardList(cluster_columns)

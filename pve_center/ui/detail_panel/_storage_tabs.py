@@ -39,12 +39,12 @@ class StorageTabs:
             "key": "name",
             "title": "name",
             "fields": [
-                ("type_text", 65),
-                ("content_text", 100),
-                ("location_text", 120),
-                ("used_text", 70),
-                ("total_text", 70),
-                ("usage_text", 60),
+                ("type_text", 75),
+                ("content_text", 225),
+                ("location_text", 80),
+                ("used_text", 100),
+                ("total_text", 100),
+                ("usage_text", 65),
             ],
         }
         self.panel.storage_list = CardList(columns)
@@ -123,8 +123,8 @@ class StorageTabs:
         panel.storage_detail_nodes_table = make_table(
             [tr("Node"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
-             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 95)],
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100),
+             (QHeaderView.Interactive, 100), (QHeaderView.Interactive, 95)],
             sortable=True,
         )
         layout.addWidget(panel.storage_detail_nodes_table)
@@ -137,7 +137,7 @@ class StorageTabs:
         table = make_table(
             [tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Interactive, 60), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 80),
              (QHeaderView.Stretch, None)],
             sortable=True,
         )
@@ -163,8 +163,8 @@ class StorageTabs:
         table = make_table(
             [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")],
             [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 55),
-             (QHeaderView.Interactive, 70)],
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
+             (QHeaderView.Interactive, 80)],
             sortable=True,
         )
         panel.storage_disks_table = table
@@ -188,8 +188,8 @@ class StorageTabs:
         panel = self.panel
         table = make_table(
             [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
-             (QHeaderView.Interactive, 70), (QHeaderView.Stretch, None)],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 80), (QHeaderView.Stretch, None)],
             sortable=True,
         )
         panel.storage_iso_table = table
@@ -213,8 +213,8 @@ class StorageTabs:
         panel = self.panel
         table = make_table(
             [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
-             (QHeaderView.Interactive, 70), (QHeaderView.Stretch, None)],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 70),
+             (QHeaderView.Interactive, 80), (QHeaderView.Stretch, None)],
             sortable=True,
         )
         panel.storage_tpl_table = table
