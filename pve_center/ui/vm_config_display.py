@@ -647,13 +647,16 @@ def get_hardware_rows(config_data, detail_data=None):
     seen = set()
     for section_name, keys in _HW_SECTIONS:
         section_label = _HW_SECTION_LABELS.get(section_name, lambda: section_name)()
-        rows.append(("__section__", section_label, "", section_name))
+        section_rows = []
         for key in keys:
             if key in config:
                 seen.add(key)
                 label = HW_LABELS.get(key) or _device_label(key)
                 value = format_value(key, config[key])
-                rows.append((key, label, value, section_name))
+                section_rows.append((key, label, value, section_name))
+        if section_rows:
+            rows.append(("__section__", section_label, "", section_name))
+            rows.extend(section_rows)
     if detail_data:
         rm = detail_data.get("running-machine")
         if rm:
@@ -682,12 +685,15 @@ def get_options_rows(config_data):
     rows = []
     for section_name, keys in _OPT_SECTIONS:
         section_label = _OPT_SECTION_LABELS.get(section_name, lambda: section_name)()
-        rows.append(("__section__", section_label, "", section_name))
+        section_rows = []
         for key in keys:
             if key in config:
                 label = HW_LABELS.get(key) or _device_label(key)
                 formatted = format_value(key, config[key])
-                rows.append((key, label, formatted, section_name))
+                section_rows.append((key, label, formatted, section_name))
+        if section_rows:
+            rows.append(("__section__", section_label, "", section_name))
+            rows.extend(section_rows)
     if extra:
         rows.append(("__section__", _OPT_SECTION_LABELS.get("misc", lambda: tr("Misc"))(), "", "misc"))
         for key in sorted(extra):
