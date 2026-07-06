@@ -85,7 +85,6 @@ class CardRow(QFrame):
     def update_fields(self, data):
         self._data.update(data)
         if self._dot_label:
-            dot_key = self._columns.get("dot")
             color_key = _status_dot(self._data.get("status", ""))
             if color_key:
                 self._dot_label.setStyleSheet(f"color: {_DOT_COLORS.get(color_key, Color.TEXT_DIM)}; font-size: 10px;")

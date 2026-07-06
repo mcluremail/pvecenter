@@ -18,7 +18,6 @@ from ..utils import format_uptime as _format_uptime
 from ..utils import status_text
 from ._constants import TabIndex, _progress_style
 from ._table_utils import (
-    compact_table,
     loading_label,
     make_table,
     safe_pct,

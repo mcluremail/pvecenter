@@ -25,7 +25,6 @@ from ._table_utils import (
     make_table,
     safe_pct,
     set_cell_text,
-    set_empty_placeholder,
     update_progress_bar,
 )
 
