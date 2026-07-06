@@ -1,3 +1,15 @@
+pve-center (2.5.0-1) unstable; urgency=medium
+
+  * CardList widget — replaces QTableWidget for list-style views
+  * Redesign: Host VMs as card rows (dot + name + status/cpu/ram/disk/uptime)
+  * Redesign: Cluster Summary as QStackedWidget (host list + cluster list)
+  * Redesign: Storage Overview as card rows (name + type/content/location/usage)
+  * Fix: column widths tuned to real PVE data (13 VMs, 6 storages)
+  * Fix: 7 missing ru translations added (PVE, uptime, remote-viewer, action errors)
+  * i18n: _I18N_VERSION bumped 3→4 to force re-seed
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 14:00:00 +0300
+
 pve-center (2.4.0-1) unstable; urgency=medium
 
   * Redesign: theme refresh — softer palette, borderless tables, more air
