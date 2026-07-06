@@ -461,7 +461,6 @@ class HostTabs:
 
             panel.card_cpu.set_value(f"{cpu_pct}%")
             cpu_sockets = host_data.get("sockets", "")
-            cpu_model = host_data.get("cpuinfo", "")
             if cpu_sockets:
                 panel.card_cpu.set_subtitle(f"{cpu_sockets} {tr('sockets')}")
             else:
