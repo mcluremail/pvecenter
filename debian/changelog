@@ -1,3 +1,17 @@
+pve-center (2.4.0-1) unstable; urgency=medium
+
+  * Redesign: theme refresh — softer palette, borderless tables, more air
+  * Redesign: header bar (icon-only toolbar, brand label right-aligned)
+  * Redesign: segmented control tabs (accent underline, no pane chrome)
+  * Redesign: title block with subtitle (status · resources · uptime)
+  * Redesign: host monitoring via MetricCards (unified with VM, was HTML table)
+  * Redesign: charts area-fill + softer grid (was line-only on white)
+  * Redesign: hardware/options borderless key-value (was table with grid)
+  * Redesign: AddServer dialog section titles + dividers (was unstyled QGroupBox)
+  * MetricCard: QFrame + objectName, 18pt value, auto-graded progress colors
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 13:00:00 +0300
+
 pve-center (2.3.2-1) unstable; urgency=medium
 
   * Fix: resolve fonts dynamically via QFontDatabase, drop hardcoded Terminus
