@@ -187,15 +187,13 @@ class MainWindow(QMainWindow):
 
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
-        self._toolbar.setIconSize(QSize(16, 16))
-        self._toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._toolbar.setIconSize(QSize(18, 18))
+        self._toolbar.setToolButtonStyle(Qt.ToolButtonIconOnly)
 
         add_action = QAction(get_icon("add"), tr("Add server"), self)
         add_action.setToolTip(tr("Add server") + " (Ctrl+N)")
         add_action.triggered.connect(lambda: self._on_add_server())
         self._toolbar.addAction(add_action)
-
-        self._toolbar.addSeparator()
 
         refresh_action = QAction(get_icon("refresh"), tr("Refresh"), self)
         refresh_action.setToolTip(tr("Refresh data") + " (Ctrl+R)")
@@ -220,6 +218,14 @@ class MainWindow(QMainWindow):
         about_action.setToolTip(tr("About"))
         about_action.triggered.connect(self._on_about)
         self._toolbar.addAction(about_action)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(spacer.sizePolicy().Policy.Expanding, spacer.sizePolicy().Policy.Fixed)
+        self._toolbar.addWidget(spacer)
+
+        brand = QLabel("PVE Center")
+        brand.setStyleSheet("font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding-right: 8px;")
+        self._toolbar.addWidget(brand)
 
         self.addToolBar(self._toolbar)
 

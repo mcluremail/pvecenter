@@ -52,35 +52,35 @@ class DetailPanel(QWidget):
 
         self.detail_label = QLabel(tr("Select object in tree"))
         self.detail_label.setAlignment(Qt.AlignTop)
-        self.detail_label.setContentsMargins(8, 2, 0, 2)
+        self.detail_label.setContentsMargins(0, 0, 0, 0)
+        self.detail_label.setObjectName("titleMain")
+
+        self.detail_sublabel = QLabel("")
+        self.detail_sublabel.setAlignment(Qt.AlignTop)
+        self.detail_sublabel.setContentsMargins(0, 0, 0, 0)
+        self.detail_sublabel.setObjectName("titleSub")
+        self.detail_sublabel.setVisible(False)
 
         self.vm_action_bar = QWidget()
         self.vm_action_bar.setMinimumHeight(32)
         self.vm_action_bar.setVisible(False)
         action_layout = QHBoxLayout(self.vm_action_bar)
-        action_layout.setContentsMargins(4, 2, 4, 2)
-        action_layout.setSpacing(4)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(8)
 
         self._vm_actions = VM_ACTION_BUTTON_LABELS
-        action_layout.addStretch()
         self._action_buttons = {}
         for action_key, label in self._vm_actions.items():
             btn = QPushButton(get_icon(VM_ACTION_ICONS[action_key]), label)
-            btn.setMinimumHeight(24)
+            btn.setMinimumHeight(30)
             btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.setToolTip(VM_ACTION_TOOLTIPS[action_key])
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
 
-        sep = QWidget()
-        sep.setFixedWidth(1)
-        sep.setFixedHeight(18)
-        sep.setStyleSheet(f"background: {Color.BORDER};")
-        action_layout.addWidget(sep)
-
         self._console_btn = QPushButton(get_icon("console"), tr("Console"))
-        self._console_btn.setMinimumHeight(24)
+        self._console_btn.setMinimumHeight(30)
         self._console_btn.setObjectName("accentBtn")
         self._console_btn.setToolTip(tr("Open SPICE/VNC console"))
         self._console_btn.clicked.connect(self._on_vm_console)
@@ -91,9 +91,23 @@ class DetailPanel(QWidget):
 
         self.tabs.hide()
 
+        title_block = QHBoxLayout()
+        title_block.setContentsMargins(24, 20, 24, 0)
+        title_block.setSpacing(12)
+        title_left = QVBoxLayout()
+        title_left.setSpacing(2)
+        title_left.addWidget(self.detail_label)
+        title_left.addWidget(self.detail_sublabel)
+        title_block.addLayout(title_left)
+        title_block.addStretch()
+        title_block.addWidget(self.vm_action_bar)
+
+        title_widget = QWidget()
+        title_widget.setLayout(title_block)
+
         main_layout = QVBoxLayout()
-        main_layout.addWidget(self.detail_label)
-        main_layout.addWidget(self.vm_action_bar)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(title_widget)
         main_layout.addWidget(self.tabs)
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(main_layout)
@@ -219,6 +233,8 @@ class DetailPanel(QWidget):
                 tr("Error: {err}").format(err=str(exc)[:100])
             )
             self.detail_label.setText(tr("Error: {name}").format(name=obj_name))
+            self.detail_sublabel.setText("")
+            self.detail_sublabel.setVisible(False)
             self.info_label.setText(tr("An error occurred while loading information"))
             self.info_stack.setCurrentIndex(0)
 
