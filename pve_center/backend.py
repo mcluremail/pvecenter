@@ -324,9 +324,6 @@ class FetchWorker(QRunnable):
                     try:
                         ver = proxmox.nodes(node_name).version.get()
                         with version_lock:
-                            pve = ver.get("pveversion")
-                            if pve:
-                                n["pveversion"] = pve
                             qemu = ver.get("qemu")
                             if qemu:
                                 n["qemu"] = qemu
@@ -335,10 +332,13 @@ class FetchWorker(QRunnable):
                                 n["lxctype"] = lxc
                     except Exception:
                         pass
-                    # kernel из статуса ноды
+                    # pveversion и kernel из статуса ноды
                     try:
                         st = proxmox.nodes(node_name).status.get()
                         with version_lock:
+                            pve = st.get("pveversion")
+                            if pve:
+                                n["pveversion"] = pve
                             n["kernel"] = st.get("kversion", "")
                     except Exception:
                         pass
@@ -409,10 +409,6 @@ class FetchWorker(QRunnable):
                 if nodes:
                     try:
                         ver = proxmox.nodes(node_name).version.get()
-                        pve = ver.get("pveversion")
-                        if pve:
-                            for n in nodes:
-                                n["pveversion"] = pve
                         qemu = ver.get("qemu")
                         if qemu:
                             for n in nodes:
@@ -425,6 +421,10 @@ class FetchWorker(QRunnable):
                         pass
                     try:
                         st = proxmox.nodes(node_name).status.get()
+                        pve = st.get("pveversion")
+                        if pve:
+                            for n in nodes:
+                                n["pveversion"] = pve
                         kver = st.get("kversion")
                         if kver:
                             for n in nodes:
