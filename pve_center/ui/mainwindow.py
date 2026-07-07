@@ -272,6 +272,30 @@ class MainWindow(QMainWindow):
         # Первая загрузка задач — стартует из on_worker_finished, когда all_nodes заполнен
         self._cached_tasks = load_tasks_cache()
 
+        # Offline mode: load cached resources immediately so tree is populated
+        # before the first network response arrives
+        from ..config import load_resources_cache
+        cached_res, cached_ts = load_resources_cache()
+        if cached_res:
+            try:
+                self.all_nodes[:] = cached_res.get("nodes", [])
+                self.all_vms[:] = cached_res.get("vms", [])
+                self.all_storages[:] = cached_res.get("storages", [])
+                self._vms_by_key = build_vm_index(self.all_vms)
+                self.detail_panel.all_nodes[:] = self.all_nodes
+                self.detail_panel.all_vms[:] = self.all_vms
+                self.detail_panel.all_storages[:] = self.all_storages
+                self.detail_panel._vms_by_key = self._vms_by_key
+                self.tree_panel.update_node_statuses(self.all_nodes, self.all_vms)
+                self._offline_mode = True
+                self._offline_ts = cached_ts
+            except Exception:
+                self._offline_mode = False
+                self._offline_ts = None
+        else:
+            self._offline_mode = False
+            self._offline_ts = None
+
     def _run_worker(self, worker):
         if len(self._workers) >= MAX_WORKERS:
             return
@@ -849,6 +873,12 @@ class MainWindow(QMainWindow):
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
+            from ..config import save_resources_cache
+            save_resources_cache(self.all_nodes, self.all_vms, self.all_storages)
+            if self._offline_mode:
+                self._offline_mode = False
+                self._offline_ts = None
+                self._update_status_bar()
 
     def _detect_status_changes(self, nodes=None, vms=None):
         nodes = nodes if nodes is not None else self.all_nodes
@@ -969,6 +999,11 @@ class MainWindow(QMainWindow):
                     self.detail_panel.set_iso_catalog(self.all_iso_images)
                     self._detect_status_changes(self._soft_nodes, self._soft_vms)
                     self._update_status_bar()
+                    from ..config import save_resources_cache
+                    save_resources_cache(self._soft_nodes, self._soft_vms, self._soft_storages)
+                    if self._offline_mode:
+                        self._offline_mode = False
+                        self._offline_ts = None
                 except Exception as exc:
                     logger.debug("soft_refresh error", exc_info=True)
                     self._notifications.show(
@@ -1191,6 +1226,8 @@ class MainWindow(QMainWindow):
         ]
         if hosts_err:
             parts.append(tr("Errors: {n}").format(n=hosts_err))
+        if self._offline_mode:
+            parts.append(tr("Offline (cached)"))
         parts.append(now_str)
         self.status_label.setText("  ".join(p for p in parts if p))
 

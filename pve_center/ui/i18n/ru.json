@@ -362,6 +362,7 @@
   "OS type": "Тип ОС",
   "OVMF (UEFI)": "OVMF (UEFI)",
   "Offline": "Недоступен",
+  "Offline (cached)": "Офлайн (кэш)",
   "Offline mode": "Автономный режим",
   "On a running VM only the VLAN tag can be changed": "На работающей ВМ можно изменить только VLAN тег",
   "Online": "Доступен",
