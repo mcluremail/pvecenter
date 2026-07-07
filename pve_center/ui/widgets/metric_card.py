@@ -55,8 +55,8 @@ class MetricCard(QFrame):
         else:
             self._bar = None
 
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(96)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setFixedHeight(84)
 
     def set_title(self, title):
         self._title_label.setText(title)

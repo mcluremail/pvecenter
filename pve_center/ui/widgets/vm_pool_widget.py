@@ -32,7 +32,6 @@ class VmPoolWidget(QWidget):
             ("disk", tr("Disk")),
         ):
             card = MetricCard(title, show_progress=(key in ("cpu", "ram", "disk")))
-            card.setMinimumHeight(80)
             summary_layout.addWidget(card)
             self._summary_cards[key] = card
         summary_widget = QWidget()
