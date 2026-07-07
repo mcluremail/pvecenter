@@ -246,6 +246,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=self._tray_quit)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self._on_add_server())
         QShortcut(QKeySequence("Del"), self, activated=self.tree_panel.request_delete_current)
+        QShortcut(QKeySequence("Ctrl+Shift+M"), self, activated=self._dump_memory_snapshot)
 
         # Таймер автообновления основных данных
         self.refresh_timer = QTimer(self)
