@@ -204,21 +204,32 @@ class HostTabs:
     def build_summary_tab(self):
         from ..widgets.card_list import CardList
         host_columns = {
-            "key": "node",
+            "key": "_key",
             "dot": "status",
             "title": "name",
+            "title_width": 200,
+            "header_labels": [
+                (tr("Host"), 200),
+                (tr("Status"), 80),
+                (tr("Address"), 140),
+                (tr("CPU"), 50),
+                (tr("RAM"), 110),
+                (tr("VMs"), 35),
+                (tr("Uptime"), 90),
+            ],
             "fields": [
-                ("status_text", 90),
-                ("address", 110),
-                ("cpu_text", 55),
-                ("ram_text", 125),
-                ("uptime_text", 125),
+                ("status_text", 80),
+                ("address", 140),
+                ("cpu_text", 50),
+                ("ram_text", 110),
+                ("vms_text", 35),
+                ("uptime_text", 90),
             ],
         }
         self.panel.host_summary_list = CardList(host_columns, filterable=True)
 
         compare_columns = {
-            "key": "node",
+            "key": "_key",
             "dot": "status",
             "title": "name",
             "title_width": 140,
@@ -247,6 +258,14 @@ class HostTabs:
         cluster_columns = {
             "key": "name",
             "title": "name",
+            "title_width": 120,
+            "header_labels": [
+                (tr("Cluster"), 120),
+                (tr("Hosts"), 70),
+                (tr("VMs"), 70),
+                (tr("CPU"), 55),
+                (tr("RAM"), 125),
+            ],
             "fields": [
                 ("hosts_text", 70),
                 ("vms_text", 70),
@@ -283,7 +302,13 @@ class HostTabs:
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime_sec = node.get("uptime", 0)
             uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            vms_count = sum(
+                1 for v in panel.all_vms
+                if v.get("node") == node.get("node")
+                and v.get("host_name") == host_name
+            )
             card_items.append({
+                "_key": f"{node.get('node', '')}@{host_name}",
                 "node": node.get("node", ""),
                 "name": node_name,
                 "status": status,
@@ -291,6 +316,7 @@ class HostTabs:
                 "address": cfg.get("host", "") if cfg else "",
                 "cpu_text": f"{cpu_pct}%",
                 "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
+                "vms_text": str(vms_count),
                 "uptime_text": uptime_str,
             })
         panel.host_summary_list.set_items(card_items)
@@ -329,11 +355,13 @@ class HostTabs:
             cfg = panel._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if cl and cl not in (False, None, "Standalone"):
-                clusters.setdefault(cl, {"hosts": [], "nodes": set()})
+                clusters.setdefault(cl, {"hosts": [], "host_names": set(), "nodes": set()})
                 clusters[cl]["hosts"].append(node)
+                clusters[cl]["host_names"].add(host_name)
                 clusters[cl]["nodes"].add(node.get("node"))
         for cl in clusters.values():
-            cl["vms"] = [vm for vm in panel.all_vms if vm.get("node") in cl["nodes"]]
+            cl["vms"] = [vm for vm in panel.all_vms
+                         if vm.get("host_name") in cl["host_names"]]
         cluster_items = []
         for cl_name, cl_data in sorted(clusters.items(), key=lambda x: x[0].lower()):
             hosts_ok = sum(1 for h in cl_data["hosts"] if h.get("status") == "online")
@@ -389,13 +417,18 @@ class HostTabs:
             disk_bytes = node.get("disk", 0) or 0
             disk_gb = round(disk_bytes / (1024**3), 1) if disk_bytes else 0
             maxdisk_gb = round(maxdisk_bytes / (1024**3), 1) if maxdisk_bytes else 0
-            vms_count = sum(1 for v in panel.all_vms if v.get("node") == node.get("node"))
+            vms_count = sum(
+                1 for v in panel.all_vms
+                if v.get("node") == node.get("node")
+                and v.get("host_name") == host_name
+            )
             uptime_sec = node.get("uptime", 0)
             uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
             pve_ver = node.get("pveversion", "")
             if pve_ver:
                 pve_ver = pve_ver.split("/")[-1] if "/" in pve_ver else pve_ver
             card_items.append({
+                "_key": f"{node.get('node', '')}@{host_name}",
                 "node": node.get("node", ""),
                 "name": node_name,
                 "status": status,
@@ -771,7 +804,13 @@ class HostTabs:
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             uptime_sec = node.get("uptime", 0)
             uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            vms_count = sum(
+                1 for v in panel.all_vms
+                if v.get("node") == node.get("node")
+                and v.get("host_name") == host_name
+            )
             card_updates.append({
+                "_key": f"{node.get('node', '')}@{host_name}",
                 "node": node.get("node", ""),
                 "name": node_name,
                 "status": status,
@@ -779,6 +818,7 @@ class HostTabs:
                 "address": cfg.get("host", "") if cfg else "",
                 "cpu_text": f"{cpu_pct}%",
                 "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
+                "vms_text": str(vms_count),
                 "uptime_text": uptime_str,
             })
         panel.host_summary_list.update_all(card_updates)
