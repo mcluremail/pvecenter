@@ -119,6 +119,13 @@ def _init_db():
     conn.execute("CREATE TABLE IF NOT EXISTS tasks_cache (id INTEGER PRIMARY KEY, data TEXT)")
     conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS resources_cache (
+            id INTEGER PRIMARY KEY,
+            data TEXT NOT NULL,
+            ts TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS translations (
             lang  TEXT NOT NULL,
             msgid TEXT NOT NULL,
@@ -389,6 +396,42 @@ def load_tasks_cache() -> list[dict]:
     except Exception as e:
         logger.warning("load_tasks_cache: %s", e)
     return []
+
+
+# ── resources cache (offline mode) ───────────────────────────────
+
+_resources_cache_lock = threading.Lock()
+
+
+def save_resources_cache(nodes, vms, storages):
+    try:
+        data = json.dumps(
+            {"nodes": nodes, "vms": vms, "storages": storages},
+            ensure_ascii=False, default=str,
+        )
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        with _resources_cache_lock:
+            conn = _init_db()
+            conn.execute("INSERT OR REPLACE INTO resources_cache (id, data, ts) VALUES (1, ?, ?)", (data, ts))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        logger.warning("save_resources_cache: %s", e)
+
+
+def load_resources_cache():
+    try:
+        with _resources_cache_lock:
+            conn = _init_db()
+            cur = conn.execute("SELECT data, ts FROM resources_cache WHERE id = 1")
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                return json.loads(row[0]), row[1]
+    except Exception as e:
+        logger.warning("load_resources_cache: %s", e)
+    return None, None
 
 
 # ── ui state ────────────────────────────────────────────────────
