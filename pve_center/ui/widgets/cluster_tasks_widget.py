@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
     QTableWidget,
     QTableWidgetItem,
@@ -172,29 +171,34 @@ class ClusterTasksWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
 
-        # Filter bar
+        # Filter bar — compact, single row
         filter_bar = QHBoxLayout()
-        filter_bar.setContentsMargins(0, 0, 0, 4)
+        filter_bar.setContentsMargins(4, 0, 4, 2)
+        filter_bar.setSpacing(4)
         self._filter_input = QLineEdit()
-        self._filter_input.setPlaceholderText(tr("Filter tasks..."))
+        self._filter_input.setPlaceholderText(tr("Filter..."))
         self._filter_input.setClearButtonEnabled(True)
+        self._filter_input.setMaximumWidth(200)
         self._filter_input.textChanged.connect(self._apply_filter)
-        filter_bar.addWidget(QLabel(tr("Filter:")))
         filter_bar.addWidget(self._filter_input)
 
         self._status_filter = QComboBox()
-        self._status_filter.addItem(tr("All statuses"), "all")
+        self._status_filter.setMaximumWidth(90)
+        self._status_filter.addItem(tr("All"), "all")
         self._status_filter.addItem(tr("OK"), "OK")
         self._status_filter.addItem(tr("Errors"), "error")
         self._status_filter.addItem(tr("Running"), "RUNNING")
         self._status_filter.currentIndexChanged.connect(self._apply_filter)
         filter_bar.addWidget(self._status_filter)
+        filter_bar.addStretch()
 
         filter_widget = QWidget()
+        filter_widget.setFixedHeight(24)
         filter_widget.setLayout(filter_bar)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         layout.addWidget(filter_widget)
         layout.addWidget(self.table)
 
