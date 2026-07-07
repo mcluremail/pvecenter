@@ -15,9 +15,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
+    QSystemTrayIcon,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -96,6 +98,11 @@ class MainWindow(QMainWindow):
         self.tree_panel.console_requested.connect(self._on_console_from_tree)
 
         self._notifications = NotificationManager(self)
+
+        self._tray = None
+        self._tray_minimize_to_tray = True
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self._init_tray()
 
         self.h_splitter = QSplitter(Qt.Horizontal)
         self.h_splitter.addWidget(self.tree_panel)
@@ -1147,12 +1154,30 @@ class MainWindow(QMainWindow):
         now_str = datetime.now().strftime("%H:%M:%S")
         hosts_ok = sum(1 for n in self.all_nodes if n.get("status") == "online")
         hosts_total = len(self.all_nodes)
+        hosts_err = sum(1 for n in self.all_nodes if n.get("status") == "error")
         vms_count = len(self.all_vms)
-        self.status_label.setText(
-            tr("Hosts: {ok}/{total}  VMs: {vms}  Updated: {ts}").format(
-                ok=hosts_ok, total=hosts_total, vms=vms_count, ts=now_str
-            )
-        )
+        vms_running = sum(1 for v in self.all_vms if v.get("status") == "running")
+        clusters = set()
+        for n in self.all_nodes:
+            c = n.get("cluster") or ""
+            if c and c != "Standalone":
+                clusters.add(c)
+        total_cpu = sum(n.get("cpu", 0) * n.get("sockets", 1) for n in self.all_nodes if n.get("status") == "online")
+        total_mem = sum(n.get("mem", 0) for n in self.all_nodes if n.get("status") == "online")
+        total_maxmem = sum(n.get("maxmem", 0) for n in self.all_nodes if n.get("status") == "online")
+        mem_pct = (total_mem / total_maxmem * 100) if total_maxmem else 0
+        cpu_pct = (total_cpu * 100) if total_cpu else 0
+        parts = [
+            tr("Hosts: {ok}/{total}").format(ok=hosts_ok, total=hosts_total),
+            tr("Clusters: {n}").format(n=len(clusters)) if clusters else "",
+            tr("VMs: {running}/{total}").format(running=vms_running, total=vms_count),
+            tr("CPU: {pct}%").format(pct=f"{cpu_pct:.0f}"),
+            tr("RAM: {pct}%").format(pct=f"{mem_pct:.0f}"),
+        ]
+        if hosts_err:
+            parts.append(tr("Errors: {n}").format(n=hosts_err))
+        parts.append(now_str)
+        self.status_label.setText("  ".join(p for p in parts if p))
 
     def _do_first_selection(self):
         self._first_selection_done = True
@@ -1242,9 +1267,56 @@ class MainWindow(QMainWindow):
             os.execve(sys.executable, [sys.executable, "-m", "pve_center.main"], env)
 
     # ------------------------------------------------------------
+    # Tray icon
+    # ------------------------------------------------------------
+    def _init_tray(self):
+        icon = get_icon("app")
+        if icon is None:
+            return
+        self._tray = QSystemTrayIcon(icon, self)
+        self._tray.setToolTip("PVE Center")
+        menu = QMenu(self)
+        show_act = menu.addAction(tr("Show window"))
+        show_act.triggered.connect(self._tray_show)
+        refresh_act = menu.addAction(tr("Refresh"))
+        refresh_act.triggered.connect(self.refresh_data)
+        menu.addSeparator()
+        quit_act = menu.addAction(tr("Quit"))
+        quit_act.triggered.connect(self._tray_quit)
+        self._tray.setContextMenu(menu)
+        self._tray.activated.connect(self._on_tray_activated)
+        self._tray.show()
+
+    def _tray_show(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _tray_quit(self):
+        self._tray_minimize_to_tray = False
+        self.close()
+
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            if self.isVisible():
+                self.hide()
+            else:
+                self._tray_show()
+
+    # ------------------------------------------------------------
     # Закрытие приложения
     # ------------------------------------------------------------
     def closeEvent(self, event):
+        if self._tray and self._tray.isVisible() and self._tray_minimize_to_tray:
+            event.ignore()
+            self.hide()
+            self._tray.showMessage(
+                "PVE Center",
+                tr("Minimize to tray"),
+                QSystemTrayIcon.Information,
+                2000,
+            )
+            return
         self._closing = True
         self.refresh_timer.stop()
         self.tasks_timer.stop()

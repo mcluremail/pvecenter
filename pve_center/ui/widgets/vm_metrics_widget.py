@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from ...config import load_ui_state, save_ui_state
 from ..i18n import tr
 from ..theme import Color
 
@@ -51,10 +52,12 @@ class VmMetricsWidget(QWidget):
         self.timeframe_combo.addItem(tr("week"), "week")
         self.timeframe_combo.addItem(tr("month"), "month")
         self.timeframe_combo.addItem(tr("year"), "year")
-        self.timeframe_combo.setCurrentIndex(0)
-        self.timeframe_combo.currentIndexChanged.connect(
-            lambda: self.timeframe_changed.emit(self.timeframe_combo.currentData())
-        )
+        saved_tf = load_ui_state("metrics_timeframe", "hour")
+        for i in range(self.timeframe_combo.count()):
+            if self.timeframe_combo.itemData(i) == saved_tf:
+                self.timeframe_combo.setCurrentIndex(i)
+                break
+        self.timeframe_combo.currentIndexChanged.connect(self._on_timeframe_changed)
         top.addWidget(self.timeframe_combo)
         top.addStretch()
         self._layout.addLayout(top)
@@ -78,6 +81,11 @@ class VmMetricsWidget(QWidget):
         key = self.metric_combo.currentData()
         self.metric_changed.emit(key)
         self._render_current_metric()
+
+    def _on_timeframe_changed(self):
+        tf = self.timeframe_combo.currentData()
+        save_ui_state("metrics_timeframe", tf)
+        self.timeframe_changed.emit(tf)
 
     def show_disk_io(self, visible=True):
         current_key = self.metric_combo.currentData()

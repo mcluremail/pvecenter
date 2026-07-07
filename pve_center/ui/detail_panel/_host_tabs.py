@@ -188,7 +188,24 @@ class HostTabs:
                 ("uptime_text", 125),
             ],
         }
-        self.panel.host_summary_list = CardList(host_columns)
+        self.panel.host_summary_list = CardList(host_columns, filterable=True)
+
+        compare_columns = {
+            "key": "node",
+            "dot": "status",
+            "title": "name",
+            "fields": [
+                ("cluster_text", 100),
+                ("status_text", 80),
+                ("cpu_text", 55),
+                ("ram_text", 110),
+                ("disk_text", 110),
+                ("vms_text", 55),
+                ("uptime_text", 100),
+                ("pve_text", 80),
+            ],
+        }
+        self.panel.node_compare_list = CardList(compare_columns, filterable=True)
 
         cluster_columns = {
             "key": "name",
@@ -206,6 +223,7 @@ class HostTabs:
         self.panel.summary_stack = QStackedWidget()
         self.panel.summary_stack.addWidget(self.panel.host_summary_list)
         self.panel.summary_stack.addWidget(self.panel.cluster_summary_list)
+        self.panel.summary_stack.addWidget(self.panel.node_compare_list)
 
         tab = QScrollArea()
         tab.setWidgetResizable(True)
@@ -245,7 +263,7 @@ class HostTabs:
 
     def show_cluster_folder(self, name):
         panel = self.panel
-        panel.detail_label.setText(tr("Clusters"))
+        panel.detail_label.setText(tr("All clusters"))
         panel.detail_sublabel.setText("")
         panel.detail_sublabel.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
@@ -253,6 +271,12 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
         panel.tabs.setTabVisible(TabIndex.SUMMARY, True)
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
+        self._populate_cluster_summary()
+        self._populate_node_compare()
+        panel.summary_stack.setCurrentIndex(2)
+
+    def _populate_cluster_summary(self):
+        panel = self.panel
         clusters = {}
         for node in panel.all_nodes:
             host_name = node.get("host_name", "")
@@ -264,7 +288,6 @@ class HostTabs:
                 clusters[cl]["nodes"].add(node.get("node"))
         for cl in clusters.values():
             cl["vms"] = [vm for vm in panel.all_vms if vm.get("node") in cl["nodes"]]
-        panel.summary_stack.setCurrentIndex(1)
         cluster_items = []
         for cl_name, cl_data in sorted(clusters.items(), key=lambda x: x[0].lower()):
             hosts_ok = sum(1 for h in cl_data["hosts"] if h.get("status") == "online")
@@ -283,6 +306,49 @@ class HostTabs:
                 "ram_text": f"{mem_used_gb}/{mem_total_gb} GiB",
             })
         panel.cluster_summary_list.set_items(cluster_items)
+
+    def _populate_node_compare(self):
+        panel = self.panel
+        card_items = []
+        for node in sorted(panel.all_nodes, key=lambda n: (n.get("host_name", ""), n.get("node", ""))):
+            node_name = node.get("_display_name") or node.get("node", "?")
+            host_name = node.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            cluster_name = cfg.get("cluster", "") if cfg else ""
+            if cluster_name in (None, "Standalone"):
+                cluster_name = tr("Standalone")
+            status = node.get("status", "unknown")
+            cpu_frac = node.get("cpu", 0)
+            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
+            mem_bytes = node.get("mem", 0)
+            maxmem_bytes = node.get("maxmem", 0) or 0
+            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
+            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
+            mem_pct = round(mem_bytes / maxmem_bytes * 100, 1) if maxmem_bytes else 0
+            maxdisk_bytes = node.get("maxdisk", 0) or 0
+            disk_bytes = node.get("disk", 0) or 0
+            disk_gb = round(disk_bytes / (1024**3), 1) if disk_bytes else 0
+            maxdisk_gb = round(maxdisk_bytes / (1024**3), 1) if maxdisk_bytes else 0
+            vms_count = sum(1 for v in panel.all_vms if v.get("node") == node.get("node"))
+            uptime_sec = node.get("uptime", 0)
+            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            pve_ver = node.get("pveversion", "")
+            if pve_ver:
+                pve_ver = pve_ver.split("/")[-1] if "/" in pve_ver else pve_ver
+            card_items.append({
+                "node": node.get("node", ""),
+                "name": node_name,
+                "status": status,
+                "cluster_text": cluster_name,
+                "status_text": status_text(status),
+                "cpu_text": f"{cpu_pct}%",
+                "ram_text": f"{mem_gb}/{maxmem_gb} ({mem_pct}%)",
+                "disk_text": f"{disk_gb}/{maxdisk_gb} GiB",
+                "vms_text": str(vms_count),
+                "uptime_text": uptime_str,
+                "pve_text": pve_ver or "—",
+            })
+        panel.node_compare_list.set_items(card_items)
 
     def show_standalone_folder(self, name):
         panel = self.panel

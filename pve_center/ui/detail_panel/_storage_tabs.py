@@ -84,7 +84,12 @@ class StorageTabs:
         panel.storage_detail_tf_combo.addItem(tr("week"), "week")
         panel.storage_detail_tf_combo.addItem(tr("month"), "month")
         panel.storage_detail_tf_combo.addItem(tr("year"), "year")
-        panel.storage_detail_tf_combo.setCurrentIndex(0)
+        from ...config import load_ui_state
+        saved_tf = load_ui_state("metrics_timeframe", "hour")
+        for i in range(panel.storage_detail_tf_combo.count()):
+            if panel.storage_detail_tf_combo.itemData(i) == saved_tf:
+                panel.storage_detail_tf_combo.setCurrentIndex(i)
+                break
         panel.storage_detail_tf_combo.currentIndexChanged.connect(
             panel._on_storage_timeframe_changed
         )
