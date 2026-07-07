@@ -3,7 +3,17 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...config import load_ui_state, save_ui_state
 from ..hover import enable_row_hover
@@ -130,6 +140,7 @@ class NumericTableItem(QTableWidgetItem):
 class ClusterTasksWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._all_tasks = []
         self.table = QTableWidget()
         self.table.verticalHeader().hide()
         self.table.setColumnCount(6)
@@ -161,11 +172,37 @@ class ClusterTasksWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
 
+        # Filter bar
+        filter_bar = QHBoxLayout()
+        filter_bar.setContentsMargins(0, 0, 0, 4)
+        self._filter_input = QLineEdit()
+        self._filter_input.setPlaceholderText(tr("Filter tasks..."))
+        self._filter_input.setClearButtonEnabled(True)
+        self._filter_input.textChanged.connect(self._apply_filter)
+        filter_bar.addWidget(QLabel(tr("Filter:")))
+        filter_bar.addWidget(self._filter_input)
+
+        self._status_filter = QComboBox()
+        self._status_filter.addItem(tr("All statuses"), "all")
+        self._status_filter.addItem(tr("OK"), "OK")
+        self._status_filter.addItem(tr("Errors"), "error")
+        self._status_filter.addItem(tr("Running"), "RUNNING")
+        self._status_filter.currentIndexChanged.connect(self._apply_filter)
+        filter_bar.addWidget(self._status_filter)
+
+        filter_widget = QWidget()
+        filter_widget.setLayout(filter_bar)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(self.table)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(filter_widget)
+        layout.addWidget(self.table)
 
     def set_tasks(self, tasks):
+        self._all_tasks = tasks
+        self._populate_table(tasks)
+
+    def _populate_table(self, tasks):
         was_sorted = self.table.isSortingEnabled()
         if was_sorted:
             self.table.setSortingEnabled(False)
@@ -266,6 +303,7 @@ class ClusterTasksWidget(QWidget):
     def set_placeholder(self, text=None):
         if text is None:
             text = tr("Loading tasks...")
+        self._all_tasks = []
         was_sorted = self.table.isSortingEnabled()
         if was_sorted:
             self.table.setSortingEnabled(False)
@@ -296,3 +334,30 @@ class ClusterTasksWidget(QWidget):
                     self.table.setColumnWidth(c, w)
         except (TypeError, ValueError):
             pass
+
+    def _apply_filter(self):
+        text = self._filter_input.text().strip().lower()
+        status_filter = self._status_filter.currentData() or "all"
+        if not text and status_filter == "all":
+            self._populate_table(self._all_tasks)
+            return
+        filtered = []
+        for task in self._all_tasks:
+            status = task.get("status", "")
+            if status_filter == "OK" and status != "OK":
+                continue
+            if status_filter == "error" and status == "OK":
+                continue
+            if status_filter == "RUNNING" and status != "RUNNING":
+                continue
+            if text:
+                node = (task.get("node", "") or "").lower()
+                user = (task.get("user", "") or "").lower()
+                ttype = (task.get("type", "") or "").lower()
+                vm_name = (task.get("_vm_name", "") or "").lower()
+                upid = (task.get("upid", "") or "").lower()
+                haystack = f"{node} {user} {ttype} {vm_name} {upid} {status.lower()}"
+                if text not in haystack:
+                    continue
+            filtered.append(task)
+        self._populate_table(filtered)
