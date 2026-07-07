@@ -1,7 +1,14 @@
 import sys
 
 from PySide6.QtCore import Property, QPoint, QPropertyAnimation, Qt, QTimer
-from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QGraphicsOpacityEffect,
+    QLabel,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .i18n import tr
 from .theme import Color
@@ -117,6 +124,12 @@ class NotificationManager:
         self._show(key, f"{status_icon} {vm_name} — {ru}", color)
 
     def _show(self, key, text, color):
+        if self.parent and not self.parent.isVisible():
+            tray = getattr(self.parent, "_tray", None)
+            if tray and tray.isVisible():
+                tray.showMessage("PVE Center", text.replace("❌", "").replace("✅", "").strip(),
+                                 QSystemTrayIcon.Information, 4000)
+                return
         existing = self._active.pop(key, None)
         if existing:
             try:

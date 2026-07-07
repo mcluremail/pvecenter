@@ -163,7 +163,7 @@ class TreePanel(QWidget):
             vm_status = vm.get("status", "") if vm else ""
             for act_key, act_label in [("start", tr("Start")), ("shutdown", tr("Shutdown")),
                                        ("reboot", tr("Reboot")), ("stop", tr("Stop")),
-                                       ("reset", tr("Reset"))]:
+                                       ("reset", tr("Reset")), ("resume", tr("Resume"))]:
                 act = QAction(act_label, self.tree)
                 act.setIcon(get_icon(VM_ACTION_ICONS[act_key]))
                 act.triggered.connect(
@@ -171,6 +171,10 @@ class TreePanel(QWidget):
                         self.vm_action_requested.emit(hn, nd, vid, a)
                 )
                 if act_key in ("shutdown", "reboot", "stop", "reset") and vm_status != "running":
+                    act.setEnabled(False)
+                if act_key == "resume" and vm_status != "paused":
+                    act.setEnabled(False)
+                if act_key == "start" and vm_status == "running":
                     act.setEnabled(False)
                 menu.addAction(act)
             console_act = QAction(tr("Console"), self.tree)
