@@ -16,7 +16,68 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.5.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.5.0)
+Latest release: [v2.5.1](https://github.com/mcluremail/pvecenter/releases/tag/v2.5.1)
+
+## Changelog
+
+### v2.5.1 — bugfix release
+
+Comprehensive code audit: ~21 bugs fixed across backend, UI, metrics, i18n, and resource management.
+
+**Backend**
+- Fixed API token creation: removed broken fallback that set token value to token name instead of secret
+- Fixed SSL trust inversion: `trust_ssl` semantics now consistent across all code paths
+- Fixed `UnboundLocalError` on connection error during token creation
+- Fixed session leak: `requests.Session` now closed in `finally` block
+- Standalone hosts: added missing `host_name` and `cluster` fields (caused UI KeyError)
+- Fixed pool assignment race in standalone mode (re-applied after pool fetch)
+- Removed duplicate API call in standalone fetch
+- `fetch_resources`: guard against missing `type` field
+- `ClusterTasksWorker`: now emits `tasks_error` on merge/sort failure (was hanging UI)
+
+**UI crashes**
+- All `data["key"]` accesses replaced with `.get()` guards in worker callbacks
+- Fixed spinner leak: `_soft_refresh_active` and `_spin_timer` now reset on hard refresh
+- Fixed hotplug validation typo: `networkdisk,usb` → `network,disk,usb` (invalid PVE API value)
+
+**Metrics & notification**
+- Fixed `KeyError` on RRD sparse data (`entry.get('time')`)
+- Fixed notification crash on deleted widget (`RuntimeError` guard in `_restore_color`)
+- Fixed toast replacement race: disconnect `destroyed` signal before `deleteLater`
+- Fixed double `metric_changed` emit in metrics widget
+- Fixed sort indicator arrow mismatch in cluster tasks table
+- Host workers now tracked and cancelled on tab switch (no more orphaned QThreads)
+
+**i18n**
+- Added 8 missing lowercase status translations (running, stopped, paused, error, offline, online, unknown, mounted)
+- Wrapped untranslated UI strings: Method, CIDR, Filter, No data, VM/CT prefix
+
+**Dead code removed**
+- Unused attributes: `_vm_iso_pending`, `_iso_volids`, `_disk_visible`, `_scroll`
+- Dead `seen_names` initialization in tree panel
+
+**Resource leaks**
+- Detail panel caches (details, config, metrics, task history) now cleared on data refresh
+- `QTimer` in table filter now has parent (was parentless)
+- Freeze detector thread stopped on application close
+- `ClusterTasksWorker`: signals disconnected when max workers cap hit (was orphaning workers)
+
+### v2.5.0 — UI redesign
+
+- MetricCard-based dashboard with progress bars
+- CardList widget for list views (Host VMs, Cluster Summary, Storage Overview)
+- Hardware/Options tabs with section grouping and device icons
+- Hide empty section headers
+- Fixed freeze on close (timers + thread pool shutdown)
+- Tree expanded-state persistence
+- CD-ROM detection by value (`media=cdrom`)
+
+### v2.4.0
+
+- Theme refresh (minimalist style)
+- Header bar, segmented tabs, borderless tables
+- Charts with area fill
+- AddServer dialog with SSL trust toggle
 
 ## Features
 
