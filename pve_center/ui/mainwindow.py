@@ -823,6 +823,7 @@ class MainWindow(QMainWindow):
         # Выбираем первый элемент в дереве при первой же возможности.
         if not getattr(self, '_first_selection_done', False) and self.tree_panel.tree.topLevelItemCount() > 0:
             self._do_first_selection()
+            self.detail_panel.refresh_current_view()
 
         # Загрузка задач стартует при первом же воркере — не ждём все данные
         if not self._tasks_started:
@@ -835,6 +836,7 @@ class MainWindow(QMainWindow):
             # сводка кластера появляется сразу, не дожидаясь _build_tree с сотнями VM
             if not getattr(self, '_first_selection_done', False):
                 self._do_first_selection()
+                self.detail_panel.refresh_current_view()
             # Все данные загружены — финальная перестройка: спиннеры гаснут, VM/пулы в дереве
             self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
             self.last_refresh_ts = time.time()
