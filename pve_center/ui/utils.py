@@ -85,4 +85,10 @@ def parse_pve_error(err):
         return tr("PVE API unavailable (connection refused)")
     if "timeout" in err_lower:
         return tr("Host not responding (timeout)")
+    if "ssl" in err_lower or "certificate" in err_lower or "cert" in err_lower:
+        if "self-signed" in err_lower or "self signed" in err_lower:
+            return tr("SSL certificate self-signed — enable Trust SSL in context menu")
+        if "expired" in err_lower or "not valid" in err_lower:
+            return tr("SSL certificate invalid or expired — enable Trust SSL in context menu")
+        return tr("SSL certificate error — enable Trust SSL in context menu")
     return err
