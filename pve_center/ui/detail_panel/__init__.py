@@ -224,12 +224,14 @@ class DetailPanel(QWidget):
             self._workers_mgr.cancel_history_worker()
             self._workers_mgr.cancel_host_workers()
             self.metrics_widget.clear_curves()
+            self.metrics_widget.setVisible(obj_type in ("vm", "host"))
 
-            for idx in (TabIndex.OPTIONS, TabIndex.HISTORY, TabIndex.HOST_VMS,
-                        TabIndex.POOL_VMS, TabIndex.SUMMARY, TabIndex.STORAGES,
-                        TabIndex.HOST_STORAGE, TabIndex.STORAGE_DETAIL,
-                        TabIndex.BACKUPS, TabIndex.DISKS_VM, TabIndex.ISO,
-                        TabIndex.TEMPLATES, TabIndex.NETWORK, TabIndex.SERVICES,
+            for idx in (TabIndex.MONITOR, TabIndex.OPTIONS, TabIndex.HISTORY,
+                        TabIndex.HOST_VMS, TabIndex.POOL_VMS, TabIndex.SUMMARY,
+                        TabIndex.STORAGES, TabIndex.HOST_STORAGE,
+                        TabIndex.STORAGE_DETAIL, TabIndex.BACKUPS,
+                        TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
+                        TabIndex.NETWORK, TabIndex.SERVICES,
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS):
                 self.tabs.setTabVisible(idx, False)
 
