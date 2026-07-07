@@ -170,6 +170,8 @@ class ClusterTasksWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
+        self.table.setSortingEnabled(False)
+        h.sortIndicatorChanged.connect(self._on_sort_changed)
 
         # Filter bar — compact, right-aligned
         filter_bar = QHBoxLayout()
@@ -214,6 +216,10 @@ class ClusterTasksWidget(QWidget):
 
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
+
+        # Sort data before inserting — avoids O(n log n) Python __lt__ calls
+        # during sortItems which freezes the UI on 400+ rows
+        tasks = self._sort_tasks(tasks, sort_col, sort_order)
 
         # Block model signals — otherwise ResizeToContents and sorting
         # react to every setItem, causing O(n²) with 500+ rows
@@ -297,21 +303,41 @@ class ClusterTasksWidget(QWidget):
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
 
-        if was_sorted:
-            self.table.setSortingEnabled(True)
-            self.table.sortItems(sort_col, sort_order)
-        else:
+        # Restore sort indicator without triggering sortItems
+        if not was_sorted:
             self.table.setSortingEnabled(True)
             self.table.horizontalHeader().setSortIndicator(0, Qt.DescendingOrder)
-            self.table.sortItems(0, Qt.DescendingOrder)
+        else:
+            self.table.setSortingEnabled(True)
+
+    def _sort_tasks(self, tasks, col, order):
+        """Sort task list in Python before inserting — avoids slow sortItems()."""
+        if not tasks:
+            return tasks
+        reverse = (order == Qt.DescendingOrder)
+        if col == 0:
+            key = lambda t: float(t.get('starttime') or 0)
+        elif col == 1:
+            key = lambda t: float(t.get('endtime') or 0)
+        elif col == 2:
+            key = lambda t: (t.get('_display_name') or t.get('node') or '').lower()
+        elif col == 3:
+            key = lambda t: (t.get('user') or '').lower()
+        elif col == 4:
+            key = lambda t: (t.get('type') or '').lower()
+        elif col == 5:
+            key = lambda t: (t.get('status') or '').lower()
+        else:
+            return tasks
+        try:
+            return sorted(tasks, key=key, reverse=reverse)
+        except (TypeError, ValueError):
+            return tasks
 
     def set_placeholder(self, text=None):
         if text is None:
             text = tr("Loading tasks...")
         self._all_tasks = []
-        was_sorted = self.table.isSortingEnabled()
-        if was_sorted:
-            self.table.setSortingEnabled(False)
         self.table.setUpdatesEnabled(False)
         self.table.model().blockSignals(True)
         self.table.setRowCount(0)
@@ -321,8 +347,10 @@ class ClusterTasksWidget(QWidget):
         self.table.setItem(0, 4, item)
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
-        if was_sorted:
-            self.table.setSortingEnabled(True)
+
+    def _on_sort_changed(self, col, order):
+        """User clicked column header — re-sort data in Python."""
+        self._populate_table(self._all_tasks)
 
     def _save_column_widths(self):
         widths = [self.table.columnWidth(c) for c in range(self.table.columnCount())]
