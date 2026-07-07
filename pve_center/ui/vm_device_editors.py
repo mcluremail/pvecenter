@@ -78,9 +78,9 @@ def _parse_disk(val):
 
 
 def _parse_cdrom(val):
-    """Parse ide2 string -> dict."""
+    """Parse ide2/sata cdrom string -> dict."""
     result = {"type": "none", "volid": ""}
-    if not val:
+    if not val or str(val).strip() == "none":
         return result
     if val == "/dev/cdrom,media=cdrom":
         result["type"] = "physical"
@@ -193,7 +193,7 @@ class VmNetworkEditorDialog(QDialog):
 
 
 class VmCdromEditorDialog(QDialog):
-    """CDROM (ide2) editor."""
+    """CDROM editor (ide2 or any sata/ide with media=cdrom)."""
     def __init__(self, key, label, current_value, iso_list=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("Edit: ") + label)

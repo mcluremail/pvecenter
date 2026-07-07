@@ -54,11 +54,13 @@ _DEVICE_PREFIX_LABELS = {
 }
 
 
-def _device_label(key):
+def _device_label(key, value=None):
     prefix = key.rstrip("0123456789")
     num = key[len(prefix):]
     base = _DEVICE_PREFIX_LABELS.get(prefix, prefix)
     if prefix == "ide" and num == "2":
+        return tr("Optical drive")
+    if value is not None and _is_cdrom_value(value) and prefix in ("ide", "sata", "scsi"):
         return tr("Optical drive")
     if prefix in ("virtio", "scsi", "sata", "ide"):
         if num:
@@ -186,13 +188,28 @@ def is_net_key(key):
     return _key_prefix(key) == "net"
 
 
-def is_cdrom_key(key):
-    return key == "ide2"
+def _is_cdrom_value(val):
+    return "media=cdrom" in str(val or "")
 
 
-def is_disk_key(key):
+def is_cdrom_key(key, value=None):
+    if key == "ide2":
+        return True
+    if value is not None and _is_cdrom_value(value):
+        if _key_prefix(key) in ("ide", "sata", "scsi"):
+            return True
+    return False
+
+
+def is_disk_key(key, value=None):
     pfx = _key_prefix(key)
-    return pfx in ("virtio", "scsi", "sata") or (pfx == "ide" and key != "ide2")
+    if pfx not in ("virtio", "scsi", "sata", "ide"):
+        return pfx == "efidisk"
+    if pfx == "ide" and key == "ide2":
+        return False
+    if value is not None and _is_cdrom_value(value):
+        return False
+    return True
 
 
 def is_tpm_key(key):
@@ -513,6 +530,26 @@ def _fmt_net(val):
     return out
 
 
+def _fmt_cdrom(val):
+    """Format a cdrom value: volid,media=cdrom[,size=...] or /dev/cdrom,media=cdrom or none."""
+    val = str(val or "").strip()
+    if not val or val == "none":
+        return tr("No media")
+    if val == "/dev/cdrom,media=cdrom":
+        return tr("Physical drive")
+    parts = val.split(",")
+    volid = parts[0]
+    fname = volid.split("/")[-1] if "/" in volid else volid
+    size = ""
+    for p in parts[1:]:
+        if p.startswith("size="):
+            size = p.split("=", 1)[1]
+    out = fname
+    if size:
+        out += f" | {size}"
+    return out
+
+
 def _fmt_disk(val):
     """Parse a disk string: storage:size,format=qcow2,cache=writeback,..."""
     val = str(val)
@@ -592,6 +629,8 @@ def format_value(key, value):
     if key in _FORMATTERS:
         return _FORMATTERS[key](value)
     prefix = key.rstrip("0123456789")
+    if is_cdrom_key(key, value):
+        return _fmt_cdrom(value)
     if prefix in _DISK_PREFIXES:
         return _fmt_disk(value)
     if prefix in _NET_PREFIXES:
@@ -651,7 +690,7 @@ def get_hardware_rows(config_data, detail_data=None):
         for key in keys:
             if key in config:
                 seen.add(key)
-                label = HW_LABELS.get(key) or _device_label(key)
+                label = HW_LABELS.get(key) or _device_label(key, config[key])
                 value = format_value(key, config[key])
                 section_rows.append((key, label, value, section_name))
         if section_rows:
@@ -688,7 +727,7 @@ def get_options_rows(config_data):
         section_rows = []
         for key in keys:
             if key in config:
-                label = HW_LABELS.get(key) or _device_label(key)
+                label = HW_LABELS.get(key) or _device_label(key, config[key])
                 formatted = format_value(key, config[key])
                 section_rows.append((key, label, formatted, section_name))
         if section_rows:
@@ -697,7 +736,7 @@ def get_options_rows(config_data):
     if extra:
         rows.append(("__section__", _OPT_SECTION_LABELS.get("misc", lambda: tr("Misc"))(), "", "misc"))
         for key in sorted(extra):
-            label = HW_LABELS.get(key) or _device_label(key)
+            label = HW_LABELS.get(key) or _device_label(key, config[key])
             formatted = format_value(key, config[key])
             rows.append((key, label, formatted, "misc"))
     return rows
