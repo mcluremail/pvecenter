@@ -174,6 +174,33 @@ class HostTabs:
         tab.setWidget(container)
         return tab
 
+    def build_health_tab(self):
+        from ..widgets.card_list import CardList
+        health_columns = {
+            "key": "id",
+            "dot": "severity",
+            "title": "title",
+            "fields": [
+                ("message", 400),
+            ],
+        }
+        self.panel.host_health_list = CardList(health_columns)
+        loading = loading_label()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        stack.addWidget(self.panel.host_health_list)
+        stack.setCurrentIndex(0)
+        self.panel.host_health_loading = loading
+        self.panel.host_health_stack = stack
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(stack)
+        tab.setWidget(container)
+        return tab
+
     def build_summary_tab(self):
         from ..widgets.card_list import CardList
         host_columns = {
@@ -454,6 +481,7 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.SERVICES, True)
         panel.tabs.setTabVisible(TabIndex.HOST_DISKS, True)
         panel.tabs.setTabVisible(TabIndex.SNAPSHOTS, True)
+        panel.tabs.setTabVisible(TabIndex.HEALTH, True)
         panel.tabs.setCurrentIndex(TabIndex.MONITOR)
 
         panel.host_network_stack.setCurrentIndex(0)
@@ -468,6 +496,9 @@ class HostTabs:
         panel.host_snapshots_stack.setCurrentIndex(0)
         panel.host_snapshots_stack.widget(0).setText(tr("Loading..."))
         panel.host_snapshots_table.setRowCount(0)
+        panel.host_health_stack.setCurrentIndex(0)
+        panel.host_health_loading.setText(tr("Loading..."))
+        panel.host_health_list.set_items([])
 
         if host_data and host_data.get("status") != "error":
             from ._constants import _fmt_pveversion
@@ -582,6 +613,7 @@ class HostTabs:
         self.fetch_host_disks(host_name, host_data)
         self.fetch_host_snapshots(host_name, host_data)
         self.fetch_host_metrics(host_data)
+        self.fetch_host_health(host_name, host_data)
 
     def populate_host_storage_table(self, storages):
         panel = self.panel
@@ -851,6 +883,62 @@ class HostTabs:
             if table.rowHeight(r) > 24:
                 table.setRowHeight(r, 24)
         table.setSortingEnabled(True)
+
+    def fetch_host_health(self, host_name, host_data):
+        panel = self.panel
+        node_name = host_data.get("node", "")
+        host_cfg_name = host_data.get("host_name", "")
+        cfg = panel._cfg_by_name.get(host_cfg_name)
+        if not cfg:
+            panel.host_health_stack.widget(0).setText(tr("No data"))
+            panel.host_health_stack.setCurrentIndex(0)
+            return
+        from ..api.metrics import HealthCheckWorker
+        worker = HealthCheckWorker(cfg, node_name, host_data)
+        worker.signals.health_ready.connect(
+            lambda nn, data, w=worker: (
+                self.on_host_health(nn, data),
+                panel._workers_mgr.discard_worker(w)
+            )
+        )
+        worker.signals.health_error.connect(
+            lambda nn, err, w=worker: (
+                self.on_host_health(nn, {"status": "error", "issues": [err], "warnings": []}),
+                panel._workers_mgr.discard_worker(w)
+            )
+        )
+        panel._workers_mgr.run_host_worker(worker)
+
+    def on_host_health(self, node_name, health):
+        panel = self.panel
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+            return
+        issues = health.get("issues", [])
+        warnings = health.get("warnings", [])
+        items = []
+        for idx, msg in enumerate(issues):
+            items.append({
+                "id": f"issue_{idx}",
+                "severity": "error",
+                "title": tr("Critical"),
+                "message": msg,
+            })
+        for idx, msg in enumerate(warnings):
+            items.append({
+                "id": f"warn_{idx}",
+                "severity": "warning",
+                "title": tr("Warning"),
+                "message": msg,
+            })
+        if not items:
+            items.append({
+                "id": "ok",
+                "severity": "online",
+                "title": tr("Healthy"),
+                "message": tr("All checks passed"),
+            })
+        panel.host_health_stack.setCurrentIndex(1)
+        panel.host_health_list.set_items(items)
 
     def fetch_host_disks(self, host_name, host_data):
         panel = self.panel

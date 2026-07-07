@@ -181,6 +181,9 @@ class DetailPanel(QWidget):
         # 17: Snapshots
         tabs.addTab(self._host_tabs.build_snapshots_tab(), get_icon("snapshot"), tr("Snapshots"))
         tabs.setTabVisible(TabIndex.SNAPSHOTS, False)
+        # 18: Health
+        tabs.addTab(self._host_tabs.build_health_tab(), get_icon("monitor"), tr("Health"))
+        tabs.setTabVisible(TabIndex.HEALTH, False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -232,7 +235,8 @@ class DetailPanel(QWidget):
                         TabIndex.STORAGE_DETAIL, TabIndex.BACKUPS,
                         TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
                         TabIndex.NETWORK, TabIndex.SERVICES,
-                        TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS):
+                        TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,
+                        TabIndex.HEALTH):
                 self.tabs.setTabVisible(idx, False)
 
             if obj_type == "cluster_folder":

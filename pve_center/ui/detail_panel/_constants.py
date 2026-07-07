@@ -35,6 +35,7 @@ class TabIndex(IntEnum):
     SERVICES = 15
     HOST_DISKS = 16
     SNAPSHOTS = 17
+    HEALTH = 18
 
 
 def _fmt_pveversion(val):
