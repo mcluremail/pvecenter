@@ -753,6 +753,9 @@ class MainWindow(QMainWindow):
         self.all_nodes.clear()
         self.all_vms.clear()
         self.all_storages.clear()
+        self.detail_panel.all_nodes.clear()
+        self.detail_panel.all_vms.clear()
+        self.detail_panel.all_storages.clear()
         self._vms_by_key.clear()
         self.all_iso_images.clear()
         self.all_ha_groups.clear()
@@ -792,10 +795,18 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
+            existing_node_keys = {(n.get("node"), n.get("host_name")) for n in self.all_nodes}
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster
-                self.all_nodes.append(node)
+                key = (node.get("node"), host)
+                if key in existing_node_keys:
+                    idx = next(i for i, n in enumerate(self.all_nodes)
+                               if (n.get("node"), n.get("host_name")) == key)
+                    self.all_nodes[idx] = node
+                else:
+                    existing_node_keys.add(key)
+                    self.all_nodes.append(node)
             for vm in data.get("vms", []):
                 vm["host_name"] = host
                 # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
@@ -825,14 +836,16 @@ class MainWindow(QMainWindow):
         else:
             is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
             err_msg = data.get("error", "Unknown error")
-            self.all_nodes.append({
-                "node": host,
-                "status": "error",
-                "error": err_msg,
-                "host_name": host,
-                "_display_name": host,
-                "_is_cluster": is_cluster_err
-            })
+            err_key = (host, host)
+            if not any((n.get("node"), n.get("host_name")) == err_key for n in self.all_nodes):
+                self.all_nodes.append({
+                    "node": host,
+                    "status": "error",
+                    "error": err_msg,
+                    "host_name": host,
+                    "_display_name": host,
+                    "_is_cluster": is_cluster_err
+                })
             from ..utils import parse_pve_error
             reason = parse_pve_error(err_msg)
             self._notifications.show(
@@ -957,24 +970,40 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
+            existing_keys = {(n.get("node"), n.get("host_name")) for n in self._soft_nodes}
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster
-                self._soft_nodes.append(node)
+                key = (node.get("node"), host)
+                if key in existing_keys:
+                    idx = next(i for i, n in enumerate(self._soft_nodes)
+                               if (n.get("node"), n.get("host_name")) == key)
+                    self._soft_nodes[idx] = node
+                else:
+                    existing_keys.add(key)
+                    self._soft_nodes.append(node)
             for vm in data.get("vms", []):
                 vm["host_name"] = host
-                self._soft_vms.append(vm)
+                vm_key = (host, vm.get("vmid", 0))
+                idx = next((i for i, v in enumerate(self._soft_vms)
+                            if (v.get("host_name"), v.get("vmid")) == vm_key), None)
+                if idx is not None:
+                    self._soft_vms[idx] = vm
+                else:
+                    self._soft_vms.append(vm)
             self._dedup_storages(data.get("storages", []), host, self._soft_storages)
         else:
             self._soft_had_errors = True
             err_msg = data.get("error", "Unknown error")
-            self._soft_nodes.append({
-                "node": host,
-                "status": "error",
-                "error": err_msg,
-                "host_name": host,
-                "_display_name": host
-            })
+            err_key = (host, host)
+            if not any((n.get("node"), n.get("host_name")) == err_key for n in self._soft_nodes):
+                self._soft_nodes.append({
+                    "node": host,
+                    "status": "error",
+                    "error": err_msg,
+                    "host_name": host,
+                    "_display_name": host
+                })
 
         self._soft_counter += 1
         active_count = len([cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)])
