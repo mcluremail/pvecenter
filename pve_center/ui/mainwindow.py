@@ -800,14 +800,21 @@ class MainWindow(QMainWindow):
                 self.all_ha_groups[host] = ha_list
         else:
             is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
+            err_msg = data.get("error", "Unknown error")
             self.all_nodes.append({
                 "node": host,
                 "status": "error",
-                "error": data.get("error", "Unknown error"),
+                "error": err_msg,
                 "host_name": host,
                 "_display_name": host,
                 "_is_cluster": is_cluster_err
             })
+            from ..utils import parse_pve_error
+            reason = parse_pve_error(err_msg)
+            self._notifications.show(
+                tr("Connection error: {host} — {reason}").format(host=host, reason=reason),
+                error=True,
+            )
 
         self._detect_status_changes()
 
@@ -930,10 +937,11 @@ class MainWindow(QMainWindow):
             self._dedup_storages(data.get("storages", []), host, self._soft_storages)
         else:
             self._soft_had_errors = True
+            err_msg = data.get("error", "Unknown error")
             self._soft_nodes.append({
                 "node": host,
                 "status": "error",
-                "error": data.get("error", "Unknown error"),
+                "error": err_msg,
                 "host_name": host,
                 "_display_name": host
             })
