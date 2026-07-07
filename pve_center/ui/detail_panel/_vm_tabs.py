@@ -130,7 +130,7 @@ class VMTabs:
         worker = VmActionWorker(cfg, node_name, vmid, vm_type, action)
         for btn in panel._action_buttons.values():
             btn.setEnabled(False)
-        panel.detail_label.setText(f"VM/CT: {vmid} — {VM_ACTION_MESSAGE_LABELS.get(action, action)}...")
+        panel.detail_label.setText(tr("VM/CT: {name}").format(name=vmid) + " — " + VM_ACTION_MESSAGE_LABELS.get(action, action) + "...")
         worker.signals.action_result.connect(lambda msg: (
             self.on_action_finished(msg),
             self.refresh_after_action(),
@@ -165,7 +165,7 @@ class VMTabs:
     def on_action_finished(self, msg):
         panel = self.panel
         vm = panel._last_vm_data or {}
-        panel.detail_label.setText(f"VM/CT: {vm.get('name', vm.get('vmid', ''))} — {msg}")
+        panel.detail_label.setText(tr("VM/CT: {name}").format(name=vm.get('name', vm.get('vmid', ''))) + " — " + msg)
         self.update_action_buttons(vm)
 
     def on_action_error(self, err):
@@ -354,7 +354,7 @@ class VMTabs:
         if detail.get("status") != "ok":
             return
         vmid = detail.get("vmid")
-        data = detail["data"]
+        data = detail.get("data", {})
         vm_data = panel._vms_by_key.get((host_name, vmid), {})
         merged = {**vm_data, **data}
         panel._last_vm_data = merged
@@ -371,14 +371,15 @@ class VMTabs:
         vmid = detail.get("vmid")
         detail_key = (vmid, host_name)
         vm_data = panel._vms_by_key.get((host_name, vmid), {})
-        if detail["status"] == "ok":
-            panel.details_cache[detail_key] = detail["data"]
-            self.display_full_vm_info(vm_data, detail["data"])
+        if detail.get("status") == "ok":
+            data = detail.get("data", {})
+            panel.details_cache[detail_key] = data
+            self.display_full_vm_info(vm_data, data)
             panel.tabs.setCurrentIndex(TabIndex.MONITOR)
             if detail_key in panel.config_cache:
-                panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], detail["data"])
+                panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], data)
             if panel._last_vm_data:
-                merged = {**vm_data, **detail["data"]}
+                merged = {**vm_data, **data}
                 panel._last_vm_data = merged
                 self.update_action_buttons(merged)
         else:

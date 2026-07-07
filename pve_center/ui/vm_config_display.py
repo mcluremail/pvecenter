@@ -172,7 +172,6 @@ CHOICE_LABELS = {
         "network,usb": tr("Network, USB"),
         "disk,usb": tr("Disks, USB"),
         "network,disk,usb": tr("Network, Disks, USB"),
-        "networkdisk,usb": tr("Network, Disks, USB"),
     },
 }
 
@@ -241,7 +240,7 @@ OPT_DEFAULTS = {
     "boot": "order=ide2;ide0;scsi0;virtio0;net0",
     "onboot": 0,
     "numa": 0,
-    "hotplug": "networkdisk,usb",
+    "hotplug": "network,disk,usb",
     "freeze": 0,
     "localtime": 0,
     "protection": 0,
@@ -299,7 +298,7 @@ FIELD_TYPES = {
     "tdf": "bool",
     "boot": "string",
     "bootdisk": "string",
-    "hotplug": ("choice", ["0", "1", "network", "disk", "usb", "network,disk", "network,usb", "disk,usb", "networkdisk,usb"]),
+    "hotplug": ("choice", ["0", "1", "network", "disk", "usb", "network,disk", "network,usb", "disk,usb", "network,disk,usb"]),
     "startup": "string",
     "rtc": ("choice", ["utc", "localtime"]),
     "keyboard": ("choice", [
@@ -393,7 +392,6 @@ def _fmt_boot(val):
 
 def _fmt_hotplug(val):
     return {
-        "networkdisk,usb": tr("Network, Disks, USB"),
         "network,disk,usb": tr("Network, Disks, USB"),
         "network,disk": tr("Network, Disks"),
         "network,usb": tr("Network, USB"),

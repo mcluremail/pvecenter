@@ -486,7 +486,6 @@ class StorageTabs:
             if ct == "iso" and items:
                 panel.storage_iso_stack.setCurrentIndex(1)
                 self.populate_content_table(panel.storage_iso_table, items, "iso")
-                panel._iso_volids = {v.get("volid", "") for v in items if v.get("volid")}
             elif ct == "iso":
                 panel.storage_iso_stack.widget(0).setText(tr("No data"))
                 panel.storage_iso_stack.setCurrentIndex(0)

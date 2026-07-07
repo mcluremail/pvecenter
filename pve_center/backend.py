@@ -39,7 +39,7 @@ def _pve_ticket_auth(host, user, password, verify=False):
     }
 
 
-def create_admin_token(host, user, password, trust_ssl=False):
+def create_admin_token(host, user, password, trust_ssl=True):
     """Create an API token for the specified PVE user.
     The token is created on behalf of the user — PVE audit shows
     the real operator, and permissions match their roles.
@@ -48,7 +48,8 @@ def create_admin_token(host, user, password, trust_ssl=False):
         host: PVE host address
         user: existing PVE user (root@pam, user@ipa, ...)
         password: user's password
-        trust_ssl: verify SSL certificate (default False)
+        trust_ssl: if True (default), accept self-signed certs (verify=False).
+                   If False, require valid SSL certificate.
 
     Returns:
         dict with token_name, token_value, user fields
@@ -58,7 +59,7 @@ def create_admin_token(host, user, password, trust_ssl=False):
     import string as str_mod
 
     import requests as rq
-    verify = bool(trust_ssl)
+    verify = not bool(trust_ssl)
 
     try:
         ticket_data = _pve_ticket_auth(host, user, password, verify=verify)
@@ -74,6 +75,7 @@ def create_admin_token(host, user, password, trust_ssl=False):
         token_id = "pvecenter-" + "".join(
             sec.choice(str_mod.ascii_lowercase + str_mod.digits) for _ in range(6)
         )
+        r = None
         for method in ("post", "put"):
             r = getattr(sess, method)(
                 f"https://{host}:{PVE_PORT}/api2/json/access/users/{user}/token/{token_id}",
@@ -83,18 +85,15 @@ def create_admin_token(host, user, password, trust_ssl=False):
             logger.info("token_create %s %s HTTP %s", method, token_id, r.status_code)
             if r.status_code < 400:
                 break
-        if r.status_code >= 400:
+        if r is None or r.status_code >= 400:
             logger.error("token_create error: %s", r.text[:300])
             return {"error": tr("Token creation error: {}").format(r.status_code)}
 
         data = r.json()
         data = data.get("data", data)
         token_value = ""
-        if isinstance(data, dict) and "value" in data:
+        if isinstance(data, dict) and data.get("value"):
             token_value = data["value"]
-        elif isinstance(data, dict) and data.get("tokenid"):
-            token_value = data.get("tokenid", "")
-
         if not token_value:
             return {"error": tr("Empty token value in server response")}
 
@@ -120,6 +119,11 @@ def create_admin_token(host, user, password, trust_ssl=False):
         if "connection" in msg.lower() or "timeout" in msg.lower() or "resolve" in msg.lower():
             return {"error": tr("Cannot connect to {}").format(host)}
         return {"error": msg}
+    finally:
+        try:
+            sess.close()
+        except Exception:
+            pass
 
 
 # ----------------------------------------------------------------------
@@ -133,7 +137,7 @@ class TokenCreationSignals(QObject):
 
 class TokenCreationWorker(QRunnable):
     """Создаёт API-токен в фоновом потоке, не блокируя UI."""
-    def __init__(self, host, user, password, trust_ssl=False):
+    def __init__(self, host, user, password, trust_ssl=True):
         super().__init__()
         self.host = host
         self.user = user
@@ -261,8 +265,8 @@ class FetchWorker(QRunnable):
                 try:
                     resources = proxmox.cluster.resources.get()
                     with res_lock:
-                        nodes = [r for r in resources if r["type"] == "node"]
-                        vms = [r for r in resources if r["type"] in ("qemu", "lxc")]
+                        nodes = [r for r in resources if r.get("type") == "node"]
+                        vms = [r for r in resources if r.get("type") in ("qemu", "lxc")]
                         storages = [r for r in resources if r.get("type") == "storage"]
                         cluster_name = self.node_cfg.get("cluster", "")
                         for n in nodes:
@@ -378,6 +382,7 @@ class FetchWorker(QRunnable):
                     with res_lock:
                         nodes = [{**node_status, "node": node_name,
                                   "_display_name": self.node_cfg["name"],
+                                  "host_name": self.node_cfg["name"],
                                   "status": "online"}]
                     try:
                         qemu_list = proxmox.nodes(node_name).qemu.get()
@@ -386,15 +391,18 @@ class FetchWorker(QRunnable):
                         for v in qemu_list:
                             vms_local.append({**v, "type": "qemu",
                                               "node": node_name,
+                                              "host_name": self.node_cfg["name"],
                                               "pool": vmid_to_pool.get(v["vmid"])})
                         for v in lxc_list:
                             vms_local.append({**v, "type": "lxc",
                                               "node": node_name,
+                                              "host_name": self.node_cfg["name"],
                                               "pool": vmid_to_pool.get(v["vmid"])})
                         storages_local = list(proxmox.nodes(node_name).storage.get())
                         for st in storages_local:
                             st["node"] = node_name
                             st["host_name"] = self.node_cfg["name"]
+                            st["cluster"] = ""
                         with res_lock:
                             vms = vms_local
                             storages = storages_local
@@ -405,7 +413,13 @@ class FetchWorker(QRunnable):
                 standalone_thread.start()
                 standalone_thread.join(timeout=30)
 
-                # Версии для standalone ноды
+                # Повторно применяем pool после завершения pool-потоков
+                # (fetch_pools может ещё работать, когда fetch_standalone уже забрал vms)
+                for vm in vms:
+                    if not vm.get("pool"):
+                        vm["pool"] = vmid_to_pool.get(vm.get("vmid"))
+
+                # Версии для standalone ноды (pveversion/kernel уже в node_status)
                 if nodes:
                     try:
                         ver = proxmox.nodes(node_name).version.get()
@@ -417,18 +431,6 @@ class FetchWorker(QRunnable):
                         if lxc:
                             for n in nodes:
                                 n["lxctype"] = lxc
-                    except Exception:
-                        pass
-                    try:
-                        st = proxmox.nodes(node_name).status.get()
-                        pve = st.get("pveversion")
-                        if pve:
-                            for n in nodes:
-                                n["pveversion"] = pve
-                        kver = st.get("kversion")
-                        if kver:
-                            for n in nodes:
-                                n["kernel"] = kver
                     except Exception:
                         pass
 
@@ -832,23 +834,30 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
             for t in threads:
                 t.join(timeout=15)
 
-            all_by_upid = {}
-            for node_name, tasks in results.items():
-                for idx, t in enumerate(tasks):
-                    upid = t.get("upid")
-                    if upid:
-                        all_by_upid[upid] = t
-                    else:
-                        all_by_upid[f"_no_upid_{node_name}_{idx}"] = t
-            merged = sorted(all_by_upid.values(),
-                            key=lambda x: float(x.get("starttime", 0) or 0),
-                            reverse=True)
-            if errors:
-                logger.warning("Task collection errors: %s", "; ".join(errors))
             try:
-                self.signals.tasks_ready.emit(merged)
-            except RuntimeError:
-                pass
+                all_by_upid = {}
+                for node_name, tasks in results.items():
+                    for idx, t in enumerate(tasks):
+                        upid = t.get("upid")
+                        if upid:
+                            all_by_upid[upid] = t
+                        else:
+                            all_by_upid[f"_no_upid_{node_name}_{idx}"] = t
+                merged = sorted(all_by_upid.values(),
+                                key=lambda x: float(x.get("starttime", 0) or 0),
+                                reverse=True)
+                if errors:
+                    logger.warning("Task collection errors: %s", "; ".join(errors))
+                try:
+                    self.signals.tasks_ready.emit(merged)
+                except RuntimeError:
+                    pass
+            except Exception as exc:
+                logger.debug("ClusterTasksWorker merge error", exc_info=True)
+                try:
+                    self.signals.tasks_error.emit(str(exc))
+                except RuntimeError:
+                    pass
         finally:
             try:
                 self.signals.finished.emit()

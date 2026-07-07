@@ -69,11 +69,17 @@ class FadeToast(QWidget):
 
     def _copy_to_clipboard(self):
         QApplication.clipboard().setText(self._text)
-        self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.OK_ROW_BG};"))
+        try:
+            self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.OK_ROW_BG};"))
+        except RuntimeError:
+            return
         QTimer.singleShot(400, self._restore_color)
 
     def _restore_color(self):
-        self.label.setStyleSheet(self.label.styleSheet().replace(f"color: {Color.OK_ROW_BG};", "color: white;"))
+        try:
+            self.label.setStyleSheet(self.label.styleSheet().replace(f"color: {Color.OK_ROW_BG};", "color: white;"))
+        except RuntimeError:
+            pass
 
     def _start_fade(self):
         self._fade_anim.start()
@@ -113,11 +119,15 @@ class NotificationManager:
     def _show(self, key, text, color):
         existing = self._active.pop(key, None)
         if existing:
+            try:
+                existing.destroyed.disconnect()
+            except (TypeError, RuntimeError):
+                pass
             existing._fade_timer.stop()
             existing._fade_anim.stop()
             existing.deleteLater()
         offset_y = 12
-        for t in self._active.values():
+        for t in list(self._active.values()):
             try:
                 if t.isVisible():
                     offset_y += t.height() + 8

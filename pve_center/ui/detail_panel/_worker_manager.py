@@ -9,12 +9,24 @@ class WorkerManager:
         self.current_worker = None
         self.current_config_worker = None
         self.current_hist_worker = None
+        self.current_host_workers = set()
 
     def run_worker(self, worker):
         if len(self._workers) >= _MAX_WORKERS_DP:
             return
         self._workers.add(worker)
         worker.signals.finished.connect(lambda w=worker: self.discard_worker(w))
+        QThreadPool.globalInstance().start(worker)
+
+    def run_host_worker(self, worker):
+        """Run a host-detail worker that is tracked for cancellation on tab switch."""
+        if len(self._workers) >= _MAX_WORKERS_DP:
+            return
+        self._workers.add(worker)
+        self.current_host_workers.add(worker)
+        worker.signals.finished.connect(
+            lambda w=worker: (self.discard_worker(w), self.current_host_workers.discard(w))
+        )
         QThreadPool.globalInstance().start(worker)
 
     def discard_worker(self, worker):
@@ -44,3 +56,11 @@ class WorkerManager:
             try: self.current_hist_worker.signals.tasks_error.disconnect()
             except RuntimeError: pass
             self.current_hist_worker = None
+
+    def cancel_host_workers(self):
+        """Discard all host-detail workers from the pool tracking so new
+        workers can be scheduled.  Running workers keep going but their
+        results are dropped by the tab-type guard in the result slots."""
+        for w in list(self.current_host_workers):
+            self.discard_worker(w)
+        self.current_host_workers.clear()

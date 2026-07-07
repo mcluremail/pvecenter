@@ -259,8 +259,9 @@ class ClusterTasksWidget(QWidget):
             self.table.setSortingEnabled(True)
             self.table.sortItems(sort_col, sort_order)
         else:
-            self.table.sortItems(0, Qt.DescendingOrder)
             self.table.setSortingEnabled(True)
+            self.table.horizontalHeader().setSortIndicator(0, Qt.DescendingOrder)
+            self.table.sortItems(0, Qt.DescendingOrder)
 
     def set_placeholder(self, text=None):
         if text is None:

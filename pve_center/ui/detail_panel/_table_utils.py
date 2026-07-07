@@ -114,7 +114,7 @@ def make_filterable_table(table):
         f"QLineEdit {{ font-size: 12px; padding: 4px 8px; border: 1px solid {Color.D1_D5_DB}; "
         f"border-radius: 3px; margin: 4px 4px 0 4px; }}"
     )
-    debounce = QTimer()
+    debounce = QTimer(container)
     debounce.setSingleShot(True)
     debounce.setInterval(200)
     debounce.timeout.connect(lambda: filter_table(table, search.text()))

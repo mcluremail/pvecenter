@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..theme import Color
 
 _DOT_COLORS = {
@@ -118,7 +119,7 @@ class CardList(QWidget):
 
         if filterable:
             self._filter = QLineEdit()
-            self._filter.setPlaceholderText("Filter")
+            self._filter.setPlaceholderText(tr("Filter"))
             self._filter.textChanged.connect(self._apply_filter)
             layout.addWidget(self._filter)
         else:
@@ -131,10 +132,9 @@ class CardList(QWidget):
         self._container_layout.setSpacing(0)
         self._container_layout.addStretch()
 
-        self._scroll = QVBoxLayout()
         layout.addWidget(self._container)
 
-        self._empty_label = QLabel("No data")
+        self._empty_label = QLabel(tr("No data"))
         self._empty_label.setStyleSheet(f"color: {Color.TEXT_DIM}; padding: 40px; font-size: 13px;")
         self._empty_label.setAlignment(Qt.AlignCenter)
         self._container_layout.insertWidget(0, self._empty_label)

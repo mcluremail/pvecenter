@@ -36,7 +36,6 @@ class DetailPanel(QWidget):
         self._storage_content_pending = {}
         self._iso_by_node = {}
         self._all_iso_catalog = {}
-        self._vm_iso_pending = {}
         self._last_vm_data = None
         self.current_obj_type = None
         self.current_obj_name = None
@@ -173,6 +172,10 @@ class DetailPanel(QWidget):
         self.all_vms = all_vms
         self._vms_by_key = build_vm_index(all_vms)
         self.all_storages = all_storages or []
+        self.details_cache.clear()
+        self.config_cache.clear()
+        self.metrics_cache.clear()
+        self.task_history_cache.clear()
 
     def update_nodes_cfg(self, nodes_cfg):
         self.nodes_cfg = nodes_cfg
@@ -200,6 +203,7 @@ class DetailPanel(QWidget):
             self._workers_mgr.cancel_detail_worker()
             self._workers_mgr.cancel_config_worker()
             self._workers_mgr.cancel_history_worker()
+            self._workers_mgr.cancel_host_workers()
             self.metrics_widget.clear_curves()
 
             for idx in (TabIndex.OPTIONS, TabIndex.HISTORY, TabIndex.HOST_VMS,

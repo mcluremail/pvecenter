@@ -81,7 +81,7 @@ class HostTabs:
     def build_network_tab(self):
         loading = loading_label()
         table = make_table(
-            [tr("Interface"), tr("Type"), tr("State"), "Method", "CIDR"],
+            [tr("Interface"), tr("Type"), tr("State"), tr("Method"), tr("CIDR")],
             [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
              (QHeaderView.Interactive, 50), (QHeaderView.Interactive, 75),
              (QHeaderView.Stretch, None)],
@@ -672,7 +672,7 @@ class HostTabs:
                 panel._workers_mgr.discard_worker(w)
             )
         )
-        panel._workers_mgr.run_worker(worker)
+        panel._workers_mgr.run_host_worker(worker)
 
     def on_host_network(self, node_name, interfaces):
         panel = self.panel
@@ -729,7 +729,7 @@ class HostTabs:
                 panel._workers_mgr.discard_worker(w)
             )
         )
-        panel._workers_mgr.run_worker(worker)
+        panel._workers_mgr.run_host_worker(worker)
 
     def on_host_services(self, node_name, services):
         panel = self.panel
@@ -781,7 +781,7 @@ class HostTabs:
                 panel._workers_mgr.discard_worker(w)
             )
         )
-        panel._workers_mgr.run_worker(worker)
+        panel._workers_mgr.run_host_worker(worker)
 
     def on_host_disks(self, node_name, disks):
         panel = self.panel
@@ -847,7 +847,7 @@ class HostTabs:
                 panel._workers_mgr.discard_worker(w)
             )
         )
-        panel._workers_mgr.run_worker(worker)
+        panel._workers_mgr.run_host_worker(worker)
 
     def on_host_snapshots(self, node_name, snapshots):
         panel = self.panel
@@ -898,7 +898,7 @@ class HostTabs:
         worker = HostMetricsWorker(cfg, node_name, timeframe)
         worker.signals.data_fetched.connect(lambda tf, nn, md, g=panel._generation, w=worker: (self.on_host_metrics_fetched(tf, nn, md, g), panel._workers_mgr.discard_worker(w)))
         worker.signals.error_occurred.connect(lambda err, w=worker: panel._workers_mgr.discard_worker(w))
-        panel._workers_mgr.run_worker(worker)
+        panel._workers_mgr.run_host_worker(worker)
 
     def on_host_metrics_fetched(self, timeframe, node_name, metrics_dict, gen):
         panel = self.panel
