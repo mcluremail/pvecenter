@@ -52,7 +52,7 @@ class VmMetricsWidget(QWidget):
         self.timeframe_combo.addItem(tr("week"), "week")
         self.timeframe_combo.addItem(tr("month"), "month")
         self.timeframe_combo.addItem(tr("year"), "year")
-        saved_tf = load_ui_state("metrics_timeframe", "hour")
+        saved_tf = load_ui_state("metrics_timeframe") or "hour"
         for i in range(self.timeframe_combo.count()):
             if self.timeframe_combo.itemData(i) == saved_tf:
                 self.timeframe_combo.setCurrentIndex(i)
