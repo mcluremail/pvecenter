@@ -99,6 +99,24 @@ class DetailPanel(QWidget):
         title_left.addWidget(self.detail_sublabel)
         title_block.addLayout(title_left)
         title_block.addStretch()
+
+        self._cluster_view_toggle = QWidget()
+        self._cluster_view_toggle.setVisible(False)
+        toggle_layout = QHBoxLayout(self._cluster_view_toggle)
+        toggle_layout.setContentsMargins(0, 0, 0, 0)
+        toggle_layout.setSpacing(0)
+        self._btn_clusters = QPushButton(tr("Clusters"))
+        self._btn_clusters.setCheckable(True)
+        self._btn_clusters.setObjectName("segBtnLeft")
+        self._btn_clusters.clicked.connect(lambda: self._switch_cluster_view("clusters"))
+        self._btn_nodes = QPushButton(tr("Nodes"))
+        self._btn_nodes.setCheckable(True)
+        self._btn_nodes.setObjectName("segBtnRight")
+        self._btn_nodes.clicked.connect(lambda: self._switch_cluster_view("compare"))
+        toggle_layout.addWidget(self._btn_clusters)
+        toggle_layout.addWidget(self._btn_nodes)
+        title_block.addWidget(self._cluster_view_toggle)
+
         title_block.addWidget(self.vm_action_bar)
 
         title_widget = QWidget()
@@ -191,6 +209,7 @@ class DetailPanel(QWidget):
             self._update_action_buttons(data)
         else:
             self.vm_action_bar.setVisible(False)
+        self._cluster_view_toggle.setVisible(False)
         try:
             self.current_obj_type = obj_type
             self.current_obj_name = obj_name
@@ -312,6 +331,17 @@ class DetailPanel(QWidget):
 
     def _on_vm_config_change_requested(self, host_name, vmid_str, params):
         self._vm_tabs.on_vm_config_change_requested(host_name, vmid_str, params)
+
+    def _switch_cluster_view(self, mode):
+        self._cluster_view_mode = mode
+        if mode == "clusters":
+            self.summary_stack.setCurrentIndex(1)
+            self._btn_clusters.setChecked(True)
+            self._btn_nodes.setChecked(False)
+        else:
+            self.summary_stack.setCurrentIndex(2)
+            self._btn_clusters.setChecked(False)
+            self._btn_nodes.setChecked(True)
 
     # ------------------------------------------------------------------
     # Small helpers that tab controllers call back
