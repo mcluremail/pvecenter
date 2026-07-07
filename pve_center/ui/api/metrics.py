@@ -7,6 +7,8 @@ import requests
 import urllib3
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from ..i18n import tr
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -619,6 +621,148 @@ class MetricsWorker(QRunnable):
             logger.debug("metrics error", exc_info=True)
             try:
                 self.signals.error_occurred.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            session.close()
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
+# Health Check Worker — collects subscription, updates, services status
+# ----------------------------------------------------------------------
+
+_CRITICAL_SERVICES = {
+    "pvestatd", "pvedaemon", "pveproxy", "pve-cluster",
+    "pve-firewall", "corosync", "pve-ha-crm", "pve-ha-lrm",
+}
+
+_CPU_WARN = 0.70
+_CPU_CRIT = 0.90
+_MEM_WARN = 0.70
+_MEM_CRIT = 0.85
+_DISK_WARN = 0.70
+_DISK_CRIT = 0.85
+
+
+class HealthCheckSignals(_FinishedMixin):
+    health_ready = Signal(str, dict)  # node_name, health_data
+    health_error = Signal(str, str)   # node_name, error
+
+
+class HealthCheckWorker(QRunnable):
+    """Collects node health: CPU/mem/disk thresholds, services, subscription, updates."""
+
+    def __init__(self, host_cfg, node_name, node_status=None):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.node_status = node_status or {}
+        self.signals = HealthCheckSignals()
+
+    def run(self):
+        session = requests.Session()
+        try:
+            session.verify = _verify_ssl(self.host_cfg)
+            auth_token = (
+                f"PVEAPIToken={self.host_cfg['user']}!"
+                f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
+            )
+            headers = {"Authorization": auth_token}
+            base = f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json"
+
+            issues = []
+            warnings = []
+
+            cpu_frac = self.node_status.get("cpu", 0) or 0
+            if isinstance(cpu_frac, (int, float)):
+                if cpu_frac >= _CPU_CRIT:
+                    issues.append(tr("CPU usage {pct}% (critical)").format(
+                        pct=round(cpu_frac * 100, 1)))
+                elif cpu_frac >= _CPU_WARN:
+                    warnings.append(tr("CPU usage {pct}% (high)").format(
+                        pct=round(cpu_frac * 100, 1)))
+
+            mem = self.node_status.get("mem", 0) or 0
+            maxmem = self.node_status.get("maxmem", 0) or 0
+            if maxmem and isinstance(mem, (int, float)):
+                mem_ratio = mem / maxmem
+                if mem_ratio >= _MEM_CRIT:
+                    issues.append(tr("Memory usage {pct}% (critical)").format(
+                        pct=round(mem_ratio * 100, 1)))
+                elif mem_ratio >= _MEM_WARN:
+                    warnings.append(tr("Memory usage {pct}% (high)").format(
+                        pct=round(mem_ratio * 100, 1)))
+
+            disk = self.node_status.get("disk", 0) or 0
+            maxdisk = self.node_status.get("maxdisk", 0) or 0
+            if maxdisk and isinstance(disk, (int, float)):
+                disk_ratio = disk / maxdisk
+                if disk_ratio >= _DISK_CRIT:
+                    issues.append(tr("Root disk usage {pct}% (critical)").format(
+                        pct=round(disk_ratio * 100, 1)))
+                elif disk_ratio >= _DISK_WARN:
+                    warnings.append(tr("Root disk usage {pct}% (high)").format(
+                        pct=round(disk_ratio * 100, 1)))
+
+            try:
+                resp = session.get(f"{base}/nodes/{self.node_name}/services",
+                                   headers=headers, timeout=10)
+                _check_response(resp)
+                services = resp.json().get("data", [])
+                for svc in services:
+                    name = svc.get("name", "")
+                    state = svc.get("state", "")
+                    if name in _CRITICAL_SERVICES and state != "running":
+                        issues.append(tr("Service {svc} is not running").format(svc=name))
+            except Exception as e:
+                logger.debug("health services error: %s", e)
+
+            try:
+                resp = session.get(f"{base}/nodes/{self.node_name}/subscription",
+                                   headers=headers, timeout=10)
+                _check_response(resp)
+                sub = resp.json().get("data", {})
+                sub_status = sub.get("status", "")
+                if sub_status in ("expired", "invalid", "suspended"):
+                    issues.append(tr("Subscription {status}").format(status=sub_status))
+            except Exception as e:
+                logger.debug("health subscription error: %s", e)
+
+            try:
+                resp = session.get(f"{base}/nodes/{self.node_name}/apt/update",
+                                   headers=headers, timeout=10)
+                _check_response(resp)
+                updates = resp.json().get("data", [])
+                if updates:
+                    warnings.append(tr("{count} package updates available").format(
+                        count=len(updates)))
+            except Exception as e:
+                logger.debug("health updates error: %s", e)
+
+            if not issues and not warnings:
+                status = "healthy"
+            elif issues:
+                status = "critical"
+            else:
+                status = "warning"
+
+            health = {
+                "status": status,
+                "issues": issues,
+                "warnings": warnings,
+            }
+            try:
+                self.signals.health_ready.emit(self.node_name, health)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("health check error", exc_info=True)
+            try:
+                self.signals.health_error.emit(self.node_name, str(e))
             except RuntimeError:
                 pass
         finally:

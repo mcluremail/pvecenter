@@ -32,8 +32,8 @@ def _status_dot(status):
         return "ok"
     if s in ("stopped", "offline"):
         return "off"
-    if s in ("error", "unknown"):
-        return "warn"
+    if s in ("error", "unknown", "warning", "critical"):
+        return "err" if s in ("error", "critical") else "warn"
     return None
 
 
@@ -61,7 +61,9 @@ class CardRow(QFrame):
             self._dot_label = QLabel("●")
             self._dot_label.setFixedWidth(14)
             self._dot_label.setAlignment(Qt.AlignCenter)
-            self._dot_label.setStyleSheet(f"color: {_DOT_COLORS.get(dot_color_key, Color.TEXT_DIM)}; font-size: 10px;")
+            dot_val = self._data.get(dot_color_key, "")
+            color_key = _status_dot(dot_val) or dot_val
+            self._dot_label.setStyleSheet(f"color: {_DOT_COLORS.get(color_key, Color.TEXT_DIM)}; font-size: 10px;")
             layout.addWidget(self._dot_label)
 
         title_key = self._columns.get("title")
@@ -90,9 +92,10 @@ class CardRow(QFrame):
     def update_fields(self, data):
         self._data.update(data)
         if self._dot_label:
-            color_key = _status_dot(self._data.get("status", ""))
-            if color_key:
-                self._dot_label.setStyleSheet(f"color: {_DOT_COLORS.get(color_key, Color.TEXT_DIM)}; font-size: 10px;")
+            dot_key = self._columns.get("dot", "status")
+            dot_val = self._data.get(dot_key, "")
+            color_key = _status_dot(dot_val) or dot_val
+            self._dot_label.setStyleSheet(f"color: {_DOT_COLORS.get(color_key, Color.TEXT_DIM)}; font-size: 10px;")
         title_key = self._columns.get("title")
         if title_key and self._title_label:
             self._title_label.setText(str(self._data.get(title_key, "")))

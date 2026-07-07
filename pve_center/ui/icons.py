@@ -11,7 +11,7 @@ def _status_color(status):
         return "#22c55e"
     elif status in ("offline", "stopped", "error"):
         return "#ef4444"
-    elif status in ("paused", "RUNNING"):
+    elif status in ("paused", "warning", "RUNNING"):
         return "#f59e0b"
     return None
 
