@@ -20,6 +20,16 @@ def _verify_ssl(cfg):
     return not bool(cfg.get("trust_ssl", True))
 
 
+def _close_proxmox(proxmox):
+    """Close underlying requests.Session to prevent connection pool leaks."""
+    try:
+        sess = proxmox._store.get("session")
+        if sess is not None:
+            sess.close()
+    except Exception:
+        pass
+
+
 # ----------------------------------------------------------------------
 # Create API token for PVE Center
 # ----------------------------------------------------------------------
@@ -183,6 +193,7 @@ class FetchWorker(QRunnable):
         self.signals = FetchSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.node_cfg["host"],
@@ -491,6 +502,7 @@ class FetchWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -515,6 +527,7 @@ class VmDetailWorker(QRunnable):
         self.signals = VmDetailSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -547,6 +560,7 @@ class VmDetailWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -572,6 +586,7 @@ class VmConfigWorker(QRunnable):
         self.signals = VmConfigSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -596,6 +611,7 @@ class VmConfigWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -623,6 +639,7 @@ class VmConfigUpdateWorker(QRunnable):
         self.signals = VmConfigUpdateSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -647,6 +664,7 @@ class VmConfigUpdateWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -673,6 +691,7 @@ class VmTaskHistoryWorker(QRunnable):
         self.signals = VmTaskHistorySignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -694,6 +713,7 @@ class VmTaskHistoryWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -706,6 +726,7 @@ class VmTaskHistoryWorker(QRunnable):
 def delete_host_token(host_cfg):
     """Удаляет API-токен с PVE-сервера через Proxmoxer.
        Возвращает True при успехе, False при ошибке."""
+    proxmox = None
     try:
         proxmox = ProxmoxAPI(
             host_cfg["host"],
@@ -723,6 +744,8 @@ def delete_host_token(host_cfg):
     except Exception as e:
         logger.warning("Failed to delete token from %s: %s", host_cfg.get("host", "?"), e)
         return False
+    finally:
+        _close_proxmox(proxmox)
 
 
 class VmActionSignals(QObject):
@@ -744,6 +767,7 @@ class VmActionWorker(QRunnable):
         self.signals = VmActionSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -780,6 +804,7 @@ class VmActionWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -811,6 +836,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
             lock = threading.Lock()
 
             def fetch_node(host_cfg, node_name):
+                proxmox = None
                 try:
                     proxmox = ProxmoxAPI(
                         host_cfg["host"],
@@ -826,6 +852,8 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
                 except Exception as e:
                     with lock:
                         errors.append(f"{node_name}: {e}")
+                finally:
+                    _close_proxmox(proxmox)
 
             threads = [threading.Thread(target=fetch_node, args=(hc, nn), daemon=True)
                        for hc, nn in self.node_requests]
@@ -890,6 +918,7 @@ class VmConsoleWorker(QRunnable):
         import sys
         import tempfile
         vv_path = None
+        proxmox = None
         try:
             try:
                 proxmox = ProxmoxAPI(
@@ -918,6 +947,9 @@ class VmConsoleWorker(QRunnable):
                 except RuntimeError:
                     pass
                 return
+            finally:
+                _close_proxmox(proxmox)
+                proxmox = None
 
             try:
                 lines = ["[virt-viewer]"]
@@ -1057,6 +1089,7 @@ class CreateVmWorker(QRunnable):
         self.signals = CreateVmSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -1113,6 +1146,7 @@ class CreateVmWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -1135,6 +1169,7 @@ class DeleteVmWorker(QRunnable):
         self.signals = DeleteVmSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -1158,6 +1193,7 @@ class DeleteVmWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -1198,6 +1234,7 @@ class MigrateVmWorker(QRunnable):
                 pass
             return
         try:
+            proxmox = None
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
                 user=self.host_cfg["user"],
@@ -1223,6 +1260,7 @@ class MigrateVmWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -1252,6 +1290,7 @@ class CloneVmWorker(QRunnable):
         self.signals = CloneVmSignals()
 
     def run(self):
+        proxmox = None
         try:
             proxmox = ProxmoxAPI(
                 self.host_cfg["host"],
@@ -1306,6 +1345,7 @@ class CloneVmWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
+            _close_proxmox(proxmox)
             try:
                 self.signals.finished.emit()
             except RuntimeError:
