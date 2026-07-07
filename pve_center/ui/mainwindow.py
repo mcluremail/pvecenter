@@ -226,6 +226,11 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._on_about)
         self._toolbar.addAction(about_action)
 
+        quit_action = QAction(tr("Quit"), self)
+        quit_action.setToolTip(tr("Quit") + " (Ctrl+Q)")
+        quit_action.triggered.connect(self._tray_quit)
+        self._toolbar.addAction(quit_action)
+
         spacer = QWidget()
         spacer.setSizePolicy(spacer.sizePolicy().Policy.Expanding, spacer.sizePolicy().Policy.Fixed)
         self._toolbar.addWidget(spacer)
@@ -238,7 +243,7 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+R"), self, activated=self.refresh_data)
         QShortcut(QKeySequence("F5"), self, activated=self.refresh_data)
-        QShortcut(QKeySequence("Ctrl+Q"), self, activated=self.close)
+        QShortcut(QKeySequence("Ctrl+Q"), self, activated=self._tray_quit)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self._on_add_server())
         QShortcut(QKeySequence("Del"), self, activated=self.tree_panel.request_delete_current)
 
@@ -1294,7 +1299,31 @@ class MainWindow(QMainWindow):
 
     def _tray_quit(self):
         self._tray_minimize_to_tray = False
-        self.close()
+        self._save_state_and_quit()
+
+    def _save_state_and_quit(self):
+        self._closing = True
+        self.refresh_timer.stop()
+        self.tasks_timer.stop()
+        self._heartbeat_timer.stop()
+        self._spin_timer.stop()
+        self.tree_panel.save_state()
+        geo = self.geometry()
+        save_ui_state("window_geometry", json.dumps([geo.x(), geo.y(), geo.width(), geo.height()]))
+        save_ui_state("window_maximized", "1" if self.isMaximized() else "0")
+        key = self.tree_panel.get_current_item_key()
+        if key:
+            save_ui_state("saved_key", json.dumps(key))
+        save_ui_state("saved_tab", str(self.detail_panel.tabs.currentIndex()))
+        save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
+        save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
+        save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
+        QThreadPool.globalInstance().clear()
+        QThreadPool.globalInstance().waitForDone(3000)
+        if self._tray:
+            self._tray.hide()
+        from PySide6.QtWidgets import QApplication
+        QApplication.quit()
 
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
@@ -1317,25 +1346,5 @@ class MainWindow(QMainWindow):
                 2000,
             )
             return
-        self._closing = True
-        self.refresh_timer.stop()
-        self.tasks_timer.stop()
-        self._heartbeat_timer.stop()
-        self._spin_timer.stop()
-        self.tree_panel.save_state()
-        # Сохраняем состояние окна
-        geo = self.geometry()
-        save_ui_state("window_geometry", json.dumps([geo.x(), geo.y(), geo.width(), geo.height()]))
-        save_ui_state("window_maximized", "1" if self.isMaximized() else "0")
-        key = self.tree_panel.get_current_item_key()
-        if key:
-            save_ui_state("saved_key", json.dumps(key))
-        save_ui_state("saved_tab", str(self.detail_panel.tabs.currentIndex()))
-        save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
-        save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
-        save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
-        # Останавливаем пул воркеров с таймаутом, чтобы не блокировать закрытие
-        # при зависших HTTP-запросах (timeout=60 на storage content и т.п.)
-        QThreadPool.globalInstance().clear()
-        QThreadPool.globalInstance().waitForDone(3000)
+        self._save_state_and_quit()
         super().closeEvent(event)
