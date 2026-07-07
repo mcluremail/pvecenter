@@ -335,7 +335,6 @@ class TreePanel(QWidget):
             self._spin_timer.stop()
             self._rebuild_timer.stop()
             self._build_tree()
-            self._restore_expanded_state()
             self._sync_toggle_button()
             self._update_empty_visibility()
         else:
@@ -343,7 +342,6 @@ class TreePanel(QWidget):
 
     def _do_rebuild(self):
         self._build_tree()
-        self._restore_expanded_state()
         self._sync_toggle_button()
         self._update_empty_visibility()
 
@@ -642,7 +640,11 @@ class TreePanel(QWidget):
                         si.setIcon(0, get_icon("storage"))
                         si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "host", shost))
 
-        self.tree.expandAll()
+        raw = load_ui_state("expandedTreePaths")
+        if raw:
+            self._restore_expanded_state()
+        else:
+            self.tree.expandAll()
         if saved_key is not None:
             item = self.find_item_by_key(saved_key)
             if item is not None:
