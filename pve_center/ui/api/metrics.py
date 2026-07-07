@@ -542,7 +542,9 @@ class HostMetricsWorker(QRunnable):
                 'netout': [],
             }
             for entry in rrd_response:
-                t = entry['time']
+                t = entry.get('time')
+                if t is None:
+                    continue
                 for key in metrics.keys():
                     field = 'memused' if key == 'mem' else key
                     if field in entry and entry[field] is not None:
@@ -603,7 +605,9 @@ class MetricsWorker(QRunnable):
                 'diskwrite': []
             }
             for entry in rrd_response:
-                t = entry['time']
+                t = entry.get('time')
+                if t is None:
+                    continue
                 for key in metrics.keys():
                     if key in entry and entry[key] is not None:
                         metrics[key].append({'time': t, 'value': entry[key]})

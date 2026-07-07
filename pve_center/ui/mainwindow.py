@@ -248,6 +248,7 @@ class MainWindow(QMainWindow):
         self._heartbeat_timer.timeout.connect(self._heartbeat)
         self._heartbeat_timer.start()
         self._freeze_detector = threading.Thread(target=self._detect_freeze, daemon=True, name="freeze-detector")
+        self._closing = False
         self._freeze_detector.start()
 
         # Таймер обновления задач кластера
@@ -693,11 +694,14 @@ class MainWindow(QMainWindow):
         # Отменяем все pending soft_refresh — их результаты устарели
         self._soft_gen += 1
         self._soft_refresh_running = False
+        self._soft_refresh_active = False
         self._soft_counter = 0
         self._soft_had_errors = False
         self._soft_nodes.clear()
         self._soft_vms.clear()
         self._soft_storages.clear()
+        self._spin_timer.stop()
+        self._refresh_spinner.setText("")
 
         # Сохраняем выделение и вкладку (для послед. восстановления после refresh)
         current_key = self.tree_panel.get_current_item_key()
@@ -748,16 +752,18 @@ class MainWindow(QMainWindow):
     def on_worker_finished(self, data, worker=None, gen=0):
         if gen != 0 and gen != self._refresh_gen:
             return
-        if data["status"] == "ok":
+        status = data.get("status", "error")
+        host = data.get("host", "")
+        if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
-            for node in data["nodes"]:
-                node["host_name"] = data["host"]
+            for node in data.get("nodes", []):
+                node["host_name"] = host
                 node["_is_cluster"] = is_cluster
                 self.all_nodes.append(node)
-            for vm in data["vms"]:
-                vm["host_name"] = data["host"]
+            for vm in data.get("vms", []):
+                vm["host_name"] = host
                 # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
-                vm_key = (data["host"], vm.get("vmid", 0))
+                vm_key = (host, vm.get("vmid", 0))
                 idx = next((i for i, v in enumerate(self.all_vms)
                             if (v.get("host_name"), v.get("vmid")) == vm_key), None)
                 if idx is not None:
@@ -765,7 +771,7 @@ class MainWindow(QMainWindow):
                 else:
                     self.all_vms.append(vm)
                 self._vms_by_key[vm_key] = vm
-            self._dedup_storages(data.get("storages", []), data["host"], self.all_storages)
+            self._dedup_storages(data.get("storages", []), host, self.all_storages)
             # Собираем уникальные имена пулов
             known = {p["poolid"] for p in self.all_pools if "poolid" in p}
             for pn in data.get("pool_names", []):
@@ -777,18 +783,17 @@ class MainWindow(QMainWindow):
                 if isos:
                     self.all_iso_images[nname] = isos
             # Собираем HA группы (host_name -> [group, ...])
-            host = data["host"]
             ha_list = data.get("ha_groups", [])
             if ha_list:
                 self.all_ha_groups[host] = ha_list
         else:
             is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
             self.all_nodes.append({
-                "node": data["host"],
+                "node": host,
                 "status": "error",
-                "error": data["error"],
-                "host_name": data["host"],
-                "_display_name": data["host"],
+                "error": data.get("error", "Unknown error"),
+                "host_name": host,
+                "_display_name": host,
                 "_is_cluster": is_cluster_err
             })
 
@@ -841,7 +846,7 @@ class MainWindow(QMainWindow):
             status = vm.get("status", "unknown")
             old = self._last_vm_statuses.get(key)
             if old is not None and old != status:
-                vm_name = vm.get("name") or f"VM {vm['vmid']}"
+                vm_name = vm.get("name") or f"VM {vm.get('vmid', '?')}"
                 self._notifications.vm_status_changed(vm_name, vm.get("host_name", ""), old, status)
             self._last_vm_statuses[key] = status
 
@@ -897,24 +902,26 @@ class MainWindow(QMainWindow):
     def on_soft_refresh_result(self, data, worker=None, gen=0):
         if gen != self._soft_gen:
             return
-        if data["status"] == "ok":
+        status = data.get("status", "error")
+        host = data.get("host", "")
+        if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
-            for node in data["nodes"]:
-                node["host_name"] = data["host"]
+            for node in data.get("nodes", []):
+                node["host_name"] = host
                 node["_is_cluster"] = is_cluster
                 self._soft_nodes.append(node)
-            for vm in data["vms"]:
-                vm["host_name"] = data["host"]
+            for vm in data.get("vms", []):
+                vm["host_name"] = host
                 self._soft_vms.append(vm)
-            self._dedup_storages(data.get("storages", []), data["host"], self._soft_storages)
+            self._dedup_storages(data.get("storages", []), host, self._soft_storages)
         else:
             self._soft_had_errors = True
             self._soft_nodes.append({
-                "node": data["host"],
+                "node": host,
                 "status": "error",
-                "error": data["error"],
-                "host_name": data["host"],
-                "_display_name": data["host"]
+                "error": data.get("error", "Unknown error"),
+                "host_name": host,
+                "_display_name": host
             })
 
         self._soft_counter += 1
@@ -1006,6 +1013,11 @@ class MainWindow(QMainWindow):
         # вручную — иначе воркер не учтётся в MAX_WORKERS и утечёт при падении
         # до emit.
         if len(self._workers) >= MAX_WORKERS:
+            try:
+                worker.signals.tasks_ready.disconnect()
+                worker.signals.tasks_error.disconnect()
+            except (RuntimeError, TypeError):
+                pass
             return
         self._workers.add(worker)
         worker.signals.finished.connect(lambda w=worker: self._discard_worker(w))
@@ -1175,8 +1187,10 @@ class MainWindow(QMainWindow):
         self._last_heartbeat = time.time()
 
     def _detect_freeze(self):
-        while True:
+        while not self._closing:
             time.sleep(2)
+            if self._closing:
+                break
             now = time.time()
             elapsed = now - self._last_heartbeat
             if elapsed > 3:
@@ -1231,6 +1245,7 @@ class MainWindow(QMainWindow):
     # Закрытие приложения
     # ------------------------------------------------------------
     def closeEvent(self, event):
+        self._closing = True
         self.refresh_timer.stop()
         self.tasks_timer.stop()
         self._heartbeat_timer.stop()

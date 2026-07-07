@@ -594,7 +594,6 @@ class TreePanel(QWidget):
                 else:
                     standalone_storages.append(st)
 
-            seen_names = set()
             for cluster_name in sorted(cluster_storages.keys(), key=str.lower):
                 cl_item = QTreeWidgetItem(st_folder)
                 cl_item.setText(0, cluster_name)

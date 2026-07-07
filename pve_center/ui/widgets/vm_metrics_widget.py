@@ -31,7 +31,6 @@ class VmMetricsWidget(QWidget):
         super().__init__(parent)
         self._has_plot = False
         self._cached_data = None
-        self._disk_visible = True
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -81,7 +80,6 @@ class VmMetricsWidget(QWidget):
         self._render_current_metric()
 
     def show_disk_io(self, visible=True):
-        self._disk_visible = visible
         current_key = self.metric_combo.currentData()
         expected_keys = [k for k, _ in _METRIC_KEYS if visible or k != "disk"]
         current_keys = [self.metric_combo.itemData(i) for i in range(self.metric_combo.count())]
@@ -91,12 +89,12 @@ class VmMetricsWidget(QWidget):
         self.metric_combo.clear()
         for key in expected_keys:
             self.metric_combo.addItem(_metric_label(key), key)
-        self.metric_combo.blockSignals(False)
         if current_key in expected_keys:
             idx = expected_keys.index(current_key)
         else:
             idx = 0
         self.metric_combo.setCurrentIndex(idx)
+        self.metric_combo.blockSignals(False)
         self._on_metric_changed()
 
     def clear_curves(self):
