@@ -359,6 +359,30 @@ def _build_qss() -> str:
         color: white;
     }}
 
+    /* ── Сегментированные кнопки (Clusters/Nodes toggle) ── */
+    QPushButton#segBtnLeft, QPushButton#segBtnRight {{
+        font-size: 12px;
+        padding: 5px 14px;
+        color: {Color.TEXT_SEC};
+        background: {Color.SLATE_100};
+    }}
+    QPushButton#segBtnLeft {{
+        border: 1px solid {Color.SLATE_300};
+        border-right: none;
+        border-top-left-radius: 4px;
+        border-bottom-left-radius: 4px;
+    }}
+    QPushButton#segBtnRight {{
+        border: 1px solid {Color.SLATE_300};
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }}
+    QPushButton#segBtnLeft:checked, QPushButton#segBtnRight:checked {{
+        background: {Color.ACCENT};
+        color: white;
+        border-color: {Color.ACCENT};
+    }}
+
     /* Опасные кнопки (Удаление) */
     QPushButton#dangerBtn {{
         background: #c0392b;

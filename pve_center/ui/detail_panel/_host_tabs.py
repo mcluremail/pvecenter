@@ -195,14 +195,13 @@ class HostTabs:
             "dot": "status",
             "title": "name",
             "fields": [
-                ("cluster_text", 100),
-                ("status_text", 80),
-                ("cpu_text", 55),
-                ("ram_text", 110),
-                ("disk_text", 110),
-                ("vms_text", 55),
-                ("uptime_text", 100),
-                ("pve_text", 80),
+                ("cluster_text", 80),
+                ("status_text", 70),
+                ("cpu_text", 50),
+                ("ram_text", 95),
+                ("disk_text", 90),
+                ("vms_text", 35),
+                ("uptime_text", 80),
             ],
         }
         self.panel.node_compare_list = CardList(compare_columns, filterable=True)
@@ -225,10 +224,7 @@ class HostTabs:
         self.panel.summary_stack.addWidget(self.panel.cluster_summary_list)
         self.panel.summary_stack.addWidget(self.panel.node_compare_list)
 
-        tab = QScrollArea()
-        tab.setWidgetResizable(True)
-        tab.setWidget(self.panel.summary_stack)
-        return tab
+        return self.panel.summary_stack
 
     def populate_host_summary(self, hosts):
         panel = self.panel
@@ -266,6 +262,7 @@ class HostTabs:
         panel.detail_label.setText(tr("All clusters"))
         panel.detail_sublabel.setText("")
         panel.detail_sublabel.setVisible(False)
+        panel._cluster_view_toggle.setVisible(True)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
@@ -273,7 +270,16 @@ class HostTabs:
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
         self._populate_cluster_summary()
         self._populate_node_compare()
-        panel.summary_stack.setCurrentIndex(2)
+        if not hasattr(panel, '_cluster_view_mode'):
+            panel._cluster_view_mode = 'compare'
+        if panel._cluster_view_mode == 'clusters':
+            panel.summary_stack.setCurrentIndex(1)
+            panel._btn_clusters.setChecked(True)
+            panel._btn_nodes.setChecked(False)
+        else:
+            panel.summary_stack.setCurrentIndex(2)
+            panel._btn_clusters.setChecked(False)
+            panel._btn_nodes.setChecked(True)
 
     def _populate_cluster_summary(self):
         panel = self.panel
@@ -355,6 +361,7 @@ class HostTabs:
         panel.detail_label.setText(tr("Standalone hosts"))
         panel.detail_sublabel.setText("")
         panel.detail_sublabel.setVisible(False)
+        panel._cluster_view_toggle.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.SUMMARY, True)
@@ -381,6 +388,7 @@ class HostTabs:
         running = sum(1 for h in hosts if h.get("status") == "online")
         panel.detail_sublabel.setText(f"{hosts_count} {tr('hosts')} · {running} {tr('online')}")
         panel.detail_sublabel.setVisible(True)
+        panel._cluster_view_toggle.setVisible(False)
         panel.tabs.setTabVisible(TabIndex.MONITOR, False)
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
@@ -396,6 +404,7 @@ class HostTabs:
         panel.detail_label.setText(display_name)
         panel.detail_sublabel.setText(" · ".join(self._host_subtitle(host_data, host_name)))
         panel.detail_sublabel.setVisible(True)
+        panel._cluster_view_toggle.setVisible(False)
 
         if host_data and host_data.get("status") == "error":
             from ..utils import parse_pve_error
