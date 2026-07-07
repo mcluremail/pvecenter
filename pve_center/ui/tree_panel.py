@@ -282,7 +282,6 @@ class TreePanel(QWidget):
         item.setData(0, ITEM_KEY_ROLE, ("section", label))
         item.setText(0, label)
         item.setIcon(0, get_icon("folder"))
-        item.setExpanded(True)
 
         context_map = {tr("Clusters"): "cluster", tr("Standalone hosts"): "standalone"}
         ctx = context_map.get(label, "")
@@ -503,14 +502,12 @@ class TreePanel(QWidget):
                     cl_item.setText(0, cluster_name)
                     cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
                     cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
-                    cl_item.setExpanded(True)
                     continue
                 vms_in_cl = [vm for vm in self.all_vms
                              if any(vm.get("node") == n.get("node") for n in nodes_in_cl)]
                 cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
                 cl_item.setIcon(0, get_icon("cluster"))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
-                cl_item.setExpanded(True)
 
                 hosts_in_cl = cluster_nodes[cluster_name]
                 for node in sorted(hosts_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
@@ -538,7 +535,6 @@ class TreePanel(QWidget):
                     pool_item.setText(0, f"{pool_name}  {_vm_count_str(vms_list)}")
                     pool_item.setIcon(0, get_icon("pool"))
                     pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
-                    pool_item.setExpanded(True)
 
                     for vm in sorted(vms_list, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
                         self._add_vm_item(pool_item, vm)
@@ -559,12 +555,10 @@ class TreePanel(QWidget):
                     host_item.setText(0, display_name)
                     host_item.setIcon(0, make_loading_icon(self._spinner_angle))
                     host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
-                    host_item.setExpanded(True)
                     continue
                 host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
                 host_item.setIcon(0, get_icon("host", node.get("status")))
                 host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
-                host_item.setExpanded(True)
                 host_item.setToolTip(0, _node_tooltip(node))
 
                 pool_groups = defaultdict(list)
@@ -581,7 +575,6 @@ class TreePanel(QWidget):
                     pool_item.setText(0, f"{pool_name}  {_vm_count_str(pool_groups[pool_name])}")
                     pool_item.setIcon(0, get_icon("pool"))
                     pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
-                    pool_item.setExpanded(True)
 
                     for vm in sorted(pool_groups[pool_name], key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
                         self._add_vm_item(pool_item, vm)
@@ -608,7 +601,6 @@ class TreePanel(QWidget):
                 cl_item.setIcon(0, get_icon("cluster"))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("storage_section", cluster_name))
                 cl_item.setFlags(cl_item.flags() & ~Qt.ItemIsSelectable)
-                cl_item.setExpanded(True)
 
                 seen_names = set()
                 for st in cluster_storages[cluster_name]:
@@ -626,7 +618,6 @@ class TreePanel(QWidget):
                 so_item.setIcon(0, get_icon("folder"))
                 so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", tr("Standalone")))
                 so_item.setFlags(so_item.flags() & ~Qt.ItemIsSelectable)
-                so_item.setExpanded(True)
 
                 seen_keys = set()
                 for st in standalone_storages:
