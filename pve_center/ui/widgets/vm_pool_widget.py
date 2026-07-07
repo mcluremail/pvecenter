@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QHeaderView,
     QProgressBar,
     QTableWidget,
@@ -13,11 +14,30 @@ from ..detail_panel._table_utils import set_empty_placeholder
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..icons import get_icon
+from .metric_card import MetricCard
 
 
 class VmPoolWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._summary_cards: dict[str, MetricCard] = {}
+
+        summary_layout = QHBoxLayout()
+        summary_layout.setContentsMargins(0, 0, 0, 6)
+        summary_layout.setSpacing(10)
+        for key, title in (
+            ("vms", tr("VMs")),
+            ("cpu", tr("CPU")),
+            ("ram", tr("Memory")),
+            ("disk", tr("Disk")),
+        ):
+            card = MetricCard(title, show_progress=(key in ("cpu", "ram", "disk")))
+            card.setMinimumHeight(80)
+            summary_layout.addWidget(card)
+            self._summary_cards[key] = card
+        summary_widget = QWidget()
+        summary_widget.setLayout(summary_layout)
+
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.verticalHeader().hide()
@@ -38,12 +58,14 @@ class VmPoolWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
         layout = QVBoxLayout(self)
-        layout.addWidget(self.table)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(summary_widget)
+        layout.addWidget(self.table)
 
     def set_pool_vms(self, vms):
         if not vms:
             set_empty_placeholder(self.table, 5)
+            self._update_summary([])
             return
         self.table.setRowCount(len(vms))
         for i, vm in enumerate(vms):
@@ -81,6 +103,39 @@ class VmPoolWidget(QWidget):
         for r in range(self.table.rowCount()):
             if self.table.rowHeight(r) > 24:
                 self.table.setRowHeight(r, 24)
+
+        self._update_summary(vms)
+
+    def _update_summary(self, vms):
+        total = len(vms)
+        running = sum(1 for v in vms if v.get("status") == "running")
+        self._summary_cards["vms"].set_value(f"{running}/{total}")
+        self._summary_cards["vms"].set_subtitle(
+            f"{total - running} {tr('stopped')}" if total != running else "")
+        self._summary_cards["vms"].set_progress(
+            int(running / total * 100) if total else 0)
+
+        cpu_sum = sum(v.get("cpu", 0) or 0 for v in vms
+                      if isinstance(v.get("cpu"), (int, float)))
+        cpu_pct = round(cpu_sum / total * 100, 1) if total else 0
+        self._summary_cards["cpu"].set_value(f"{cpu_pct}%")
+        self._summary_cards["cpu"].set_progress(cpu_pct)
+
+        mem_total = sum(v.get("maxmem", 0) or 0 for v in vms)
+        mem_used = sum(v.get("mem", 0) or 0 for v in vms)
+        mem_pct = round(mem_used / mem_total * 100, 1) if mem_total else 0
+        mem_gb = round(mem_used / (1024**3), 1) if mem_used else 0
+        maxmem_gb = round(mem_total / (1024**3), 1) if mem_total else 0
+        self._summary_cards["ram"].set_value(f"{mem_gb}/{maxmem_gb} GiB")
+        self._summary_cards["ram"].set_progress(mem_pct)
+
+        disk_total = sum(v.get("maxdisk", 0) or 0 for v in vms)
+        disk_used = sum(v.get("disk", 0) or 0 for v in vms)
+        disk_pct = round(disk_used / disk_total * 100, 1) if disk_total else 0
+        disk_gb = round(disk_used / (1024**3), 1) if disk_used else 0
+        maxdisk_gb = round(disk_total / (1024**3), 1) if disk_total else 0
+        self._summary_cards["disk"].set_value(f"{disk_gb}/{maxdisk_gb} GiB")
+        self._summary_cards["disk"].set_progress(disk_pct)
 
     def _set_progress(self, row, col, pct):
         bar = QProgressBar()
