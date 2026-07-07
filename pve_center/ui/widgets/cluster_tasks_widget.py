@@ -171,10 +171,12 @@ class ClusterTasksWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
 
-        # Filter bar — compact, single row
+        # Filter bar — compact, right-aligned
         filter_bar = QHBoxLayout()
-        filter_bar.setContentsMargins(4, 0, 4, 2)
+        filter_bar.setContentsMargins(4, 3, 4, 3)
         filter_bar.setSpacing(4)
+        filter_bar.addStretch()
+
         self._filter_input = QLineEdit()
         self._filter_input.setPlaceholderText(tr("Filter..."))
         self._filter_input.setClearButtonEnabled(True)
@@ -190,17 +192,16 @@ class ClusterTasksWidget(QWidget):
         self._status_filter.addItem(tr("Running"), "RUNNING")
         self._status_filter.currentIndexChanged.connect(self._apply_filter)
         filter_bar.addWidget(self._status_filter)
-        filter_bar.addStretch()
 
         filter_widget = QWidget()
-        filter_widget.setFixedHeight(24)
+        filter_widget.setFixedHeight(30)
         filter_widget.setLayout(filter_bar)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(self.table, 1)
         layout.addWidget(filter_widget)
-        layout.addWidget(self.table)
 
     def set_tasks(self, tasks):
         self._all_tasks = tasks
