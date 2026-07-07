@@ -109,11 +109,12 @@ class VmHardwareWidget(QWidget):
                 self.table.setRowHeight(i, 28)
             else:
                 icon = None
-                if is_disk_key(key):
+                raw_val = self._config_data.get(key)
+                if is_disk_key(key, raw_val):
                     icon = get_icon("disk")
                 elif is_net_key(key):
                     icon = get_icon("network")
-                elif is_cdrom_key(key):
+                elif is_cdrom_key(key, raw_val):
                     icon = get_icon("iso")
                 elif is_tpm_key(key):
                     icon = get_icon("tpm")
@@ -153,12 +154,13 @@ class VmHardwareWidget(QWidget):
             return
 
         is_running = self._vm_status == "running"
-        if is_running and raw_key not in self._EDITABLE_WHEN_RUNNING:
+        current_value = self._config_data.get(raw_key)
+        if is_running and raw_key not in self._EDITABLE_WHEN_RUNNING \
+                and not is_cdrom_key(raw_key, current_value):
             QMessageBox.information(self, tr("Cannot be changed on a running VM"),
                                     tr("Stop the VM to edit"))
             return
 
-        current_value = self._config_data.get(raw_key)
         label = item.text()
 
         if is_net_key(raw_key):
@@ -171,7 +173,7 @@ class VmHardwareWidget(QWidget):
                 self.config_changed.emit(self._host_name, str(self._vmid), {key: value})
             return
 
-        if is_cdrom_key(raw_key):
+        if is_cdrom_key(raw_key, current_value):
             dlg = VmCdromEditorDialog(raw_key, label, current_value,
                                       self._iso_list, self)
             if dlg.exec() != VmCdromEditorDialog.Accepted:
@@ -185,7 +187,7 @@ class VmHardwareWidget(QWidget):
                                          {key: value})
             return
 
-        if is_disk_key(raw_key):
+        if is_disk_key(raw_key, current_value):
             dlg = VmDiskEditorDialog(raw_key, label, current_value, self)
             if dlg.exec() != VmDiskEditorDialog.Accepted:
                 return
