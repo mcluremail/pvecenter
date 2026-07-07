@@ -299,6 +299,7 @@
   "Memory": "Память",
   "Memory (MB)": "Память (МБ)",
   "Memory (MB):": "Память (МБ):",
+  "Memory snapshot dumped to log": "Снимок памяти записан в лог",
   "Memory usage {pct}% (critical)": "Использование памяти {pct}% (критично)",
   "Memory usage {pct}% (high)": "Использование памяти {pct}% (высокое)",
   "Method": "Метод",

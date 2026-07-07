@@ -13,6 +13,9 @@ logging.basicConfig(
 
 
 def main():
+    import tracemalloc
+    tracemalloc.start(25)
+
     app = QApplication(sys.argv)
 
     from .ui.i18n import set_language
@@ -24,7 +27,12 @@ def main():
     from .ui.mainwindow import MainWindow
     window = MainWindow(nodes_cfg)
     window.show()
-    sys.exit(app.exec())
+    ret = app.exec()
+    snap = tracemalloc.take_snapshot()
+    logging.info("=== tracemalloc top 20 ===")
+    for stat in snap.statistics("lineno")[:20]:
+        logging.info(str(stat))
+    sys.exit(ret)
 
 
 if __name__ == "__main__":
