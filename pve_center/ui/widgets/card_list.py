@@ -68,7 +68,11 @@ class CardRow(QFrame):
         if title_key:
             self._title_label = QLabel(str(self._data.get(title_key, "")))
             self._title_label.setStyleSheet(f"font-weight: 500; color: {Color.TEXT};")
-            self._title_label.setMinimumWidth(120)
+            title_width = self._columns.get("title_width", 0)
+            if title_width:
+                self._title_label.setFixedWidth(title_width)
+            else:
+                self._title_label.setMinimumWidth(120)
             layout.addWidget(self._title_label)
 
         fields = self._columns.get("fields", [])
@@ -124,6 +128,26 @@ class CardList(QWidget):
             layout.addWidget(self._filter)
         else:
             self._filter = None
+
+        header_labels = columns.get("header_labels")
+        if header_labels:
+            header = QFrame()
+            header.setObjectName("cardListHeader")
+            h_layout = QHBoxLayout(header)
+            h_layout.setContentsMargins(14, 6, 14, 6)
+            h_layout.setSpacing(10)
+            if columns.get("dot"):
+                dot_placeholder = QLabel("")
+                dot_placeholder.setFixedWidth(14)
+                h_layout.addWidget(dot_placeholder)
+            for label_text, width in header_labels:
+                lbl = QLabel(label_text)
+                lbl.setStyleSheet(f"color: {Color.TEXT_DIM}; font-size: 11px; text-transform: uppercase;")
+                if width:
+                    lbl.setFixedWidth(width)
+                h_layout.addWidget(lbl)
+            h_layout.addStretch()
+            layout.addWidget(header)
 
         self._container = QFrame()
         self._container.setObjectName("cardList")

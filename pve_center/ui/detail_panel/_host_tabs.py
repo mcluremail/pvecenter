@@ -194,6 +194,17 @@ class HostTabs:
             "key": "node",
             "dot": "status",
             "title": "name",
+            "title_width": 140,
+            "header_labels": [
+                (tr("Node"), 140),
+                (tr("Cluster"), 80),
+                (tr("Status"), 70),
+                (tr("CPU"), 50),
+                (tr("RAM"), 95),
+                (tr("Disk"), 90),
+                (tr("VMs"), 35),
+                (tr("Uptime"), 80),
+            ],
             "fields": [
                 ("cluster_text", 80),
                 ("status_text", 70),
@@ -272,6 +283,7 @@ class HostTabs:
         self._populate_node_compare()
         if not hasattr(panel, '_cluster_view_mode'):
             panel._cluster_view_mode = 'compare'
+        from PySide6.QtCore import QTimer
         if panel._cluster_view_mode == 'clusters':
             panel.summary_stack.setCurrentIndex(1)
             panel._btn_clusters.setChecked(True)
@@ -280,6 +292,7 @@ class HostTabs:
             panel.summary_stack.setCurrentIndex(2)
             panel._btn_clusters.setChecked(False)
             panel._btn_nodes.setChecked(True)
+        QTimer.singleShot(0, lambda: panel.summary_stack.updateGeometry())
 
     def _populate_cluster_summary(self):
         panel = self.panel
