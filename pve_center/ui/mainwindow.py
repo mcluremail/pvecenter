@@ -1181,17 +1181,22 @@ class MainWindow(QMainWindow):
             elapsed = now - self._last_heartbeat
             if elapsed > 3:
                 logger.error("=== FREEZE DETECTED: main thread unresponsive for %.1fs ===", elapsed)
-                for thread_id, frame in sys._current_frames().items():
-                    name = ""
-                    for t in threading.enumerate():
-                        if t.ident == thread_id:
-                            name = t.name
-                            break
-                    if "MainThread" in name or name == "":
+                try:
+                    main_thread = threading.main_thread()
+                    frame = sys._current_frames().get(main_thread.ident)
+                    if frame is not None:
                         import io
                         buf = io.StringIO()
                         traceback.print_stack(frame, file=buf)
-                        logger.error("Thread [%s] (%s):\n%s", thread_id, name, buf.getvalue())
+                        stack = buf.getvalue()
+                        if stack:
+                            logger.error("MainThread stack:\n%s", stack)
+                        else:
+                            logger.error("MainThread stack: <empty>")
+                    else:
+                        logger.error("MainThread frame not found")
+                except Exception as exc:
+                    logger.error("Failed to dump stack: %s", exc, exc_info=True)
                 logger.error("=== END FREEZE REPORT ===")
 
     def _on_language_changed(self, idx):
@@ -1228,6 +1233,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.refresh_timer.stop()
         self.tasks_timer.stop()
+        self._heartbeat_timer.stop()
+        self._spin_timer.stop()
         self.tree_panel.save_state()
         # Сохраняем состояние окна
         geo = self.geometry()
@@ -1240,4 +1247,8 @@ class MainWindow(QMainWindow):
         save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
         save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
         save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
+        # Останавливаем пул воркеров с таймаутом, чтобы не блокировать закрытие
+        # при зависших HTTP-запросах (timeout=60 на storage content и т.п.)
+        QThreadPool.globalInstance().clear()
+        QThreadPool.globalInstance().waitForDone(3000)
         super().closeEvent(event)
