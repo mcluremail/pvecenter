@@ -329,7 +329,13 @@ class HostTabs:
     def _populate_node_compare(self):
         panel = self.panel
         card_items = []
-        for node in sorted(panel.all_nodes, key=lambda n: (n.get("host_name", ""), n.get("node", ""))):
+        def _sort_key(n):
+            host_name = n.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            cl = cfg.get("cluster") if cfg else None
+            is_standalone = not cl or cl in (False, None, "Standalone")
+            return (1 if is_standalone else 0, cl or "", n.get("node", ""))
+        for node in sorted(panel.all_nodes, key=_sort_key):
             node_name = node.get("_display_name") or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
