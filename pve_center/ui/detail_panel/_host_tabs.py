@@ -362,7 +362,15 @@ class HostTabs:
             cl = cfg.get("cluster") if cfg else None
             is_standalone = not cl or cl in (False, None, "Standalone")
             return (1 if is_standalone else 0, cl or "", n.get("node", ""))
-        for node in sorted(panel.all_nodes, key=_sort_key):
+        # Only cluster nodes — standalone has its own folder
+        cluster_nodes = []
+        for node in panel.all_nodes:
+            host_name = node.get("host_name", "")
+            cfg = panel._cfg_by_name.get(host_name)
+            cl = cfg.get("cluster") if cfg else None
+            if cl and cl not in (False, None, "Standalone"):
+                cluster_nodes.append(node)
+        for node in sorted(cluster_nodes, key=_sort_key):
             node_name = node.get("_display_name") or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
