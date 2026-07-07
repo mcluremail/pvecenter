@@ -1,3 +1,17 @@
+pve-center (2.5.1-1) unstable; urgency=medium
+
+  * Bugfix release: comprehensive code audit (~21 bugs fixed)
+  * Backend: token value bug, SSL inversion, session leak, pool race, KeyError guards
+  * UI: .get() guards in worker callbacks, spinner leak, hotplug typo fix
+  * Metrics: RRD KeyError, notification crash, double emit, sort arrow
+  * Host workers tracked and cancelled on tab switch
+  * i18n: 8 missing lowercase status keys, tr() wrapping
+  * Dead code removed: _vm_iso_pending, _iso_volids, _disk_visible, _scroll
+  * Resource leaks: cache eviction, QTimer parent, freeze thread stop
+  * _I18N_VERSION bumped 4→5 to force re-seed
+
+ -- Taurus McLure <taurus@mclure.ru>  Tue, 07 Jul 2026 09:30:00 +0300
+
 pve-center (2.5.0-1) unstable; urgency=medium
 
   * CardList widget — replaces QTableWidget for list-style views
