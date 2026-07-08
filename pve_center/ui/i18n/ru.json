@@ -722,5 +722,7 @@
   "yes": "да",
   "{count} package updates available": "Доступно обновлений пакетов: {count}",
   "— none —": "— нет —",
-  "❌ {} is unavailable": "❌ {} недоступен"
+  "❌ {} is unavailable": "❌ {} недоступен",
+  "VM State": "Состояние ВМ",
+  "Parent": "Родитель"
 }

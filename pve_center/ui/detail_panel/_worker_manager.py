@@ -9,6 +9,7 @@ class WorkerManager:
         self.current_worker = None
         self.current_config_worker = None
         self.current_hist_worker = None
+        self.current_snap_worker = None
         self.current_host_workers = set()
 
     def run_worker(self, worker):
@@ -56,6 +57,15 @@ class WorkerManager:
             try: self.current_hist_worker.signals.tasks_error.disconnect()
             except RuntimeError: pass
             self.current_hist_worker = None
+
+    def cancel_snapshots_worker(self):
+        if self.current_snap_worker:
+            self.discard_worker(self.current_snap_worker)
+            try: self.current_snap_worker.signals.snapshots_ready.disconnect()
+            except RuntimeError: pass
+            try: self.current_snap_worker.signals.snapshots_error.disconnect()
+            except RuntimeError: pass
+            self.current_snap_worker = None
 
     def cancel_host_workers(self):
         """Discard all host-detail workers from the pool tracking so new
