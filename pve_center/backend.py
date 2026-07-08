@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 
 import urllib3
 from proxmoxer import ProxmoxAPI
@@ -917,6 +918,24 @@ class VmActionWorker(QRunnable):
                 pass
 
 
+def _poll_task(proxmox, node_name, upid, timeout=60, interval=1.0):
+    """Poll PVE async task until it finishes or timeout.
+    Returns (status, exitstatus) tuple: ('stopped', 'OK') on success.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            info = proxmox.nodes(node_name).tasks(upid).status.get()
+            data = info.get("data", info) if isinstance(info, dict) else info
+            status = data.get("status", "")
+            if status == "stopped":
+                return status, data.get("exitstatus", "")
+            time.sleep(interval)
+        except Exception as exc:
+            return "error", str(exc)
+    return "timeout", ""
+
+
 # ----------------------------------------------------------------------
 # VmSnapshotCreateWorker
 # ----------------------------------------------------------------------
@@ -951,17 +970,37 @@ class VmSnapshotCreateWorker(QRunnable):
             )
             node = proxmox.nodes(self.node_name)
             resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
-            resource.snapshot.post(
+            upid = resource.snapshot.post(
                 snapname=self.snap_name,
                 description=self.description,
                 vmstate=1 if self.vmstate else 0,
             )
-            try:
-                self.signals.result.emit(
-                    tr("Snapshot \"{name}\" created").format(name=self.snap_name)
-                )
-            except RuntimeError:
-                pass
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(proxmox, self.node_name, upid, timeout=120)
+                if status == "stopped" and exitstatus == "OK":
+                    try:
+                        self.signals.result.emit(
+                            tr("Snapshot \"{name}\" created").format(name=self.snap_name)
+                        )
+                    except RuntimeError:
+                        pass
+                else:
+                    err = exitstatus or status
+                    try:
+                        self.signals.error.emit(
+                            tr("Snapshot create failed: {err}").format(err=err)
+                        )
+                    except RuntimeError:
+                        pass
+            else:
+                try:
+                    self.signals.result.emit(
+                        tr("Snapshot \"{name}\" created").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
         except Exception as e:
             logger.debug("backend error", exc_info=True)
             try:
@@ -1008,13 +1047,33 @@ class VmSnapshotDeleteWorker(QRunnable):
             )
             node = proxmox.nodes(self.node_name)
             resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
-            resource.snapshot(self.snap_name).delete()
-            try:
-                self.signals.result.emit(
-                    tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
-                )
-            except RuntimeError:
-                pass
+            upid = resource.snapshot(self.snap_name).delete()
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(proxmox, self.node_name, upid, timeout=120)
+                if status == "stopped" and exitstatus == "OK":
+                    try:
+                        self.signals.result.emit(
+                            tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
+                        )
+                    except RuntimeError:
+                        pass
+                else:
+                    err = exitstatus or status
+                    try:
+                        self.signals.error.emit(
+                            tr("Snapshot delete failed: {err}").format(err=err)
+                        )
+                    except RuntimeError:
+                        pass
+            else:
+                try:
+                    self.signals.result.emit(
+                        tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
         except Exception as e:
             logger.debug("backend error", exc_info=True)
             try:

@@ -731,5 +731,7 @@
   "Snapshot created": "Снимок создан",
   "Snapshot deleted": "Снимок удалён",
   "Delete snapshot \"{name}\"?": "Удалить снимок \"{name}\"?",
-  "Include RAM state in snapshot": "Включить состояние RAM в снимок"
+  "Include RAM state in snapshot": "Включить состояние RAM в снимок",
+  "Snapshot create failed: {err}": "Ошибка создания снимка: {err}",
+  "Snapshot delete failed: {err}": "Ошибка удаления снимка: {err}"
 }

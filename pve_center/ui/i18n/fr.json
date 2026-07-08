@@ -606,5 +606,7 @@
   "Snapshot created": "Instantané créé",
   "Snapshot deleted": "Instantané supprimé",
   "Delete snapshot \"{name}\"?": "Supprimer l'instantané \"{name}\" ?",
-  "Include RAM state in snapshot": "Inclure l'état de la RAM dans l'instantané"
+  "Include RAM state in snapshot": "Inclure l'état de la RAM dans l'instantané",
+  "Snapshot create failed: {err}": "Échec de la création de l'instantané : {err}",
+  "Snapshot delete failed: {err}": "Échec de la suppression de l'instantané : {err}"
 }

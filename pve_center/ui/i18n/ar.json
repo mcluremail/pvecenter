@@ -606,5 +606,7 @@
   "Snapshot created": "تم إنشاء اللقطة",
   "Snapshot deleted": "تم حذف اللقطة",
   "Delete snapshot \"{name}\"?": "حذف اللقطة \"{name}\"؟",
-  "Include RAM state in snapshot": "تضمين حالة الذاكرة في اللقطة"
+  "Include RAM state in snapshot": "تضمين حالة الذاكرة في اللقطة",
+  "Snapshot create failed: {err}": "فشل إنشاء اللقطة: {err}",
+  "Snapshot delete failed: {err}": "فشل حذف اللقطة: {err}"
 }

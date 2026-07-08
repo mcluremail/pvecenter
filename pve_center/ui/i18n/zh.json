@@ -606,5 +606,7 @@
   "Snapshot created": "快照已创建",
   "Snapshot deleted": "快照已删除",
   "Delete snapshot \"{name}\"?": "删除快照 \"{name}\"？",
-  "Include RAM state in snapshot": "在快照中包含内存状态"
+  "Include RAM state in snapshot": "在快照中包含内存状态",
+  "Snapshot create failed: {err}": "创建快照失败: {err}",
+  "Snapshot delete failed: {err}": "删除快照失败: {err}"
 }
