@@ -64,17 +64,6 @@ _ADD_TYPES = [
     ("tpmstate", tr("Add: TPM")),
 ]
 
-_MAX_SLOTS = {
-    "scsi": 31,
-    "virtio": 16,
-    "sata": 6,
-    "ide": 4,
-    "net": 32,
-    "usb": 5,
-    "hostpci": 16,
-    "serial": 4,
-}
-
 
 def _next_free_slot(config_data, prefix, max_count):
     used = set()
@@ -93,7 +82,6 @@ def _next_free_slot(config_data, prefix, max_count):
 class VmHardwareWidget(QWidget):
     config_changed = Signal(str, str, object)
     remove_device = Signal(str, str, str, object)
-    destroy_disk = Signal(str, str, str)
 
     _EDITABLE_WHEN_RUNNING = ("ide2", "net0", "net1", "net2", "net3")
 
@@ -315,12 +303,16 @@ class VmHardwareWidget(QWidget):
         if is_running and type_key not in ("cdrom",):
             hotplug = str(self._config_data.get("hotplug", ""))
             allow = False
-            if type_key == "net" and ("network" in hotplug or hotplug in ("1", "all")):
+            if hotplug in ("1", "all"):
                 allow = True
-            elif type_key == "disk" and ("disk" in hotplug or hotplug in ("1", "all")):
-                allow = True
-            elif type_key == "usb" and ("usb" in hotplug or hotplug in ("1", "all")):
-                allow = True
+            elif hotplug and hotplug != "0":
+                parts = set(hotplug.split(","))
+                if type_key == "net" and "network" in parts:
+                    allow = True
+                elif type_key == "disk" and "disk" in parts:
+                    allow = True
+                elif type_key == "usb" and "usb" in parts:
+                    allow = True
             if not allow:
                 QMessageBox.information(self, tr("Cannot add on a running VM"),
                                         tr("Stop the VM to add devices"))

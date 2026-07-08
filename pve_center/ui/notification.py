@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtCore import Property, QPoint, QPropertyAnimation, Qt, QTimer
+from PySide6.QtCore import QPoint, QPropertyAnimation, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QGraphicsOpacityEffect,
@@ -28,7 +28,6 @@ class FadeToast(QWidget):
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.setAttribute(Qt.WA_DontShowOnScreen, False)
 
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(1.0)
@@ -71,8 +70,6 @@ class FadeToast(QWidget):
 
         self.show()
         self._fade_timer.start()
-
-    opacity = Property(float, lambda s: s._opacity_effect.opacity(), lambda s, v: s._opacity_effect.setOpacity(v))
 
     def _copy_to_clipboard(self):
         QApplication.clipboard().setText(self._text)

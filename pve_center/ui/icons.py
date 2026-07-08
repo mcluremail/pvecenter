@@ -11,7 +11,7 @@ def _status_color(status):
         return "#22c55e"
     elif status in ("offline", "stopped", "error"):
         return "#ef4444"
-    elif status in ("paused", "warning", "RUNNING"):
+    elif status in ("paused", "warning"):
         return "#f59e0b"
     return None
 
@@ -335,12 +335,6 @@ _UPLOAD = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-r
 <path d="M2.5 11 L2.5 12.5 L11.5 12.5 L11.5 11" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
-_DOWNLOAD = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-<path d="M7 1.5 L7 9" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round"/>
-<polyline points="4.5,6.5 7,9 9.5,6.5" fill="none" stroke="{c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M2.5 11 L2.5 12.5 L11.5 12.5 L11.5 11" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>"""
-
 _USB = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
 <rect x="5" y="1.5" width="4" height="8" rx="0.8" fill="none" stroke="{c}" stroke-width="1.2"/>
 <line x1="6" y1="9.5" x2="6" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
@@ -400,7 +394,6 @@ def init_icons():
         "add": _make_icon(_ADD.format(c=_C, c2=_C2), 12),
         "remove": _make_icon(_REMOVE.format(c=_C, c2=_C2), 12),
         "upload": _make_icon(_UPLOAD.format(c=_C, c2=_C2), 14),
-        "download": _make_icon(_DOWNLOAD.format(c=_C, c2=_C2), 14),
         "usb": _make_icon(_USB.format(c=_C, c2=_C2)),
         "pci": _make_icon(_PCI.format(c=_C, c2=_C2)),
         "serial": _make_icon(_SERIAL.format(c=_C, c2=_C2)),

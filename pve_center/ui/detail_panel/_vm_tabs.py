@@ -352,6 +352,8 @@ class VMTabs:
 
         self.load_iso_for_node(host_name, node_name)
 
+        panel.hardware_widget.set_vm_status(vm_data.get("status", ""))
+        panel.hardware_widget.set_context(host_name, vmid, node_name)
         if detail_key not in panel.config_cache:
             panel.hardware_widget.set_hardware_data(None)
             panel.options_widget.set_options_data(None)
@@ -368,9 +370,6 @@ class VMTabs:
             detail = panel.details_cache.get(detail_key)
             panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], detail)
             panel.options_widget.set_options_data(panel.config_cache[detail_key])
-
-        panel.hardware_widget.set_context(host_name, vmid, node_name)
-        panel.hardware_widget.set_vm_status(vm_data.get("status", ""))
         if node_name not in panel._iso_by_node and panel._all_iso_catalog:
             panel._iso_by_node[node_name] = {
                 iso["volid"] for iso in panel._all_iso_catalog.get(node_name, [])
@@ -600,6 +599,8 @@ class VMTabs:
             return
         if not panel._last_vm_data or panel._last_vm_data.get("vmid") != vmid or panel._last_vm_data.get("host_name") != host_name:
             return
+        detail_key = (vmid, host_name)
+        panel.vm_snapshots_cache.pop(detail_key, None)
         panel.vm_snapshots_loading.setText(parse_pve_error(err))
         panel.vm_snapshots_stack.setCurrentIndex(0)
 
@@ -1003,22 +1004,20 @@ class VMTabs:
             return
         storages = [s for s in panel.all_storages
                     if s.get("node") == node_name
-                    and "iso" in (s.get("content", "").split(","))]
-        from PySide6.QtCore import QThreadPool
+                    and "iso" in (s.get("content") or "").split(",")]
+        from ..api.metrics import StorageContentListWorker
         for storage_info in storages:
             storage = storage_info.get("storage")
             if not storage:
                 continue
-            from ..api.metrics import StorageContentListWorker
             worker = StorageContentListWorker(cfg, node_name, storage, "iso")
             worker.signals.result.connect(
                 lambda sn, ct, data, n=node_name: self.on_vm_iso_loaded(n, data)
             )
             worker.signals.error.connect(
-                lambda sn, ct, err, n=node_name: None
+                lambda sn, ct, err, n=node_name: logger.warning("ISO load failed for %s/%s: %s", n, sn, err)
             )
-            worker.signals.finished.connect(lambda w=worker: w.signals.finished.disconnect())
-            QThreadPool.globalInstance().start(worker)
+            panel._workers_mgr.run_worker(worker)
 
     def on_vm_iso_loaded(self, node_name, data):
         panel = self.panel

@@ -1,0 +1,2 @@
+[console_scripts]
+pvecenter = pve_center.main:main

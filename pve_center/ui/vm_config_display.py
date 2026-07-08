@@ -195,11 +195,11 @@ def _is_cdrom_value(val):
 
 
 def is_cdrom_key(key, value=None):
-    if key == "ide2":
-        return True
     if value is not None and _is_cdrom_value(value):
         if _key_prefix(key) in ("ide", "sata", "scsi"):
             return True
+    if key == "ide2" and (value is None or _is_cdrom_value(value)):
+        return True
     return False
 
 
@@ -207,8 +207,6 @@ def is_disk_key(key, value=None):
     pfx = _key_prefix(key)
     if pfx not in ("virtio", "scsi", "sata", "ide"):
         return pfx == "efidisk"
-    if pfx == "ide" and key == "ide2":
-        return False
     if value is not None and _is_cdrom_value(value):
         return False
     return True
@@ -775,13 +773,11 @@ def get_hardware_rows(config_data, detail_data=None):
         if key not in config:
             config[key] = default
     rows = []
-    seen = set()
     for section_name, keys in _HW_SECTIONS:
         section_label = _HW_SECTION_LABELS.get(section_name, lambda: section_name)()
         section_rows = []
         for key in keys:
             if key in config:
-                seen.add(key)
                 label = HW_LABELS.get(key) or _device_label(key, config[key])
                 value = format_value(key, config[key])
                 section_rows.append((key, label, value, section_name))

@@ -38,7 +38,6 @@ def _close_proxmox(proxmox):
 # ----------------------------------------------------------------------
 # Create API token for PVE Center
 # ----------------------------------------------------------------------
-PVE_PORT = 8006
 
 
 def _pve_ticket_auth(host, user, password, verify=False):
@@ -77,6 +76,7 @@ def create_admin_token(host, user, password, trust_ssl=True):
     verify = not bool(trust_ssl)
 
     try:
+        sess = None
         ticket_data = _pve_ticket_auth(host, user, password, verify=verify)
         ticket = ticket_data["ticket"]
         csrf = ticket_data["csrf"]
@@ -97,10 +97,12 @@ def create_admin_token(host, user, password, trust_ssl=True):
                 data={"comment": "PVE Center", "expire": 0, "privsep": 0},
                 timeout=15,
             )
-            logger.info("token_create %s %s HTTP %s", method, token_id, r.status_code)
+            logger.debug("token_create %s %s HTTP %s", method, token_id, r.status_code)
             if r.status_code < 400:
                 break
-        if r is None or r.status_code >= 400:
+        if r is None:
+            return {"error": tr("Token creation error: no response")}
+        if r.status_code >= 400:
             logger.error("token_create error: %s", r.text[:300])
             return {"error": tr("Token creation error: {}").format(r.status_code)}
 
@@ -135,10 +137,11 @@ def create_admin_token(host, user, password, trust_ssl=True):
             return {"error": tr("Cannot connect to {}").format(host)}
         return {"error": msg}
     finally:
-        try:
-            sess.close()
-        except Exception:
-            pass
+        if sess is not None:
+            try:
+                sess.close()
+            except Exception:
+                pass
 
 
 # ----------------------------------------------------------------------
@@ -387,7 +390,7 @@ class FetchWorker(QRunnable):
                     nonlocal node_name, nodes, vms, storages
                     try:
                         local_nodes = proxmox.nodes.get()
-                        nn = local_nodes[0]["node"] if local_nodes else self.node_cfg["name"]
+                        nn = local_nodes[0].get("node") if local_nodes else self.node_cfg["name"]
                     except Exception:
                         nn = self.node_cfg["name"]
                     node_name = nn
@@ -408,12 +411,12 @@ class FetchWorker(QRunnable):
                             vms_local.append({**v, "type": "qemu",
                                               "node": node_name,
                                               "host_name": self.node_cfg["name"],
-                                              "pool": vmid_to_pool.get(v["vmid"])})
+                                              "pool": vmid_to_pool.get(v.get("vmid"))})
                         for v in lxc_list:
                             vms_local.append({**v, "type": "lxc",
                                               "node": node_name,
                                               "host_name": self.node_cfg["name"],
-                                              "pool": vmid_to_pool.get(v["vmid"])})
+                                              "pool": vmid_to_pool.get(v.get("vmid"))})
                         storages_local = list(proxmox.nodes(node_name).storage.get())
                         for st in storages_local:
                             st["node"] = node_name
@@ -931,6 +934,8 @@ def _poll_task(proxmox, node_name, upid, timeout=60, interval=1.0):
         try:
             info = proxmox.nodes(node_name).tasks(upid).status.get()
             data = info.get("data", info) if isinstance(info, dict) else info
+            if not isinstance(data, dict):
+                return "error", "unexpected response"
             status = data.get("status", "")
             if status == "stopped":
                 return status, data.get("exitstatus", "")
@@ -1294,7 +1299,7 @@ class VmConsoleWorker(QRunnable):
                                 pass
                         return
                 except subprocess.TimeoutExpired:
-                    logger.info("remote-viewer started (pid=%d)", proc.pid)
+                    logger.debug("remote-viewer started (pid=%d)", proc.pid)
                     def _cleanup():
                         try:
                             proc.wait()
@@ -1790,6 +1795,15 @@ class StorageUploadWorker(QRunnable):
                 def close(self):
                     self._fp.close()
 
+                def seek(self, pos, whence=0):
+                    return self._fp.seek(pos, whence)
+
+                def tell(self):
+                    return self._fp.tell()
+
+                def fileno(self):
+                    return self._fp.fileno()
+
             with open(self.file_path, "rb") as fp:
                 wrapper = _ProgressReader(fp, file_size, lambda p: _safe_emit(self.signals.progress, p))
                 files = {"filename": (file_name, wrapper, "application/octet-stream")}
@@ -1801,7 +1815,10 @@ class StorageUploadWorker(QRunnable):
                 if not resp.ok:
                     try:
                         body = resp.json()
-                        msg = body.get("data", {}).get("message", "") or body.get("message", "")
+                        data = body.get("data", body)
+                        msg = data.get("message", "") if isinstance(data, dict) else str(data)
+                        if not msg:
+                            msg = body.get("message", "")
                     except Exception:
                         msg = ""
                     raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])

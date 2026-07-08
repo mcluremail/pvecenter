@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBo
 
 from ..i18n import tr
 from ..icons import get_icon
-from ..theme import Color
 from ..utils import build_cfg_index, build_vm_index
 from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
 from ._constants import TabIndex

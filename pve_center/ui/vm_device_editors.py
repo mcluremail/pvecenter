@@ -30,11 +30,11 @@ DISK_CACHE = [
 
 def _parse_net(val):
     """Parse netX string -> dict of components."""
+    if not val or str(val).strip() in ("", "None"):
+        return {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": ""}
     val = str(val)
     parts = val.split(",")
     result = {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": ""}
-    if not val:
-        return result
     first = parts[0]
     if "=" in first:
         result["model"], result["mac"] = first.split("=", 1)
@@ -62,10 +62,10 @@ def _build_net(model, mac, bridge, tag, queues):
 
 
 def _parse_disk(val):
+    if not val or str(val).strip() in ("", "None"):
+        return {"storage": "", "size": "", "format": "", "cache": "none", "extra": []}
     parts = str(val).split(",")
-    result = {"storage": "", "size": "", "format": "", "cache": "none"}
-    if not val:
-        return result
+    result = {"storage": "", "size": "", "format": "", "cache": "none", "extra": []}
     first = parts[0]
     if ":" in first:
         result["storage"] = first.split(":")[0]
@@ -75,6 +75,8 @@ def _parse_disk(val):
             result["cache"] = p.split("=", 1)[1]
         elif p.startswith("format="):
             result["format"] = p.split("=", 1)[1]
+        else:
+            result["extra"].append(p)
     return result
 
 
@@ -352,6 +354,7 @@ class VmDiskEditorDialog(QDialog):
             parts.append(f"format={self._parsed['format']}")
         if cache and cache != "none":
             parts.append(f"cache={cache}")
+        parts.extend(self._parsed.get("extra", []))
         if parts:
             new_val += "," + ",".join(parts)
         return (self._key, new_val)
@@ -673,8 +676,9 @@ class VmAddDiskDialog(QDialog):
         header = QLabel(f"<b>{tr('Add: Hard Disk')}</b>")
         layout.addWidget(header)
 
+        bus = slot_key.rstrip("0123456789")
         info = QLabel(tr("Bus: {bus}, slot: {slot}").format(
-            bus=slot_key.rstrip("0123456789"), slot=slot_key))
+            bus=bus, slot=slot_key[len(bus):]))
         info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         layout.addWidget(info)
 
@@ -997,7 +1001,8 @@ class VmAddEfiDialog(QDialog):
         storage = self._storage_combo.currentText().strip() or "local-lvm"
         efitype = self._type_combo.currentData()
         fmt = self._format_combo.currentData()
-        val = f"{storage}:4,efitype={efitype},format={fmt}"
+        size = 4 if efitype != "2m" else 2
+        val = f"{storage}:{size},efitype={efitype},format={fmt}"
         return (self._key, val)
 
 

@@ -349,7 +349,7 @@ class ClusterTasksWidget(QWidget):
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
 
-    # --- Progress bar row for upload/download operations ---
+    # --- Progress bar row for upload/transfer operations ---
 
     def add_progress_row(self, key, description):
         """Insert a row at top showing a progress bar in the Status column."""
@@ -380,7 +380,21 @@ class ClusterTasksWidget(QWidget):
         self.table.setCellWidget(0, 5, bar)
         self.table.setRowHeight(0, 22)
         self._progress_rows = getattr(self, "_progress_rows", {})
+        self._reindex_progress_rows()
         self._progress_rows[key] = 0
+
+    def _reindex_progress_rows(self):
+        """Rebuild _progress_rows by scanning the table for progress bar rows."""
+        rows = getattr(self, "_progress_rows", {})
+        new_rows = {}
+        for row in range(self.table.rowCount()):
+            bar = self.table.cellWidget(row, 5)
+            if isinstance(bar, QProgressBar):
+                for k, idx in list(rows.items()):
+                    if idx == row:
+                        new_rows[k] = row
+                        break
+        self._progress_rows = new_rows
 
     def update_progress_row(self, key, percent):
         rows = getattr(self, "_progress_rows", {})

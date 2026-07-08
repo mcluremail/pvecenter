@@ -345,7 +345,6 @@
   "No media —": "— Нет носителя —",
   "No pool": "— нет —",
   "No servers added.": "Нет добавленных серверов.\nНажмите + чтобы добавить",
-  "No servers added.\\nPress + to add": "Серверы не добавлены.\\nНажмите + для добавления",
   "No servers to export. Add at least one server first.": "Нет серверов для экспорта. Сначала добавьте хотя бы один сервер.",
   "No snapshots": "Нет снимков",
   "No tasks": "Нет задач",
@@ -788,10 +787,6 @@
   "Cannot upload to this storage type": "Нельзя загружать в этот тип хранилища",
   "Delete failed: {err}": "Ошибка удаления: {err}",
   "Delete source after move": "Удалить источник после перемещения",
-  "Download": "Скачать",
-  "Download complete: {path}": "Скачивание завершено: {path}",
-  "Download failed: {err}": "Ошибка скачивания: {err}",
-  "Download {name}": "Скачивание {name}",
   "File deleted: {volid}": "Файл удалён: {volid}",
   "ISO images (*.iso);;All files (*.*)": "ISO-образы (*.iso);;Все файлы (*.*)",
   "Move complete: {volid} → {storage}": "Перемещение завершено: {volid} → {storage}",
@@ -809,5 +804,6 @@
   "Upload complete: {name}": "Загрузка завершена: {name}",
   "Upload failed: {err}": "Ошибка загрузки: {err}",
   "Upload {name}": "Загрузка {name}",
-  "Volume:": "Том:"
+  "Volume:": "Том:",
+  "No servers added.\nPress + to add": "Серверы не добавлены.\nНажмите + для добавления"
 }

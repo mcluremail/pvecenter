@@ -47,7 +47,6 @@ class StorageToolbar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._content_type = ""
-        self._has_selection = False
 
         self._upload_btn = QToolButton()
         self._upload_btn.setText(tr("Upload"))
@@ -83,18 +82,13 @@ class StorageToolbar(QWidget):
     def set_content_type(self, ct):
         self._content_type = ct
         can_upload = ct in self._UPLOAD_TYPES
-        self._upload_btn.setEnabled(can_upload and self._has_selection is False)
+        self._upload_btn.setEnabled(can_upload)
         if not can_upload:
             self._upload_btn.setToolTip(tr("Cannot upload to this storage type"))
         else:
             self._upload_btn.setToolTip("")
-        if can_upload:
-            self._upload_btn.setEnabled(True)
-        else:
-            self._upload_btn.setEnabled(False)
 
     def set_has_selection(self, has_sel):
-        self._has_selection = has_sel
         can_upload = self._content_type in self._UPLOAD_TYPES
         self._upload_btn.setEnabled(can_upload)
         self._move_btn.setEnabled(has_sel)
@@ -587,21 +581,18 @@ class StorageTabs:
             if tb and id(tb) not in connected:
                 tb.set_context(node_name, storage_name, host_name, cfg, ct)
                 connected.add(id(tb))
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    try:
-                        tb.upload_requested.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
-                    try:
-                        tb.move_requested.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
-                    try:
-                        tb.remove_requested.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
+                try:
+                    tb.upload_requested.disconnect()
+                except (TypeError, RuntimeError):
+                    pass
+                try:
+                    tb.move_requested.disconnect()
+                except (TypeError, RuntimeError):
+                    pass
+                try:
+                    tb.remove_requested.disconnect()
+                except (TypeError, RuntimeError):
+                    pass
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
                 tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
@@ -616,6 +607,10 @@ class StorageTabs:
                 }
                 tbl = table_map_tb.get(tb)
                 if tbl:
+                    try:
+                        tbl.itemSelectionChanged.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
                     tbl.itemSelectionChanged.connect(
                         lambda t=tbl, b=tb: b.set_has_selection(len(t.selectedItems()) > 0 and t.currentRow() >= 0)
                     )
@@ -758,6 +753,9 @@ class StorageTabs:
         for i, b in enumerate(backups):
             vm_item = QTableWidgetItem(f"VM {b.get('vmid', '')}")
             vm_item.setIcon(get_icon("backup"))
+            volid = b.get("volid", "")
+            if volid:
+                vm_item.setData(Qt.UserRole, volid)
             table.setItem(i, 0, vm_item)
             table.setItem(i, 1, QTableWidgetItem(b.get("subtype") or b.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
@@ -870,7 +868,7 @@ class StorageTabs:
             if isinstance(old_bar, QProgressBar):
                 update_progress_bar(old_bar, pct, f"{pct}%")
 
-    # --- File operations: Upload / Download / Move / Remove ---
+    # --- File operations: Upload / Move / Remove ---
 
     def _get_selected_volid(self, table):
         """Extract volid from the selected row of a storage content table.
@@ -889,7 +887,7 @@ class StorageTabs:
             item = table.item(row, 0)
         if not item:
             return None, None
-        volid = item.text()
+        volid = item.data(Qt.UserRole) or item.text()
         return row, volid
 
     def _get_active_table(self, node_name, storage_name):
