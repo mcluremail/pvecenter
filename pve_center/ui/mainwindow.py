@@ -246,7 +246,6 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=self._tray_quit)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self._on_add_server())
         QShortcut(QKeySequence("Del"), self, activated=self.tree_panel.request_delete_current)
-        QShortcut(QKeySequence("Ctrl+Shift+M"), self, activated=self._dump_memory_snapshot)
 
         # Таймер автообновления основных данных
         self.refresh_timer = QTimer(self)
@@ -1296,20 +1295,6 @@ class MainWindow(QMainWindow):
                 self.tree_panel.select_first_item()
         else:
             self.tree_panel.select_first_item()
-
-    def _dump_memory_snapshot(self):
-        """Ctrl+Shift+M — dump tracemalloc snapshot to log."""
-        import tracemalloc
-        if not tracemalloc.is_tracing():
-            logger.info("tracemalloc not started")
-            return
-        snap = tracemalloc.take_snapshot()
-        import os
-        rss_kb = os.popen(f"ps -o rss= -p {os.getpid()}").read().strip()
-        logger.info("=== tracemalloc snapshot (RSS: %s KB) ===", rss_kb)
-        for stat in snap.statistics("lineno")[:20]:
-            logger.info(str(stat))
-        self._notifications.show(tr("Memory snapshot dumped to log"))
 
     # ------------------------------------------------------------
     # Детектор зависания
