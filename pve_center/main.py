@@ -14,7 +14,7 @@ logging.basicConfig(
 
 def main():
     import tracemalloc
-    tracemalloc.start(25)
+    tracemalloc.start(10)
 
     app = QApplication(sys.argv)
 

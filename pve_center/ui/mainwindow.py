@@ -306,27 +306,29 @@ class MainWindow(QMainWindow):
         QThreadPool.globalInstance().start(worker)
 
     def _discard_worker(self, worker):
-        """Безопасно удаляет воркер из _workers.
-        Отключает все signal connections чтобы избежать утечки через замыкания лямбд."""
+        """Удаляет воркер из _workers и отключает signal connections."""
         self._workers.discard(worker)
-        if worker and hasattr(worker, "signals"):
+        if not worker or not hasattr(worker, "signals"):
+            return
+        import warnings
+        sigs = worker.signals
+        for attr in ("finished", "result_ready", "tasks_ready", "tasks_error",
+                     "detail_ready", "config_ready", "config_error",
+                     "config_updated", "config_update_error",
+                     "action_result", "action_error",
+                     "console_ready", "console_error",
+                     "vm_created", "vm_error", "vm_deleted",
+                     "vm_migrated", "vm_cloned",
+                     "token_ready", "token_error"):
+            sig = getattr(sigs, attr, None)
+            if sig is None:
+                continue
             try:
-                worker.signals.finished.disconnect()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sig.disconnect()
             except (RuntimeError, TypeError):
                 pass
-            for attr in dir(worker.signals):
-                if attr in ("result_ready", "tasks_ready", "tasks_error",
-                            "detail_ready", "config_ready", "config_error",
-                            "config_updated", "config_update_error",
-                            "action_result", "action_error",
-                            "console_ready", "console_error",
-                            "vm_created", "vm_error", "vm_deleted",
-                            "vm_migrated", "vm_cloned",
-                            "token_ready", "token_error"):
-                    try:
-                        getattr(worker.signals, attr).disconnect()
-                    except (RuntimeError, TypeError, AttributeError):
-                        pass
 
     def _dedup_storages(self, new_storages, host_name, target_list):
         for st in new_storages:
