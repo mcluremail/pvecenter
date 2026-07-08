@@ -51,6 +51,9 @@ _DEVICE_PREFIX_LABELS = {
     "virtio": tr("Hard disk"),
     "efidisk": tr("EFI disk"),
     "tpmstate": tr("TPM"),
+    "usb": tr("USB"),
+    "hostpci": tr("PCI"),
+    "serial": tr("Serial port"),
 }
 
 
@@ -62,7 +65,7 @@ def _device_label(key, value=None):
         return tr("Optical drive")
     if value is not None and _is_cdrom_value(value) and prefix in ("ide", "sata", "scsi"):
         return tr("Optical drive")
-    if prefix in ("virtio", "scsi", "sata", "ide"):
+    if prefix in ("virtio", "scsi", "sata", "ide", "usb", "hostpci", "serial", "net"):
         if num:
             return f"{base} ({prefix}{num})"
         return base
@@ -176,7 +179,7 @@ CHOICE_LABELS = {
 }
 
 # Device keys that can be edited as raw strings
-_EDITABLE_DEVICE_PREFIXES = {"net", "ide", "sata", "scsi", "virtio", "efidisk", "tpmstate"}
+_EDITABLE_DEVICE_PREFIXES = {"net", "ide", "sata", "scsi", "virtio", "efidisk", "tpmstate", "usb", "hostpci", "serial"}
 
 
 def _key_prefix(key):
@@ -213,6 +216,33 @@ def is_disk_key(key, value=None):
 
 def is_tpm_key(key):
     return _key_prefix(key) == "tpmstate"
+
+
+def is_usb_key(key):
+    return _key_prefix(key) == "usb"
+
+
+def is_pci_key(key):
+    return _key_prefix(key) == "hostpci"
+
+
+def is_serial_key(key):
+    return _key_prefix(key) == "serial"
+
+
+_SYSTEM_KEYS = frozenset({"name", "cpu", "cores", "sockets", "memory",
+                          "bios", "machine", "vga", "scsihw"})
+
+
+def is_removable_key(key, value=None):
+    if key in _SYSTEM_KEYS:
+        return False
+    if is_net_key(key) or is_tpm_key(key) or is_usb_key(key) \
+            or is_pci_key(key) or is_serial_key(key):
+        return True
+    if is_disk_key(key, value) or is_cdrom_key(key, value):
+        return True
+    return False
 
 
 # PVE defaults for keys absent from config API (hardware tab)
@@ -336,6 +366,9 @@ _HW_SECTIONS = [
                         [f"scsi{i}" for i in range(31)] +
                         [f"virtio{i}" for i in range(16)] +
                         ["efidisk0", "tpmstate0"]),
+    ("usb",            [f"usb{i}" for i in range(5)]),
+    ("pci",            [f"hostpci{i}" for i in range(16)]),
+    ("serial",         [f"serial{i}" for i in range(4)]),
 ]
 
 # Formatter helpers
@@ -584,6 +617,55 @@ def _fmt_disk(val):
     return out
 
 
+def _fmt_usb(val):
+    """Format USB device: host=1234:5678[,usb3=1] or spice."""
+    val = str(val or "")
+    if val == "spice":
+        return tr("SPICE")
+    parts = val.split(",")
+    host = ""
+    usb3 = False
+    for p in parts:
+        if p.startswith("host="):
+            host = p.split("=", 1)[1]
+        elif p == "usb3=1" or p == "usb3":
+            usb3 = True
+    out = host or tr("Unknown")
+    if usb3:
+        out += " | USB 3.0"
+    return out
+
+
+def _fmt_pci(val):
+    """Format PCI device: 0000:01:02.0[,rombar=1][,x-vga=1]."""
+    val = str(val or "")
+    parts = val.split(",")
+    host = parts[0] if parts else val
+    rombar = False
+    xvga = False
+    for p in parts[1:]:
+        if p.startswith("rombar=1"):
+            rombar = True
+        elif p.startswith("x-vga=1"):
+            xvga = True
+    out = host
+    if rombar:
+        out += f" | {tr('ROM')}"
+    if xvga:
+        out += f" | {tr('VGA passthrough')}"
+    return out
+
+
+def _fmt_serial(val):
+    """Format serial port: socket or /dev/ttyS0."""
+    val = str(val or "")
+    if not val:
+        return tr("Not set")
+    if val == "socket":
+        return tr("Socket")
+    return val
+
+
 # Formatter registry: key prefix -> callable(value) -> str
 _FORMATTERS = {
     "memory": _fmt_memory,
@@ -621,6 +703,9 @@ _FORMATTERS = {
 # Disk and network device prefixes
 _DISK_PREFIXES = {"ide", "sata", "scsi", "virtio", "efidisk", "tpmstate"}
 _NET_PREFIXES = {"net"}
+_USB_PREFIXES = {"usb"}
+_PCI_PREFIXES = {"hostpci"}
+_SERIAL_PREFIXES = {"serial"}
 
 
 def format_value(key, value):
@@ -633,6 +718,12 @@ def format_value(key, value):
         return _fmt_disk(value)
     if prefix in _NET_PREFIXES:
         return _fmt_net(value)
+    if prefix in _USB_PREFIXES:
+        return _fmt_usb(value)
+    if prefix in _PCI_PREFIXES:
+        return _fmt_pci(value)
+    if prefix in _SERIAL_PREFIXES:
+        return _fmt_serial(value)
     return str(value)
 
 
@@ -662,6 +753,9 @@ _HW_SECTION_LABELS = {
     "system": lambda: tr("System"),
     "network": lambda: tr("Network"),
     "storage": lambda: tr("Storage"),
+    "usb": lambda: tr("USB"),
+    "pci": lambda: tr("PCI"),
+    "serial": lambda: tr("Serial ports"),
 }
 
 _OPT_SECTION_LABELS = {

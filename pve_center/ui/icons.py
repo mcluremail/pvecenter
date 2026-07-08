@@ -324,6 +324,33 @@ _CLONE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-re
 <rect x="5" y="5" width="7" height="7" rx="0.8" fill="none" stroke="{c2}" stroke-width="1.2"/>
 </svg>"""
 
+_REMOVE = """<svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="6" cy="6" r="5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="3.5" y1="6" x2="8.5" y2="6" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+</svg>"""
+
+_USB = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="5" y="1.5" width="4" height="8" rx="0.8" fill="none" stroke="{c}" stroke-width="1.2"/>
+<line x1="6" y1="9.5" x2="6" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="8" y1="9.5" x2="8" y2="12" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<circle cx="7" cy="5" r="0.7" fill="{c2}"/>
+</svg>"""
+
+_PCI = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="2.5" y="2" width="9" height="10" rx="0.8" fill="none" stroke="{c}" stroke-width="1.2"/>
+<rect x="4.5" y="4" width="5" height="1.5" rx="0.3" fill="{c2}"/>
+<line x1="4" y1="7" x2="10" y2="7" stroke="{c}" stroke-width="0.9" stroke-linecap="round"/>
+<line x1="4" y1="9" x2="10" y2="9" stroke="{c}" stroke-width="0.9" stroke-linecap="round"/>
+<line x1="4" y1="11" x2="10" y2="11" stroke="{c}" stroke-width="0.9" stroke-linecap="round"/>
+</svg>"""
+
+_SERIAL = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="2" y="3" width="10" height="8" rx="0.8" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="4" cy="7" r="0.8" fill="{c2}"/>
+<circle cx="7" cy="7" r="0.8" fill="{c2}"/>
+<circle cx="10" cy="7" r="0.8" fill="{c2}"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -359,6 +386,10 @@ def init_icons():
         "expand": _make_icon(_EXPAND.format(c=_C, c2=_C2), 12),
         "collapse": _make_icon(_COLLAPSE.format(c=_C, c2=_C2), 12),
         "add": _make_icon(_ADD.format(c=_C, c2=_C2), 12),
+        "remove": _make_icon(_REMOVE.format(c=_C, c2=_C2), 12),
+        "usb": _make_icon(_USB.format(c=_C, c2=_C2)),
+        "pci": _make_icon(_PCI.format(c=_C, c2=_C2)),
+        "serial": _make_icon(_SERIAL.format(c=_C, c2=_C2)),
         "start": _make_icon(_START.format(c=_C, c2=_C2)),
         "shutdown": _make_icon(_SHUTDOWN.format(c=_C, c2=_C2)),
         "reboot": _make_icon(_REBOOT.format(c=_C, c2=_C2)),

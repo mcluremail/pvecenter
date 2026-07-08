@@ -96,6 +96,7 @@ class VMTabs:
         panel.hardware_widget = VmHardwareWidget()
         tab.setWidget(panel.hardware_widget)
         panel.hardware_widget.config_changed.connect(panel._on_vm_config_change_requested)
+        panel.hardware_widget.remove_device.connect(self._on_remove_with_destroy)
         return tab
 
     def build_options_tab(self):
@@ -376,6 +377,10 @@ class VMTabs:
             }
         iso_set = panel._iso_by_node.setdefault(node_name, set())
         panel.hardware_widget.set_iso_list(iso_set)
+        node_storages = [s for s in panel.all_storages
+                         if s.get("node") == node_name
+                         and "images" in (s.get("content", "") or "").split(",")]
+        panel.hardware_widget.set_storage_list(node_storages)
         panel.options_widget.set_context(host_name, vmid, node_name)
 
         if detail_key not in panel.task_history_cache:
@@ -491,6 +496,70 @@ class VMTabs:
         worker.signals.config_update_error.connect(
             lambda vid, err, w=worker: (
                 panel.config_update_result.emit(tr("Error changing VM {vid}: {err}").format(vid=vid, err=err)),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_remove_with_destroy(self, host_name, vmid_str, key, raw_value):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        vmid = int(vmid_str)
+        vm = panel._vms_by_key.get((host_name, vmid))
+        node = vm.get("node") if vm else host_name
+        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+
+        from ...backend import VmConfigUpdateWorker
+        worker = VmConfigUpdateWorker(cfg, node, vmid, {"delete": key}, vm_type)
+        worker.signals.config_updated.connect(
+            lambda vid, res, w=worker: (
+                panel.config_update_result.emit(
+                    tr("VM {vid}: {key} removed").format(vid=vid, key=key)
+                ),
+                self._destroy_disk_after_remove(host_name, node, key, raw_value),
+                self.reload_config(vmid, host_name),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.config_update_error.connect(
+            lambda vid, err, w=worker: (
+                panel.config_update_result.emit(
+                    tr("Error removing {key}: {err}").format(key=key, err=err)
+                ),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _destroy_disk_after_remove(self, host_name, node, key, raw_value):
+        panel = self.panel
+        val_str = str(raw_value or "")
+        storage = ""
+        volid = ""
+        if ":" in val_str:
+            storage = val_str.split(":")[0]
+            rest = val_str.split(":", 1)[1]
+            volid = f"{storage}:{rest.split(',')[0]}"
+        if not storage or not volid:
+            return
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        from ...backend import StorageContentDeleteWorker
+        worker = StorageContentDeleteWorker(cfg, node, storage, volid)
+        worker.signals.result.connect(
+            lambda msg, w=worker: (
+                panel.config_update_result.emit(msg),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, w=worker: (
+                panel.config_update_result.emit(
+                    tr("Destroy failed: {err}").format(err=err)
+                ),
                 panel._workers_mgr.discard_worker(w),
             )
         )

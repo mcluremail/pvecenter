@@ -1627,3 +1627,81 @@ class CloneVmWorker(QRunnable):
                 self.signals.finished.emit()
             except RuntimeError:
                 pass
+
+
+# ----------------------------------------------------------------------
+# StorageContentDeleteWorker — destroy disk image via DELETE /storage/{storage}/content/{volid}
+# ----------------------------------------------------------------------
+class StorageContentDeleteSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class StorageContentDeleteWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, storage, volid, timeout=120):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.storage = storage
+        self.volid = volid
+        self.timeout = timeout
+        self.signals = StorageContentDeleteSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            upid = (
+                proxmox.nodes(self.node_name)
+                .storage(self.storage)
+                .content(self.volid)
+                .delete()
+            )
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(
+                    proxmox, self.node_name, upid, timeout=self.timeout
+                )
+                if status == "stopped" and exitstatus == "OK":
+                    try:
+                        self.signals.result.emit(
+                            tr("Disk image {volid} destroyed").format(volid=self.volid)
+                        )
+                    except RuntimeError:
+                        pass
+                else:
+                    err = exitstatus or status
+                    try:
+                        self.signals.error.emit(
+                            tr("Destroy failed: {err}").format(err=err)
+                        )
+                    except RuntimeError:
+                        pass
+            else:
+                try:
+                    self.signals.result.emit(
+                        tr("Disk image {volid} destroyed").format(volid=self.volid)
+                    )
+                except RuntimeError:
+                    pass
+        except Exception as e:
+            logger.debug("storage content delete error", exc_info=True)
+            try:
+                self.signals.error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass

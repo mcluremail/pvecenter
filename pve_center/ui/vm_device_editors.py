@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
@@ -639,3 +640,485 @@ class VmStartupEditorDialog(QDialog):
         if self._down_spin.value() > 0:
             parts.append(f"down={self._down_spin.value()}")
         return (self._key, ",".join(parts) if parts else None)
+
+
+# ---------------------------------------------------------------------------
+# Add device dialogs
+# ---------------------------------------------------------------------------
+
+DISK_BUSES = [
+    ("scsi", tr("SCSI")),
+    ("virtio", tr("VirtIO")),
+    ("sata", tr("SATA")),
+    ("ide", tr("IDE")),
+]
+
+DISK_FORMATS = [("qcow2", "qcow2"), ("raw", "raw")]
+
+
+class VmAddDiskDialog(QDialog):
+    """Add a new hard disk: choose bus, storage, size, cache."""
+
+    def __init__(self, slot_key, storages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: Hard Disk"))
+        self.setMinimumWidth(500)
+        self._key = slot_key
+        self._storages = storages or []
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: Hard Disk')}</b>")
+        layout.addWidget(header)
+
+        info = QLabel(tr("Bus: {bus}, slot: {slot}").format(
+            bus=slot_key.rstrip("0123456789"), slot=slot_key))
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._cache_combo = QComboBox()
+        for val, label_text in DISK_CACHE:
+            self._cache_combo.addItem(label_text, val)
+        self._cache_combo.setCurrentIndex(0)
+        form.addRow(tr("Cache:"), self._cache_combo)
+
+        self._storage_combo = QComboBox()
+        self._storage_combo.setEditable(True)
+        for s in self._storages:
+            name = s.get("storage", "")
+            if name:
+                self._storage_combo.addItem(name, name)
+        if self._storage_combo.count() == 0:
+            self._storage_combo.addItem("local-lvm", "local-lvm")
+        form.addRow(tr("Storage:"), self._storage_combo)
+
+        self._size_spin = QSpinBox()
+        self._size_spin.setRange(1, 1048576)
+        self._size_spin.setValue(32)
+        self._size_spin.setSuffix(" GB")
+        form.addRow(tr("Size:"), self._size_spin)
+
+        self._discard_check = QCheckBox(tr("Discard (TRIM/UNMAP)"))
+        form.addRow("", self._discard_check)
+
+        self._ssd_check = QCheckBox(tr("SSD emulation"))
+        form.addRow("", self._ssd_check)
+
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_raw_value(self):
+        storage = self._storage_combo.currentText().strip() or "local-lvm"
+        size = self._size_spin.value()
+        val = f"{storage}:{size}"
+        parts = []
+        cache = self._cache_combo.currentData()
+        if cache and cache != "none":
+            parts.append(f"cache={cache}")
+        if self._discard_check.isChecked():
+            parts.append("discard=on")
+        if self._ssd_check.isChecked():
+            parts.append("ssd=1")
+        if parts:
+            val += "," + ",".join(parts)
+        return (self._key, val)
+
+
+class VmAddUsbDialog(QDialog):
+    """Add a USB device: host=XXXX:YYYY or spice."""
+
+    def __init__(self, slot_key, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: USB Device"))
+        self.setMinimumWidth(450)
+        self._key = slot_key
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: USB Device')}</b>")
+        layout.addWidget(header)
+
+        info = QLabel(f"{tr('Slot:')} {slot_key}")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._type_combo = QComboBox()
+        self._type_combo.addItem(tr("Host device"), "host")
+        self._type_combo.addItem(tr("SPICE"), "spice")
+        form.addRow(tr("Type:"), self._type_combo)
+
+        self._host_edit = QLineEdit()
+        self._host_edit.setPlaceholderText("1234:5678")
+        form.addRow(tr("Host device:"), self._host_edit)
+
+        self._usb3_check = QCheckBox(tr("USB 3.0"))
+        form.addRow("", self._usb3_check)
+
+        layout.addLayout(form)
+
+        self._type_combo.currentTextChanged.connect(self._on_type_changed)
+        self._on_type_changed()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self._on_ok)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _on_type_changed(self):
+        is_host = self._type_combo.currentData() == "host"
+        self._host_edit.setEnabled(is_host)
+
+    def _on_ok(self):
+        if self._type_combo.currentData() == "host" and not self._host_edit.text().strip():
+            return
+        self.accept()
+
+    def get_raw_value(self):
+        tp = self._type_combo.currentData()
+        if tp == "spice":
+            return (self._key, "spice")
+        host = self._host_edit.text().strip()
+        parts = [f"host={host}"]
+        if self._usb3_check.isChecked():
+            parts.append("usb3=1")
+        return (self._key, ",".join(parts))
+
+
+class VmAddPciDialog(QDialog):
+    """Add a PCI device: hostpciN."""
+
+    def __init__(self, slot_key, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: PCI Device"))
+        self.setMinimumWidth(450)
+        self._key = slot_key
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: PCI Device')}</b>")
+        layout.addWidget(header)
+
+        info = QLabel(f"{tr('Slot:')} {slot_key}")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._host_edit = QLineEdit()
+        self._host_edit.setPlaceholderText("0000:01:02.0")
+        form.addRow(tr("Host device:"), self._host_edit)
+
+        self._rombar_check = QCheckBox(tr("ROM-Bar"))
+        form.addRow("", self._rombar_check)
+
+        self._xvga_check = QCheckBox(tr("x-VGA (passthrough)"))
+        form.addRow("", self._xvga_check)
+
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self._on_ok)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _on_ok(self):
+        if not self._host_edit.text().strip():
+            return
+        self.accept()
+
+    def get_raw_value(self):
+        host = self._host_edit.text().strip()
+        parts = [host]
+        if self._rombar_check.isChecked():
+            parts.append("rombar=1")
+        if self._xvga_check.isChecked():
+            parts.append("x-vga=1")
+        return (self._key, ",".join(parts))
+
+
+class VmAddSerialDialog(QDialog):
+    """Add a serial port: serialN."""
+
+    def __init__(self, slot_key, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: Serial Port"))
+        self.setMinimumWidth(400)
+        self._key = slot_key
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: Serial Port')}</b>")
+        layout.addWidget(header)
+
+        info = QLabel(f"{tr('Slot:')} {slot_key}")
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._type_combo = QComboBox()
+        self._type_combo.addItem(tr("Socket"), "socket")
+        self._type_combo.addItem(tr("Device (/dev/ttyS*)"), "device")
+        form.addRow(tr("Type:"), self._type_combo)
+
+        self._dev_edit = QLineEdit()
+        self._dev_edit.setPlaceholderText("/dev/ttyS0")
+        self._dev_edit.setEnabled(False)
+        form.addRow(tr("Device:"), self._dev_edit)
+
+        layout.addLayout(form)
+
+        self._type_combo.currentTextChanged.connect(self._on_type_changed)
+        self._on_type_changed()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _on_type_changed(self):
+        self._dev_edit.setEnabled(self._type_combo.currentData() == "device")
+
+    def get_raw_value(self):
+        if self._type_combo.currentData() == "socket":
+            return (self._key, "socket")
+        dev = self._dev_edit.text().strip()
+        return (self._key, dev or "/dev/ttyS0")
+
+
+class VmAddEfiDialog(QDialog):
+    """Add an EFI disk: efidisk0."""
+
+    def __init__(self, slot_key, storages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: EFI Disk"))
+        self.setMinimumWidth(450)
+        self._key = slot_key
+        self._storages = storages or []
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: EFI Disk')}</b>")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._storage_combo = QComboBox()
+        self._storage_combo.setEditable(True)
+        for s in self._storages:
+            name = s.get("storage", "")
+            if name:
+                self._storage_combo.addItem(name, name)
+        if self._storage_combo.count() == 0:
+            self._storage_combo.addItem("local-lvm", "local-lvm")
+        form.addRow(tr("Storage:"), self._storage_combo)
+
+        self._format_combo = QComboBox()
+        for val, label_text in DISK_FORMATS:
+            self._format_combo.addItem(label_text, val)
+        form.addRow(tr("Format:"), self._format_combo)
+
+        self._type_combo = QComboBox()
+        self._type_combo.addItem(tr("4 MB (Secure Boot)"), "4m")
+        self._type_combo.addItem(tr("2 MB (legacy)"), "2m")
+        form.addRow(tr("EFI type:"), self._type_combo)
+
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_raw_value(self):
+        storage = self._storage_combo.currentText().strip() or "local-lvm"
+        efitype = self._type_combo.currentData()
+        fmt = self._format_combo.currentData()
+        val = f"{storage}:4,efitype={efitype},format={fmt}"
+        return (self._key, val)
+
+
+class VmAddTpmDialog(QDialog):
+    """Add a TPM state: tpmstate0."""
+
+    def __init__(self, slot_key, storages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Add: TPM"))
+        self.setMinimumWidth(450)
+        self._key = slot_key
+        self._storages = storages or []
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Add: TPM')}</b>")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        self._storage_combo = QComboBox()
+        self._storage_combo.setEditable(True)
+        for s in self._storages:
+            name = s.get("storage", "")
+            if name:
+                self._storage_combo.addItem(name, name)
+        if self._storage_combo.count() == 0:
+            self._storage_combo.addItem("local-lvm", "local-lvm")
+        form.addRow(tr("Storage:"), self._storage_combo)
+
+        self._version_combo = QComboBox()
+        self._version_combo.addItem(tr("v2.0"), "v2.0")
+        self._version_combo.addItem(tr("v1.2"), "v1.2")
+        form.addRow(tr("Version:"), self._version_combo)
+
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Add"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_raw_value(self):
+        storage = self._storage_combo.currentText().strip() or "local-lvm"
+        version = self._version_combo.currentData()
+        val = f"{storage}:1,version={version}"
+        return (self._key, val)
+
+
+class VmRemoveDeviceDialog(QDialog):
+    """Confirm removal of a device, with optional disk destroy."""
+
+    def __init__(self, key, label, is_disk, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Remove device"))
+        self.setMinimumWidth(450)
+        self._key = key
+        self._is_disk = is_disk
+        self._destroy = False
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{tr('Remove device?')}</b>")
+        layout.addWidget(header)
+
+        desc = QLabel(tr("This will remove the configuration entry: {label}").format(label=label))
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        if is_disk:
+            self._destroy_check = QCheckBox(
+                tr("Destroy disk image (permanent, cannot be undone)")
+            )
+            self._destroy_check.toggled.connect(self._on_destroy_toggled)
+            layout.addWidget(self._destroy_check)
+
+            warn = QLabel(
+                tr("Without destroying, the disk image remains on storage "
+                   "and can be re-attached later.")
+            )
+            warn.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+            warn.setWordWrap(True)
+            layout.addWidget(warn)
+        else:
+            self._destroy_check = None
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Remove"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self._on_ok)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _on_destroy_toggled(self, checked):
+        self._destroy = checked
+
+    def _on_ok(self):
+        self.accept()
+
+    @property
+    def destroy(self):
+        return self._destroy
+
+    def get_key(self):
+        return self._key
