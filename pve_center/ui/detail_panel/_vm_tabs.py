@@ -368,8 +368,8 @@ class VMTabs:
                     lambda vid, snaps, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
                         (self.on_snapshots_loaded(vid, snaps, g, h), panel._workers_mgr.discard_worker(w)))
                 panel._workers_mgr.current_snap_worker.signals.snapshots_error.connect(
-                    lambda vid, err, w=panel._workers_mgr.current_snap_worker:
-                        panel._workers_mgr.discard_worker(w))
+                    lambda vid, err, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
+                        (self.on_snapshots_error(vid, err, g, h), panel._workers_mgr.discard_worker(w)))
                 panel._workers_mgr.run_worker(panel._workers_mgr.current_snap_worker)
         else:
             self.populate_vm_snapshots_tree(panel.vm_snapshots_cache[detail_key])
@@ -501,12 +501,23 @@ class VMTabs:
 
     def on_snapshots_loaded(self, vmid, snapshots, gen, host_name):
         panel = self.panel
+        logger.info("on_snapshots_loaded: vmid=%s count=%d gen=%d", vmid, len(snapshots), gen)
         if gen != panel._generation:
             return
         detail_key = (vmid, host_name)
         panel.vm_snapshots_cache[detail_key] = snapshots
         if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
             self.populate_vm_snapshots_tree(snapshots)
+
+    def on_snapshots_error(self, vmid, err, gen, host_name):
+        panel = self.panel
+        logger.warning("on_snapshots_error: vmid=%s err=%s gen=%d", vmid, err, gen)
+        if gen != panel._generation:
+            return
+        if not panel._last_vm_data or panel._last_vm_data.get("vmid") != vmid or panel._last_vm_data.get("host_name") != host_name:
+            return
+        panel.vm_snapshots_loading.setText(parse_pve_error(err))
+        panel.vm_snapshots_stack.setCurrentIndex(0)
 
     def populate_vm_snapshots_tree(self, snapshots):
         panel = self.panel

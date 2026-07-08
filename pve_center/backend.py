@@ -753,6 +753,7 @@ class VmSnapshotsWorker(QRunnable):
             node = proxmox.nodes(self.node_name)
             resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
             snaps = resource.snapshot.get()
+            logger.info("VmSnapshotsWorker: vmid=%s got %d snapshots", self.vmid, len(snaps) if snaps else 0)
             filtered = [dict(s) for s in snaps if s.get("name") != "current"]
             for snap in filtered:
                 name = snap.get("name", "")
@@ -769,7 +770,7 @@ class VmSnapshotsWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.warning("VmSnapshotsWorker error for vmid %s: %s", self.vmid, e, exc_info=True)
             try:
                 self.signals.snapshots_error.emit(self.vmid, str(e))
             except RuntimeError:
