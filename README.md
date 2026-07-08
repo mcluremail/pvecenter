@@ -16,9 +16,35 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.5.1](https://github.com/mcluremail/pvecenter/releases/tag/v2.5.1)
+Latest release: [v2.6.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.6.0)
 
 ## Changelog
+
+### v2.6.0 — features & fixes
+
+**New features**
+- Status bar: hosts, VMs, CPU, RAM summary in bottom bar
+- Tray icon: minimize to tray on close, quick actions menu
+- RRD timeframe persistence: chart range saved between sessions
+- Node comparison: side-by-side cluster node comparison view
+- Multi-cluster dashboard: Clusters | Nodes toggle in cluster folder summary
+- Health check tab: CPU/mem/disk thresholds, PVE service status, apt updates
+- Audit log filters: text search + status dropdown (All/OK/Errors/Running)
+- Pool resource summary: aggregated VM count, CPU, memory, disk with progress bars
+- Offline mode: cached resources loaded on startup, shown until first live data arrives
+
+**Bug fixes**
+- SSL error detection: actionable message for self-signed/expired/invalid certificates
+- Session leak: requests.Session closed in finally block of all 13 ProxmoxAPI workers
+- Node deduplication: nodes matched by (node, host_name) — standalone hosts with same PVE node name no longer count each other's VMs
+- CardList key collisions: key changed from "node" to "node@host_name" for uniqueness
+- Summary view column alignment: header labels + VMs column added to standalone host list
+- Cluster folder: standalone hosts no longer appear in cluster node compare view
+- Pool metric cards: fixed height instead of expanding to fill available space
+- Audit log filter bar: compact, right-aligned, minimal vertical space
+- Tasks table sort freeze: sort in Python before table insert — eliminated 3-5s freeze on 400+ rows
+- Worker memory leak: signal connections disconnected in _discard_worker — was leaking 108K lambda objects (30+ MiB)
+- Cluster summary VM count: matched by host_name set instead of node name set
 
 ### v2.5.1 — bugfix release
 
@@ -90,6 +116,7 @@ Comprehensive code audit: ~21 bugs fixed across backend, UI, metrics, i18n, and 
 - Snapshots — all snapshots on a host in a single table
 - VM hardware configuration, options, task history
 - Host network interfaces, PVE services, disks (with FC multipath dedup)
+- Health check tab: CPU/mem/disk thresholds, critical service status, subscription & apt updates
 - Status indicators with colored markers (green, red, yellow)
 
 **Management**
@@ -107,18 +134,24 @@ Comprehensive code audit: ~21 bugs fixed across backend, UI, metrics, i18n, and 
 - Node config stored in SQLite database, no plaintext tokens on disk
 - Config export/import: encrypted bundle with password (PBKDF2 + Fernet)
 - SSL certificate validation: per-host toggle (trust / self-signed)
+- Audit log filters: text search + status filter (All/OK/Errors/Running)
 
 **Interface**
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
 - CardList widget — list views as card rows (Host VMs, Cluster Summary, Storage Overview) with status dots, filter, double-click editing
+- Node comparison view: side-by-side cluster node metrics (CPU, RAM, disk, VMs, uptime, PVE version)
+- Multi-cluster dashboard: Clusters summary + Nodes comparison toggle
 - Hardware/Options tabs with section grouping and device type icons
-- Task history with colored status badges
+- Task history with colored status badges and filter bar
+- Status bar: live hosts/VMs/CPU/RAM summary
+- System tray icon: minimize to tray, quick quit, context menu
+- Offline mode: cached resources shown on startup before first network response
 - Multi-language UI (English, Russian, Arabic, Chinese, French, Spanish)
 - Background auto-refresh every 20 seconds without losing selection or tabs
 - Toast notifications on host/VM status changes
-- Diagnostics for unreachable hosts (DNS error, timeout, auth failure, etc.)
+- Diagnostics for unreachable hosts (DNS error, timeout, auth failure, SSL errors)
 - Fast startup: parallel data loading, cluster summary and status bar in seconds
-- Persistence: window geometry, splitter positions, create-VM settings, expanded tree nodes saved between sessions
+- Persistence: window geometry, splitter positions, create-VM settings, expanded tree nodes, RRD timeframe saved between sessions
 - Cluster task cache in SQLite — tasks visible instantly on next launch
 
 ## Requirements
