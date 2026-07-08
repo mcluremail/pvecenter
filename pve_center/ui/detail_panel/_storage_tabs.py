@@ -595,10 +595,6 @@ class StorageTabs:
                     except (TypeError, RuntimeError):
                         pass
                     try:
-                        tb.download_requested.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
-                    try:
                         tb.move_requested.disconnect()
                     except (TypeError, RuntimeError):
                         pass
