@@ -721,6 +721,68 @@ class VmTaskHistoryWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# VmSnapshotsWorker
+# ----------------------------------------------------------------------
+class VmSnapshotsSignals(QObject):
+    snapshots_ready = Signal(int, list)   # vmid, список снапшотов
+    snapshots_error = Signal(int, str)
+    finished = Signal()
+
+
+class VmSnapshotsWorker(QRunnable):
+    """Загружает список снапшотов для конкретной ВМ (с доп. запросом размера)."""
+    def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.signals = VmSnapshotsSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            node = proxmox.nodes(self.node_name)
+            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            snaps = resource.snapshot.get()
+            filtered = [dict(s) for s in snaps if s.get("name") != "current"]
+            for snap in filtered:
+                name = snap.get("name", "")
+                if not name:
+                    continue
+                try:
+                    cfg = resource.snapshot(name).config.get()
+                    snap["size"] = cfg.get("size", "")
+                except Exception:
+                    snap["size"] = ""
+            filtered.sort(key=lambda s: (s.get("snaptime", 0) or 0))
+            try:
+                self.signals.snapshots_ready.emit(self.vmid, filtered)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("backend error", exc_info=True)
+            try:
+                self.signals.snapshots_error.emit(self.vmid, str(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # Удаление токена с сервера
 # ----------------------------------------------------------------------
 def delete_host_token(host_cfg):

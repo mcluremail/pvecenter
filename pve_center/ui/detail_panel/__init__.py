@@ -33,6 +33,7 @@ class DetailPanel(QWidget):
         self.config_cache = {}
         self.metrics_cache = {}
         self.task_history_cache = {}
+        self.vm_snapshots_cache = {}
         self._storage_content_pending = {}
         self._iso_by_node = {}
         self._all_iso_catalog = {}
@@ -184,6 +185,9 @@ class DetailPanel(QWidget):
         # 18: Health
         tabs.addTab(self._host_tabs.build_health_tab(), get_icon("monitor"), tr("Health"))
         tabs.setTabVisible(TabIndex.HEALTH, False)
+        # 19: VM Snapshots
+        tabs.addTab(self._vm_tabs.build_snapshots_tab(), get_icon("snapshot"), tr("Snapshots"))
+        tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -197,6 +201,7 @@ class DetailPanel(QWidget):
         self.config_cache.clear()
         self.metrics_cache.clear()
         self.task_history_cache.clear()
+        self.vm_snapshots_cache.clear()
 
     def update_nodes_cfg(self, nodes_cfg):
         self.nodes_cfg = nodes_cfg
@@ -225,6 +230,7 @@ class DetailPanel(QWidget):
             self._workers_mgr.cancel_detail_worker()
             self._workers_mgr.cancel_config_worker()
             self._workers_mgr.cancel_history_worker()
+            self._workers_mgr.cancel_snapshots_worker()
             self._workers_mgr.cancel_host_workers()
             self.metrics_widget.clear_curves()
             self.metrics_widget.setVisible(obj_type in ("vm", "host"))
@@ -236,7 +242,7 @@ class DetailPanel(QWidget):
                         TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
                         TabIndex.NETWORK, TabIndex.SERVICES,
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,
-                        TabIndex.HEALTH):
+                        TabIndex.HEALTH, TabIndex.VM_SNAPSHOTS):
                 self.tabs.setTabVisible(idx, False)
 
             if obj_type == "cluster_folder":

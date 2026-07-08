@@ -1,7 +1,18 @@
 import logging
+from datetime import datetime
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QGridLayout, QLabel, QScrollArea, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QGridLayout,
+    QHeaderView,
+    QLabel,
+    QScrollArea,
+    QStackedWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..i18n import tr
 from ..theme import Color
@@ -15,7 +26,7 @@ from ..widgets.vm_options_widget import VmOptionsWidget
 from ..widgets.vm_pool_widget import VmPoolWidget
 from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
 from ._constants import TabIndex
-from ._table_utils import safe_pct
+from ._table_utils import loading_label, safe_pct
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +112,41 @@ class VMTabs:
         tab.setWidgetResizable(True)
         panel.task_history_widget = VmTaskHistoryWidget()
         tab.setWidget(panel.task_history_widget)
+        return tab
+
+    def build_snapshots_tab(self):
+        panel = self.panel
+        loading = loading_label()
+        tree = QTreeWidget()
+        tree.setHeaderLabels([
+            tr("Snapshot"), tr("Description"), tr("Created"),
+            tr("VM State"), tr("Size"), tr("Parent"),
+        ])
+        tree.setEditTriggers(QTreeWidget.NoEditTriggers)
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(True)
+        tree.setColumnWidth(0, 200)
+        tree.setColumnWidth(1, 200)
+        tree.setColumnWidth(2, 160)
+        tree.setColumnWidth(3, 80)
+        tree.setColumnWidth(4, 100)
+        tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tree.header().setStretchLastSection(False)
+        tree.header().setSectionResizeMode(5, QHeaderView.Stretch)
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        stack.addWidget(tree)
+        stack.setCurrentIndex(0)
+        panel.vm_snapshots_loading = loading
+        panel.vm_snapshots_tree = tree
+        panel.vm_snapshots_stack = stack
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(stack)
+        tab.setWidget(container)
         return tab
 
     def build_pool_tab(self):
@@ -233,6 +279,7 @@ class VMTabs:
         panel.tabs.setTabVisible(TabIndex.HARDWARE, True)
         panel.tabs.setTabVisible(TabIndex.OPTIONS, True)
         panel.tabs.setTabVisible(TabIndex.HISTORY, True)
+        panel.tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, True)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
         panel.tabs.setCurrentIndex(TabIndex.MONITOR)
 
@@ -307,6 +354,25 @@ class VMTabs:
                 panel._workers_mgr.run_worker(panel._workers_mgr.current_hist_worker)
         else:
             panel.task_history_widget.set_tasks(panel.task_history_cache[detail_key])
+
+        vm_type = vm_data.get("type", "qemu") or "qemu"
+        if detail_key not in panel.vm_snapshots_cache:
+            panel.vm_snapshots_tree.clear()
+            panel.vm_snapshots_loading.setText(tr("Loading..."))
+            panel.vm_snapshots_stack.setCurrentIndex(0)
+            cfg = panel._cfg_by_name.get(host_name)
+            if cfg:
+                from ...backend import VmSnapshotsWorker
+                panel._workers_mgr.current_snap_worker = VmSnapshotsWorker(cfg, node_name, vmid, vm_type)
+                panel._workers_mgr.current_snap_worker.signals.snapshots_ready.connect(
+                    lambda vid, snaps, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
+                        (self.on_snapshots_loaded(vid, snaps, g, h), panel._workers_mgr.discard_worker(w)))
+                panel._workers_mgr.current_snap_worker.signals.snapshots_error.connect(
+                    lambda vid, err, w=panel._workers_mgr.current_snap_worker:
+                        panel._workers_mgr.discard_worker(w))
+                panel._workers_mgr.run_worker(panel._workers_mgr.current_snap_worker)
+        else:
+            self.populate_vm_snapshots_tree(panel.vm_snapshots_cache[detail_key])
 
     def show_vm_metrics(self, vm_data):
         panel = self.panel
@@ -432,6 +498,83 @@ class VMTabs:
         panel.task_history_cache[detail_key] = tasks
         if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
             panel.task_history_widget.set_tasks(tasks)
+
+    def on_snapshots_loaded(self, vmid, snapshots, gen, host_name):
+        panel = self.panel
+        if gen != panel._generation:
+            return
+        detail_key = (vmid, host_name)
+        panel.vm_snapshots_cache[detail_key] = snapshots
+        if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
+            self.populate_vm_snapshots_tree(snapshots)
+
+    def populate_vm_snapshots_tree(self, snapshots):
+        panel = self.panel
+        tree = panel.vm_snapshots_tree
+        tree.clear()
+        if not snapshots:
+            panel.vm_snapshots_loading.setText(tr("No snapshots"))
+            panel.vm_snapshots_stack.setCurrentIndex(0)
+            return
+        snap_by_name = {}
+        for snap in snapshots:
+            snap_by_name[snap.get("name", "")] = snap
+        created_items = set()
+        remaining = list(snapshots)
+
+        def create_item(snap):
+            name = snap.get("name", "")
+            desc = snap.get("description", "") or ""
+            snaptime = snap.get("snaptime", 0)
+            if snaptime:
+                ts = datetime.fromtimestamp(snaptime).strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                ts = ""
+            vm_state = tr("yes") if snap.get("vmstate", 0) else tr("no")
+            size_val = snap.get("size", "")
+            if isinstance(size_val, (int, float)) and size_val > 0:
+                gb = size_val / (1024 ** 3)
+                if gb >= 1024:
+                    size_str = f"{gb / 1024:.1f} TiB"
+                else:
+                    size_str = f"{gb:.1f} GiB"
+            else:
+                size_str = str(size_val) if size_val else "—"
+            parent_name = snap.get("parent", "") or ""
+            item = QTreeWidgetItem([name, desc, ts, vm_state, size_str, parent_name])
+            return item
+
+        for _ in range(len(snapshots) + 1):
+            progress = False
+            still = []
+            for snap in remaining:
+                parent_name = snap.get("parent", "") or ""
+                if not parent_name or parent_name == "current" or parent_name not in snap_by_name:
+                    item = create_item(snap)
+                    tree.addTopLevelItem(item)
+                    snap["_tree_item"] = item
+                    created_items.add(snap.get("name", ""))
+                    progress = True
+                elif parent_name in created_items:
+                    parent_snap = snap_by_name[parent_name]
+                    parent_item = parent_snap.get("_tree_item")
+                    if parent_item:
+                        item = create_item(snap)
+                        parent_item.addChild(item)
+                        snap["_tree_item"] = item
+                        created_items.add(snap.get("name", ""))
+                        progress = True
+                    else:
+                        still.append(snap)
+                else:
+                    still.append(snap)
+            remaining = still
+            if not progress:
+                break
+
+        tree.expandAll()
+        tree.resizeColumnToContents(0)
+        panel.vm_snapshots_stack.setCurrentIndex(1)
 
     def reload_config(self, vmid, host_name):
         panel = self.panel
@@ -607,6 +750,7 @@ class VMTabs:
         panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
         panel.tabs.setTabVisible(TabIndex.OPTIONS, False)
         panel.tabs.setTabVisible(TabIndex.HISTORY, False)
+        panel.tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, True)
         panel.tabs.setCurrentIndex(TabIndex.POOL_VMS)
