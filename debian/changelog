@@ -1,3 +1,26 @@
+pve-center (2.6.0-1) unstable; urgency=medium
+
+  * New features: status bar, tray icon, RRD timeframe persist, node comparison
+  * New features: multi-cluster dashboard (Clusters|Nodes toggle)
+  * New features: health check tab (CPU/mem/disk thresholds, PVE services)
+  * New features: audit log filters (text search + status dropdown)
+  * New features: pool resource summary cards (VMs/CPU/RAM/Disk with progress bars)
+  * New features: offline mode (cached resources on startup)
+  * Fix: SSL error detection (self-signed/expired/invalid certificates)
+  * Fix: session leak — requests.Session closed in all 13 ProxmoxAPI workers
+  * Fix: node deduplication — standalone hosts with same PVE node name no longer count each other's VMs
+  * Fix: CardList key collisions (node@host_name instead of node)
+  * Fix: summary view column alignment + VMs column
+  * Fix: standalone hosts no longer appear in cluster node compare
+  * Fix: pool metric cards fixed height (was expanding to fill space)
+  * Fix: compact audit log filter bar
+  * Fix: tasks table sort freeze (Python sort instead of sortItems)
+  * Fix: worker memory leak — disconnect signal connections in _discard_worker
+  * Fix: cluster summary VM count matched by host_name set
+  * _I18N_VERSION bumped 5→10
+
+ -- Taurus McLure <taurus@mclure.ru>  Wed, 08 Jul 2026 12:00:00 +0300
+
 pve-center (2.5.1-1) unstable; urgency=medium
 
   * Bugfix release: comprehensive code audit (~21 bugs fixed)
