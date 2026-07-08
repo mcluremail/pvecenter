@@ -1862,9 +1862,10 @@ class StorageDownloadWorker(QRunnable):
                 f"={self.host_cfg['token_value']}"
             )
             headers = {"Authorization": auth_token}
+            encoded_volid = self.volid.replace("/", "%2F")
             url = (
                 f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
-                f"nodes/{self.node_name}/storage/{self.storage_name}/content/{self.volid}"
+                f"nodes/{self.node_name}/storage/{self.storage_name}/content/{encoded_volid}"
             )
             logger.info("download url=%s, volid=%s, storage=%s", url, self.volid, self.storage_name)
             resp = requests.get(
