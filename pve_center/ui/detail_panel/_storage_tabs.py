@@ -598,13 +598,25 @@ class StorageTabs:
             if tb and id(tb) not in connected:
                 tb.set_context(node_name, storage_name, host_name, cfg, ct)
                 connected.add(id(tb))
-                try:
-                    tb.upload_requested.disconnect()
-                    tb.download_requested.disconnect()
-                    tb.move_requested.disconnect()
-                    tb.remove_requested.disconnect()
-                except (TypeError, RuntimeError):
-                    pass
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    try:
+                        tb.upload_requested.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+                    try:
+                        tb.download_requested.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+                    try:
+                        tb.move_requested.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+                    try:
+                        tb.remove_requested.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
                 tb.download_requested.connect(lambda n=node_name, s=storage_name, h=host_name:

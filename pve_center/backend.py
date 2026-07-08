@@ -1863,7 +1863,7 @@ class StorageDownloadWorker(QRunnable):
             )
             headers = {"Authorization": auth_token}
             import urllib.parse
-            encoded_volid = urllib.parse.quote(self.volid, safe="")
+            encoded_volid = urllib.parse.quote(self.volid, safe=":/")
             url = (
                 f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                 f"nodes/{self.node_name}/storage/{self.storage_name}/content/{encoded_volid}"
