@@ -16,9 +16,43 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.6.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.6.0)
+Latest release: [v2.7.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.7.0)
 
 ## Changelog
+
+### v2.7.0 — hardware management, storage operations, audit
+
+**New features**
+- VM Hardware Add/Remove/Edit: toolbar with 8 device types (Hard Disk, CD/DVD, Network, USB, PCI, Serial, EFI Disk, TPM)
+- Disk destroy on removal: optional delete storage content after removing disk from VM config
+- Hotplug-aware guards: Add/Remove blocked for running VMs unless hotplug allows the device type
+- Storage file operations: Upload (ISO, templates, backups), Move (between storages), Remove — toolbar above each content table
+- Upload progress bar: real-time progress shown in cluster tasks table
+- 137 new i18n keys for ar/zh/fr/es (health-check, status-bar, SSL notifications, hardware editors)
+
+**Bug fixes**
+- Backup volid: stored in Qt.UserRole (was returning "VM 123" instead of actual volid for Move/Remove)
+- Progress row stale index: reindexed on insert (concurrent uploads shifted rows)
+- itemSelectionChanged reconnect leak: disconnect before reconnect (accumulated callbacks)
+- set_vm_status order: called before set_hardware_data (buttons reflected previous VM's status)
+- _parse_net/_parse_disk: handle None without str(None)="None" bug
+- VmDiskEditorDialog: preserve non-cache params (discard, ssd, iothread) on cache change
+- EFI disk: size=2 for efitype=2m, size=4 for 4m (was always 4)
+- is_cdrom_key: check value for ide2, not always True (hard disks on ide2 no longer treated as CD-ROM)
+- create_admin_token: handle r is None, init sess=None before try
+- _ProgressReader: add seek/tell/fileno for requests compatibility
+- StorageUploadWorker: fix resp.json double-parse when data is string
+- _poll_task: guard against non-dict data response
+- fetch_standalone: use v.get("vmid") instead of v["vmid"]
+- on_snapshots_error: pop stale cache entry on error
+- ISO worker: routed through _workers_mgr, errors logged instead of swallowed
+
+**Dead code removed**
+- Download feature (PVE API doesn't support file download via token)
+- Dead signals: destroy_disk, opacity Property
+- Dead fields: _MAX_SLOTS, _has_selection, seen set
+- Duplicate PVE_PORT, unused imports, stale comments
+- Debug logging (token_create, remote-viewer) INFO → DEBUG
 
 ### v2.6.0 — features & fixes
 
@@ -115,6 +149,8 @@ Comprehensive code audit: ~21 bugs fixed across backend, UI, metrics, i18n, and 
 - Storage content: backups, VM disks, ISO images, templates
 - Snapshots — all snapshots on a host in a single table
 - VM hardware configuration, options, task history
+- VM hardware management: add/remove/edit devices (disk, CD/DVD, network, USB, PCI, serial, EFI, TPM) with hotplug awareness
+- Storage file operations: upload, move, remove files on storage content tables
 - Host network interfaces, PVE services, disks (with FC multipath dedup)
 - Health check tab: CPU/mem/disk thresholds, critical service status, subscription & apt updates
 - Status indicators with colored markers (green, red, yellow)
