@@ -61,3 +61,15 @@ def confirm_vm_action(action, vmid, parent=None):
     msg.setDefaultButton(yes)
     msg.exec()
     return msg.clickedButton() == yes
+
+
+def confirm_snapshot_delete(snap_name, parent=None):
+    """Show confirmation dialog for snapshot deletion."""
+    from PySide6.QtWidgets import QMessageBox
+    msg_text = tr("Delete snapshot \"{name}\"?").format(name=snap_name)
+    msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msg_text, parent=parent)
+    yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+    msg.addButton(tr("No"), QMessageBox.NoRole)
+    msg.setDefaultButton(yes)
+    msg.exec()
+    return msg.clickedButton() == yes

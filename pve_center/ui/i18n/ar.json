@@ -599,5 +599,12 @@
   "VM {vmid} cloned to {newid} on {target}": "تم استنساخ VM {vmid} إلى {newid} على {target}",
   "VM info": "معلومات VM",
   "Type:": "النوع:",
-  "VMID:": "VMID:"
+  "VMID:": "VMID:",
+  "Delete snapshot": "حذف اللقطة",
+  "Snapshot name": "اسم اللقطة",
+  "Include RAM state": "تضمين حالة الذاكرة",
+  "Snapshot created": "تم إنشاء اللقطة",
+  "Snapshot deleted": "تم حذف اللقطة",
+  "Delete snapshot \"{name}\"?": "حذف اللقطة \"{name}\"؟",
+  "Include RAM state in snapshot": "تضمين حالة الذاكرة في اللقطة"
 }
