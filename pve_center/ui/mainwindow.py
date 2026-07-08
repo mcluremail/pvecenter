@@ -307,9 +307,26 @@ class MainWindow(QMainWindow):
 
     def _discard_worker(self, worker):
         """Безопасно удаляет воркер из _workers.
-        Вызывается в finally после обработки сигнала, чтобы воркер не утекал
-        при RuntimeError (уничтоженный виджет) или любом исключении в хендлере."""
+        Отключает все signal connections чтобы избежать утечки через замыкания лямбд."""
         self._workers.discard(worker)
+        if worker and hasattr(worker, "signals"):
+            try:
+                worker.signals.finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            for attr in dir(worker.signals):
+                if attr in ("result_ready", "tasks_ready", "tasks_error",
+                            "detail_ready", "config_ready", "config_error",
+                            "config_updated", "config_update_error",
+                            "action_result", "action_error",
+                            "console_ready", "console_error",
+                            "vm_created", "vm_error", "vm_deleted",
+                            "vm_migrated", "vm_cloned",
+                            "token_ready", "token_error"):
+                    try:
+                        getattr(worker.signals, attr).disconnect()
+                    except (RuntimeError, TypeError, AttributeError):
+                        pass
 
     def _dedup_storages(self, new_storages, host_name, target_list):
         for st in new_storages:
