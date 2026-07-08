@@ -136,8 +136,14 @@ class NotificationManager:
                 existing.destroyed.disconnect()
             except (TypeError, RuntimeError):
                 pass
-            existing._fade_timer.stop()
-            existing._fade_anim.stop()
+            try:
+                existing._fade_timer.stop()
+            except RuntimeError:
+                pass
+            try:
+                existing._fade_anim.stop()
+            except RuntimeError:
+                pass
             existing.deleteLater()
         offset_y = 12
         for t in list(self._active.values()):
