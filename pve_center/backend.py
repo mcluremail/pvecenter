@@ -1866,16 +1866,19 @@ class StorageDownloadWorker(QRunnable):
                 f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                 f"nodes/{self.node_name}/storage/{self.storage_name}/content/{self.volid}"
             )
+            logger.info("download url=%s, volid=%s, storage=%s", url, self.volid, self.storage_name)
             resp = requests.get(
                 url, headers=headers, params={"download": 1},
                 verify=verify, timeout=self.timeout, stream=True,
             )
             if not resp.ok:
+                raw = resp.text[:500]
+                logger.info("download failed: status=%s, body=%s", resp.status_code, raw)
                 try:
                     body = resp.json()
                     msg = body.get("data", {}).get("message", "") or body.get("message", "")
                 except Exception:
-                    msg = ""
+                    msg = raw
                 raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])
             total = int(resp.headers.get("content-length", 0))
             downloaded = 0

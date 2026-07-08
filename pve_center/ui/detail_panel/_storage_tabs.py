@@ -890,14 +890,23 @@ class StorageTabs:
     # --- File operations: Upload / Download / Move / Remove ---
 
     def _get_selected_volid(self, table):
-        """Extract volid from the selected row of a storage content table."""
+        """Extract volid from the selected row of a storage content table.
+        Different tables store volid in different columns:
+        - ISO/Templates: column 0 (Volume)
+        - VM Disks: column 2 (Volume)
+        - Backups: column 0 shows 'VM {vmid}', volid is not displayed;
+          we reconstruct it from backup data.
+        """
         row = table.currentRow()
         if row < 0:
             return None, None
-        item0 = table.item(row, 0)
-        if not item0:
+        if table is self.panel.storage_disks_table:
+            item = table.item(row, 2)
+        else:
+            item = table.item(row, 0)
+        if not item:
             return None, None
-        volid = item0.text()
+        volid = item.text()
         return row, volid
 
     def _get_active_table(self, node_name, storage_name):
