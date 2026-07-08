@@ -140,6 +140,7 @@ class ClusterTasksWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._all_tasks = []
+        self._sort_initialized = False
         self.table = QTableWidget()
         self.table.verticalHeader().hide()
         self.table.setColumnCount(6)
@@ -170,7 +171,6 @@ class ClusterTasksWidget(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
-        self.table.setSortingEnabled(False)
         h.sortIndicatorChanged.connect(self._on_sort_changed)
 
         # Filter bar — compact, right-aligned
@@ -210,10 +210,6 @@ class ClusterTasksWidget(QWidget):
         self._populate_table(tasks)
 
     def _populate_table(self, tasks):
-        was_sorted = self.table.isSortingEnabled()
-        if was_sorted:
-            self.table.setSortingEnabled(False)
-
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
 
@@ -303,12 +299,14 @@ class ClusterTasksWidget(QWidget):
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
 
-        # Restore sort indicator without triggering sortItems
-        if not was_sorted:
-            self.table.setSortingEnabled(True)
+        # Set sort indicator visual only — do NOT enable sorting
+        # (setSortingEnabled(True) triggers sortItems with Python __lt__
+        # which freezes on 400+ rows; data is already sorted in Python)
+        if not self._sort_initialized:
+            self._sort_initialized = True
             self.table.horizontalHeader().setSortIndicator(0, Qt.DescendingOrder)
         else:
-            self.table.setSortingEnabled(True)
+            self.table.horizontalHeader().setSortIndicator(sort_col, sort_order)
 
     def _sort_tasks(self, tasks, col, order):
         """Sort task list in Python before inserting — avoids slow sortItems()."""
