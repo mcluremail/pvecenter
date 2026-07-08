@@ -36,10 +36,9 @@ from ._table_utils import (
 
 
 class StorageToolbar(QWidget):
-    """Toolbar with Upload/Download/Move/Remove buttons for storage content tables."""
+    """Toolbar with Upload/Move/Remove buttons for storage content tables."""
 
     upload_requested = Signal()
-    download_requested = Signal()
     move_requested = Signal()
     remove_requested = Signal()
 
@@ -60,14 +59,6 @@ class StorageToolbar(QWidget):
         self._upload_btn.clicked.connect(self.upload_requested)
         self._upload_btn.setToolTip("")
 
-        self._download_btn = QPushButton(tr("Download"))
-        dl_icon = get_icon("download")
-        if dl_icon:
-            self._download_btn.setIcon(dl_icon)
-        self._download_btn.setEnabled(False)
-        self._download_btn.clicked.connect(self.download_requested)
-        self._download_btn.setToolTip("")
-
         self._move_btn = QPushButton(tr("Move"))
         self._move_btn.setEnabled(False)
         self._move_btn.clicked.connect(self.move_requested)
@@ -85,7 +76,6 @@ class StorageToolbar(QWidget):
         layout.setSpacing(6)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._upload_btn)
-        layout.addWidget(self._download_btn)
         layout.addWidget(self._move_btn)
         layout.addWidget(self._remove_btn)
         layout.addStretch()
@@ -107,7 +97,6 @@ class StorageToolbar(QWidget):
         self._has_selection = has_sel
         can_upload = self._content_type in self._UPLOAD_TYPES
         self._upload_btn.setEnabled(can_upload)
-        self._download_btn.setEnabled(has_sel)
         self._move_btn.setEnabled(has_sel)
         self._remove_btn.setEnabled(has_sel)
 
@@ -619,8 +608,6 @@ class StorageTabs:
                         pass
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
-                tb.download_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
-                    self._on_download(n, s, h))
                 tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
                     self._on_move(n, s, h))
                 tb.remove_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
@@ -964,49 +951,6 @@ class StorageTabs:
             lambda err, k=key: (
                 panel.transfer_finished.emit(k, False, err),
                 panel.config_update_result.emit(tr("Upload failed: {err}").format(err=err), ),
-                panel._workers_mgr.discard_worker(worker),
-            )
-        )
-        panel._workers_mgr.run_worker(worker)
-
-    def _on_download(self, node_name, storage_name, host_name):
-        panel = self.panel
-        cfg = panel._cfg_by_name.get(host_name)
-        if not cfg:
-            return
-        table = self._get_active_table(node_name, storage_name)
-        if not table:
-            return
-        _, volid = self._get_selected_volid(table)
-        if not volid:
-            return
-        volid_full = volid
-        if ":" not in volid and not volid.startswith(storage_name):
-            volid_full = f"{storage_name}:{volid}"
-        default_name = volid_full.split(":")[-1].split("/")[-1] if ":" in volid_full else volid
-        path, _ = QFileDialog.getSaveFileName(
-            self.panel, tr("Save file to..."), default_name, tr("All files (*.*)")
-        )
-        if not path:
-            return
-        key = f"download:{volid_full}"
-        panel.transfer_started.emit(key, tr("Download {name}").format(name=default_name))
-        from ...backend import StorageDownloadWorker
-        worker = StorageDownloadWorker(cfg, node_name, storage_name, volid_full, path)
-        worker.signals.progress.connect(
-            lambda pct, k=key: panel.transfer_progress.emit(k, pct)
-        )
-        worker.signals.result.connect(
-            lambda msg, k=key: (
-                panel.transfer_finished.emit(k, True, msg),
-                panel.config_update_result.emit(msg),
-                panel._workers_mgr.discard_worker(worker),
-            )
-        )
-        worker.signals.error.connect(
-            lambda err, k=key: (
-                panel.transfer_finished.emit(k, False, err),
-                panel.config_update_result.emit(tr("Download failed: {err}").format(err=err)),
                 panel._workers_mgr.discard_worker(worker),
             )
         )
