@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..i18n import tr
+from ..icons import get_icon
 from ..theme import Color
 from ..utils import format_uptime as _format_uptime
 from ..utils import parse_pve_error, status_text
@@ -133,6 +134,8 @@ class VMTabs:
         tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         tree.header().setStretchLastSection(False)
         tree.header().setSectionResizeMode(5, QHeaderView.Stretch)
+        tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        tree.customContextMenuRequested.connect(self._on_snapshot_context_menu)
         stack = QStackedWidget()
         stack.addWidget(loading)
         stack.addWidget(tree)
@@ -140,11 +143,24 @@ class VMTabs:
         panel.vm_snapshots_loading = loading
         panel.vm_snapshots_tree = tree
         panel.vm_snapshots_stack = stack
+        from PySide6.QtWidgets import QHBoxLayout, QPushButton
+        btn_bar = QWidget()
+        btn_layout = QHBoxLayout(btn_bar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        create_btn = QPushButton(get_icon("snapshot"), tr("Create Snapshot"))
+        create_btn.setMinimumHeight(28)
+        create_btn.clicked.connect(self.on_snapshot_create)
+        btn_layout.addWidget(create_btn)
+        btn_layout.addStretch()
+        panel.vm_snapshots_create_btn = create_btn
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(btn_bar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -517,6 +533,148 @@ class VMTabs:
             return
         panel.vm_snapshots_loading.setText(parse_pve_error(err))
         panel.vm_snapshots_stack.setCurrentIndex(0)
+
+    def reload_snapshots(self, vmid, host_name):
+        panel = self.panel
+        detail_key = (vmid, host_name)
+        panel.vm_snapshots_cache.pop(detail_key, None)
+        panel.vm_snapshots_tree.clear()
+        panel.vm_snapshots_loading.setText(tr("Loading..."))
+        panel.vm_snapshots_stack.setCurrentIndex(0)
+        cfg = panel._cfg_by_name.get(host_name)
+        if cfg and panel._last_vm_data:
+            node_name = panel._last_vm_data.get("node") or host_name
+            vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+            gen = panel._generation
+            from ...backend import VmSnapshotsWorker
+            worker = VmSnapshotsWorker(cfg, node_name, vmid, vm_type)
+            worker.signals.snapshots_ready.connect(
+                lambda vid, snaps, g=gen, h=host_name, w=worker: (
+                    self.on_snapshots_loaded(vid, snaps, g, h),
+                    panel._workers_mgr.discard_worker(w),
+                )
+            )
+            worker.signals.snapshots_error.connect(
+                lambda vid, err, g=gen, h=host_name, w=worker: (
+                    self.on_snapshots_error(vid, err, g, h),
+                    panel._workers_mgr.discard_worker(w),
+                )
+            )
+            panel._workers_mgr.run_worker(worker)
+
+    def on_snapshot_create(self):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        vmid = panel._last_vm_data.get("vmid")
+        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        node_name = panel._last_vm_data.get("node") or host_name
+        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFormLayout,
+            QLineEdit,
+        )
+        dlg = QDialog(panel)
+        dlg.setWindowTitle(tr("Create Snapshot"))
+        dlg.setMinimumWidth(360)
+        form = QFormLayout(dlg)
+        name_edit = QLineEdit()
+        name_edit.setPlaceholderText(tr("Snapshot name"))
+        desc_edit = QLineEdit()
+        desc_edit.setPlaceholderText(tr("Description"))
+        vmstate_check = QCheckBox()
+        vmstate_check.setToolTip(tr("Include RAM state in snapshot"))
+        form.addRow(tr("Snapshot name"), name_edit)
+        form.addRow(tr("Description"), desc_edit)
+        form.addRow(tr("Include RAM state"), vmstate_check)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            parent=dlg,
+        )
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
+        ok_btn.setEnabled(False)
+        name_edit.textChanged.connect(lambda t: ok_btn.setEnabled(bool(t.strip())))
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        snap_name = name_edit.text().strip()
+        if not snap_name:
+            return
+        description = desc_edit.text().strip()
+        vmstate = vmstate_check.isChecked()
+        from ...backend import VmSnapshotCreateWorker
+        worker = VmSnapshotCreateWorker(cfg, node_name, vmid, vm_type, snap_name, description, vmstate)
+        panel.vm_snapshots_create_btn.setEnabled(False)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.reload_snapshots(vmid, host_name),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.finished.connect(
+            lambda: panel.vm_snapshots_create_btn.setEnabled(True)
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_snapshot_context_menu(self, pos):
+        panel = self.panel
+        tree = panel.vm_snapshots_tree
+        item = tree.itemAt(pos)
+        if not item:
+            return
+        snap_name = item.text(0)
+        if not snap_name:
+            return
+        from PySide6.QtGui import QAction
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(tree)
+        menu.setStyleSheet(
+            "QMenu { font-size: 12px; padding: 2px; }"
+            "QMenu::item { padding: 4px 12px; }"
+            f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
+        )
+        delete_act = QAction(tr("Delete snapshot"), tree)
+        delete_act.triggered.connect(lambda: self.on_snapshot_delete(snap_name))
+        menu.addAction(delete_act)
+        menu.exec(tree.viewport().mapToGlobal(pos))
+
+    def on_snapshot_delete(self, snap_name):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        vmid = panel._last_vm_data.get("vmid")
+        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        node_name = panel._last_vm_data.get("node") or host_name
+        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        from ..vm_actions import confirm_snapshot_delete
+        if not confirm_snapshot_delete(snap_name, parent=panel):
+            return
+        from ...backend import VmSnapshotDeleteWorker
+        worker = VmSnapshotDeleteWorker(cfg, node_name, vmid, vm_type, snap_name)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.reload_snapshots(vmid, host_name),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_worker(worker)
 
     def populate_vm_snapshots_tree(self, snapshots):
         panel = self.panel

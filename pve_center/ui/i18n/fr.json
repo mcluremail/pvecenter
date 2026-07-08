@@ -599,5 +599,12 @@
   "VM {vmid} cloned to {newid} on {target}": "VM {vmid} clonée en {newid} sur {target}",
   "VM info": "Informations VM",
   "Type:": "Type :",
-  "VMID:": "VMID :"
+  "VMID:": "VMID :",
+  "Delete snapshot": "Supprimer l'instantané",
+  "Snapshot name": "Nom de l'instantané",
+  "Include RAM state": "Inclure l'état de la RAM",
+  "Snapshot created": "Instantané créé",
+  "Snapshot deleted": "Instantané supprimé",
+  "Delete snapshot \"{name}\"?": "Supprimer l'instantané \"{name}\" ?",
+  "Include RAM state in snapshot": "Inclure l'état de la RAM dans l'instantané"
 }

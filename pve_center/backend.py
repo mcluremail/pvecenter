@@ -918,6 +918,118 @@ class VmActionWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# VmSnapshotCreateWorker
+# ----------------------------------------------------------------------
+class VmSnapshotCreateSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class VmSnapshotCreateWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, vm_type, snap_name, description="", vmstate=False):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.snap_name = snap_name
+        self.description = description
+        self.vmstate = vmstate
+        self.signals = VmSnapshotCreateSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            node = proxmox.nodes(self.node_name)
+            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            resource.snapshot.post(
+                name=self.snap_name,
+                description=self.description,
+                vmstate=1 if self.vmstate else 0,
+            )
+            try:
+                self.signals.result.emit(
+                    tr("Snapshot \"{name}\" created").format(name=self.snap_name)
+                )
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("backend error", exc_info=True)
+            try:
+                self.signals.error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
+# VmSnapshotDeleteWorker
+# ----------------------------------------------------------------------
+class VmSnapshotDeleteSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class VmSnapshotDeleteWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, vm_type, snap_name):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.snap_name = snap_name
+        self.signals = VmSnapshotDeleteSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            node = proxmox.nodes(self.node_name)
+            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            resource.snapshot(self.snap_name).delete()
+            try:
+                self.signals.result.emit(
+                    tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
+                )
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("backend error", exc_info=True)
+            try:
+                self.signals.error.emit(str(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # ClusterTasksWorker
 # ----------------------------------------------------------------------
 class ClusterTasksSignals(QObject):

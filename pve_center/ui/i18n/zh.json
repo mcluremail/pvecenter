@@ -599,5 +599,12 @@
   "VM {vmid} cloned to {newid} on {target}": "虚拟机 {vmid} 已克隆为 {newid} 于 {target}",
   "VM info": "虚拟机信息",
   "Type:": "类型：",
-  "VMID:": "VMID："
+  "VMID:": "VMID：",
+  "Delete snapshot": "删除快照",
+  "Snapshot name": "快照名称",
+  "Include RAM state": "包含内存状态",
+  "Snapshot created": "快照已创建",
+  "Snapshot deleted": "快照已删除",
+  "Delete snapshot \"{name}\"?": "删除快照 \"{name}\"？",
+  "Include RAM state in snapshot": "在快照中包含内存状态"
 }

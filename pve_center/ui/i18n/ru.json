@@ -724,5 +724,12 @@
   "— none —": "— нет —",
   "❌ {} is unavailable": "❌ {} недоступен",
   "VM State": "Состояние ВМ",
-  "Parent": "Родитель"
+  "Parent": "Родитель",
+  "Delete snapshot": "Удалить снимок",
+  "Snapshot name": "Имя снимка",
+  "Include RAM state": "Включить состояние RAM",
+  "Snapshot created": "Снимок создан",
+  "Snapshot deleted": "Снимок удалён",
+  "Delete snapshot \"{name}\"?": "Удалить снимок \"{name}\"?",
+  "Include RAM state in snapshot": "Включить состояние RAM в снимок"
 }
