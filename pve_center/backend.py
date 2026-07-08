@@ -952,7 +952,7 @@ class VmSnapshotCreateWorker(QRunnable):
             node = proxmox.nodes(self.node_name)
             resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
             resource.snapshot.post(
-                name=self.snap_name,
+                snapname=self.snap_name,
                 description=self.description,
                 vmstate=1 if self.vmstate else 0,
             )
