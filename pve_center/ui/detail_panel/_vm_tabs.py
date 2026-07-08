@@ -313,6 +313,26 @@ class VMTabs:
             self.display_full_vm_info(vm_data, panel.details_cache[detail_key])
 
         node_name = vm_data.get("node") or host_name
+
+        vm_type = vm_data.get("type", "qemu") or "qemu"
+        if detail_key not in panel.vm_snapshots_cache:
+            panel.vm_snapshots_tree.clear()
+            panel.vm_snapshots_loading.setText(tr("Loading..."))
+            panel.vm_snapshots_stack.setCurrentIndex(0)
+            cfg = panel._cfg_by_name.get(host_name)
+            if cfg:
+                from ...backend import VmSnapshotsWorker
+                panel._workers_mgr.current_snap_worker = VmSnapshotsWorker(cfg, node_name, vmid, vm_type)
+                panel._workers_mgr.current_snap_worker.signals.snapshots_ready.connect(
+                    lambda vid, snaps, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
+                        (self.on_snapshots_loaded(vid, snaps, g, h), panel._workers_mgr.discard_worker(w)))
+                panel._workers_mgr.current_snap_worker.signals.snapshots_error.connect(
+                    lambda vid, err, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
+                        (self.on_snapshots_error(vid, err, g, h), panel._workers_mgr.discard_worker(w)))
+                panel._workers_mgr.run_worker(panel._workers_mgr.current_snap_worker)
+        else:
+            self.populate_vm_snapshots_tree(panel.vm_snapshots_cache[detail_key])
+
         self.load_iso_for_node(host_name, node_name)
 
         if detail_key not in panel.config_cache:
@@ -354,25 +374,6 @@ class VMTabs:
                 panel._workers_mgr.run_worker(panel._workers_mgr.current_hist_worker)
         else:
             panel.task_history_widget.set_tasks(panel.task_history_cache[detail_key])
-
-        vm_type = vm_data.get("type", "qemu") or "qemu"
-        if detail_key not in panel.vm_snapshots_cache:
-            panel.vm_snapshots_tree.clear()
-            panel.vm_snapshots_loading.setText(tr("Loading..."))
-            panel.vm_snapshots_stack.setCurrentIndex(0)
-            cfg = panel._cfg_by_name.get(host_name)
-            if cfg:
-                from ...backend import VmSnapshotsWorker
-                panel._workers_mgr.current_snap_worker = VmSnapshotsWorker(cfg, node_name, vmid, vm_type)
-                panel._workers_mgr.current_snap_worker.signals.snapshots_ready.connect(
-                    lambda vid, snaps, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
-                        (self.on_snapshots_loaded(vid, snaps, g, h), panel._workers_mgr.discard_worker(w)))
-                panel._workers_mgr.current_snap_worker.signals.snapshots_error.connect(
-                    lambda vid, err, g=gen, h=host_name, w=panel._workers_mgr.current_snap_worker:
-                        (self.on_snapshots_error(vid, err, g, h), panel._workers_mgr.discard_worker(w)))
-                panel._workers_mgr.run_worker(panel._workers_mgr.current_snap_worker)
-        else:
-            self.populate_vm_snapshots_tree(panel.vm_snapshots_cache[detail_key])
 
     def show_vm_metrics(self, vm_data):
         panel = self.panel

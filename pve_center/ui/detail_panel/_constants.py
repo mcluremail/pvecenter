@@ -4,7 +4,7 @@ from ..theme import Color
 
 _HEADER_STYLE = "QHeaderView::section { padding: 6px 8px; border: none; border-bottom: 1px solid #f0f1f4; }"
 
-_MAX_WORKERS_DP = 8
+_MAX_WORKERS_DP = 12
 
 try:
     import pyqtgraph as pg

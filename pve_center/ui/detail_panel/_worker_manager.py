@@ -1,6 +1,10 @@
+import logging
+
 from PySide6.QtCore import QThreadPool
 
 from ._constants import _MAX_WORKERS_DP
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerManager:
@@ -14,6 +18,7 @@ class WorkerManager:
 
     def run_worker(self, worker):
         if len(self._workers) >= _MAX_WORKERS_DP:
+            logger.warning("run_worker: pool full (%d/%d), worker not started", len(self._workers), _MAX_WORKERS_DP)
             return
         self._workers.add(worker)
         worker.signals.finished.connect(lambda w=worker: self.discard_worker(w))
