@@ -502,7 +502,6 @@ class VMTabs:
 
     def on_snapshots_loaded(self, vmid, snapshots, gen, host_name):
         panel = self.panel
-        logger.info("on_snapshots_loaded: vmid=%s count=%d gen=%d", vmid, len(snapshots), gen)
         if gen != panel._generation:
             return
         detail_key = (vmid, host_name)
@@ -512,7 +511,6 @@ class VMTabs:
 
     def on_snapshots_error(self, vmid, err, gen, host_name):
         panel = self.panel
-        logger.warning("on_snapshots_error: vmid=%s err=%s gen=%d", vmid, err, gen)
         if gen != panel._generation:
             return
         if not panel._last_vm_data or panel._last_vm_data.get("vmid") != vmid or panel._last_vm_data.get("host_name") != host_name:
@@ -779,6 +777,7 @@ class VMTabs:
         storages = [s for s in panel.all_storages
                     if s.get("node") == node_name
                     and "iso" in (s.get("content", "").split(","))]
+        from PySide6.QtCore import QThreadPool
         for storage_info in storages:
             storage = storage_info.get("storage")
             if not storage:
@@ -791,7 +790,8 @@ class VMTabs:
             worker.signals.error.connect(
                 lambda sn, ct, err, n=node_name: None
             )
-            panel._workers_mgr.run_worker(worker)
+            worker.signals.finished.connect(lambda w=worker: w.signals.finished.disconnect())
+            QThreadPool.globalInstance().start(worker)
 
     def on_vm_iso_loaded(self, node_name, data):
         panel = self.panel

@@ -729,6 +729,44 @@ class VmSnapshotsSignals(QObject):
     finished = Signal()
 
 
+_DISK_KEYS = ("scsi", "ide", "sata", "virtio", "efidisk")
+
+
+def _parse_disk_size(val_str):
+    """Parse size from a PVE disk config string like 'local-lvm:vm-100-disk-0,size=32G'."""
+    if not isinstance(val_str, str):
+        return 0
+    total = 0
+    for part in val_str.split(","):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        if key.strip() != "size":
+            continue
+        value = value.strip().upper()
+        if not value:
+            continue
+        multiplier = 1
+        if value.endswith("T"):
+            multiplier = 1024 ** 4
+            value = value[:-1]
+        elif value.endswith("G"):
+            multiplier = 1024 ** 3
+            value = value[:-1]
+        elif value.endswith("M"):
+            multiplier = 1024 ** 2
+            value = value[:-1]
+        elif value.endswith("K"):
+            multiplier = 1024
+            value = value[:-1]
+        try:
+            total += float(value) * multiplier
+        except ValueError:
+            pass
+    return int(total)
+
+
 class VmSnapshotsWorker(QRunnable):
     """Загружает список снапшотов для конкретной ВМ (с доп. запросом размера)."""
     def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
@@ -753,7 +791,6 @@ class VmSnapshotsWorker(QRunnable):
             node = proxmox.nodes(self.node_name)
             resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
             snaps = resource.snapshot.get()
-            logger.info("VmSnapshotsWorker: vmid=%s got %d snapshots", self.vmid, len(snaps) if snaps else 0)
             filtered = [dict(s) for s in snaps if s.get("name") != "current"]
             for snap in filtered:
                 name = snap.get("name", "")
@@ -761,16 +798,22 @@ class VmSnapshotsWorker(QRunnable):
                     continue
                 try:
                     cfg = resource.snapshot(name).config.get()
-                    snap["size"] = cfg.get("size", "")
+                    total_bytes = 0
+                    for key, val in cfg.items():
+                        if not isinstance(val, str):
+                            continue
+                        if key[0].isdigit() or key.startswith(("scsi", "ide", "sata", "virtio", "efidisk")):
+                            total_bytes += _parse_disk_size(val)
+                    snap["size"] = total_bytes
                 except Exception:
-                    snap["size"] = ""
+                    snap["size"] = 0
             filtered.sort(key=lambda s: (s.get("snaptime", 0) or 0))
             try:
                 self.signals.snapshots_ready.emit(self.vmid, filtered)
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.warning("VmSnapshotsWorker error for vmid %s: %s", self.vmid, e, exc_info=True)
+            logger.debug("VmSnapshotsWorker error for vmid %s: %s", self.vmid, e)
             try:
                 self.signals.snapshots_error.emit(self.vmid, str(e))
             except RuntimeError:
