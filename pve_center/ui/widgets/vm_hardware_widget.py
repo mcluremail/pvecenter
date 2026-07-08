@@ -127,6 +127,7 @@ class VmHardwareWidget(QWidget):
 
         self._add_btn = QToolButton()
         self._add_btn.setText(tr("Add"))
+        self._add_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         add_icon = get_icon("add")
         if add_icon:
             self._add_btn.setIcon(add_icon)
