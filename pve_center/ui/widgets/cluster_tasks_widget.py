@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
+    QProgressBar,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -156,11 +157,13 @@ class ClusterTasksWidget(QWidget):
         h.setSectionResizeMode(1, QHeaderView.Interactive)
         h.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         h.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(4, QHeaderView.Stretch)
-        h.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(4, QHeaderView.Interactive)
+        h.setSectionResizeMode(5, QHeaderView.Interactive)
 
         self.table.setColumnWidth(0, 155)
         self.table.setColumnWidth(1, 155)
+        self.table.setColumnWidth(4, 250)
+        self.table.setColumnWidth(5, 180)
 
         # Restore column widths (changes saved via sectionResized)
         self._restore_column_widths()
@@ -345,6 +348,70 @@ class ClusterTasksWidget(QWidget):
         self.table.setItem(0, 4, item)
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
+
+    # --- Progress bar row for upload/download operations ---
+
+    def add_progress_row(self, key, description):
+        """Insert a row at top showing a progress bar in the Status column."""
+        self.table.insertRow(0)
+        now_str = datetime.now().strftime(TIMESTAMP_FMT)
+        item0 = QTableWidgetItem(now_str)
+        item0.setForeground(QColor(Color.STATUS_WARN))
+        self.table.setItem(0, 0, item0)
+        item1 = QTableWidgetItem(tr("running..."))
+        item1.setForeground(QColor(Color.STATUS_WARN))
+        self.table.setItem(0, 1, item1)
+        self.table.setItem(0, 2, QTableWidgetItem(""))
+        self.table.setItem(0, 3, QTableWidgetItem(""))
+        item4 = QTableWidgetItem(description)
+        font = item4.font()
+        font.setBold(True)
+        item4.setFont(font)
+        self.table.setItem(0, 4, item4)
+        bar = QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(0)
+        bar.setFixedHeight(16)
+        bar.setStyleSheet(
+            f"QProgressBar {{ border: 1px solid {Color.BORDER_LIGHT}; border-radius: 3px;"
+            f" text-align: center; font-size: 11px; }}"
+            f"QProgressBar::chunk {{ background: {Color.STATUS_WARN}; border-radius: 2px; }}"
+        )
+        self.table.setCellWidget(0, 5, bar)
+        self.table.setRowHeight(0, 22)
+        self._progress_rows = getattr(self, "_progress_rows", {})
+        self._progress_rows[key] = 0
+
+    def update_progress_row(self, key, percent):
+        rows = getattr(self, "_progress_rows", {})
+        if key not in rows:
+            return
+        row = rows[key]
+        bar = self.table.cellWidget(row, 5)
+        if isinstance(bar, QProgressBar):
+            bar.setValue(percent)
+
+    def finish_progress_row(self, key, success, message=""):
+        rows = getattr(self, "_progress_rows", {})
+        if key not in rows:
+            return
+        row = rows[key]
+        bar = self.table.cellWidget(row, 5)
+        if isinstance(bar, QProgressBar):
+            self.table.removeCellWidget(row, 5)
+        if success:
+            now_str = datetime.now().strftime(TIMESTAMP_FMT)
+            self.table.setItem(row, 1, QTableWidgetItem(now_str))
+            item5 = QTableWidgetItem("OK")
+            item5.setForeground(QColor(Color.STATUS_OK))
+            self.table.setItem(row, 5, item5)
+        else:
+            item5 = QTableWidgetItem(tr("Error"))
+            item5.setForeground(QColor(Color.STATUS_ERR))
+            self.table.setItem(row, 5, item5)
+        if message:
+            self.table.setItem(row, 4, QTableWidgetItem(message))
+        del rows[key]
 
     def _on_sort_changed(self, col, order):
         """User clicked column header — re-sort data in Python."""

@@ -82,6 +82,15 @@ class MainWindow(QMainWindow):
         self.detail_panel.config_update_result.connect(
             lambda msg: self._notifications.show(msg, error=tr("Error") in msg)
         )
+        self.detail_panel.transfer_started.connect(
+            lambda key, desc: self.tasks_widget.add_progress_row(key, desc)
+        )
+        self.detail_panel.transfer_progress.connect(
+            lambda key, pct: self.tasks_widget.update_progress_row(key, pct)
+        )
+        self.detail_panel.transfer_finished.connect(
+            lambda key, ok, msg: self.tasks_widget.finish_progress_row(key, ok, msg)
+        )
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
 

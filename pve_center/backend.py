@@ -1,7 +1,9 @@
 import logging
+import os
 import threading
 import time
 
+import requests
 import urllib3
 from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
@@ -12,6 +14,8 @@ from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+PVE_PORT = 8006
 
 
 def _verify_ssl(cfg):
@@ -1674,7 +1678,7 @@ class StorageContentDeleteWorker(QRunnable):
                 if status == "stopped" and exitstatus == "OK":
                     try:
                         self.signals.result.emit(
-                            tr("Disk image {volid} destroyed").format(volid=self.volid)
+                            tr("File deleted: {volid}").format(volid=self.volid)
                         )
                     except RuntimeError:
                         pass
@@ -1682,14 +1686,14 @@ class StorageContentDeleteWorker(QRunnable):
                     err = exitstatus or status
                     try:
                         self.signals.error.emit(
-                            tr("Destroy failed: {err}").format(err=err)
+                            tr("Delete failed: {err}").format(err=err)
                         )
                     except RuntimeError:
                         pass
             else:
                 try:
                     self.signals.result.emit(
-                        tr("Disk image {volid} destroyed").format(volid=self.volid)
+                        tr("File deleted: {volid}").format(volid=self.volid)
                     )
                 except RuntimeError:
                     pass
@@ -1705,3 +1709,263 @@ class StorageContentDeleteWorker(QRunnable):
                 self.signals.finished.emit()
             except RuntimeError:
                 pass
+
+
+def _safe_emit(signal, *args):
+    try:
+        signal.emit(*args)
+    except RuntimeError:
+        pass
+
+
+# ----------------------------------------------------------------------
+# StorageUploadWorker — POST /nodes/{node}/storage/{storage}/upload (multipart)
+# ----------------------------------------------------------------------
+class StorageUploadSignals(QObject):
+    progress = Signal(int)
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class StorageUploadWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, storage_name, content_type, file_path, timeout=300):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.storage_name = storage_name
+        self.content_type = content_type
+        self.file_path = file_path
+        self.timeout = timeout
+        self.signals = StorageUploadSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            file_name = os.path.basename(self.file_path)
+            file_size = os.path.getsize(self.file_path)
+            verify = not bool(self.host_cfg.get("trust_ssl", True))
+            auth_token = (
+                f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}"
+                f"={self.host_cfg['token_value']}"
+            )
+            headers = {"Authorization": auth_token}
+            url = (
+                f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
+                f"nodes/{self.node_name}/storage/{self.storage_name}/upload"
+            )
+
+            class _ProgressReader:
+                def __init__(self, fp, total, callback):
+                    self._fp = fp
+                    self._total = total
+                    self._sent = 0
+                    self._cb = callback
+                    self._last_pct = -1
+
+                def read(self, size=-1):
+                    chunk = self._fp.read(size)
+                    if chunk:
+                        self._sent += len(chunk)
+                        pct = int(self._sent * 100 / self._total) if self._total else 0
+                        if pct != self._last_pct:
+                            self._last_pct = pct
+                            self._cb(pct)
+                    return chunk
+
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    chunk = self._fp.read(8192)
+                    if not chunk:
+                        raise StopIteration
+                    self._sent += len(chunk)
+                    pct = int(self._sent * 100 / self._total) if self._total else 0
+                    if pct != self._last_pct:
+                        self._last_pct = pct
+                        self._cb(pct)
+                    return chunk
+
+                def close(self):
+                    self._fp.close()
+
+            with open(self.file_path, "rb") as fp:
+                wrapper = _ProgressReader(fp, file_size, lambda p: _safe_emit(self.signals.progress, p))
+                files = {"filename": (file_name, wrapper, "application/octet-stream")}
+                data = {"content": self.content_type}
+                resp = requests.post(
+                    url, headers=headers, data=data, files=files,
+                    verify=verify, timeout=self.timeout,
+                )
+                if not resp.ok:
+                    try:
+                        body = resp.json()
+                        msg = body.get("data", {}).get("message", "") or body.get("message", "")
+                    except Exception:
+                        msg = ""
+                    raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])
+                result = resp.json().get("data", "")
+                if isinstance(result, str) and result.startswith("UPID:"):
+                    proxmox = ProxmoxAPI(
+                        self.host_cfg["host"],
+                        user=self.host_cfg["user"],
+                        token_name=self.host_cfg["token_name"],
+                        token_value=self.host_cfg["token_value"],
+                        verify_ssl=verify,
+                        timeout=10,
+                    )
+                    status, exitstatus = _poll_task(
+                        proxmox, self.node_name, result, timeout=self.timeout
+                    )
+                    if status == "stopped" and exitstatus == "OK":
+                        _safe_emit(self.signals.result, tr("Upload complete: {name}").format(name=file_name))
+                    else:
+                        err = exitstatus or status
+                        _safe_emit(self.signals.error, tr("Upload failed: {err}").format(err=err))
+                else:
+                    _safe_emit(self.signals.result, tr("Upload complete: {name}").format(name=file_name))
+        except Exception as e:
+            logger.debug("upload error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# StorageDownloadWorker — GET /nodes/{node}/storage/{storage}/content/{volid}?download=1
+# ----------------------------------------------------------------------
+class StorageDownloadSignals(QObject):
+    progress = Signal(int)
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class StorageDownloadWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, storage_name, volid, dest_path, timeout=300):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.storage_name = storage_name
+        self.volid = volid
+        self.dest_path = dest_path
+        self.timeout = timeout
+        self.signals = StorageDownloadSignals()
+
+    def run(self):
+        try:
+            verify = not bool(self.host_cfg.get("trust_ssl", True))
+            auth_token = (
+                f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}"
+                f"={self.host_cfg['token_value']}"
+            )
+            headers = {"Authorization": auth_token}
+            import urllib.parse
+            encoded_volid = urllib.parse.quote(self.volid, safe="")
+            url = (
+                f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
+                f"nodes/{self.node_name}/storage/{self.storage_name}/content/{encoded_volid}"
+            )
+            resp = requests.get(
+                url, headers=headers, params={"download": 1},
+                verify=verify, timeout=self.timeout, stream=True,
+            )
+            if not resp.ok:
+                try:
+                    body = resp.json()
+                    msg = body.get("data", {}).get("message", "") or body.get("message", "")
+                except Exception:
+                    msg = ""
+                raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])
+            total = int(resp.headers.get("content-length", 0))
+            downloaded = 0
+            last_pct = -1
+            with open(self.dest_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0:
+                        pct = int(downloaded * 100 / total)
+                        if pct != last_pct:
+                            last_pct = pct
+                            _safe_emit(self.signals.progress, pct)
+            _safe_emit(self.signals.result, tr("Download complete: {path}").format(path=self.dest_path))
+        except Exception as e:
+            logger.debug("download error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# StorageMoveWorker — POST /nodes/{node}/storage/{storage}/content/{volid}
+# ----------------------------------------------------------------------
+class StorageMoveSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class StorageMoveWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, storage_name, volid,
+                 target_storage, target_vmid=0, delete_source=False, timeout=300):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.storage_name = storage_name
+        self.volid = volid
+        self.target_storage = target_storage
+        self.target_vmid = target_vmid
+        self.delete_source = delete_source
+        self.timeout = timeout
+        self.signals = StorageMoveSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=not bool(self.host_cfg.get("trust_ssl", True)),
+                timeout=10,
+            )
+            params = {"target_storage": self.target_storage}
+            if self.target_vmid:
+                params["target_vmid"] = self.target_vmid
+            if self.delete_source:
+                params["delete"] = 1
+            upid = (
+                proxmox.nodes(self.node_name)
+                .storage(self.storage_name)
+                .content(self.volid)
+                .post(**params)
+            )
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(
+                    proxmox, self.node_name, upid, timeout=self.timeout
+                )
+                if status == "stopped" and exitstatus == "OK":
+                    _safe_emit(self.signals.result,
+                               tr("Move complete: {volid} → {storage}").format(
+                                   volid=self.volid, storage=self.target_storage))
+                else:
+                    err = exitstatus or status
+                    _safe_emit(self.signals.error, tr("Move failed: {err}").format(err=err))
+            else:
+                _safe_emit(self.signals.result,
+                           tr("Move complete: {volid} → {storage}").format(
+                               volid=self.volid, storage=self.target_storage))
+        except Exception as e:
+            logger.debug("move error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)

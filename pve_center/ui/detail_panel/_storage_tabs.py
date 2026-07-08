@@ -1,21 +1,27 @@
 from datetime import datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QProgressBar,
+    QPushButton,
     QScrollArea,
     QStackedWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ..i18n import tr
 from ..icons import get_icon
+from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
 from ._constants import _HAS_PG, TabIndex, _progress_style
 from ._table_utils import (
@@ -27,6 +33,92 @@ from ._table_utils import (
     set_cell_text,
     update_progress_bar,
 )
+
+
+class StorageToolbar(QWidget):
+    """Toolbar with Upload/Download/Move/Remove buttons for storage content tables."""
+
+    upload_requested = Signal()
+    download_requested = Signal()
+    move_requested = Signal()
+    remove_requested = Signal()
+
+    _UPLOAD_TYPES = {"iso", "vztmpl", "backup"}
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._content_type = ""
+        self._has_selection = False
+
+        self._upload_btn = QToolButton()
+        self._upload_btn.setText(tr("Upload"))
+        up_icon = get_icon("upload")
+        if up_icon:
+            self._upload_btn.setIcon(up_icon)
+        self._upload_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._upload_btn.setEnabled(False)
+        self._upload_btn.clicked.connect(self.upload_requested)
+        self._upload_btn.setToolTip("")
+
+        self._download_btn = QPushButton(tr("Download"))
+        dl_icon = get_icon("download")
+        if dl_icon:
+            self._download_btn.setIcon(dl_icon)
+        self._download_btn.setEnabled(False)
+        self._download_btn.clicked.connect(self.download_requested)
+        self._download_btn.setToolTip("")
+
+        self._move_btn = QPushButton(tr("Move"))
+        self._move_btn.setEnabled(False)
+        self._move_btn.clicked.connect(self.move_requested)
+        self._move_btn.setToolTip("")
+
+        self._remove_btn = QPushButton(tr("Remove"))
+        rm_icon = get_icon("remove")
+        if rm_icon:
+            self._remove_btn.setIcon(rm_icon)
+        self._remove_btn.setEnabled(False)
+        self._remove_btn.clicked.connect(self.remove_requested)
+        self._remove_btn.setToolTip("")
+
+        layout = QHBoxLayout(self)
+        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._upload_btn)
+        layout.addWidget(self._download_btn)
+        layout.addWidget(self._move_btn)
+        layout.addWidget(self._remove_btn)
+        layout.addStretch()
+
+    def set_content_type(self, ct):
+        self._content_type = ct
+        can_upload = ct in self._UPLOAD_TYPES
+        self._upload_btn.setEnabled(can_upload and self._has_selection is False)
+        if not can_upload:
+            self._upload_btn.setToolTip(tr("Cannot upload to this storage type"))
+        else:
+            self._upload_btn.setToolTip("")
+        if can_upload:
+            self._upload_btn.setEnabled(True)
+        else:
+            self._upload_btn.setEnabled(False)
+
+    def set_has_selection(self, has_sel):
+        self._has_selection = has_sel
+        can_upload = self._content_type in self._UPLOAD_TYPES
+        self._upload_btn.setEnabled(can_upload)
+        self._download_btn.setEnabled(has_sel)
+        self._move_btn.setEnabled(has_sel)
+        self._remove_btn.setEnabled(has_sel)
+
+    def set_context(self, node_name, storage_name, host_name, cfg, content_type):
+        self._content_type = content_type
+        can_upload = content_type in self._UPLOAD_TYPES
+        self._upload_btn.setEnabled(can_upload)
+        if not can_upload:
+            self._upload_btn.setToolTip(tr("Cannot upload to this storage type"))
+        else:
+            self._upload_btn.setToolTip("")
 
 
 class StorageTabs:
@@ -147,10 +239,14 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_backups_table = table
+        toolbar = StorageToolbar()
+        panel.storage_backups_toolbar = toolbar
         stack = QStackedWidget()
         loading = loading_label()
         stack.addWidget(loading)
-        stack.addWidget(make_filterable_table(table))
+        filter_table = make_filterable_table(table)
+        filter_widget = filter_table
+        stack.addWidget(filter_widget)
         stack.setCurrentIndex(0)
         panel.storage_backups_loading = loading
         panel.storage_backups_stack = stack
@@ -159,6 +255,8 @@ class StorageTabs:
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -173,6 +271,8 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_disks_table = table
+        toolbar = StorageToolbar()
+        panel.storage_disks_toolbar = toolbar
         stack = QStackedWidget()
         loading = loading_label()
         stack.addWidget(loading)
@@ -185,6 +285,8 @@ class StorageTabs:
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -198,6 +300,8 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_iso_table = table
+        toolbar = StorageToolbar()
+        panel.storage_iso_toolbar = toolbar
         stack = QStackedWidget()
         loading = loading_label()
         stack.addWidget(loading)
@@ -210,6 +314,8 @@ class StorageTabs:
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -223,6 +329,8 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_tpl_table = table
+        toolbar = StorageToolbar()
+        panel.storage_tpl_toolbar = toolbar
         stack = QStackedWidget()
         loading = loading_label()
         stack.addWidget(loading)
@@ -235,6 +343,8 @@ class StorageTabs:
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -473,6 +583,47 @@ class StorageTabs:
             nodes_with_sto = set(s.get("node") for s in filtered)
             node_vms = [vm for vm in panel.all_vms if vm.get("node") in nodes_with_sto]
             self.fetch_storage_disks_simple(storage_name, node_name, host_name, cfg, node_vms)
+
+        toolbar_map = {
+            "backup": panel.storage_backups_toolbar,
+            "images": panel.storage_disks_toolbar,
+            "rootdir": panel.storage_disks_toolbar,
+            "iso": panel.storage_iso_toolbar,
+            "vztmpl": panel.storage_tpl_toolbar,
+            "snippets": panel.storage_tpl_toolbar,
+        }
+        connected = set()
+        for ct in allowed:
+            tb = toolbar_map.get(ct)
+            if tb and id(tb) not in connected:
+                tb.set_context(node_name, storage_name, host_name, cfg, ct)
+                connected.add(id(tb))
+                try:
+                    tb.upload_requested.disconnect()
+                    tb.download_requested.disconnect()
+                    tb.move_requested.disconnect()
+                    tb.remove_requested.disconnect()
+                except (TypeError, RuntimeError):
+                    pass
+                tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
+                    self._on_upload(n, s, h, ct))
+                tb.download_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
+                    self._on_download(n, s, h))
+                tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
+                    self._on_move(n, s, h))
+                tb.remove_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
+                    self._on_remove_file(n, s, h))
+                table_map_tb = {
+                    panel.storage_backups_toolbar: panel.storage_backups_table,
+                    panel.storage_disks_toolbar: panel.storage_disks_table,
+                    panel.storage_iso_toolbar: panel.storage_iso_table,
+                    panel.storage_tpl_toolbar: panel.storage_tpl_table,
+                }
+                tbl = table_map_tb.get(tb)
+                if tbl:
+                    tbl.itemSelectionChanged.connect(
+                        lambda t=tbl, b=tb: b.set_has_selection(len(t.selectedItems()) > 0 and t.currentRow() >= 0)
+                    )
 
     def on_storage_content_piece(self, storage_name, content_type, data):
         panel = self.panel
@@ -723,3 +874,219 @@ class StorageTabs:
             old_bar = node_table.cellWidget(r, 5)
             if isinstance(old_bar, QProgressBar):
                 update_progress_bar(old_bar, pct, f"{pct}%")
+
+    # --- File operations: Upload / Download / Move / Remove ---
+
+    def _get_selected_volid(self, table):
+        """Extract volid from the selected row of a storage content table."""
+        row = table.currentRow()
+        if row < 0:
+            return None, None
+        item0 = table.item(row, 0)
+        if not item0:
+            return None, None
+        volid = item0.text()
+        return row, volid
+
+    def _get_active_table(self, node_name, storage_name):
+        """Return the currently visible content table based on active tab."""
+        panel = self.panel
+        idx = panel.tabs.currentIndex()
+        if idx == TabIndex.BACKUPS:
+            return panel.storage_backups_table
+        if idx == TabIndex.DISKS_VM:
+            return panel.storage_disks_table
+        if idx == TabIndex.ISO:
+            return panel.storage_iso_table
+        if idx == TabIndex.TEMPLATES:
+            return panel.storage_tpl_table
+        return None
+
+    def _on_upload(self, node_name, storage_name, host_name, content_type):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        if content_type == "images":
+            QMessageBox.information(self.panel, tr("Upload"), tr("Cannot upload to this storage type"))
+            return
+        file_filter_map = {
+            "iso": tr("ISO images (*.iso);;All files (*.*)"),
+            "vztmpl": tr("Templates (*.tar.gz *.tar.xz);;All files (*.*)"),
+            "backup": tr("Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)"),
+            "snippets": tr("All files (*.*)"),
+        }
+        path, _ = QFileDialog.getOpenFileName(
+            self.panel, tr("Select file to upload"), "",
+            file_filter_map.get(content_type, tr("All files (*.*)"))
+        )
+        if not path:
+            return
+        import os
+        file_name = os.path.basename(path)
+        key = f"upload:{storage_name}:{file_name}"
+        panel.transfer_started.emit(key, tr("Upload {name}").format(name=file_name))
+        from ...backend import StorageUploadWorker
+        worker = StorageUploadWorker(cfg, node_name, storage_name, content_type, path)
+        worker.signals.progress.connect(
+            lambda pct, k=key: panel.transfer_progress.emit(k, pct)
+        )
+        worker.signals.result.connect(
+            lambda msg, k=key: (
+                panel.transfer_finished.emit(k, True, msg),
+                panel.config_update_result.emit(msg),
+                self._reload_storage_content(),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, k=key: (
+                panel.transfer_finished.emit(k, False, err),
+                panel.config_update_result.emit(tr("Upload failed: {err}").format(err=err), ),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_download(self, node_name, storage_name, host_name):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        table = self._get_active_table(node_name, storage_name)
+        if not table:
+            return
+        _, volid = self._get_selected_volid(table)
+        if not volid:
+            return
+        volid_full = volid
+        if ":" not in volid and not volid.startswith(storage_name):
+            volid_full = f"{storage_name}:{volid}"
+        default_name = volid_full.split(":")[-1].split("/")[-1] if ":" in volid_full else volid
+        path, _ = QFileDialog.getSaveFileName(
+            self.panel, tr("Save file to..."), default_name, tr("All files (*.*)")
+        )
+        if not path:
+            return
+        key = f"download:{volid_full}"
+        panel.transfer_started.emit(key, tr("Download {name}").format(name=default_name))
+        from ...backend import StorageDownloadWorker
+        worker = StorageDownloadWorker(cfg, node_name, storage_name, volid_full, path)
+        worker.signals.progress.connect(
+            lambda pct, k=key: panel.transfer_progress.emit(k, pct)
+        )
+        worker.signals.result.connect(
+            lambda msg, k=key: (
+                panel.transfer_finished.emit(k, True, msg),
+                panel.config_update_result.emit(msg),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, k=key: (
+                panel.transfer_finished.emit(k, False, err),
+                panel.config_update_result.emit(tr("Download failed: {err}").format(err=err)),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_move(self, node_name, storage_name, host_name):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        table = self._get_active_table(node_name, storage_name)
+        if not table:
+            return
+        _, volid = self._get_selected_volid(table)
+        if not volid:
+            return
+        volid_full = volid
+        if ":" not in volid and not volid.startswith(storage_name):
+            volid_full = f"{storage_name}:{volid}"
+        is_disk = table is panel.storage_disks_table
+        target_storages = [
+            s for s in panel.all_storages
+            if s.get("node") == node_name and s.get("storage") != storage_name
+        ]
+        dlg = StorageMoveDialog(volid_full, target_storages, is_disk, self.panel)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params["target_storage"]:
+            return
+        from ...backend import StorageMoveWorker
+        worker = StorageMoveWorker(
+            cfg, node_name, storage_name, volid_full,
+            params["target_storage"],
+            params["target_vmid"],
+            params["delete_source"],
+        )
+        worker.signals.result.connect(
+            lambda msg, w=worker: (
+                panel.config_update_result.emit(msg),
+                self._reload_storage_content(),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, w=worker: (
+                panel.config_update_result.emit(tr("Move failed: {err}").format(err=err)),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_remove_file(self, node_name, storage_name, host_name):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        table = self._get_active_table(node_name, storage_name)
+        if not table:
+            return
+        _, volid = self._get_selected_volid(table)
+        if not volid:
+            return
+        volid_full = volid
+        if ":" not in volid and not volid.startswith(storage_name):
+            volid_full = f"{storage_name}:{volid}"
+        if not confirm_file_delete(volid_full, self.panel):
+            return
+        from ...backend import StorageContentDeleteWorker
+        worker = StorageContentDeleteWorker(cfg, node_name, storage_name, volid_full)
+        worker.signals.result.connect(
+            lambda msg, w=worker: (
+                panel.config_update_result.emit(msg),
+                self._reload_storage_content(),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, w=worker: (
+                panel.config_update_result.emit(tr("Delete failed: {err}").format(err=err)),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _reload_storage_content(self):
+        panel = self.panel
+        if panel.current_obj_type != "storage":
+            return
+        storage_name = panel.current_obj_name
+        data = panel.current_obj_data or {}
+        cluster = data.get("cluster")
+        host_name_filter = data.get("host_name")
+        if cluster:
+            filtered = [s for s in panel.all_storages
+                        if s.get("storage") == storage_name and s.get("cluster") == cluster]
+        elif host_name_filter:
+            filtered = [s for s in panel.all_storages
+                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
+        else:
+            filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
+        if filtered:
+            rep = filtered[0]
+            self.load_storage_content(storage_name, filtered, rep)

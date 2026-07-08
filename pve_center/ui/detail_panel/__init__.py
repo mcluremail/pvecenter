@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 class DetailPanel(QWidget):
     config_update_result = Signal(str)
+    transfer_progress = Signal(str, int)      # (key, percent)
+    transfer_started = Signal(str, str)       # (key, description)
+    transfer_finished = Signal(str, bool, str) # (key, success, message)
 
     def __init__(self, nodes_cfg):
         super().__init__()
