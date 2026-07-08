@@ -326,6 +326,44 @@ class SnapshotSignals(_FinishedMixin):
     snapshots_ready = Signal(str, list)
     snapshots_error = Signal(str, str)
 
+
+_DISK_PREFIXES = ("scsi", "ide", "sata", "virtio", "efidisk")
+
+
+def _parse_disk_size(val_str):
+    if not isinstance(val_str, str):
+        return 0
+    total = 0
+    for part in val_str.split(","):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        if key.strip() != "size":
+            continue
+        value = value.strip().upper()
+        if not value:
+            continue
+        multiplier = 1
+        if value.endswith("T"):
+            multiplier = 1024 ** 4
+            value = value[:-1]
+        elif value.endswith("G"):
+            multiplier = 1024 ** 3
+            value = value[:-1]
+        elif value.endswith("M"):
+            multiplier = 1024 ** 2
+            value = value[:-1]
+        elif value.endswith("K"):
+            multiplier = 1024
+            value = value[:-1]
+        try:
+            total += float(value) * multiplier
+        except ValueError:
+            pass
+    return int(total)
+
+
 class HostSnapshotsWorker(QRunnable):
     def __init__(self, host_cfg, node_name, vms):
         super().__init__()
@@ -359,21 +397,39 @@ class HostSnapshotsWorker(QRunnable):
                     r = s.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
                     _check_response(r)
                     data = r.json().get("data", [])
+                    vm_snaps = []
                     for snap in data:
                         if snap.get("name") == "current":
                             continue
                         snap["vmid"] = vmid
                         snap["vm_name"] = vm_name
-                        with lock:
-                            all_snapshots.append(dict(snap))
+                        snap["size"] = 0
+                        vm_snaps.append(dict(snap))
+                    for snap in vm_snaps:
+                        snap_name = snap.get("name", "")
+                        if not snap_name:
+                            continue
+                        try:
+                            cfg_url = f"{url}/{urllib.parse.quote(snap_name, safe='')}/config"
+                            rc = s.get(cfg_url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+                            _check_response(rc)
+                            cfg = rc.json().get("data", {})
+                            total_bytes = 0
+                            for key, val in cfg.items():
+                                if not isinstance(val, str):
+                                    continue
+                                if any(key.startswith(p) for p in _DISK_PREFIXES):
+                                    total_bytes += _parse_disk_size(val)
+                            snap["size"] = total_bytes
+                        except Exception:
+                            pass
+                    with lock:
+                        all_snapshots.extend(vm_snaps)
                 except Exception:
                     pass
                 finally:
                     s.close()
 
-            # executor.map возвращает ленивый итератор — без list() futures не
-            # создаются и потоки не стартуют. Список результатов не нужен, но
-            # итератор должен быть материализован, чтобы воркеры запустились.
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                 list(executor.map(fetch_vm_snapshots, self.vms))
 

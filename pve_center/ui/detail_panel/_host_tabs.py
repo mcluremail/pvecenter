@@ -150,20 +150,30 @@ class HostTabs:
         return tab
 
     def build_snapshots_tab(self):
+        from PySide6.QtWidgets import QTreeWidget
         loading = loading_label()
-        table = make_table(
-            [tr("VM"), tr("Snapshot"), tr("Description"), tr("Created"), tr("Current")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
-             (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
-             (QHeaderView.Interactive, 50)],
-            sortable=True,
-        )
+        tree = QTreeWidget()
+        tree.setHeaderLabels([
+            tr("Snapshot"), tr("Description"), tr("Created"),
+            tr("VM State"), tr("Size"), tr("Parent"),
+        ])
+        tree.setEditTriggers(QTreeWidget.NoEditTriggers)
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(True)
+        tree.setColumnWidth(0, 200)
+        tree.setColumnWidth(1, 200)
+        tree.setColumnWidth(2, 160)
+        tree.setColumnWidth(3, 80)
+        tree.setColumnWidth(4, 100)
+        tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tree.header().setStretchLastSection(False)
+        tree.header().setSectionResizeMode(5, QHeaderView.Stretch)
         stack = QStackedWidget()
         stack.addWidget(loading)
-        stack.addWidget(table)
+        stack.addWidget(tree)
         stack.setCurrentIndex(0)
         self.panel.host_snapshots_loading = loading
-        self.panel.host_snapshots_table = table
+        self.panel.host_snapshots_tree = tree
         self.panel.host_snapshots_stack = stack
         tab = QScrollArea()
         tab.setWidgetResizable(True)
@@ -536,7 +546,7 @@ class HostTabs:
         panel.host_disks_table.setRowCount(0)
         panel.host_snapshots_stack.setCurrentIndex(0)
         panel.host_snapshots_stack.widget(0).setText(tr("Loading..."))
-        panel.host_snapshots_table.setRowCount(0)
+        panel.host_snapshots_tree.clear()
         panel.host_health_stack.setCurrentIndex(0)
         panel.host_health_loading.setText(tr("Loading..."))
         panel.host_health_list.set_items([])
@@ -1085,30 +1095,79 @@ class HostTabs:
             return
         if snapshots:
             panel.host_snapshots_stack.setCurrentIndex(1)
-            self.populate_host_snapshots_table(snapshots)
+            self.populate_host_snapshots_tree(snapshots)
         else:
             panel.host_snapshots_stack.widget(0).setText(tr("No snapshots"))
             panel.host_snapshots_stack.setCurrentIndex(0)
 
-    def populate_host_snapshots_table(self, snapshots):
-        table = self.panel.host_snapshots_table
-        table.setRowCount(len(snapshots))
-        for i, snap in enumerate(snapshots):
-            table.setItem(i, 0, QTableWidgetItem(f"{snap.get('vmid', '')} {snap.get('vm_name', '')}"))
-            table.setItem(i, 1, QTableWidgetItem(snap.get("name", "")))
-            table.setItem(i, 2, QTableWidgetItem(snap.get("description", "")))
+    def populate_host_snapshots_tree(self, snapshots):
+        from PySide6.QtWidgets import QTreeWidgetItem
+        tree = self.panel.host_snapshots_tree
+        tree.clear()
+        vms_map = {}
+        for snap in snapshots:
+            vmid = snap.get("vmid", 0)
+            vms_map.setdefault(vmid, []).append(snap)
+
+        def make_snap_item(snap):
+            name = snap.get("name", "")
+            desc = snap.get("description", "") or ""
             snaptime = snap.get("snaptime", 0)
-            if snaptime:
-                ts = datetime.fromtimestamp(snaptime).strftime("%Y-%m-%d %H:%M:%S")
-                table.setItem(i, 3, QTableWidgetItem(ts))
+            ts = datetime.fromtimestamp(snaptime).strftime("%Y-%m-%d %H:%M:%S") if snaptime else ""
+            vm_state = tr("yes") if snap.get("vmstate", 0) else tr("no")
+            size_val = snap.get("size", 0)
+            if isinstance(size_val, (int, float)) and size_val > 0:
+                gb = size_val / (1024 ** 3)
+                size_str = f"{gb / 1024:.1f} TiB" if gb >= 1024 else f"{gb:.1f} GiB"
             else:
-                table.setItem(i, 3, QTableWidgetItem(""))
-            running = tr("yes") if snap.get("running", 0) else tr("no")
-            table.setItem(i, 4, QTableWidgetItem(running))
-        table.resizeRowsToContents()
-        for r in range(table.rowCount()):
-            if table.rowHeight(r) > 24:
-                table.setRowHeight(r, 24)
+                size_str = "—"
+            parent_name = snap.get("parent", "") or ""
+            return QTreeWidgetItem([name, desc, ts, vm_state, size_str, parent_name])
+
+        for vmid in sorted(vms_map.keys()):
+            vm_snaps = vms_map[vmid]
+            first = vm_snaps[0]
+            vm_label = f"{vmid} {first.get('vm_name', '')}"
+            vm_item = QTreeWidgetItem([vm_label, "", "", "", "", ""])
+            font = vm_item.font(0)
+            font.setBold(True)
+            vm_item.setFont(0, font)
+            snap_by_name = {s.get("name", ""): s for s in vm_snaps}
+            created_names = set()
+            remaining = list(vm_snaps)
+
+            for _ in range(len(vm_snaps) + 1):
+                progress = False
+                still = []
+                for snap in remaining:
+                    parent_name = snap.get("parent", "") or ""
+                    if not parent_name or parent_name == "current" or parent_name not in snap_by_name:
+                        item = make_snap_item(snap)
+                        vm_item.addChild(item)
+                        snap["_item"] = item
+                        created_names.add(snap.get("name", ""))
+                        progress = True
+                    elif parent_name in created_names:
+                        parent_snap = snap_by_name[parent_name]
+                        parent_item = parent_snap.get("_item")
+                        if parent_item:
+                            item = make_snap_item(snap)
+                            parent_item.addChild(item)
+                            snap["_item"] = item
+                            created_names.add(snap.get("name", ""))
+                            progress = True
+                        else:
+                            still.append(snap)
+                    else:
+                        still.append(snap)
+                remaining = still
+                if not progress:
+                    break
+
+            tree.addTopLevelItem(vm_item)
+
+        tree.expandAll()
+        tree.resizeColumnToContents(0)
 
     def fetch_host_metrics(self, host_data):
         panel = self.panel
