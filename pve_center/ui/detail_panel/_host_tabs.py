@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QStackedWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -615,6 +616,7 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.SNAPSHOTS, True)
         panel.tabs.setTabVisible(TabIndex.HEALTH, True)
         panel.tabs.setTabVisible(TabIndex.BACKUP_JOBS, True)
+        panel.tabs.setTabVisible(TabIndex.ACCESS, True)
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, False)
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
         self.populate_host_summary(hosts)
@@ -624,6 +626,7 @@ class HostTabs:
         self._fetch_cluster_snapshots(hosts)
         self._fetch_cluster_health(hosts)
         self._fetch_backup_jobs(cluster_cfg, cluster_name)
+        self._fetch_access_all(cluster_cfg)
 
     def show_host_info(self, host_name, host_data):
         panel = self.panel
@@ -666,6 +669,7 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.SNAPSHOTS, True)
         panel.tabs.setTabVisible(TabIndex.HEALTH, True)
         panel.tabs.setTabVisible(TabIndex.BACKUP_JOBS, True)
+        panel.tabs.setTabVisible(TabIndex.ACCESS, True)
         panel.tabs.setCurrentIndex(TabIndex.MONITOR)
 
         panel.host_network_stack.setCurrentIndex(0)
@@ -814,6 +818,16 @@ class HostTabs:
                         break
                 if cluster_cfg:
                     self._fetch_backup_jobs(cluster_cfg, cluster_name)
+            access_cfg = host_cfg
+            if is_cluster_host:
+                cluster_name = host_cfg.get("cluster", "")
+                for n in panel.all_nodes:
+                    cn = panel._cfg_by_name.get(n.get("host_name", ""))
+                    if cn and cn.get("cluster") == cluster_name:
+                        access_cfg = cn
+                        break
+            if access_cfg:
+                self._fetch_access_all(access_cfg)
 
     def populate_host_storage_table(self, storages):
         panel = self.panel
@@ -1796,6 +1810,1096 @@ class HostTabs:
         ))
         worker.signals.error.connect(lambda err, w=worker: (
             panel.config_update_result.emit(tr("Job delete failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    # ------------------------------------------------------------------
+    # Access Management tab
+    # ------------------------------------------------------------------
+
+    def build_access_tab(self):
+        panel = self.panel
+        inner = QTabWidget()
+
+        inner.addTab(self._build_access_users_page(), get_icon("user"), tr("Users"))
+        inner.addTab(self._build_access_tokens_page(), get_icon("token"), tr("API Tokens"))
+        inner.addTab(self._build_access_groups_page(), get_icon("group"), tr("Groups"))
+        inner.addTab(self._build_access_roles_page(), get_icon("role"), tr("Roles"))
+        inner.addTab(self._build_access_acl_page(), get_icon("acl"), tr("Permissions"))
+
+        panel.access_inner = inner
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(inner)
+        return tab
+
+    # --- Users sub-page ---
+
+    def _build_access_users_page(self):
+        panel = self.panel
+        loading = loading_label()
+        table = make_table(
+            [tr("User ID"), tr("Enabled"), tr("Expire"), tr("Groups"),
+             tr("Comment"), tr("Tokens")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 60),
+             (QHeaderView.Interactive, 100), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 60)],
+            sortable=True,
+        )
+        panel.access_users_table = table
+        table.doubleClicked.connect(lambda idx: self._on_edit_access_user())
+        toolbar = QWidget()
+        btn_layout = QHBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_add_access_user)
+        btn_layout.addWidget(add_btn)
+        edit_btn = QPushButton(tr("Edit"))
+        edit_btn.setMinimumHeight(28)
+        edit_btn.clicked.connect(self._on_edit_access_user)
+        btn_layout.addWidget(edit_btn)
+        remove_btn = QPushButton(get_icon("remove"), tr("Remove"))
+        remove_btn.setMinimumHeight(28)
+        remove_btn.clicked.connect(self._on_remove_access_user)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addStretch()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        from ._table_utils import make_filterable_table
+        stack.addWidget(make_filterable_table(table))
+        stack.setCurrentIndex(0)
+        panel.access_users_loading = loading
+        panel.access_users_stack = stack
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        return container
+
+    # --- Tokens sub-page ---
+
+    def _build_access_tokens_page(self):
+        panel = self.panel
+        loading = loading_label()
+        table = make_table(
+            [tr("Token ID"), tr("User"), tr("Comment"), tr("Priv. sep."),
+             tr("Expire")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 80),
+             (QHeaderView.Interactive, 100)],
+            sortable=True,
+        )
+        panel.access_tokens_table = table
+        table.doubleClicked.connect(lambda idx: self._on_edit_access_token())
+        toolbar = QWidget()
+        btn_layout = QHBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_add_access_token)
+        btn_layout.addWidget(add_btn)
+        edit_btn = QPushButton(tr("Edit"))
+        edit_btn.setMinimumHeight(28)
+        edit_btn.clicked.connect(self._on_edit_access_token)
+        btn_layout.addWidget(edit_btn)
+        remove_btn = QPushButton(get_icon("remove"), tr("Remove"))
+        remove_btn.setMinimumHeight(28)
+        remove_btn.clicked.connect(self._on_remove_access_token)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addStretch()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        from ._table_utils import make_filterable_table
+        stack.addWidget(make_filterable_table(table))
+        stack.setCurrentIndex(0)
+        panel.access_tokens_loading = loading
+        panel.access_tokens_stack = stack
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        return container
+
+    # --- Groups sub-page ---
+
+    def _build_access_groups_page(self):
+        panel = self.panel
+        loading = loading_label()
+        table = make_table(
+            [tr("Group ID"), tr("Comment"), tr("Members")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None)],
+            sortable=True,
+        )
+        panel.access_groups_table = table
+        table.doubleClicked.connect(lambda idx: self._on_edit_access_group())
+        toolbar = QWidget()
+        btn_layout = QHBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_add_access_group)
+        btn_layout.addWidget(add_btn)
+        edit_btn = QPushButton(tr("Edit"))
+        edit_btn.setMinimumHeight(28)
+        edit_btn.clicked.connect(self._on_edit_access_group)
+        btn_layout.addWidget(edit_btn)
+        remove_btn = QPushButton(get_icon("remove"), tr("Remove"))
+        remove_btn.setMinimumHeight(28)
+        remove_btn.clicked.connect(self._on_remove_access_group)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addStretch()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        from ._table_utils import make_filterable_table
+        stack.addWidget(make_filterable_table(table))
+        stack.setCurrentIndex(0)
+        panel.access_groups_loading = loading
+        panel.access_groups_stack = stack
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        return container
+
+    # --- Roles sub-page ---
+
+    def _build_access_roles_page(self):
+        panel = self.panel
+        loading = loading_label()
+        table = make_table(
+            [tr("Role ID"), tr("Privileges"), tr("Built-in")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Interactive, 70)],
+            sortable=True,
+        )
+        panel.access_roles_table = table
+        table.doubleClicked.connect(lambda idx: self._on_edit_access_role())
+        toolbar = QWidget()
+        btn_layout = QHBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_add_access_role)
+        btn_layout.addWidget(add_btn)
+        edit_btn = QPushButton(tr("Edit"))
+        edit_btn.setMinimumHeight(28)
+        edit_btn.clicked.connect(self._on_edit_access_role)
+        btn_layout.addWidget(edit_btn)
+        remove_btn = QPushButton(get_icon("remove"), tr("Remove"))
+        remove_btn.setMinimumHeight(28)
+        remove_btn.clicked.connect(self._on_remove_access_role)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addStretch()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        from ._table_utils import make_filterable_table
+        stack.addWidget(make_filterable_table(table))
+        stack.setCurrentIndex(0)
+        panel.access_roles_loading = loading
+        panel.access_roles_stack = stack
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        return container
+
+    # --- ACL / Permissions sub-page ---
+
+    def _build_access_acl_page(self):
+        panel = self.panel
+        loading = loading_label()
+        table = make_table(
+            [tr("Path"), tr("Type"), tr("ID"), tr("Role"), tr("Propagate")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 80),
+             (QHeaderView.Stretch, None), (QHeaderView.Stretch, None),
+             (QHeaderView.Interactive, 80)],
+            sortable=True,
+        )
+        panel.access_acl_table = table
+        toolbar = QWidget()
+        btn_layout = QHBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_add_access_acl)
+        btn_layout.addWidget(add_btn)
+        remove_btn = QPushButton(get_icon("remove"), tr("Remove"))
+        remove_btn.setMinimumHeight(28)
+        remove_btn.clicked.connect(self._on_remove_access_acl)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addStretch()
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        from ._table_utils import make_filterable_table
+        stack.addWidget(make_filterable_table(table))
+        stack.setCurrentIndex(0)
+        panel.access_acl_loading = loading
+        panel.access_acl_stack = stack
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        return container
+
+    # --- Fetch methods ---
+
+    def _fetch_access_all(self, cfg):
+        self._fetch_access_users(cfg)
+        self._fetch_access_groups(cfg)
+        self._fetch_access_roles(cfg)
+        self._fetch_access_acl(cfg)
+
+    def _fetch_access_users(self, cfg):
+        panel = self.panel
+        if not cfg:
+            panel.access_users_loading.setText(tr("No data"))
+            panel.access_users_stack.setCurrentIndex(0)
+            return
+        panel.access_users_loading.setText(tr("Loading..."))
+        panel.access_users_stack.setCurrentIndex(0)
+        panel.access_users_table.setRowCount(0)
+        panel._access_cfg = cfg
+        from ...backend import AccessUsersWorker
+        worker = AccessUsersWorker(cfg)
+        worker.signals.users_ready.connect(
+            lambda data, w=worker: (
+                self._on_access_users_loaded(data),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.users_error.connect(
+            lambda err, w=worker: (
+                self._on_access_users_error(err),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_access_users_loaded(self, data):
+        panel = self.panel
+        if panel.current_obj_type not in ("cluster", "host"):
+            return
+        panel._access_users_cache = data
+        table = panel.access_users_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(data))
+        for i, user in enumerate(data):
+            uid = user.get("userid", "")
+            id_item = QTableWidgetItem(uid)
+            id_item.setIcon(get_icon("user"))
+            id_item.setData(Qt.UserRole, user)
+            table.setItem(i, 0, id_item)
+
+            enable_val = user.get("enable", 1)
+            if isinstance(enable_val, str):
+                enable_val = int(enable_val)
+            en_text = tr("Yes") if enable_val else tr("No")
+            en_item = QTableWidgetItem(en_text)
+            en_item.setForeground(QColor(
+                Color.STATUS_OK if enable_val else Color.GRAY_400
+            ))
+            table.setItem(i, 1, en_item)
+
+            expire = user.get("expire", 0)
+            if isinstance(expire, str):
+                expire = int(expire)
+            if expire and expire > 0:
+                from datetime import datetime as _dt
+                expire_text = _dt.fromtimestamp(expire).strftime("%Y-%m-%d")
+            else:
+                expire_text = tr("Never")
+            table.setItem(i, 2, QTableWidgetItem(expire_text))
+
+            groups = user.get("groups", "")
+            if isinstance(groups, list):
+                groups = ", ".join(groups)
+            table.setItem(i, 3, QTableWidgetItem(groups or ""))
+
+            table.setItem(i, 4, QTableWidgetItem(user.get("comment", "") or ""))
+
+            tokens = user.get("tokens", [])
+            tokens_count = len(tokens) if isinstance(tokens, list) else 0
+            table.setItem(i, 5, QTableWidgetItem(str(tokens_count)))
+
+        table.setSortingEnabled(True)
+        if data:
+            panel.access_users_stack.setCurrentIndex(1)
+        else:
+            panel.access_users_loading.setText(tr("No users"))
+            panel.access_users_stack.setCurrentIndex(0)
+
+    def _on_access_users_error(self, err):
+        panel = self.panel
+        panel.access_users_loading.setText(tr("Error: {err}").format(err=err[:80]))
+        panel.access_users_stack.setCurrentIndex(0)
+
+    def _fetch_access_tokens(self, cfg):
+        panel = self.panel
+        if not cfg:
+            panel.access_tokens_loading.setText(tr("No data"))
+            panel.access_tokens_stack.setCurrentIndex(0)
+            return
+        panel.access_tokens_loading.setText(tr("Loading..."))
+        panel.access_tokens_stack.setCurrentIndex(0)
+        panel.access_tokens_table.setRowCount(0)
+        users = getattr(panel, "_access_users_cache", [])
+        if not users:
+            panel.access_tokens_loading.setText(tr("No users"))
+            panel.access_tokens_stack.setCurrentIndex(0)
+            return
+        from ...backend import AccessTokensWorker
+        for user in users:
+            uid = user.get("userid")
+            if not uid:
+                continue
+            worker = AccessTokensWorker(cfg, uid)
+            worker.signals.tokens_ready.connect(
+                lambda data, w=worker, u=uid: (
+                    self._on_access_tokens_partial(data, u),
+                    panel._workers_mgr.discard_worker(w),
+                )
+            )
+            worker.signals.tokens_error.connect(
+                lambda err, w=worker: (
+                    panel._workers_mgr.discard_worker(w),
+                )
+            )
+            panel._workers_mgr.run_host_worker(worker)
+
+    def _on_access_tokens_partial(self, data, userid):
+        panel = self.panel
+        if panel.current_obj_type not in ("cluster", "host"):
+            return
+        if not isinstance(data, list):
+            return
+        table = panel.access_tokens_table
+        table.setSortingEnabled(False)
+        for token in data:
+            row = table.rowCount()
+            table.insertRow(row)
+            tid = token.get("tokenid", "")
+            id_item = QTableWidgetItem(tid)
+            id_item.setIcon(get_icon("token"))
+            id_item.setData(Qt.UserRole, {"userid": userid, **token})
+            table.setItem(row, 0, id_item)
+            table.setItem(row, 1, QTableWidgetItem(userid))
+            table.setItem(row, 2, QTableWidgetItem(token.get("comment", "") or ""))
+            privsep = token.get("privsep", 1)
+            if isinstance(privsep, str):
+                privsep = int(privsep)
+            table.setItem(row, 3, QTableWidgetItem(tr("Yes") if privsep else tr("No")))
+            expire = token.get("expire", 0)
+            if isinstance(expire, str):
+                expire = int(expire)
+            if expire and expire > 0:
+                from datetime import datetime as _dt
+                expire_text = _dt.fromtimestamp(expire).strftime("%Y-%m-%d")
+            else:
+                expire_text = tr("Never")
+            table.setItem(row, 4, QTableWidgetItem(expire_text))
+        table.setSortingEnabled(True)
+        if table.rowCount() > 0:
+            panel.access_tokens_stack.setCurrentIndex(1)
+        else:
+            panel.access_tokens_loading.setText(tr("No tokens"))
+            panel.access_tokens_stack.setCurrentIndex(0)
+
+    def _fetch_access_groups(self, cfg):
+        panel = self.panel
+        if not cfg:
+            panel.access_groups_loading.setText(tr("No data"))
+            panel.access_groups_stack.setCurrentIndex(0)
+            return
+        panel.access_groups_loading.setText(tr("Loading..."))
+        panel.access_groups_stack.setCurrentIndex(0)
+        panel.access_groups_table.setRowCount(0)
+        from ...backend import AccessGroupsWorker
+        worker = AccessGroupsWorker(cfg)
+        worker.signals.groups_ready.connect(
+            lambda data, w=worker: (
+                self._on_access_groups_loaded(data),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.groups_error.connect(
+            lambda err, w=worker: (
+                panel.access_groups_loading.setText(tr("Error: {err}").format(err=err[:80])),
+                panel.access_groups_stack.setCurrentIndex(0),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_access_groups_loaded(self, data):
+        panel = self.panel
+        if panel.current_obj_type not in ("cluster", "host"):
+            return
+        panel._access_groups_cache = data
+        table = panel.access_groups_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(data))
+        for i, group in enumerate(data):
+            gid = group.get("groupid", "")
+            id_item = QTableWidgetItem(gid)
+            id_item.setIcon(get_icon("group"))
+            id_item.setData(Qt.UserRole, group)
+            table.setItem(i, 0, id_item)
+            table.setItem(i, 1, QTableWidgetItem(group.get("comment", "") or ""))
+            members = group.get("users", "")
+            if isinstance(members, list):
+                members = ", ".join(members)
+            table.setItem(i, 2, QTableWidgetItem(members or ""))
+        table.setSortingEnabled(True)
+        if data:
+            panel.access_groups_stack.setCurrentIndex(1)
+        else:
+            panel.access_groups_loading.setText(tr("No groups"))
+            panel.access_groups_stack.setCurrentIndex(0)
+
+    def _fetch_access_roles(self, cfg):
+        panel = self.panel
+        if not cfg:
+            panel.access_roles_loading.setText(tr("No data"))
+            panel.access_roles_stack.setCurrentIndex(0)
+            return
+        panel.access_roles_loading.setText(tr("Loading..."))
+        panel.access_roles_stack.setCurrentIndex(0)
+        panel.access_roles_table.setRowCount(0)
+        from ...backend import AccessRolesWorker
+        worker = AccessRolesWorker(cfg)
+        worker.signals.roles_ready.connect(
+            lambda data, w=worker: (
+                self._on_access_roles_loaded(data),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.roles_error.connect(
+            lambda err, w=worker: (
+                panel.access_roles_loading.setText(tr("Error: {err}").format(err=err[:80])),
+                panel.access_roles_stack.setCurrentIndex(0),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_access_roles_loaded(self, data):
+        panel = self.panel
+        if panel.current_obj_type not in ("cluster", "host"):
+            return
+        panel._access_roles_cache = data
+        table = panel.access_roles_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(data))
+        for i, role in enumerate(data):
+            rid = role.get("roleid", "")
+            id_item = QTableWidgetItem(rid)
+            id_item.setIcon(get_icon("role"))
+            id_item.setData(Qt.UserRole, role)
+            table.setItem(i, 0, id_item)
+            privs = role.get("privs", "") or ""
+            table.setItem(i, 1, QTableWidgetItem(privs))
+            special = role.get("special", 0)
+            if isinstance(special, str):
+                special = int(special)
+            sp_text = tr("Yes") if special else ""
+            sp_item = QTableWidgetItem(sp_text)
+            if special:
+                sp_item.setForeground(QColor(Color.GRAY_400))
+            table.setItem(i, 2, sp_item)
+        table.setSortingEnabled(True)
+        if data:
+            panel.access_roles_stack.setCurrentIndex(1)
+        else:
+            panel.access_roles_loading.setText(tr("No roles"))
+            panel.access_roles_stack.setCurrentIndex(0)
+
+    def _fetch_access_acl(self, cfg):
+        panel = self.panel
+        if not cfg:
+            panel.access_acl_loading.setText(tr("No data"))
+            panel.access_acl_stack.setCurrentIndex(0)
+            return
+        panel.access_acl_loading.setText(tr("Loading..."))
+        panel.access_acl_stack.setCurrentIndex(0)
+        panel.access_acl_table.setRowCount(0)
+        from ...backend import AccessAclWorker
+        worker = AccessAclWorker(cfg)
+        worker.signals.acl_ready.connect(
+            lambda data, w=worker: (
+                self._on_access_acl_loaded(data),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.acl_error.connect(
+            lambda err, w=worker: (
+                panel.access_acl_loading.setText(tr("Error: {err}").format(err=err[:80])),
+                panel.access_acl_stack.setCurrentIndex(0),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_access_acl_loaded(self, data):
+        panel = self.panel
+        if panel.current_obj_type not in ("cluster", "host"):
+            return
+        table = panel.access_acl_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(data))
+        for i, entry in enumerate(data):
+            path = entry.get("path", "")
+            path_item = QTableWidgetItem(path)
+            path_item.setData(Qt.UserRole, entry)
+            table.setItem(i, 0, path_item)
+            table.setItem(i, 1, QTableWidgetItem(entry.get("type", "")))
+            table.setItem(i, 2, QTableWidgetItem(entry.get("ugid", "")))
+            table.setItem(i, 3, QTableWidgetItem(entry.get("roleid", "")))
+            propagate = entry.get("propagate", 1)
+            if isinstance(propagate, str):
+                propagate = int(propagate)
+            table.setItem(i, 4, QTableWidgetItem(tr("Yes") if propagate else tr("No")))
+        table.setSortingEnabled(True)
+        if data:
+            panel.access_acl_stack.setCurrentIndex(1)
+        else:
+            panel.access_acl_loading.setText(tr("No permissions"))
+            panel.access_acl_stack.setCurrentIndex(0)
+
+    # --- User CRUD ---
+
+    def _on_add_access_user(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        groups = getattr(panel, "_access_groups_cache", [])
+        from ..user_dialog import UserDialog
+        dlg = UserDialog(panel, groups=groups)
+        if dlg.exec() != UserDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import AccessUserCreateWorker
+        worker = AccessUserCreateWorker(cfg, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_users(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("User create failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_edit_access_user(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_users_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Edit user"), tr("Select a user to edit"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        user = item.data(Qt.UserRole)
+        if not user:
+            return
+        groups = getattr(panel, "_access_groups_cache", [])
+        from ..user_dialog import UserDialog
+        dlg = UserDialog(panel, user=user, groups=groups)
+        if dlg.exec() != UserDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        userid = user.get("userid", "")
+        from ...backend import AccessUserUpdateWorker
+        worker = AccessUserUpdateWorker(cfg, userid, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_users(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("User update failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_remove_access_user(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_users_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Remove user"), tr("Select a user to remove"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        user = item.data(Qt.UserRole)
+        if not user:
+            return
+        userid = user.get("userid", "")
+        reply = QMessageBox.question(
+            panel, tr("Remove user"),
+            tr("Delete user \"{id}\"?").format(id=userid),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        from ...backend import AccessUserDeleteWorker
+        worker = AccessUserDeleteWorker(cfg, userid)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_users(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("User delete failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    # --- Token CRUD ---
+
+    def _on_add_access_token(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        users = getattr(panel, "_access_users_cache", [])
+        if not users:
+            panel.config_update_result.emit(tr("No users found"))
+            return
+        from ..token_dialog import TokenDialog
+        dlg = TokenDialog(panel, users=users)
+        if dlg.exec() != TokenDialog.Accepted:
+            return
+        userid = dlg.get_userid()
+        tokenid = dlg.get_tokenid()
+        params = dlg.get_params()
+        if not userid or not tokenid:
+            return
+        from ...backend import AccessTokenCreateWorker
+        worker = AccessTokenCreateWorker(cfg, userid, tokenid, params)
+        worker.signals.result.connect(
+            lambda msg, full, value, w=worker: (
+                panel.config_update_result.emit(msg),
+                self._show_token_value(full, value) if full else None,
+                self._fetch_access_tokens(cfg),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Token create failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_edit_access_token(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_tokens_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Edit token"), tr("Select a token to edit"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        token_data = item.data(Qt.UserRole)
+        if not token_data:
+            return
+        userid = token_data.get("userid", "")
+        from ..token_dialog import TokenDialog
+        dlg = TokenDialog(panel, userid=userid, token=token_data)
+        if dlg.exec() != TokenDialog.Accepted:
+            return
+        tokenid = dlg.get_tokenid()
+        params = dlg.get_params()
+        if not tokenid:
+            return
+        from ...backend import AccessTokenUpdateWorker
+        worker = AccessTokenUpdateWorker(cfg, userid, tokenid, params)
+        worker.signals.result.connect(
+            lambda msg, full, value, w=worker: (
+                panel.config_update_result.emit(msg),
+                self._show_token_value(full, value) if full else None,
+                self._fetch_access_tokens(cfg),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Token update failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_remove_access_token(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_tokens_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Remove token"), tr("Select a token to remove"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        token_data = item.data(Qt.UserRole)
+        if not token_data:
+            return
+        userid = token_data.get("userid", "")
+        tokenid = token_data.get("tokenid", "")
+        reply = QMessageBox.question(
+            panel, tr("Remove token"),
+            tr("Delete token \"{id}\" for user \"{user}\"?").format(id=tokenid, user=userid),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        from ...backend import AccessTokenDeleteWorker
+        worker = AccessTokenDeleteWorker(cfg, userid, tokenid)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_tokens(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Token delete failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _show_token_value(self, full_tokenid, value):
+        from ..token_dialog import TokenValueDialog
+        dlg = TokenValueDialog(self.panel, full_tokenid, value)
+        dlg.exec()
+
+    # --- Group CRUD ---
+
+    def _on_add_access_group(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        from ..group_dialog import GroupDialog
+        dlg = GroupDialog(panel)
+        if dlg.exec() != GroupDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import AccessGroupCreateWorker
+        worker = AccessGroupCreateWorker(cfg, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_groups(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Group create failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_edit_access_group(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_groups_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Edit group"), tr("Select a group to edit"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        group = item.data(Qt.UserRole)
+        if not group:
+            return
+        from ..group_dialog import GroupDialog
+        dlg = GroupDialog(panel, group=group)
+        if dlg.exec() != GroupDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        gid = group.get("groupid", "")
+        from ...backend import AccessGroupUpdateWorker
+        worker = AccessGroupUpdateWorker(cfg, gid, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_groups(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Group update failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_remove_access_group(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_groups_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Remove group"), tr("Select a group to remove"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        group = item.data(Qt.UserRole)
+        if not group:
+            return
+        gid = group.get("groupid", "")
+        reply = QMessageBox.question(
+            panel, tr("Remove group"),
+            tr("Delete group \"{id}\"?").format(id=gid),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        from ...backend import AccessGroupDeleteWorker
+        worker = AccessGroupDeleteWorker(cfg, gid)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_groups(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Group delete failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    # --- Role CRUD ---
+
+    def _on_add_access_role(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        from ..role_dialog import RoleDialog
+        dlg = RoleDialog(panel)
+        if dlg.exec() != RoleDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import AccessRoleCreateWorker
+        worker = AccessRoleCreateWorker(cfg, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_roles(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Role create failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_edit_access_role(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_roles_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Edit role"), tr("Select a role to edit"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        role = item.data(Qt.UserRole)
+        if not role:
+            return
+        rid = role.get("roleid", "")
+        from ..role_dialog import RoleDialog
+        dlg = RoleDialog(panel, role=role)
+        if dlg.exec() != RoleDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import AccessRoleUpdateWorker
+        worker = AccessRoleUpdateWorker(cfg, rid, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_roles(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Role update failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_remove_access_role(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_roles_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Remove role"), tr("Select a role to remove"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        role = item.data(Qt.UserRole)
+        if not role:
+            return
+        special = role.get("special", 0)
+        if isinstance(special, str):
+            special = int(special)
+        if special:
+            QMessageBox.information(panel, tr("Remove role"), tr("Built-in roles cannot be deleted"))
+            return
+        rid = role.get("roleid", "")
+        reply = QMessageBox.question(
+            panel, tr("Remove role"),
+            tr("Delete role \"{id}\"?").format(id=rid),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        from ...backend import AccessRoleDeleteWorker
+        worker = AccessRoleDeleteWorker(cfg, rid)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_roles(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Role delete failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    # --- ACL CRUD ---
+
+    def _on_add_access_acl(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        roles = getattr(panel, "_access_roles_cache", [])
+        users = getattr(panel, "_access_users_cache", [])
+        groups = getattr(panel, "_access_groups_cache", [])
+        tokens = []
+        table = panel.access_tokens_table
+        for r in range(table.rowCount()):
+            item = table.item(r, 0)
+            if item:
+                td = item.data(Qt.UserRole)
+                if td:
+                    tokens.append({
+                        "full-tokenid": f"{td.get('userid', '')}!{td.get('tokenid', '')}"
+                    })
+        from ..acl_dialog import AclDialog
+        dlg = AclDialog(panel, roles=roles, users=users, groups=groups, tokens=tokens)
+        if dlg.exec() != AclDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import AccessAclUpdateWorker
+        worker = AccessAclUpdateWorker(cfg, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_acl(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Permission add failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_remove_access_acl(self):
+        panel = self.panel
+        cfg = getattr(panel, "_access_cfg", None)
+        if not cfg:
+            return
+        table = panel.access_acl_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("Remove permissions"), tr("Select an entry to remove"))
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        entry = item.data(Qt.UserRole)
+        if not entry:
+            return
+        path = entry.get("path", "")
+        roleid = entry.get("roleid", "")
+        etype = entry.get("type", "")
+        ugid = entry.get("ugid", "")
+        reply = QMessageBox.question(
+            panel, tr("Remove permissions"),
+            tr("Remove permission: role \"{role}\" for \"{ugid}\" on \"{path}\"?").format(
+                role=roleid, ugid=ugid, path=path),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        params = {"path": path, "roles": roleid, "delete": 1}
+        if etype == "user":
+            params["users"] = ugid
+        elif etype == "group":
+            params["groups"] = ugid
+        elif etype == "token":
+            params["tokens"] = ugid
+        from ...backend import AccessAclUpdateWorker
+        worker = AccessAclUpdateWorker(cfg, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self._fetch_access_acl(cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Permission remove failed: {err}").format(err=err)),
             panel._workers_mgr.discard_worker(w),
         ))
         panel._workers_mgr.run_host_worker(worker)

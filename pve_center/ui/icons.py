@@ -365,6 +365,38 @@ _SERIAL = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-r
 <circle cx="10" cy="7" r="0.8" fill="{c2}"/>
 </svg>"""
 
+_USER = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="8" cy="5.5" r="2.5" fill="none" stroke="{c}" stroke-width="1.3"/>
+<path d="M3 13.5 C3 10.5 5.5 9 8 9 C10.5 9 13 10.5 13 13.5" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+</svg>"""
+
+_TOKEN = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="3" y="5" width="10" height="7" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<circle cx="6" cy="8.5" r="0.9" fill="{c2}"/>
+<line x1="8.5" y1="8.5" x2="11" y2="8.5" stroke="{c}" stroke-width="1" stroke-linecap="round"/>
+<line x1="8" y1="3" x2="8" y2="5" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+</svg>"""
+
+_GROUP = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="5.5" cy="5" r="2" fill="none" stroke="{c}" stroke-width="1.2"/>
+<circle cx="10.5" cy="5" r="2" fill="none" stroke="{c}" stroke-width="1.2"/>
+<path d="M2.5 13 C2.5 10.5 4 9 5.5 9 C7 9 8.5 10.5 8.5 13" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<path d="M7.5 13 C7.5 10.5 9 9 10.5 9 C12 9 13.5 10.5 13.5 13" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+</svg>"""
+
+_ROLE = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="3" y="3" width="10" height="10" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<circle cx="6" cy="7" r="0.8" fill="{c2}"/>
+<circle cx="10" cy="7" r="0.8" fill="{c2}"/>
+<line x1="5" y1="10" x2="11" y2="10" stroke="{c}" stroke-width="1" stroke-linecap="round"/>
+</svg>"""
+
+_ACL = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="4" y="7" width="8" height="6" rx="0.8" fill="none" stroke="{c}" stroke-width="1.3"/>
+<path d="M5.5 7 L5.5 5 C5.5 3.5 6.5 2.5 8 2.5 C9.5 2.5 10.5 3.5 10.5 5 L10.5 7" fill="none" stroke="{c}" stroke-width="1.3" stroke-linecap="round"/>
+<circle cx="8" cy="10" r="1" fill="{c2}"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -420,4 +452,9 @@ def init_icons():
         "unlock": _make_icon(_UNLOCK.format(c=_C, c2=_C2), 14),
         "migrate": _make_icon(_MIGRATE.format(c=_C, c2=_C2), 14),
         "clone": _make_icon(_CLONE.format(c=_C, c2=_C2), 14),
+        "user": _make_icon(_USER.format(c=_C, c2=_C2)),
+        "token": _make_icon(_TOKEN.format(c=_C, c2=_C2)),
+        "group": _make_icon(_GROUP.format(c=_C, c2=_C2)),
+        "role": _make_icon(_ROLE.format(c=_C, c2=_C2)),
+        "acl": _make_icon(_ACL.format(c=_C, c2=_C2)),
     }

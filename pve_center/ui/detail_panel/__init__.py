@@ -196,6 +196,9 @@ class DetailPanel(QWidget):
         # 21: Backup Jobs
         tabs.addTab(self._host_tabs.build_backup_jobs_tab(), get_icon("backup"), tr("Backup Jobs"))
         tabs.setTabVisible(TabIndex.BACKUP_JOBS, False)
+        # 22: Access Management
+        tabs.addTab(self._host_tabs.build_access_tab(), get_icon("user"), tr("Access"))
+        tabs.setTabVisible(TabIndex.ACCESS, False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -251,7 +254,8 @@ class DetailPanel(QWidget):
                         TabIndex.NETWORK, TabIndex.SERVICES,
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,
                         TabIndex.HEALTH, TabIndex.VM_SNAPSHOTS,
-                        TabIndex.VM_BACKUP, TabIndex.BACKUP_JOBS):
+                        TabIndex.VM_BACKUP, TabIndex.BACKUP_JOBS,
+                        TabIndex.ACCESS):
                 self.tabs.setTabVisible(idx, False)
 
             if obj_type == "cluster_folder":
