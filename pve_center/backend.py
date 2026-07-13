@@ -1918,3 +1918,357 @@ class StorageMoveWorker(QRunnable):
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# VzdumpWorker — POST /nodes/{node}/vzdump (on-demand backup)
+# ----------------------------------------------------------------------
+class VzdumpSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class VzdumpWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, storage,
+                 mode="snapshot", compress="0", notes="", remove=False,
+                 bwlimit=0, timeout=3600):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.storage = storage
+        self.mode = mode
+        self.compress = compress
+        self.notes = notes
+        self.remove = remove
+        self.bwlimit = bwlimit
+        self.timeout = timeout
+        self.signals = VzdumpSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            params = {
+                "vmid": str(self.vmid),
+                "storage": self.storage,
+                "mode": self.mode,
+                "compress": self.compress,
+            }
+            if self.notes:
+                params["notes"] = self.notes
+            if self.remove:
+                params["remove"] = 1
+            if self.bwlimit and self.bwlimit > 0:
+                params["bwlimit"] = self.bwlimit
+            upid = proxmox.nodes(self.node_name).vzdump.post(**params)
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(
+                    proxmox, self.node_name, upid, timeout=self.timeout
+                )
+                if status == "stopped" and exitstatus == "OK":
+                    _safe_emit(self.signals.result,
+                               tr("Backup completed for VM {vmid}").format(vmid=self.vmid))
+                else:
+                    err = exitstatus or status
+                    _safe_emit(self.signals.error, tr("Backup failed: {err}").format(err=err))
+            else:
+                _safe_emit(self.signals.result,
+                           tr("Backup completed for VM {vmid}").format(vmid=self.vmid))
+        except Exception as e:
+            logger.debug("vzdump error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# VmRestoreWorker — POST /nodes/{node}/qemu or /nodes/{node}/lxc (restore)
+# ----------------------------------------------------------------------
+class VmRestoreSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class VmRestoreWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, vm_type, archive,
+                 storage="", name="", force=False, unique=False, timeout=3600):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.archive = archive
+        self.storage = storage
+        self.name = name
+        self.force = force
+        self.unique = unique
+        self.timeout = timeout
+        self.signals = VmRestoreSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=10,
+            )
+            params = {
+                "vmid": int(self.vmid),
+                "archive": self.archive,
+                "force": 1 if self.force else 0,
+            }
+            if self.storage:
+                params["storage"] = self.storage
+            if self.name:
+                params["name"] = self.name
+            if self.unique:
+                params["unique"] = 1
+            resource = proxmox.nodes(self.node_name)
+            if self.vm_type == "lxc":
+                upid = resource.lxc.post(**params)
+            else:
+                upid = resource.qemu.post(**params)
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(
+                    proxmox, self.node_name, upid, timeout=self.timeout
+                )
+                if status == "stopped" and exitstatus == "OK":
+                    _safe_emit(self.signals.result,
+                               tr("Restore completed for VM {vmid}").format(vmid=self.vmid))
+                else:
+                    err = exitstatus or status
+                    _safe_emit(self.signals.error, tr("Restore failed: {err}").format(err=err))
+            else:
+                _safe_emit(self.signals.result,
+                           tr("Restore completed for VM {vmid}").format(vmid=self.vmid))
+        except Exception as e:
+            logger.debug("restore error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# Cluster jobs — GET /cluster/backup (PVE7) or /cluster/jobs (PVE8+)
+# ----------------------------------------------------------------------
+class ClusterJobsSignals(QObject):
+    jobs_ready = Signal(list)
+    jobs_error = Signal(str)
+    finished = Signal()
+
+
+class ClusterJobsWorker(QRunnable):
+    """Fetch scheduled jobs (backup + replication) from cluster API."""
+
+    def __init__(self, host_cfg, pve_major=7):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.pve_major = pve_major
+        self.signals = ClusterJobsSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=15,
+            )
+            jobs = []
+            if self.pve_major >= 8:
+                try:
+                    data = proxmox.cluster.jobs.get()
+                    if isinstance(data, dict):
+                        data = data.get("data", data)
+                    if isinstance(data, list):
+                        jobs = data
+                except Exception:
+                    logger.debug("cluster/jobs failed, falling back to /cluster/backup", exc_info=True)
+                    data = proxmox.cluster.backup.get()
+                    if isinstance(data, dict):
+                        data = data.get("data", data)
+                    if isinstance(data, list):
+                        jobs = data
+            else:
+                data = proxmox.cluster.backup.get()
+                if isinstance(data, dict):
+                    data = data.get("data", data)
+                if isinstance(data, list):
+                    jobs = data
+                try:
+                    repl = proxmox.cluster.replication.get()
+                    if isinstance(repl, dict):
+                        repl = repl.get("data", repl)
+                    if isinstance(repl, list):
+                        jobs.extend(repl)
+                except Exception:
+                    pass
+            _safe_emit(self.signals.jobs_ready, jobs)
+        except Exception as e:
+            logger.debug("cluster jobs error", exc_info=True)
+            _safe_emit(self.signals.jobs_error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# Cluster job create — POST /cluster/backup or /cluster/jobs
+# ----------------------------------------------------------------------
+class ClusterJobCreateSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class ClusterJobCreateWorker(QRunnable):
+    """Create a scheduled backup job."""
+
+    def __init__(self, host_cfg, params, pve_major=7):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.params = params
+        self.pve_major = pve_major
+        self.signals = ClusterJobCreateSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=15,
+            )
+            if self.pve_major >= 8:
+                try:
+                    proxmox.cluster.jobs.post(**self.params)
+                except Exception:
+                    proxmox.cluster.backup.post(**self.params)
+            else:
+                proxmox.cluster.backup.post(**self.params)
+            _safe_emit(self.signals.result, tr("Backup job created"))
+        except Exception as e:
+            logger.debug("job create error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# Cluster job update — PUT /cluster/backup/{id} or /cluster/jobs/{id}
+# ----------------------------------------------------------------------
+class ClusterJobUpdateSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class ClusterJobUpdateWorker(QRunnable):
+    """Update a scheduled backup job."""
+
+    def __init__(self, host_cfg, job_id, params, pve_major=7):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.job_id = job_id
+        self.params = params
+        self.pve_major = pve_major
+        self.signals = ClusterJobUpdateSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=15,
+            )
+            if self.pve_major >= 8:
+                try:
+                    proxmox.cluster.jobs(self.job_id).put(**self.params)
+                except Exception:
+                    proxmox.cluster.backup(self.job_id).put(**self.params)
+            else:
+                proxmox.cluster.backup(self.job_id).put(**self.params)
+            _safe_emit(self.signals.result, tr("Backup job updated"))
+        except Exception as e:
+            logger.debug("job update error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# Cluster job delete — DELETE /cluster/backup/{id} or /cluster/jobs/{id}
+# ----------------------------------------------------------------------
+class ClusterJobDeleteSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class ClusterJobDeleteWorker(QRunnable):
+    """Delete a scheduled backup job."""
+
+    def __init__(self, host_cfg, job_id, pve_major=7):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.job_id = job_id
+        self.pve_major = pve_major
+        self.signals = ClusterJobDeleteSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = ProxmoxAPI(
+                self.host_cfg["host"],
+                user=self.host_cfg["user"],
+                token_name=self.host_cfg["token_name"],
+                token_value=self.host_cfg["token_value"],
+                verify_ssl=_verify_ssl(self.host_cfg),
+                timeout=15,
+            )
+            if self.pve_major >= 8:
+                try:
+                    proxmox.cluster.jobs(self.job_id).delete()
+                except Exception:
+                    proxmox.cluster.backup(self.job_id).delete()
+            else:
+                proxmox.cluster.backup(self.job_id).delete()
+            _safe_emit(self.signals.result, tr("Backup job deleted"))
+        except Exception as e:
+            logger.debug("job delete error", exc_info=True)
+            _safe_emit(self.signals.error, str(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)

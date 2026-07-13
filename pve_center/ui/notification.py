@@ -1,4 +1,5 @@
 import sys
+import weakref
 
 from PySide6.QtCore import QPoint, QPropertyAnimation, Qt, QTimer
 from PySide6.QtWidgets import (
@@ -72,7 +73,10 @@ class FadeToast(QWidget):
         self._fade_timer.start()
 
     def _copy_to_clipboard(self):
-        QApplication.clipboard().setText(self._text)
+        try:
+            QApplication.clipboard().setText(self._text)
+        except RuntimeError:
+            return
         try:
             self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.OK_ROW_BG};"))
         except RuntimeError:
@@ -86,7 +90,10 @@ class FadeToast(QWidget):
             pass
 
     def _start_fade(self):
-        self._fade_anim.start()
+        try:
+            self._fade_anim.start()
+        except RuntimeError:
+            pass
 
 
 class NotificationManager:
@@ -128,30 +135,37 @@ class NotificationManager:
                                  QSystemTrayIcon.Information, 4000)
                 return
         existing = self._active.pop(key, None)
-        if existing:
-            try:
-                existing.destroyed.disconnect()
-            except (TypeError, RuntimeError):
-                pass
-            try:
-                existing._fade_timer.stop()
-            except RuntimeError:
-                pass
-            try:
-                existing._fade_anim.stop()
-            except RuntimeError:
-                pass
-            existing.deleteLater()
+        if existing is not None:
+            ref = existing()
+            if ref is not None:
+                try:
+                    ref._fade_timer.stop()
+                except RuntimeError:
+                    pass
+                try:
+                    ref._fade_anim.stop()
+                except RuntimeError:
+                    pass
+                try:
+                    ref.deleteLater()
+                except RuntimeError:
+                    pass
         offset_y = 12
-        for t in list(self._active.values()):
+        dead_keys = []
+        for k, t_ref in list(self._active.items()):
+            t = t_ref()
+            if t is None:
+                dead_keys.append(k)
+                continue
             try:
                 if t.isVisible():
                     offset_y += t.height() + 8
             except RuntimeError:
-                pass
+                dead_keys.append(k)
+        for k in dead_keys:
+            self._active.pop(k, None)
         toast = FadeToast(self.parent, text, color, offset_y=offset_y)
-        self._active[key] = toast
-        toast.destroyed.connect(lambda k=key: self._active.pop(k, None))
+        self._active[key] = weakref.ref(toast)
 
     def show(self, text, error=False):
         color = Color.DANGER if error else Color.SLATE_800

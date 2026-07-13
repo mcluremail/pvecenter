@@ -21,9 +21,9 @@ class TabIndex(IntEnum):
     HARDWARE = 1
     OPTIONS = 2
     HISTORY = 3
-    HOST_VMS = 4
-    POOL_VMS = 5
-    SUMMARY = 6
+    SUMMARY = 4
+    HOST_VMS = 5
+    POOL_VMS = 6
     STORAGES = 7
     HOST_STORAGE = 8
     STORAGE_DETAIL = 9
@@ -37,6 +37,8 @@ class TabIndex(IntEnum):
     SNAPSHOTS = 17
     HEALTH = 18
     VM_SNAPSHOTS = 19
+    VM_BACKUP = 20
+    BACKUP_JOBS = 21
 
 
 def _fmt_pveversion(val):

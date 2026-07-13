@@ -142,15 +142,16 @@ class DetailPanel(QWidget):
         tabs.addTab(self._vm_tabs.build_options_tab(), get_icon("options"), tr("Options"))
         # 3: History
         tabs.addTab(self._vm_tabs.build_history_tab(), get_icon("history"), tr("History"))
-        # 4: Host VMs
+        # 4: Summary
+        self._summary_widget = self._host_tabs.build_summary_tab()
+        tabs.addTab(self._summary_widget, get_icon("host"), tr("Summary"))
+        tabs.setTabVisible(TabIndex.SUMMARY, False)
+        # 5: Host VMs
         tabs.addTab(self._host_tabs.build_host_vm_tab(), get_icon("vm"), tr("Virtual Machines"))
         tabs.setTabVisible(TabIndex.HOST_VMS, False)
-        # 5: Pool VMs
+        # 6: Pool VMs
         tabs.addTab(self._vm_tabs.build_pool_tab(), get_icon("pool"), tr("Pool VMs"))
         tabs.setTabVisible(TabIndex.POOL_VMS, False)
-        # 6: Summary
-        tabs.addTab(self._host_tabs.build_summary_tab(), get_icon("host"), tr("Summary"))
-        tabs.setTabVisible(TabIndex.SUMMARY, False)
         # 7: Storages overview
         tabs.addTab(self._storage_tabs.build_storage_overview_tab(), get_icon("storage"), tr("Storage"))
         tabs.setTabVisible(TabIndex.STORAGES, False)
@@ -190,6 +191,12 @@ class DetailPanel(QWidget):
         # 19: VM Snapshots
         tabs.addTab(self._vm_tabs.build_snapshots_tab(), get_icon("snapshot"), tr("Snapshots"))
         tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, False)
+        # 20: VM Backup
+        tabs.addTab(self._vm_tabs.build_vm_backup_tab(), get_icon("backup"), tr("Backup"))
+        tabs.setTabVisible(TabIndex.VM_BACKUP, False)
+        # 21: Backup Jobs
+        tabs.addTab(self._host_tabs.build_backup_jobs_tab(), get_icon("backup"), tr("Backup Jobs"))
+        tabs.setTabVisible(TabIndex.BACKUP_JOBS, False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -244,7 +251,8 @@ class DetailPanel(QWidget):
                         TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
                         TabIndex.NETWORK, TabIndex.SERVICES,
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,
-                        TabIndex.HEALTH, TabIndex.VM_SNAPSHOTS):
+                        TabIndex.HEALTH, TabIndex.VM_SNAPSHOTS,
+                        TabIndex.VM_BACKUP, TabIndex.BACKUP_JOBS):
                 self.tabs.setTabVisible(idx, False)
 
             if obj_type == "cluster_folder":

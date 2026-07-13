@@ -16,9 +16,26 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.7.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.7.0)
+Latest release: [v2.8.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.8.0)
 
 ## Changelog
+
+### v2.8.0 — vzdump backup & restore, backup jobs, cluster tabs
+
+**New features**
+- VM on-demand backup (vzdump): storage, mode (snapshot/suspend/stop), compression (none/gzip/lzo/zstd), notes, remove-old, bandwidth limit
+- VM restore from backup: new VMID auto-suggest, target storage, force overwrite, unique MAC
+- Backup jobs scheduling: add/edit/remove jobs with Daily/Weekly/Custom schedule, retention, compression — supports both PVE 8+ (`/cluster/jobs`) and PVE 7 (`/cluster/backup`)
+- Cluster-level tabs: Virtual Machines (aggregated), Storage (aggregated), Snapshots, Health, Backup Jobs
+- Cluster summary cards: hosts (online/total), VMs (running/total), CPU, RAM, Storage with progress bars
+- VM stats header: VMs total (running/stopped), CPU used, RAM used
+- Summary tab moved to first position for cluster view
+- Double-click on backup job row to edit
+- Restore icon added to icon set
+
+**Bug fixes**
+- FadeToast crash: weakref pattern prevents "Internal C++ object already deleted" (strong ref kept toast alive after parent deleted)
+- Cluster health tab stuck on Loading: replaced arbitrary `total * 2` threshold with done/total counter
 
 ### v2.7.0 — hardware management, storage operations, audit
 

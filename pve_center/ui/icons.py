@@ -167,6 +167,14 @@ _BACKUP = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-r
 <line x1="7" y1="11" x2="8.5" y2="9.5" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
 </svg>"""
 
+_RESTORE = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<rect x="2" y="1" width="10" height="12" rx="1" fill="none" stroke="{c}" stroke-width="1.3"/>
+<line x1="4.5" y1="4" x2="9.5" y2="4" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="4.5" y1="6.5" x2="9.5" y2="6.5" stroke="{c2}" stroke-width="1" stroke-linecap="round"/>
+<polyline points="7,11 7,8.5 5.5,10" fill="none" stroke="{c}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="7" y1="8.5" x2="8.5" y2="10" stroke="{c}" stroke-width="1.2" stroke-linecap="round"/>
+</svg>"""
+
 _ISO = """<svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
 <circle cx="7" cy="7" r="5.5" fill="none" stroke="{c}" stroke-width="1.3"/>
 <circle cx="7" cy="7" r="1.8" fill="{c2}" stroke="{c}" stroke-width="1"/>
@@ -383,6 +391,7 @@ def init_icons():
         "history": _make_icon(_HISTORY.format(c=_C, c2=_C2)),
         "disk": _make_icon(_DISK.format(c=_C, c2=_C2)),
         "backup": _make_icon(_BACKUP.format(c=_C, c2=_C2)),
+        "restore": _make_icon(_RESTORE.format(c=_C, c2=_C2)),
         "iso": _make_icon(_ISO.format(c=_C, c2=_C2)),
         "template": _make_icon(_TEMPLATE.format(c=_C, c2=_C2)),
         "tpm": _make_icon(_TPM.format(c=_C, c2=_C2)),

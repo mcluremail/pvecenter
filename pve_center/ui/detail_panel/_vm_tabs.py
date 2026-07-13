@@ -4,10 +4,13 @@ from datetime import datetime
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGridLayout,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPushButton,
     QScrollArea,
     QStackedWidget,
+    QTableWidgetItem,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -144,7 +147,6 @@ class VMTabs:
         panel.vm_snapshots_loading = loading
         panel.vm_snapshots_tree = tree
         panel.vm_snapshots_stack = stack
-        from PySide6.QtWidgets import QHBoxLayout, QPushButton
         btn_bar = QWidget()
         btn_layout = QHBoxLayout(btn_bar)
         btn_layout.setContentsMargins(0, 0, 0, 0)
@@ -163,6 +165,56 @@ class VMTabs:
         layout.setSpacing(0)
         layout.addWidget(btn_bar)
         layout.addWidget(stack)
+        tab.setWidget(container)
+        return tab
+
+    def build_vm_backup_tab(self):
+        panel = self.panel
+        loading = loading_label()
+        from ._table_utils import make_filterable_table, make_table
+        table = make_table(
+            [tr("Archive"), tr("Type"), tr("Format"), tr("Size"), tr("Created"), tr("Storage")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Interactive, 70), (QHeaderView.Interactive, 80),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100)],
+            sortable=True,
+        )
+        panel.vm_backup_table = table
+        toolbar = QWidget()
+        btn_layout = QVBoxLayout(toolbar)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(4)
+        btn_row = QWidget()
+        btn_row_layout = QHBoxLayout(btn_row)
+        btn_row_layout.setContentsMargins(0, 0, 0, 0)
+        btn_row_layout.setSpacing(4)
+        backup_btn = QPushButton(get_icon("backup"), tr("Backup now"))
+        backup_btn.setMinimumHeight(28)
+        backup_btn.clicked.connect(self.on_vm_backup)
+        btn_row_layout.addWidget(backup_btn)
+        restore_btn = QPushButton(get_icon("restore"), tr("Restore"))
+        restore_btn.setMinimumHeight(28)
+        restore_btn.clicked.connect(self.on_vm_restore)
+        btn_row_layout.addWidget(restore_btn)
+        btn_row_layout.addStretch()
+        btn_layout.addWidget(btn_row)
+        panel.vm_backup_btn = backup_btn
+        panel.vm_restore_btn = restore_btn
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        filter_table = make_filterable_table(table)
+        stack.addWidget(filter_table)
+        stack.setCurrentIndex(0)
+        panel.vm_backup_loading = loading
+        panel.vm_backup_stack = stack
+        btn_layout.addWidget(stack)
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         tab.setWidget(container)
         return tab
 
@@ -297,6 +349,7 @@ class VMTabs:
         panel.tabs.setTabVisible(TabIndex.OPTIONS, True)
         panel.tabs.setTabVisible(TabIndex.HISTORY, True)
         panel.tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, True)
+        panel.tabs.setTabVisible(TabIndex.VM_BACKUP, True)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
         panel.tabs.setCurrentIndex(TabIndex.MONITOR)
 
@@ -351,6 +404,7 @@ class VMTabs:
             self.populate_vm_snapshots_tree(panel.vm_snapshots_cache[detail_key])
 
         self.load_iso_for_node(host_name, node_name)
+        self.load_vm_backups(vmid, node_name, host_name)
 
         panel.hardware_widget.set_vm_status(vm_data.get("status", ""))
         panel.hardware_widget.set_context(host_name, vmid, node_name)
@@ -989,6 +1043,7 @@ class VMTabs:
         panel.tabs.setTabVisible(TabIndex.OPTIONS, False)
         panel.tabs.setTabVisible(TabIndex.HISTORY, False)
         panel.tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, False)
+        panel.tabs.setTabVisible(TabIndex.VM_BACKUP, False)
         panel.tabs.setTabVisible(TabIndex.HOST_VMS, False)
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, True)
         panel.tabs.setCurrentIndex(TabIndex.POOL_VMS)
@@ -1024,3 +1079,192 @@ class VMTabs:
         vols = {v.get("volid") for v in (data or []) if v.get("volid")}
         if node_name in panel._iso_by_node:
             panel._iso_by_node[node_name].update(vols)
+
+    # --- VM backup (vzdump + restore) ---
+
+    def load_vm_backups(self, vmid, node_name, host_name):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        panel.vm_backup_loading.setText(tr("Loading..."))
+        panel.vm_backup_stack.setCurrentIndex(0)
+        panel.vm_backup_table.setRowCount(0)
+        backup_storages = [
+            s for s in panel.all_storages
+            if s.get("node") == node_name
+            and "backup" in (s.get("content", "") or "").split(",")
+        ]
+        if not backup_storages:
+            panel.vm_backup_loading.setText(tr("No backup storage available"))
+            panel.vm_backup_stack.setCurrentIndex(0)
+            return
+        panel._vm_backup_pending = len(backup_storages)
+        panel._vm_backup_all = []
+        from ..api.metrics import StorageContentListWorker
+        for storage_info in backup_storages:
+            storage = storage_info.get("storage")
+            if not storage:
+                continue
+            worker = StorageContentListWorker(cfg, node_name, storage, "backup")
+            worker.signals.result.connect(
+                lambda sn, ct, data, v=vmid: self.on_vm_backups_loaded(v, sn, data)
+            )
+            worker.signals.error.connect(
+                lambda sn, ct, err, v=vmid: self.on_vm_backups_loaded(v, sn, [])
+            )
+            panel._workers_mgr.run_worker(worker)
+
+    def on_vm_backups_loaded(self, vmid, storage_name, data):
+        panel = self.panel
+        if not hasattr(panel, "_vm_backup_pending"):
+            return
+        filtered = [b for b in (data or []) if str(b.get("vmid", "")) == str(vmid)]
+        panel._vm_backup_all.extend(filtered)
+        panel._vm_backup_pending -= 1
+        if panel._vm_backup_pending > 0:
+            return
+        backups = panel._vm_backup_all
+        del panel._vm_backup_pending
+        panel._vm_backup_all = []
+        if backups:
+            panel.vm_backup_stack.setCurrentIndex(1)
+            self.populate_vm_backups_table(backups)
+        else:
+            panel.vm_backup_loading.setText(tr("No backups found for this VM"))
+            panel.vm_backup_stack.setCurrentIndex(0)
+
+    def populate_vm_backups_table(self, backups):
+        panel = self.panel
+        table = panel.vm_backup_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(backups))
+        from ._table_utils import format_volsize
+        for i, b in enumerate(backups):
+            volid = b.get("volid", "")
+            archive_item = QTableWidgetItem(volid)
+            archive_item.setIcon(get_icon("backup"))
+            archive_item.setData(Qt.UserRole, volid)
+            table.setItem(i, 0, archive_item)
+            table.setItem(i, 1, QTableWidgetItem(b.get("subtype") or b.get("type", "")))
+            table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
+            size = b.get("size", 0) or 0
+            table.setItem(i, 3, QTableWidgetItem(format_volsize(size) if size else "0"))
+            ctime = b.get("ctime")
+            if ctime:
+                table.setItem(i, 4, QTableWidgetItem(datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")))
+            else:
+                table.setItem(i, 4, QTableWidgetItem(""))
+            table.setItem(i, 5, QTableWidgetItem(b.get("storage", "")))
+        table.setSortingEnabled(True)
+
+    def on_vm_backup(self):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        vmid = panel._last_vm_data.get("vmid")
+        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        node_name = panel._last_vm_data.get("node") or host_name
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        from ..vzdump_dialog import VzdumpDialog
+        storages = [s for s in panel.all_storages if s.get("node") == node_name]
+        dlg = VzdumpDialog(panel, vmid=vmid, storages=storages)
+        if dlg.exec() != VzdumpDialog.Accepted:
+            return
+        params = dlg.get_params()
+        if not params:
+            return
+        from ...backend import VzdumpWorker
+        worker = VzdumpWorker(
+            cfg, node_name, vmid,
+            storage=params["storage"],
+            mode=params["mode"],
+            compress=params["compress"],
+            notes=params["notes"],
+            remove=params["remove"],
+            bwlimit=params["bwlimit"],
+        )
+        key = f"vzdump:{vmid}"
+        panel.transfer_started.emit(key, tr("Backup VM {vmid}").format(vmid=vmid))
+        panel.vm_backup_btn.setEnabled(False)
+        worker.signals.result.connect(lambda msg, k=key, w=worker: (
+            panel.transfer_finished.emit(k, True, msg),
+            panel.config_update_result.emit(msg),
+            self.load_vm_backups(vmid, node_name, host_name),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, k=key, w=worker: (
+            panel.transfer_finished.emit(k, False, err),
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.finished.connect(
+            lambda: panel.vm_backup_btn.setEnabled(True)
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def on_vm_restore(self):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        node_name = panel._last_vm_data.get("node") or host_name
+        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        table = panel.vm_backup_table
+        row = table.currentRow()
+        if row < 0:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(panel, tr("Restore"), tr("Select a backup to restore"))
+            return
+        archive_item = table.item(row, 0)
+        if not archive_item:
+            return
+        volid = archive_item.data(Qt.UserRole) or archive_item.text()
+        if not volid:
+            return
+        used_vmids = {v.get("vmid") for v in panel.all_vms if v.get("vmid")}
+        next_vmid = self._next_free_vmid(used_vmids)
+        from ..vm_restore_dialog import VmRestoreDialog
+        storages = [s for s in panel.all_storages if s.get("node") == node_name]
+        dlg = VmRestoreDialog(panel, volid=volid, vm_type=vm_type,
+                              storages=storages, next_vmid=next_vmid)
+        if dlg.exec() != VmRestoreDialog.Accepted:
+            return
+        params = dlg.get_params()
+        from ...backend import VmRestoreWorker
+        worker = VmRestoreWorker(
+            cfg, node_name, params["vmid"], vm_type, volid,
+            storage=params["storage"],
+            name=params["name"],
+            force=params["force"],
+            unique=params["unique"],
+        )
+        key = f"restore:{params['vmid']}"
+        panel.transfer_started.emit(key, tr("Restore VM {vmid}").format(vmid=params["vmid"]))
+        panel.vm_restore_btn.setEnabled(False)
+        worker.signals.result.connect(lambda msg, k=key, w=worker: (
+            panel.transfer_finished.emit(k, True, msg),
+            panel.config_update_result.emit(msg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, k=key, w=worker: (
+            panel.transfer_finished.emit(k, False, err),
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.finished.connect(
+            lambda: panel.vm_restore_btn.setEnabled(True)
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    @staticmethod
+    def _next_free_vmid(used_vmids, start=100, end=999999999):
+        for vid in range(start, end + 1):
+            if vid not in used_vmids:
+                return vid
+        return start
