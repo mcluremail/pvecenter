@@ -16,9 +16,33 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.8.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.8.0)
+Latest release: [v2.8.1](https://github.com/mcluremail/pvecenter/releases/tag/v2.8.1)
 
 ## Changelog
+
+### v2.8.1 — audit bug fixes
+
+**Bug fixes (18 issues)**
+- LXC restore: used `hostname` param instead of `name`; `unique` only sent for QEMU VMs
+- PVE8 `/cluster/jobs`: filtered to `vzdump` type only (was returning all job types)
+- Removed dead `/cluster/replication` API call (endpoint doesn't exist)
+- PVE8 job create/update: now includes `type=vzdump` param (was falling back to PVE7)
+- ClusterJobUpdateWorker: `id` stripped from PUT body (was causing HTTP 400)
+- BackupJobDialog: weekday names now translatable (`tr()` at call time, not module load)
+- BackupJobDialog: `prune-backups` parsing handles `keep-last=N` format
+- BackupJobDialog: Save button disabled + warning shown when no backup storages
+- BackupJobDialog: `bool("0")` == True bug for `enabled` field (now `int()`)
+- BackupJobDialog: removed dead `is_pve8` parameter
+- VzdumpDialog: canonical i18n key `Backup VM {vmid}`
+- VM backup tab: storage name now shown in Storage column (was always empty)
+- VM backup tab: generation guard prevents cross-VM data corruption on rapid switch
+- Cluster snapshots: crash fix — `data` is a list, not dict (was calling `.items()`)
+- Cluster storage aggregation: filtered by cluster name (was summing all clusters)
+- Cluster health tab: completion check for hosts without config
+- Backup jobs: fetched for cluster-member hosts via cluster config
+- TabIndex.HARDWARE: now hidden on type switch (was always visible)
+- Notification: `online→online` no longer shows spurious warning toast
+- Notification: `vm_status_changed` unused `old_status` parameter removed
 
 ### v2.8.0 — vzdump backup & restore, backup jobs, cluster tabs
 

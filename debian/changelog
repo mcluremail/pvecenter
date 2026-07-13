@@ -1,3 +1,28 @@
+pve-center (2.8.1-1) unstable; urgency=medium
+
+  * Fix: LXC restore used 'name' instead of 'hostname' param; 'unique' only for QEMU
+  * Fix: PVE8 /cluster/jobs filtered to vzdump type only (was returning all job types)
+  * Fix: removed dead /cluster/replication call (endpoint doesn't exist)
+  * Fix: PVE8 job create/update now includes type=vzdump param
+  * Fix: ClusterJobUpdateWorker stripped 'id' from PUT body (was causing 400 error)
+  * Fix: BackupJobDialog — weekday names now translatable (tr() at call time)
+  * Fix: BackupJobDialog — prune-backups parsing handles keep-last=N format
+  * Fix: BackupJobDialog — Save button disabled when no backup storages
+  * Fix: BackupJobDialog — bool("0")==True for enabled field (now int())
+  * Fix: BackupJobDialog — removed dead is_pve8 parameter
+  * Fix: VzdumpDialog — canonical i18n key 'Backup VM {vmid}'
+  * Fix: VM backup tab — storage name now shown in Storage column (was empty)
+  * Fix: VM backup tab — generation guard prevents cross-VM data corruption on rapid switch
+  * Fix: cluster snapshots crash — data is list not dict (was calling .items() on list)
+  * Fix: cluster storage aggregation filtered by cluster name (was summing all clusters)
+  * Fix: cluster health tab completion check for hosts without config
+  * Fix: backup jobs fetched for cluster-member hosts via cluster config
+  * Fix: TabIndex.HARDWARE now hidden on type switch (was always visible)
+  * Fix: notification — online→online no longer shows spurious toast
+  * Fix: notification — vm_status_changed unused old_status parameter removed
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 13 Jul 2026 00:00:00 +0300
+
 pve-center (2.8.0-1) unstable; urgency=medium
 
   * New features: VM on-demand backup (vzdump) with storage, mode, compression
