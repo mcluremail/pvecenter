@@ -111,15 +111,14 @@ class NotificationManager:
         elif old_status in ("error", "offline", "unknown") and new_status == "online":
             text = tr("is back online ✅ {}").format(host_name)
             color = Color.SUCCESS
-        elif new_status == "online":
-            text = tr("is online 🟢 {}").format(host_name)
-            color = Color.SLATE_800
-        else:
+        elif new_status != "online" and old_status != new_status:
             text = f"🟡 {host_name} — {new_status}"
             color = Color.WARNING
+        else:
+            return
         self._show(key, text, color)
 
-    def vm_status_changed(self, vm_name, host_name, old_status, new_status):
+    def vm_status_changed(self, vm_name, host_name, new_status):
         key = f"vm:{host_name}:{vm_name}"
         status_labels = {"running": tr("Running"), "stopped": tr("Stopped"), "paused": tr("Paused")}
         ru = status_labels.get(new_status, new_status)

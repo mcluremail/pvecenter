@@ -1967,7 +1967,7 @@ class VzdumpWorker(QRunnable):
                 params["notes"] = self.notes
             if self.remove:
                 params["remove"] = 1
-            if self.bwlimit and self.bwlimit > 0:
+            if self.bwlimit > 0:
                 params["bwlimit"] = self.bwlimit
             upid = proxmox.nodes(self.node_name).vzdump.post(**params)
             if isinstance(upid, dict):
@@ -2036,14 +2036,16 @@ class VmRestoreWorker(QRunnable):
             }
             if self.storage:
                 params["storage"] = self.storage
-            if self.name:
-                params["name"] = self.name
-            if self.unique:
-                params["unique"] = 1
             resource = proxmox.nodes(self.node_name)
             if self.vm_type == "lxc":
+                if self.name:
+                    params["hostname"] = self.name
                 upid = resource.lxc.post(**params)
             else:
+                if self.name:
+                    params["name"] = self.name
+                if self.unique:
+                    params["unique"] = 1
                 upid = resource.qemu.post(**params)
             if isinstance(upid, dict):
                 upid = upid.get("data", upid)
@@ -2104,7 +2106,7 @@ class ClusterJobsWorker(QRunnable):
                     if isinstance(data, dict):
                         data = data.get("data", data)
                     if isinstance(data, list):
-                        jobs = data
+                        jobs = [j for j in data if j.get("type", "vzdump") == "vzdump"]
                 except Exception:
                     logger.debug("cluster/jobs failed, falling back to /cluster/backup", exc_info=True)
                     data = proxmox.cluster.backup.get()
@@ -2118,14 +2120,6 @@ class ClusterJobsWorker(QRunnable):
                     data = data.get("data", data)
                 if isinstance(data, list):
                     jobs = data
-                try:
-                    repl = proxmox.cluster.replication.get()
-                    if isinstance(repl, dict):
-                        repl = repl.get("data", repl)
-                    if isinstance(repl, list):
-                        jobs.extend(repl)
-                except Exception:
-                    pass
             _safe_emit(self.signals.jobs_ready, jobs)
         except Exception as e:
             logger.debug("cluster jobs error", exc_info=True)
@@ -2167,7 +2161,9 @@ class ClusterJobCreateWorker(QRunnable):
             )
             if self.pve_major >= 8:
                 try:
-                    proxmox.cluster.jobs.post(**self.params)
+                    p = dict(self.params)
+                    p["type"] = "vzdump"
+                    proxmox.cluster.jobs.post(**p)
                 except Exception:
                     proxmox.cluster.backup.post(**self.params)
             else:
@@ -2212,13 +2208,16 @@ class ClusterJobUpdateWorker(QRunnable):
                 verify_ssl=_verify_ssl(self.host_cfg),
                 timeout=15,
             )
+            p = {k: v for k, v in self.params.items() if k != "id"}
             if self.pve_major >= 8:
                 try:
-                    proxmox.cluster.jobs(self.job_id).put(**self.params)
+                    pj = dict(p)
+                    pj["type"] = "vzdump"
+                    proxmox.cluster.jobs(self.job_id).put(**pj)
                 except Exception:
-                    proxmox.cluster.backup(self.job_id).put(**self.params)
+                    proxmox.cluster.backup(self.job_id).put(**p)
             else:
-                proxmox.cluster.backup(self.job_id).put(**self.params)
+                proxmox.cluster.backup(self.job_id).put(**p)
             _safe_emit(self.signals.result, tr("Backup job updated"))
         except Exception as e:
             logger.debug("job update error", exc_info=True)

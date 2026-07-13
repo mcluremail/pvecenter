@@ -1097,10 +1097,10 @@ class VMTabs:
         ]
         if not backup_storages:
             panel.vm_backup_loading.setText(tr("No backup storage available"))
-            panel.vm_backup_stack.setCurrentIndex(0)
             return
         panel._vm_backup_pending = len(backup_storages)
         panel._vm_backup_all = []
+        panel._vm_backup_gen = getattr(panel, "_generation", 0)
         from ..api.metrics import StorageContentListWorker
         for storage_info in backup_storages:
             storage = storage_info.get("storage")
@@ -1108,25 +1108,31 @@ class VMTabs:
                 continue
             worker = StorageContentListWorker(cfg, node_name, storage, "backup")
             worker.signals.result.connect(
-                lambda sn, ct, data, v=vmid: self.on_vm_backups_loaded(v, sn, data)
+                lambda sn, ct, data, v=vmid, s=storage: self.on_vm_backups_loaded(v, s, data)
             )
             worker.signals.error.connect(
-                lambda sn, ct, err, v=vmid: self.on_vm_backups_loaded(v, sn, [])
+                lambda sn, ct, err, v=vmid, s=storage: self.on_vm_backups_loaded(v, s, [])
             )
             panel._workers_mgr.run_worker(worker)
 
     def on_vm_backups_loaded(self, vmid, storage_name, data):
         panel = self.panel
+        gen = getattr(panel, "_vm_backup_gen", None)
+        if gen is not None and gen != getattr(panel, "_generation", 0):
+            return
         if not hasattr(panel, "_vm_backup_pending"):
             return
-        filtered = [b for b in (data or []) if str(b.get("vmid", "")) == str(vmid)]
-        panel._vm_backup_all.extend(filtered)
+        for b in (data or []):
+            if str(b.get("vmid", "")) == str(vmid):
+                b["storage"] = storage_name
+                panel._vm_backup_all.append(b)
         panel._vm_backup_pending -= 1
         if panel._vm_backup_pending > 0:
             return
         backups = panel._vm_backup_all
-        del panel._vm_backup_pending
+        panel.__dict__.pop("_vm_backup_pending", None)
         panel._vm_backup_all = []
+        panel._vm_backup_gen = None
         if backups:
             panel.vm_backup_stack.setCurrentIndex(1)
             self.populate_vm_backups_table(backups)

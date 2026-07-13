@@ -406,6 +406,10 @@ class HostTabs:
         panel = self.panel
         host_names = {h.get("host_name", "") for h in hosts}
         node_names = {h.get("node", "") for h in hosts}
+        cluster_name = ""
+        first_cfg = next((panel._cfg_by_name.get(h.get("host_name", "")) for h in hosts), None)
+        if first_cfg:
+            cluster_name = first_cfg.get("cluster", "")
         vms = [vm for vm in panel.all_vms
                if vm.get("node") in node_names
                and vm.get("host_name") in host_names]
@@ -429,13 +433,11 @@ class HostTabs:
         panel.card_cluster_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
         ram_pct = safe_pct(total_mem, total_maxmem)
         panel.card_cluster_ram.set_progress(ram_pct)
-        cluster_storages = [s for s in panel.all_storages if s.get("cluster")]
-        if not cluster_storages:
-            cluster_name = hosts[0].get("host_name", "") if hosts else ""
-            cfg = panel._cfg_by_name.get(cluster_name)
-            cn = cfg.get("cluster") if cfg else None
-            if cn:
-                cluster_storages = [s for s in panel.all_storages if s.get("cluster") == cn]
+        if cluster_name:
+            cluster_storages = [s for s in panel.all_storages if s.get("cluster") == cluster_name]
+        else:
+            cluster_storages = [s for s in panel.all_storages
+                                if s.get("node") in node_names]
         total_used = sum(s.get("used", 0) or 0 for s in cluster_storages)
         total_total = sum(s.get("total", 0) or 0 for s in cluster_storages)
         used_gb = round(total_used / (1024**3), 1) if total_used else 0
@@ -597,7 +599,7 @@ class HostTabs:
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster") == cluster_name:
                 hosts.append(node)
-                if cfg.get("cluster_rep"):
+                if cfg.get("cluster_rep") or cluster_cfg is None:
                     cluster_cfg = cfg
         panel.detail_label.setText(cluster_name)
         hosts_count = len(hosts)
@@ -802,6 +804,16 @@ class HostTabs:
             is_cluster_host = bool(host_cfg.get("cluster"))
             if not is_cluster_host:
                 self._fetch_backup_jobs(host_cfg, host_name)
+            else:
+                cluster_name = host_cfg.get("cluster", "")
+                cluster_cfg = None
+                for n in panel.all_nodes:
+                    cn = panel._cfg_by_name.get(n.get("host_name", ""))
+                    if cn and cn.get("cluster") == cluster_name:
+                        cluster_cfg = cn
+                        break
+                if cluster_cfg:
+                    self._fetch_backup_jobs(cluster_cfg, cluster_name)
 
     def populate_host_storage_table(self, storages):
         panel = self.panel
@@ -1434,20 +1446,6 @@ class HostTabs:
                         if not s.get("cluster")
                         and any(s.get("node") == h.get("node") for h in panel.all_nodes
                                 if panel._cfg_by_name.get(h.get("host_name", ""), {}).get("cluster") == cluster_name)]
-        from ..widgets.card_list import CardList
-        if not hasattr(panel, "storage_list") or panel.storage_list is None:
-            panel.storage_list = CardList({
-                "key": "name",
-                "title": "name",
-                "fields": [
-                    ("type_text", 75),
-                    ("content_text", 225),
-                    ("location_text", 80),
-                    ("used_text", 100),
-                    ("total_text", 100),
-                    ("usage_text", 65),
-                ],
-            })
         card_items = []
         seen = set()
         for st in storages:
@@ -1496,7 +1494,10 @@ class HostTabs:
                 )
             )
             worker.signals.snapshots_error.connect(
-                lambda nn, err, w=worker: panel._workers_mgr.discard_worker(w)
+                lambda nn, err, w=worker: (
+                    self._on_cluster_snapshots(nn, []),
+                    panel._workers_mgr.discard_worker(w),
+                )
             )
             panel._workers_mgr.run_host_worker(worker)
 
@@ -1505,11 +1506,16 @@ class HostTabs:
         if panel.current_obj_type != "cluster":
             return
         tree = panel.host_snapshots_tree
-        for vmid, snaps in (data or {}).items():
-            vm_label = tr("VM {vmid}").format(vmid=vmid)
+        vms_map = {}
+        for snap in (data or []):
+            vmid = snap.get("vmid", 0)
+            vms_map.setdefault(vmid, []).append(snap)
+        for vmid in sorted(vms_map.keys()):
+            snaps = vms_map[vmid]
+            vm_name = snaps[0].get("vm_name", "")
+            vm_label = f"{vmid} {vm_name}".strip()
             vm_item = QTreeWidgetItem(tree, [vm_label, "", "", "", "", ""])
             vm_item.setIcon(0, get_icon("snapshot"))
-            vm_item.setExpanded(False)
             for snap in snaps:
                 name = snap.get("name", "")
                 desc = snap.get("description", "") or ""
@@ -1517,9 +1523,14 @@ class HostTabs:
                 created = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M") if ctime else ""
                 parent = snap.get("parent", "") or ""
                 size = snap.get("size", 0) or 0
-                size_text = f"{round(size / (1024**3), 1)} GiB" if size else ""
+                if isinstance(size, (int, float)) and size > 0:
+                    gb = size / (1024 ** 3)
+                    size_text = f"{gb / 1024:.1f} TiB" if gb >= 1024 else f"{gb:.1f} GiB"
+                else:
+                    size_text = ""
                 QTreeWidgetItem(vm_item, [name, desc, created, "", size_text, parent])
         tree.resizeColumnToContents(0)
+        tree.expandAll()
         panel.host_snapshots_stack.setCurrentIndex(1)
 
     def _fetch_cluster_health(self, hosts):
@@ -1557,6 +1568,9 @@ class HostTabs:
                 )
             )
             panel._workers_mgr.run_host_worker(worker)
+        if panel._cluster_health_done >= panel._cluster_health_total:
+            panel.host_health_list.set_items([])
+            panel.host_health_stack.setCurrentIndex(1)
 
     def _on_cluster_health(self, node_name, result):
         panel = self.panel
@@ -1691,7 +1705,7 @@ class HostTabs:
         pve_major = getattr(panel, "_backup_jobs_pve_major", 7)
         storages = self._get_backup_jobs_storages()
         from ..backup_job_dialog import BackupJobDialog
-        dlg = BackupJobDialog(panel, storages=storages, is_pve8=pve_major >= 8)
+        dlg = BackupJobDialog(panel, storages=storages)
         if dlg.exec() != BackupJobDialog.Accepted:
             return
         params = dlg.get_params()
@@ -1727,7 +1741,7 @@ class HostTabs:
         pve_major = getattr(panel, "_backup_jobs_pve_major", 7)
         storages = self._get_backup_jobs_storages()
         from ..backup_job_dialog import BackupJobDialog
-        dlg = BackupJobDialog(panel, storages=storages, job=job, is_pve8=pve_major >= 8)
+        dlg = BackupJobDialog(panel, storages=storages, job=job)
         if dlg.exec() != BackupJobDialog.Accepted:
             return
         params = dlg.get_params()

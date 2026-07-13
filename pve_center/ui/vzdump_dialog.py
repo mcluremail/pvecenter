@@ -31,7 +31,7 @@ class VzdumpDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        header = QLabel(f"<b>{tr('Create backup for VM {vmid}').format(vmid=self._vmid)}</b>")
+        header = QLabel(f"<b>{tr('Backup VM {vmid}').format(vmid=self._vmid)}</b>")
         layout.addWidget(header)
 
         form = QFormLayout()
@@ -65,7 +65,9 @@ class VzdumpDialog(QDialog):
         self._compress_combo.addItem("gzip", "gzip")
         self._compress_combo.addItem("lzo", "lzo")
         self._compress_combo.addItem("zstd", "zstd")
-        self._compress_combo.setCurrentIndex(3)
+        idx = self._compress_combo.findData("zstd")
+        if idx >= 0:
+            self._compress_combo.setCurrentIndex(idx)
         form.addRow(tr("Compression:"), self._compress_combo)
 
         self._notes_edit = QLineEdit()

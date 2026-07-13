@@ -14,26 +14,27 @@ from PySide6.QtWidgets import (
 
 from .i18n import tr
 
-_WEEKDAYS = [
-    ("mon", tr("Monday")),
-    ("tue", tr("Tuesday")),
-    ("wed", tr("Wednesday")),
-    ("thu", tr("Thursday")),
-    ("fri", tr("Friday")),
-    ("sat", tr("Saturday")),
-    ("sun", tr("Sunday")),
-]
+
+def _weekdays():
+    return [
+        ("mon", tr("Monday")),
+        ("tue", tr("Tuesday")),
+        ("wed", tr("Wednesday")),
+        ("thu", tr("Thursday")),
+        ("fri", tr("Friday")),
+        ("sat", tr("Saturday")),
+        ("sun", tr("Sunday")),
+    ]
 
 
 class BackupJobDialog(QDialog):
     """Dialog for creating or editing a scheduled backup job."""
 
-    def __init__(self, parent=None, storages=None, job=None, is_pve8=False):
+    def __init__(self, parent=None, storages=None, job=None):
         super().__init__(parent)
         self._storages = storages or []
         self._job = job or {}
         self._is_edit = bool(job)
-        self._is_pve8 = is_pve8
         self.setWindowTitle(tr("Edit backup job") if self._is_edit else tr("Add backup job"))
         self.setMinimumWidth(480)
         self._build_ui()
@@ -73,12 +74,19 @@ class BackupJobDialog(QDialog):
                 self._storage_combo.addItem(name, name)
         form.addRow(tr("Storage:"), self._storage_combo)
 
+        self._storage_warn = QLabel(tr("No backup storage available"))
+        self._storage_warn.setStyleSheet("color: #dc2626;")
+        self._storage_warn.setVisible(False)
+        form.addRow("", self._storage_warn)
+
         self._compress_combo = QComboBox()
         self._compress_combo.addItem(tr("None"), "0")
         self._compress_combo.addItem("gzip", "gzip")
         self._compress_combo.addItem("lzo", "lzo")
         self._compress_combo.addItem("zstd", "zstd")
-        self._compress_combo.setCurrentIndex(3)
+        idx = self._compress_combo.findData("zstd")
+        if idx >= 0:
+            self._compress_combo.setCurrentIndex(idx)
         form.addRow(tr("Compression:"), self._compress_combo)
 
         schedule_label = QLabel(f"<b>{tr('Schedule')}</b>")
@@ -99,9 +107,11 @@ class BackupJobDialog(QDialog):
         sched_form.addRow(tr("Time:"), self._time_edit)
 
         self._dow_combo = QComboBox()
-        for code, label in _WEEKDAYS:
+        for code, label in _weekdays():
             self._dow_combo.addItem(label, code)
-        self._dow_combo.setCurrentIndex(5)
+        idx = self._dow_combo.findData("sat")
+        if idx >= 0:
+            self._dow_combo.setCurrentIndex(idx)
         sched_form.addRow(tr("Day of week:"), self._dow_combo)
 
         self._custom_edit = QLineEdit()
@@ -139,16 +149,20 @@ class BackupJobDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton(tr("Save"))
-        ok_btn.setObjectName("accentBtn")
-        ok_btn.setFixedWidth(120)
-        ok_btn.clicked.connect(self.accept)
+        self._ok_btn = QPushButton(tr("Save"))
+        self._ok_btn.setObjectName("accentBtn")
+        self._ok_btn.setFixedWidth(120)
+        self._ok_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.setFixedWidth(120)
         cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(self._ok_btn)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+        if not backup_storages:
+            self._storage_warn.setVisible(True)
+            self._ok_btn.setEnabled(False)
 
     def _on_schedule_type_changed(self):
         sched_type = self._schedule_type_combo.currentData()
@@ -164,7 +178,12 @@ class BackupJobDialog(QDialog):
 
     def _fill_from_job(self):
         job = self._job
-        self._enabled_check.setChecked(bool(job.get("enabled", 1)))
+        enabled_raw = job.get("enabled", 1)
+        if isinstance(enabled_raw, str):
+            enabled_val = int(enabled_raw)
+        else:
+            enabled_val = int(enabled_raw or 0)
+        self._enabled_check.setChecked(bool(enabled_val))
         vmid = job.get("vmid", "")
         self._vmid_edit.setText(str(vmid) if vmid else "")
         mode = job.get("mode", "snapshot")
@@ -183,21 +202,57 @@ class BackupJobDialog(QDialog):
         remove = int(job.get("remove", 0) or 0)
         self._remove_check.setChecked(bool(remove))
         if remove:
-            self._retain_spin.setValue(int(job.get("prune-backups", "keep-all=3").split("=")[1].strip(" '\"")) if isinstance(job.get("prune-backups"), str) else 3)
+            prune = job.get("prune-backups", "keep-last=3")
+            retain = 3
+            if isinstance(prune, str):
+                for part in prune.split(","):
+                    part = part.strip()
+                    if part.startswith("keep-last="):
+                        try:
+                            retain = int(part.split("=")[1].strip(" '\""))
+                        except (ValueError, IndexError):
+                            retain = 3
+                        break
+            self._retain_spin.setValue(retain)
         bwlimit = int(job.get("bwlimit", 0) or 0)
         self._bwlimit_spin.setValue(bwlimit)
         schedule = job.get("schedule", "")
         if schedule:
-            self._schedule_type_combo.setCurrentIndex(2)
-            self._custom_edit.setText(schedule)
+            sched_parts = schedule.split()
+            if len(sched_parts) == 2 and sched_parts[0].lower() in (
+                "mon", "tue", "wed", "thu", "fri", "sat", "sun"
+            ):
+                idx = self._schedule_type_combo.findData("weekly")
+                if idx >= 0:
+                    self._schedule_type_combo.setCurrentIndex(idx)
+                dow_idx = self._dow_combo.findData(sched_parts[0].lower())
+                if dow_idx >= 0:
+                    self._dow_combo.setCurrentIndex(dow_idx)
+                try:
+                    h, m = sched_parts[1].split(":")
+                    from PySide6.QtCore import QTime
+                    self._time_edit.setTime(QTime(int(h), int(m)))
+                except (ValueError, IndexError):
+                    pass
+            elif len(sched_parts) == 1 and ":" in sched_parts[0]:
+                idx = self._schedule_type_combo.findData("daily")
+                if idx >= 0:
+                    self._schedule_type_combo.setCurrentIndex(idx)
+                try:
+                    h, m = sched_parts[0].split(":")
+                    from PySide6.QtCore import QTime
+                    self._time_edit.setTime(QTime(int(h), int(m)))
+                except (ValueError, IndexError):
+                    pass
+            else:
+                idx = self._schedule_type_combo.findData("custom")
+                if idx >= 0:
+                    self._schedule_type_combo.setCurrentIndex(idx)
+                self._custom_edit.setText(schedule)
             self._on_schedule_type_changed()
 
     def get_params(self):
         params = {}
-        if self._is_edit:
-            job_id = self._job.get("id", "")
-            if job_id:
-                params["id"] = job_id
         params["enabled"] = 1 if self._enabled_check.isChecked() else 0
         vmid_text = self._vmid_edit.text().strip()
         params["vmid"] = vmid_text if vmid_text else "all"
@@ -209,7 +264,7 @@ class BackupJobDialog(QDialog):
             params["comment"] = notes
         if self._remove_check.isChecked():
             params["remove"] = 1
-            params["prune-backups"] = f"keep-all={self._retain_spin.value()}"
+            params["prune-backups"] = f"keep-last={self._retain_spin.value()}"
         else:
             params["remove"] = 0
         bwlimit = self._bwlimit_spin.value()

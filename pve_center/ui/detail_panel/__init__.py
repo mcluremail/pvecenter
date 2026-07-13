@@ -143,8 +143,7 @@ class DetailPanel(QWidget):
         # 3: History
         tabs.addTab(self._vm_tabs.build_history_tab(), get_icon("history"), tr("History"))
         # 4: Summary
-        self._summary_widget = self._host_tabs.build_summary_tab()
-        tabs.addTab(self._summary_widget, get_icon("host"), tr("Summary"))
+        tabs.addTab(self._host_tabs.build_summary_tab(), get_icon("host"), tr("Summary"))
         tabs.setTabVisible(TabIndex.SUMMARY, False)
         # 5: Host VMs
         tabs.addTab(self._host_tabs.build_host_vm_tab(), get_icon("vm"), tr("Virtual Machines"))
@@ -244,9 +243,9 @@ class DetailPanel(QWidget):
             self.metrics_widget.clear_curves()
             self.metrics_widget.setVisible(obj_type in ("vm", "host"))
 
-            for idx in (TabIndex.MONITOR, TabIndex.OPTIONS, TabIndex.HISTORY,
-                        TabIndex.HOST_VMS, TabIndex.POOL_VMS, TabIndex.SUMMARY,
-                        TabIndex.STORAGES, TabIndex.HOST_STORAGE,
+            for idx in (TabIndex.MONITOR, TabIndex.HARDWARE, TabIndex.OPTIONS,
+                        TabIndex.HISTORY, TabIndex.HOST_VMS, TabIndex.POOL_VMS,
+                        TabIndex.SUMMARY, TabIndex.STORAGES, TabIndex.HOST_STORAGE,
                         TabIndex.STORAGE_DETAIL, TabIndex.BACKUPS,
                         TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
                         TabIndex.NETWORK, TabIndex.SERVICES,

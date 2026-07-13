@@ -939,7 +939,7 @@ class MainWindow(QMainWindow):
             old = self._last_vm_statuses.get(key)
             if old is not None and old != status:
                 vm_name = vm.get("name") or f"VM {vm.get('vmid', '?')}"
-                self._notifications.vm_status_changed(vm_name, vm.get("host_name", ""), old, status)
+                self._notifications.vm_status_changed(vm_name, vm.get("host_name", ""), status)
             self._last_vm_statuses[key] = status
 
     # ------------------------------------------------------------
