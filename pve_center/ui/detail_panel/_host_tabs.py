@@ -2147,6 +2147,9 @@ class HostTabs:
         else:
             panel.access_users_loading.setText(tr("No users"))
             panel.access_users_stack.setCurrentIndex(0)
+        cfg = getattr(panel, "_access_cfg", None)
+        if cfg:
+            self._fetch_access_tokens(cfg)
 
     def _on_access_users_error(self, err):
         panel = self.panel
@@ -2167,11 +2170,15 @@ class HostTabs:
             panel.access_tokens_loading.setText(tr("No users"))
             panel.access_tokens_stack.setCurrentIndex(0)
             return
+        user_ids = [u.get("userid") for u in users if u.get("userid")]
+        if not user_ids:
+            panel.access_tokens_loading.setText(tr("No users"))
+            panel.access_tokens_stack.setCurrentIndex(0)
+            return
+        panel._access_tokens_pending = len(user_ids)
+        panel._access_tokens_total = 0
         from ...backend import AccessTokensWorker
-        for user in users:
-            uid = user.get("userid")
-            if not uid:
-                continue
+        for uid in user_ids:
             worker = AccessTokensWorker(cfg, uid)
             worker.signals.tokens_ready.connect(
                 lambda data, w=worker, u=uid: (
@@ -2181,16 +2188,29 @@ class HostTabs:
             )
             worker.signals.tokens_error.connect(
                 lambda err, w=worker: (
+                    self._on_access_tokens_done(),
                     panel._workers_mgr.discard_worker(w),
                 )
             )
             panel._workers_mgr.run_host_worker(worker)
 
+    def _on_access_tokens_done(self):
+        panel = self.panel
+        panel._access_tokens_pending = getattr(panel, "_access_tokens_pending", 0) - 1
+        if panel._access_tokens_pending <= 0:
+            if panel.access_tokens_table.rowCount() > 0:
+                panel.access_tokens_stack.setCurrentIndex(1)
+            else:
+                panel.access_tokens_loading.setText(tr("No tokens"))
+                panel.access_tokens_stack.setCurrentIndex(0)
+
     def _on_access_tokens_partial(self, data, userid):
         panel = self.panel
         if panel.current_obj_type not in ("cluster", "host"):
+            self._on_access_tokens_done()
             return
         if not isinstance(data, list):
+            self._on_access_tokens_done()
             return
         table = panel.access_tokens_table
         table.setSortingEnabled(False)
@@ -2220,9 +2240,7 @@ class HostTabs:
         table.setSortingEnabled(True)
         if table.rowCount() > 0:
             panel.access_tokens_stack.setCurrentIndex(1)
-        else:
-            panel.access_tokens_loading.setText(tr("No tokens"))
-            panel.access_tokens_stack.setCurrentIndex(0)
+        self._on_access_tokens_done()
 
     def _fetch_access_groups(self, cfg):
         panel = self.panel

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
 )
 
@@ -48,10 +49,10 @@ class RoleDialog(QDialog):
         )
         self.setWindowTitle(title)
         self.setMinimumWidth(560)
-        self.setMinimumHeight(480)
         self._build_ui()
         if self._is_edit:
             self._fill_from_role()
+        self._adjust_size()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -87,7 +88,13 @@ class RoleDialog(QDialog):
                 cb.setEnabled(False)
             self._priv_checks[priv] = cb
             priv_layout.addWidget(cb, i // cols, i % cols)
-        layout.addWidget(priv_group)
+
+        priv_scroll = QScrollArea()
+        priv_scroll.setWidgetResizable(True)
+        priv_scroll.setWidget(priv_group)
+        priv_scroll.setFrameShape(QScrollArea.NoFrame)
+        priv_scroll.setMinimumHeight(200)
+        layout.addWidget(priv_scroll)
 
         if not self._is_special:
             sel_layout = QHBoxLayout()
@@ -119,6 +126,17 @@ class RoleDialog(QDialog):
             btn_layout.addWidget(self._ok_btn)
             btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def _adjust_size(self):
+        self.adjustSize()
+        w = max(self.minimumWidth(), self.sizeHint().width())
+        h = self.layout().sizeHint().height()
+        screen = self.screen()
+        if screen:
+            avail = screen.availableGeometry()
+            max_h = int(avail.height() * 0.85)
+            h = min(h, max_h)
+        self.resize(w, h)
 
     def _select_all(self):
         for cb in self._priv_checks.values():
