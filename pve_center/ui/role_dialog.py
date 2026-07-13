@@ -128,7 +128,6 @@ class RoleDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _adjust_size(self):
-        self.adjustSize()
         w = max(self.minimumWidth(), self.sizeHint().width())
         h = self.layout().sizeHint().height()
         screen = self.screen()
