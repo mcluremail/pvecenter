@@ -1,3 +1,16 @@
+pve-center (2.8.0-1) unstable; urgency=medium
+
+  * New features: VM on-demand backup (vzdump) with storage, mode, compression
+  * New features: VM restore from backup with auto-suggested VMID
+  * New features: backup jobs scheduling (Daily/Weekly/Custom, PVE 8+ and PVE 7)
+  * New features: cluster-level tabs (VMs, Storage, Snapshots, Health, Backup Jobs)
+  * New features: cluster summary cards (hosts, VMs, CPU, RAM, storage)
+  * New features: VM stats header (VMs total, CPU used, RAM used)
+  * Fix: FadeToast crash — weakref pattern for deleted toasts
+  * Fix: cluster health tab stuck on Loading — done/total counter
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 13 Jul 2026 00:00:00 +0300
+
 pve-center (2.6.0-1) unstable; urgency=medium
 
   * New features: status bar, tray icon, RRD timeframe persist, node comparison
