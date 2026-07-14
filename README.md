@@ -16,9 +16,29 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.8.1](https://github.com/mcluremail/pvecenter/releases/tag/v2.8.1)
+Latest release: [v2.9.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.9.0)
 
 ## Changelog
+
+### v2.9.0 — VM templates, cloning, audit fixes, update check
+
+**New features**
+- VM templates: convert QEMU VM ↔ template (context menu + detail panel buttons)
+- Clone from template: host context menu shows templates, clone dialog picks template then target
+- Template-aware UI: template VMs get distinct icon in tree, lifecycle/migrate/console actions disabled for templates
+- LXC console: VNC proxy support (was SPICE-only, always failed for containers)
+- Automatic update check: fetches GitHub releases on startup, notifies if newer version available
+
+**Bug fixes (audit)**
+- Tree soft refresh: template VMs now show template icon (was reverting to VM status icon)
+- Worker pool exhaustion: user now gets notification when max concurrent workers reached (was silent)
+- DeleteVmWorker: LXC containers now deleted via lxc endpoint (was always QEMU endpoint)
+- VmConsoleWorker: LXC uses VNC proxy, QEMU uses SPICE (was SPICE for both)
+- _on_vm_convert: pre-checks VM is stopped before converting to template
+- _on_vm_action_from_tree: rejects lifecycle actions for templates
+- _on_vm_migrate: rejects migration for templates
+- Dead code: removed unused `suspend` from _CONFIRM_ACTIONS/_CONFIRM_MESSAGES
+- Signal consistency: `vm_clone_from_template_requested` now `(host_name, node)` order
 
 ### v2.8.1 — audit bug fixes
 
