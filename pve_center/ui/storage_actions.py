@@ -49,7 +49,7 @@ class StorageMoveDialog(QDialog):
         form.addRow(tr("Target storage:"), self._target_combo)
 
         self._vmid_spin = QSpinBox()
-        self._vmid_spin.setRange(0, 999999)
+        self._vmid_spin.setRange(0, 999999999)
         self._vmid_spin.setSpecialValueText(tr("Not set"))
         if is_disk:
             form.addRow(tr("Target VM:"), self._vmid_spin)

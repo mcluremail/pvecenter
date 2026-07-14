@@ -13,16 +13,26 @@ from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 
 logger = logging.getLogger(__name__)
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 PVE_PORT = 8006
+
+_WARN_SUPPRESSED = False
+
+
+def _suppress_ssl_warnings():
+    global _WARN_SUPPRESSED
+    if not _WARN_SUPPRESSED:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        _WARN_SUPPRESSED = True
 
 
 def _verify_ssl(cfg):
     """Return verify_ssl value for requests/proxmoxer.
-    trust_ssl=True (default) → accept cert, verify_ssl=False.
-    trust_ssl=False → strict verification, verify_ssl=True."""
-    return not bool(cfg.get("trust_ssl", True))
+    trust_ssl=False (default) → strict verification, verify_ssl=True.
+    trust_ssl=True → accept any cert, verify_ssl=False."""
+    trust = cfg.get("trust_ssl", False)
+    if trust:
+        _suppress_ssl_warnings()
+    return not bool(trust)
 
 
 def _close_proxmox(proxmox):
@@ -35,6 +45,51 @@ def _close_proxmox(proxmox):
         pass
 
 
+def _cleanup_vv(vv_path):
+    if vv_path and os.path.exists(vv_path):
+        try:
+            os.unlink(vv_path)
+        except OSError:
+            pass
+
+
+def _make_proxmox(cfg, timeout=15):
+    """Create ProxmoxAPI with SSL verification and redirects disabled."""
+    proxmox = ProxmoxAPI(
+        cfg["host"],
+        user=cfg["user"],
+        token_name=cfg["token_name"],
+        token_value=cfg["token_value"],
+        verify_ssl=_verify_ssl(cfg),
+        timeout=timeout,
+    )
+    sess = proxmox._store.get("session")
+    if sess is not None:
+        sess.max_redirects = 0
+        sess.allow_redirects = False
+    return proxmox
+
+
+def _q(value):
+    """URL-encode a path segment for proxmoxer."""
+    from urllib.parse import quote
+    return quote(str(value), safe="")
+
+
+def _sanitize_error(exc):
+    """Sanitize exception message for UI display — strip URLs, hostnames, credential fragments."""
+    msg = str(exc)
+    import re as _re
+    # Strip URLs
+    msg = _re.sub(r'https?://[^\s\'"]+', '[url]', msg)
+    # Strip host:port patterns
+    msg = _re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\b', '[host]', msg)
+    # Limit length
+    if len(msg) > 150:
+        msg = msg[:150] + "..."
+    return msg
+
+
 # ----------------------------------------------------------------------
 # Create API token for PVE Center
 # ----------------------------------------------------------------------
@@ -44,7 +99,7 @@ def _pve_ticket_auth(host, user, password, verify=False):
     import requests as rq
     url = f"https://{host}:{PVE_PORT}/api2/json/access/ticket"
     resp = rq.post(url, data={"username": user, "password": password},
-                   verify=verify, timeout=15)
+                   verify=verify, timeout=15, allow_redirects=False)
     resp.raise_for_status()
     data = resp.json().get("data", {})
     return {
@@ -53,7 +108,7 @@ def _pve_ticket_auth(host, user, password, verify=False):
     }
 
 
-def create_admin_token(host, user, password, trust_ssl=True):
+def create_admin_token(host, user, password, trust_ssl=False):
     """Create an API token for the specified PVE user.
     The token is created on behalf of the user — PVE audit shows
     the real operator, and permissions match their roles.
@@ -62,8 +117,8 @@ def create_admin_token(host, user, password, trust_ssl=True):
         host: PVE host address
         user: existing PVE user (root@pam, user@ipa, ...)
         password: user's password
-        trust_ssl: if True (default), accept self-signed certs (verify=False).
-                   If False, require valid SSL certificate.
+        trust_ssl: if True, accept self-signed certs (verify=False).
+                   If False (default), require valid SSL certificate.
 
     Returns:
         dict with token_name, token_value, user fields
@@ -74,6 +129,8 @@ def create_admin_token(host, user, password, trust_ssl=True):
 
     import requests as rq
     verify = not bool(trust_ssl)
+    if trust_ssl:
+        _suppress_ssl_warnings()
 
     try:
         sess = None
@@ -93,7 +150,7 @@ def create_admin_token(host, user, password, trust_ssl=True):
         r = None
         for method in ("post", "put"):
             r = getattr(sess, method)(
-                f"https://{host}:{PVE_PORT}/api2/json/access/users/{user}/token/{token_id}",
+                f"https://{host}:{PVE_PORT}/api2/json/access/users/{_q(user)}/token/{_q(token_id)}",
                 data={"comment": "PVE Center", "expire": 0, "privsep": 0},
                 timeout=15,
             )
@@ -103,7 +160,7 @@ def create_admin_token(host, user, password, trust_ssl=True):
         if r is None:
             return {"error": tr("Token creation error: no response")}
         if r.status_code >= 400:
-            logger.error("token_create error: %s", r.text[:300])
+            logger.error("token_create failed: HTTP %s", r.status_code)
             return {"error": tr("Token creation error: {}").format(r.status_code)}
 
         data = r.json()
@@ -119,10 +176,10 @@ def create_admin_token(host, user, password, trust_ssl=True):
             vr = rq.get(
                 f"https://{host}:{PVE_PORT}/api2/json/cluster/resources",
                 headers={"Authorization": auth_header},
-                verify=verify, timeout=10,
+                verify=verify, timeout=10, allow_redirects=False,
             )
             if vr.status_code != 200:
-                logger.warning("verify FAILED: %s", vr.text[:200])
+                logger.warning("verify FAILED: HTTP %s", vr.status_code)
                 return {"error": tr("Token created but not working: {}").format(vr.status_code)}
         except Exception as ve:
             logger.warning("verify exception: %s", ve)
@@ -135,7 +192,7 @@ def create_admin_token(host, user, password, trust_ssl=True):
             return {"error": tr("Invalid login or password")}
         if "connection" in msg.lower() or "timeout" in msg.lower() or "resolve" in msg.lower():
             return {"error": tr("Cannot connect to {}").format(host)}
-        return {"error": msg}
+        return {"error": tr("Token creation failed. Check host, user, and password.")}
     finally:
         if sess is not None:
             try:
@@ -155,7 +212,7 @@ class TokenCreationSignals(QObject):
 
 class TokenCreationWorker(QRunnable):
     """Создаёт API-токен в фоновом потоке, не блокируя UI."""
-    def __init__(self, host, user, password, trust_ssl=True):
+    def __init__(self, host, user, password, trust_ssl=False):
         super().__init__()
         self.host = host
         self.user = user
@@ -167,6 +224,7 @@ class TokenCreationWorker(QRunnable):
         try:
             result = create_admin_token(self.host, self.user, self.password,
                                         trust_ssl=self.trust_ssl)
+            self.password = None
             if "error" in result:
                 try:
                     self.signals.token_error.emit(result["error"])
@@ -178,8 +236,9 @@ class TokenCreationWorker(QRunnable):
                 except RuntimeError:
                     pass
         except Exception as e:
+            self.password = None
             try:
-                self.signals.token_error.emit(str(e))
+                self.signals.token_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -203,14 +262,7 @@ class FetchWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.node_cfg["host"],
-                user=self.node_cfg["user"],
-                token_name=self.node_cfg["token_name"],
-                token_value=self.node_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.node_cfg),
-                timeout=15
-            )
+            proxmox = _make_proxmox(self.node_cfg, timeout=15)
 
             is_cluster_rep = self.node_cfg.get("cluster_rep", False)
 
@@ -241,7 +293,7 @@ class FetchWorker(QRunnable):
                         if not pname:
                             return
                         try:
-                            pd = proxmox.pools(pname).get()
+                            pd = proxmox.pools(_q(pname)).get()
                             members = pd.get("members") if isinstance(pd, dict) else None
                         except Exception:
                             members = p.get("members")
@@ -262,8 +314,8 @@ class FetchWorker(QRunnable):
                         t.start()
                     for t in pool_threads:
                         t.join(timeout=10)
-                except Exception:
-                    logger.debug("backend error", exc_info=True)
+                except Exception as e:
+                    logger.debug("backend error: %s", e)
 
             def fetch_ha():
                 nonlocal ha_groups
@@ -291,8 +343,8 @@ class FetchWorker(QRunnable):
                         for n in nodes:
                             short = n["node"]
                             n["_display_name"] = f"{short}@{cluster_name}" if cluster_name else short
-                except Exception:
-                    logger.debug("backend error", exc_info=True)
+                except Exception as e:
+                    logger.debug("backend error: %s", e)
 
             phase1 = []
             phase1.append(threading.Thread(target=fetch_pools, daemon=True))
@@ -323,7 +375,7 @@ class FetchWorker(QRunnable):
                 def fetch_node_storage(n):
                     node_name = n["node"]
                     try:
-                        node_storages = proxmox.nodes(node_name).storage.get()
+                        node_storages = proxmox.nodes(_q(node_name)).storage.get()
                         with detail_lock:
                             detail_by_node[node_name] = {
                                 ds["storage"]: ds for ds in node_storages
@@ -345,7 +397,7 @@ class FetchWorker(QRunnable):
                 def fetch_node_version(n):
                     node_name = n["node"]
                     try:
-                        ver = proxmox.nodes(node_name).version.get()
+                        ver = proxmox.nodes(_q(node_name)).version.get()
                         with version_lock:
                             qemu = ver.get("qemu")
                             if qemu:
@@ -357,7 +409,7 @@ class FetchWorker(QRunnable):
                         pass
                     # pveversion и kernel из статуса ноды
                     try:
-                        st = proxmox.nodes(node_name).status.get()
+                        st = proxmox.nodes(_q(node_name)).status.get()
                         with version_lock:
                             pve = st.get("pveversion")
                             if pve:
@@ -395,7 +447,7 @@ class FetchWorker(QRunnable):
                         nn = self.node_cfg["name"]
                     node_name = nn
                     try:
-                        node_status = proxmox.nodes(node_name).status.get()
+                        node_status = proxmox.nodes(_q(node_name)).status.get()
                     except Exception:
                         return
                     with res_lock:
@@ -404,8 +456,8 @@ class FetchWorker(QRunnable):
                                   "host_name": self.node_cfg["name"],
                                   "status": "online"}]
                     try:
-                        qemu_list = proxmox.nodes(node_name).qemu.get()
-                        lxc_list = proxmox.nodes(node_name).lxc.get()
+                        qemu_list = proxmox.nodes(_q(node_name)).qemu.get()
+                        lxc_list = proxmox.nodes(_q(node_name)).lxc.get()
                         vms_local = []
                         for v in qemu_list:
                             vms_local.append({**v, "type": "qemu",
@@ -417,7 +469,7 @@ class FetchWorker(QRunnable):
                                               "node": node_name,
                                               "host_name": self.node_cfg["name"],
                                               "pool": vmid_to_pool.get(v.get("vmid"))})
-                        storages_local = list(proxmox.nodes(node_name).storage.get())
+                        storages_local = list(proxmox.nodes(_q(node_name)).storage.get())
                         for st in storages_local:
                             st["node"] = node_name
                             st["host_name"] = self.node_cfg["name"]
@@ -425,8 +477,8 @@ class FetchWorker(QRunnable):
                         with res_lock:
                             vms = vms_local
                             storages = storages_local
-                    except Exception:
-                        logger.debug("backend error", exc_info=True)
+                    except Exception as e:
+                        logger.debug("backend error: %s", e)
 
                 standalone_thread = threading.Thread(target=fetch_standalone, daemon=True)
                 standalone_thread.start()
@@ -441,7 +493,7 @@ class FetchWorker(QRunnable):
                 # Версии для standalone ноды (pveversion/kernel уже в node_status)
                 if nodes:
                     try:
-                        ver = proxmox.nodes(node_name).version.get()
+                        ver = proxmox.nodes(_q(node_name)).version.get()
                         qemu = ver.get("qemu")
                         if qemu:
                             for n in nodes:
@@ -467,7 +519,7 @@ class FetchWorker(QRunnable):
                 try:
                     seen = {}
                     for sname in iso_storages:
-                        for item in proxmox.nodes(nname).storage(sname).content.get(content="iso"):
+                        for item in proxmox.nodes(_q(nname)).storage(_q(sname)).content.get(content="iso"):
                             if item.get("content") == "iso":
                                 volid = item["volid"]
                                 if volid not in seen:
@@ -537,18 +589,11 @@ class VmDetailWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             if self.vm_type == "qemu":
-                status = proxmox.nodes(self.node_name).qemu(self.vmid).status.current.get()
+                status = proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).status.current.get()
             else:
-                status = proxmox.nodes(self.node_name).lxc(self.vmid).status.current.get()
+                status = proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).status.current.get()
             try:
                 self.signals.detail_ready.emit({
                     "vmid": self.vmid,
@@ -558,7 +603,7 @@ class VmDetailWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
                 self.signals.detail_ready.emit({
                     "vmid": self.vmid,
@@ -596,24 +641,17 @@ class VmConfigWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             if self.vm_type == "qemu":
-                config = proxmox.nodes(self.node_name).qemu(self.vmid).config.get()
+                config = proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).config.get()
             else:
-                config = proxmox.nodes(self.node_name).lxc(self.vmid).config.get()
+                config = proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).config.get()
             try:
                 self.signals.config_ready.emit(self.vmid, config)
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
                 self.signals.config_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -649,24 +687,17 @@ class VmConfigUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             if self.vm_type == "qemu":
-                result = proxmox.nodes(self.node_name).qemu(self.vmid).config.put(**self.params)
+                result = proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).config.put(**self.params)
             else:
-                result = proxmox.nodes(self.node_name).lxc(self.vmid).config.put(**self.params)
+                result = proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).config.put(**self.params)
             try:
                 self.signals.config_updated.emit(self.vmid, result)
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
                 self.signals.config_update_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -701,21 +732,14 @@ class VmTaskHistoryWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10
-            )
-            tasks = proxmox.nodes(self.node_name).tasks.get(vmid=self.vmid, limit=self.limit)
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
+            tasks = proxmox.nodes(_q(self.node_name)).tasks.get(vmid=self.vmid, limit=self.limit)
             try:
                 self.signals.tasks_ready.emit(self.vmid, tasks)
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
                 self.signals.tasks_error.emit(self.vmid, str(e))
             except RuntimeError:
@@ -788,16 +812,9 @@ class VmSnapshotsWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
-            node = proxmox.nodes(self.node_name)
-            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
+            node = proxmox.nodes(_q(self.node_name))
+            resource = node.qemu(_q(self.vmid)) if self.vm_type == "qemu" else node.lxc(_q(self.vmid))
             snaps = resource.snapshot.get()
             filtered = [dict(s) for s in snaps if s.get("name") != "current"]
             for snap in filtered:
@@ -842,17 +859,10 @@ def delete_host_token(host_cfg):
        Возвращает True при успехе, False при ошибке."""
     proxmox = None
     try:
-        proxmox = ProxmoxAPI(
-            host_cfg["host"],
-            user=host_cfg["user"],
-            token_name=host_cfg["token_name"],
-            token_value=host_cfg["token_value"],
-            verify_ssl=_verify_ssl(host_cfg),
-            timeout=10,
-        )
+        proxmox = _make_proxmox(host_cfg, timeout=10)
         userid = host_cfg["user"]
         token_id = host_cfg["token_name"]
-        proxmox.access.users(userid).token(token_id).delete()
+        proxmox.access.users(_q(userid)).token(_q(token_id)).delete()
         logger.info("Token %s for user %s deleted from %s", token_id, userid, host_cfg["host"])
         return True
     except Exception as e:
@@ -883,22 +893,15 @@ class VmActionWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             if self.vm_type == "qemu":
                 call = getattr(
-                    proxmox.nodes(self.node_name).qemu(self.vmid).status,
+                    proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).status,
                     self.action,
                 )
             else:
                 call = getattr(
-                    proxmox.nodes(self.node_name).lxc(self.vmid).status,
+                    proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).status,
                     self.action,
                 )
             call.post()
@@ -912,9 +915,9 @@ class VmActionWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
-                self.signals.action_error.emit(str(e))
+                self.signals.action_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -932,7 +935,7 @@ def _poll_task(proxmox, node_name, upid, timeout=60, interval=1.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            info = proxmox.nodes(node_name).tasks(upid).status.get()
+            info = proxmox.nodes(_q(node_name)).tasks(_q(upid)).status.get()
             data = info.get("data", info) if isinstance(info, dict) else info
             if not isinstance(data, dict):
                 return "error", "unexpected response"
@@ -969,16 +972,9 @@ class VmSnapshotCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
-            node = proxmox.nodes(self.node_name)
-            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
+            node = proxmox.nodes(_q(self.node_name))
+            resource = node.qemu(_q(self.vmid)) if self.vm_type == "qemu" else node.lxc(_q(self.vmid))
             upid = resource.snapshot.post(
                 snapname=self.snap_name,
                 description=self.description,
@@ -1011,9 +1007,9 @@ class VmSnapshotCreateWorker(QRunnable):
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
-                self.signals.error.emit(str(e))
+                self.signals.error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1046,16 +1042,9 @@ class VmSnapshotDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
-            node = proxmox.nodes(self.node_name)
-            resource = node.qemu(self.vmid) if self.vm_type == "qemu" else node.lxc(self.vmid)
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
+            node = proxmox.nodes(_q(self.node_name))
+            resource = node.qemu(_q(self.vmid)) if self.vm_type == "qemu" else node.lxc(_q(self.vmid))
             upid = resource.snapshot(self.snap_name).delete()
             if isinstance(upid, dict):
                 upid = upid.get("data", upid)
@@ -1084,9 +1073,9 @@ class VmSnapshotDeleteWorker(QRunnable):
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
-                self.signals.error.emit(str(e))
+                self.signals.error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1124,15 +1113,8 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
             def fetch_node(host_cfg, node_name):
                 proxmox = None
                 try:
-                    proxmox = ProxmoxAPI(
-                        host_cfg["host"],
-                        user=host_cfg["user"],
-                        token_name=host_cfg["token_name"],
-                        token_value=host_cfg["token_value"],
-                        verify_ssl=_verify_ssl(host_cfg),
-                        timeout=10
-                    )
-                    tasks = proxmox.nodes(node_name).tasks.get(limit=100)
+                    proxmox = _make_proxmox(host_cfg, timeout=10)
+                    tasks = proxmox.nodes(_q(node_name)).tasks.get(limit=100)
                     with lock:
                         results[node_name] = tasks
                 except Exception as e:
@@ -1167,7 +1149,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
                 except RuntimeError:
                     pass
             except Exception as exc:
-                logger.debug("ClusterTasksWorker merge error", exc_info=True)
+                logger.debug("ClusterTasksWorker merge error: %s", exc)
                 try:
                     self.signals.tasks_error.emit(str(exc))
                 except RuntimeError:
@@ -1207,16 +1189,9 @@ class VmConsoleWorker(QRunnable):
         proxmox = None
         try:
             try:
-                proxmox = ProxmoxAPI(
-                    self.host_cfg["host"],
-                    user=self.host_cfg["user"],
-                    token_name=self.host_cfg["token_name"],
-                    token_value=self.host_cfg["token_value"],
-                    verify_ssl=_verify_ssl(self.host_cfg),
-                    timeout=10
-                )
-                endpoint = (proxmox.nodes(self.node_name).lxc if self.vm_type == "lxc"
-                            else proxmox.nodes(self.node_name).qemu)
+                proxmox = _make_proxmox(self.host_cfg, timeout=10)
+                endpoint = (proxmox.nodes(_q(self.node_name)).lxc if self.vm_type == "lxc"
+                            else proxmox.nodes(_q(self.node_name)).qemu)
                 config = endpoint(self.vmid).spiceproxy.post(
                     proxy=self.host_cfg["host"]
                 )
@@ -1258,6 +1233,12 @@ class VmConsoleWorker(QRunnable):
                 fd, vv_path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write("\n".join(lines) + "\n")
+                try:
+                    os.chmod(vv_path, 0o600)
+                except OSError:
+                    pass
+                import atexit
+                atexit.register(lambda p=vv_path: _cleanup_vv(p))
             except Exception as e:
                 try:
                     self.signals.console_error.emit(tr("VV file write error: {}").format(e))
@@ -1267,11 +1248,15 @@ class VmConsoleWorker(QRunnable):
 
             try:
                 if sys.platform == "win32":
+                    pf = os.environ.get("PROGRAMFILES", r"C:\Program Files")
+                    pf_x86 = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+                    if not os.path.isabs(pf) or not os.path.isdir(pf):
+                        pf = r"C:\Program Files"
+                    if not os.path.isabs(pf_x86) or not os.path.isdir(pf_x86):
+                        pf_x86 = r"C:\Program Files (x86)"
                     candidates = [
-                        os.path.join(os.environ.get("PROGRAMFILES", r"C:\Program Files"),
-                                     "VirtViewer", "bin", "remote-viewer.exe"),
-                        os.path.join(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
-                                     "VirtViewer", "bin", "remote-viewer.exe"),
+                        os.path.join(pf, "VirtViewer", "bin", "remote-viewer.exe"),
+                        os.path.join(pf_x86, "VirtViewer", "bin", "remote-viewer.exe"),
                         "remote-viewer.exe",
                     ]
                     rv_cmd = next((c for c in candidates if os.path.isfile(c)), candidates[-1])
@@ -1302,14 +1287,13 @@ class VmConsoleWorker(QRunnable):
                     logger.debug("remote-viewer started (pid=%d)", proc.pid)
                     def _cleanup():
                         try:
-                            proc.wait()
+                            proc.wait(timeout=86400)
                         except Exception:
-                            pass
-                        if vv_path and os.path.exists(vv_path):
                             try:
-                                os.unlink(vv_path)
-                            except OSError:
+                                proc.kill()
+                            except Exception:
                                 pass
+                        _cleanup_vv(vv_path)
                     threading.Thread(target=_cleanup, daemon=True).start()
             except FileNotFoundError:
                 try:
@@ -1377,14 +1361,7 @@ class CreateVmWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=30,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
 
             params = dict(self.params)
             # Request next free VMID if not specified
@@ -1400,7 +1377,7 @@ class CreateVmWorker(QRunnable):
                         pass
                     return
 
-            proxmox.nodes(self.node_name).qemu.post(**params)
+            proxmox.nodes(_q(self.node_name)).qemu.post(**params)
             # POST /nodes/{node}/qemu returns UPID string, not {"data": {"vmid":...}}
             # vmid is now guaranteed in params (user-provided or nextid)
             vmid = params.get("vmid", "?")
@@ -1426,9 +1403,9 @@ class CreateVmWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
-                self.signals.vm_error.emit(str(e))
+                self.signals.vm_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1457,25 +1434,18 @@ class DeleteVmWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=30,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
 
-            proxmox.nodes(self.node_name).qemu(self.vmid).delete(purge=1)
+            proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).delete(purge=1)
             msg = tr("VM {vmid} deleted from {node}").format(vmid=self.vmid, node=self.node_name)
             try:
                 self.signals.vm_deleted.emit(msg)
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("backend error", exc_info=True)
+            logger.debug("backend error: %s", e)
             try:
-                self.signals.vm_error.emit(str(e))
+                self.signals.vm_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1521,18 +1491,11 @@ class MigrateVmWorker(QRunnable):
             return
         try:
             proxmox = None
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=120,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=120)
             params = {"target": self.target_node}
             if self.with_local_disks:
                 params["with-local-disks"] = 1
-            proxmox.nodes(self.node_name).qemu(self.vmid).migrate.post(**params)
+            proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).migrate.post(**params)
             msg = tr("VM {vmid} migration to {target} started").format(
                 vmid=self.vmid, target=self.target_node)
             try:
@@ -1540,9 +1503,9 @@ class MigrateVmWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("migrate error", exc_info=True)
+            logger.debug("migrate error: %s", e)
             try:
-                self.signals.vm_error.emit(str(e))
+                self.signals.vm_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1578,14 +1541,7 @@ class CloneVmWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=120,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=120)
 
             params = dict(self.params)
             if not params.get("newid"):
@@ -1602,7 +1558,7 @@ class CloneVmWorker(QRunnable):
                     clone_params["storage"] = params["storage"]
                 if params.get("full"):
                     clone_params["full"] = 1
-                proxmox.nodes(self.node_name).lxc(self.vmid).clone.post(**clone_params)
+                proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).clone.post(**clone_params)
             else:
                 clone_params = {
                     "newid": params["newid"],
@@ -1614,7 +1570,7 @@ class CloneVmWorker(QRunnable):
                     clone_params["full"] = 1
                 if params.get("storage"):
                     clone_params["storage"] = params["storage"]
-                proxmox.nodes(self.node_name).qemu(self.vmid).clone.post(**clone_params)
+                proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).clone.post(**clone_params)
 
             newid = params.get("newid", "?")
             msg = tr("VM {vmid} cloned to {newid} on {target}").format(
@@ -1625,9 +1581,9 @@ class CloneVmWorker(QRunnable):
             except RuntimeError:
                 pass
         except Exception as e:
-            logger.debug("clone error", exc_info=True)
+            logger.debug("clone error: %s", e)
             try:
-                self.signals.vm_error.emit(str(e))
+                self.signals.vm_error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1660,16 +1616,9 @@ class StorageContentDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             upid = (
-                proxmox.nodes(self.node_name)
+                proxmox.nodes(_q(self.node_name))
                 .storage(self.storage)
                 .content(self.volid)
                 .delete()
@@ -1703,9 +1652,9 @@ class StorageContentDeleteWorker(QRunnable):
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.debug("storage content delete error", exc_info=True)
+            logger.debug("storage content delete error: %s", e)
             try:
-                self.signals.error.emit(str(e))
+                self.signals.error.emit(_sanitize_error(e))
             except RuntimeError:
                 pass
         finally:
@@ -1749,7 +1698,7 @@ class StorageUploadWorker(QRunnable):
         try:
             file_name = os.path.basename(self.file_path)
             file_size = os.path.getsize(self.file_path)
-            verify = not bool(self.host_cfg.get("trust_ssl", True))
+            verify = _verify_ssl(self.host_cfg)
             auth_token = (
                 f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}"
                 f"={self.host_cfg['token_value']}"
@@ -1810,7 +1759,7 @@ class StorageUploadWorker(QRunnable):
                 data = {"content": self.content_type}
                 resp = requests.post(
                     url, headers=headers, data=data, files=files,
-                    verify=verify, timeout=self.timeout,
+                    verify=verify, timeout=self.timeout, allow_redirects=False,
                 )
                 if not resp.ok:
                     try:
@@ -1824,14 +1773,7 @@ class StorageUploadWorker(QRunnable):
                     raise Exception(f"HTTP {resp.status_code}: {msg or resp.reason}"[:500])
                 result = resp.json().get("data", "")
                 if isinstance(result, str) and result.startswith("UPID:"):
-                    proxmox = ProxmoxAPI(
-                        self.host_cfg["host"],
-                        user=self.host_cfg["user"],
-                        token_name=self.host_cfg["token_name"],
-                        token_value=self.host_cfg["token_value"],
-                        verify_ssl=verify,
-                        timeout=10,
-                    )
+                    proxmox = _make_proxmox(self.host_cfg, timeout=10)
                     status, exitstatus = _poll_task(
                         proxmox, self.node_name, result, timeout=self.timeout
                     )
@@ -1843,8 +1785,8 @@ class StorageUploadWorker(QRunnable):
                 else:
                     _safe_emit(self.signals.result, tr("Upload complete: {name}").format(name=file_name))
         except Exception as e:
-            logger.debug("upload error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("upload error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -1876,22 +1818,15 @@ class StorageMoveWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=not bool(self.host_cfg.get("trust_ssl", True)),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             params = {"target_storage": self.target_storage}
             if self.target_vmid:
                 params["target_vmid"] = self.target_vmid
             if self.delete_source:
                 params["delete"] = 1
             upid = (
-                proxmox.nodes(self.node_name)
-                .storage(self.storage_name)
+                proxmox.nodes(_q(self.node_name))
+                .storage(_q(self.storage_name))
                 .content(self.volid)
                 .post(**params)
             )
@@ -1913,8 +1848,8 @@ class StorageMoveWorker(QRunnable):
                            tr("Move complete: {volid} → {storage}").format(
                                volid=self.volid, storage=self.target_storage))
         except Exception as e:
-            logger.debug("move error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("move error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -1949,14 +1884,7 @@ class VzdumpWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             params = {
                 "vmid": str(self.vmid),
                 "storage": self.storage,
@@ -1969,7 +1897,7 @@ class VzdumpWorker(QRunnable):
                 params["remove"] = 1
             if self.bwlimit > 0:
                 params["bwlimit"] = self.bwlimit
-            upid = proxmox.nodes(self.node_name).vzdump.post(**params)
+            upid = proxmox.nodes(_q(self.node_name)).vzdump.post(**params)
             if isinstance(upid, dict):
                 upid = upid.get("data", upid)
             if isinstance(upid, str) and upid.startswith("UPID:"):
@@ -1986,8 +1914,8 @@ class VzdumpWorker(QRunnable):
                 _safe_emit(self.signals.result,
                            tr("Backup completed for VM {vmid}").format(vmid=self.vmid))
         except Exception as e:
-            logger.debug("vzdump error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("vzdump error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2021,14 +1949,7 @@ class VmRestoreWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=10,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=10)
             params = {
                 "vmid": int(self.vmid),
                 "archive": self.archive,
@@ -2036,7 +1957,7 @@ class VmRestoreWorker(QRunnable):
             }
             if self.storage:
                 params["storage"] = self.storage
-            resource = proxmox.nodes(self.node_name)
+            resource = proxmox.nodes(_q(self.node_name))
             if self.vm_type == "lxc":
                 if self.name:
                     params["hostname"] = self.name
@@ -2063,8 +1984,8 @@ class VmRestoreWorker(QRunnable):
                 _safe_emit(self.signals.result,
                            tr("Restore completed for VM {vmid}").format(vmid=self.vmid))
         except Exception as e:
-            logger.debug("restore error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("restore error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2091,14 +2012,7 @@ class ClusterJobsWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             jobs = []
             if self.pve_major >= 8:
                 try:
@@ -2107,8 +2021,8 @@ class ClusterJobsWorker(QRunnable):
                         data = data.get("data", data)
                     if isinstance(data, list):
                         jobs = [j for j in data if j.get("type", "vzdump") == "vzdump"]
-                except Exception:
-                    logger.debug("cluster/jobs failed, falling back to /cluster/backup", exc_info=True)
+                except Exception as e:
+                    logger.debug("cluster/jobs failed, falling back to /cluster/backup: %s", e)
                     data = proxmox.cluster.backup.get()
                     if isinstance(data, dict):
                         data = data.get("data", data)
@@ -2122,8 +2036,8 @@ class ClusterJobsWorker(QRunnable):
                     jobs = data
             _safe_emit(self.signals.jobs_ready, jobs)
         except Exception as e:
-            logger.debug("cluster jobs error", exc_info=True)
-            _safe_emit(self.signals.jobs_error, str(e))
+            logger.debug("cluster jobs error: %s", e)
+            _safe_emit(self.signals.jobs_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2151,14 +2065,7 @@ class ClusterJobCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             if self.pve_major >= 8:
                 try:
                     p = dict(self.params)
@@ -2170,8 +2077,8 @@ class ClusterJobCreateWorker(QRunnable):
                 proxmox.cluster.backup.post(**self.params)
             _safe_emit(self.signals.result, tr("Backup job created"))
         except Exception as e:
-            logger.debug("job create error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("job create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2200,28 +2107,21 @@ class ClusterJobUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             p = {k: v for k, v in self.params.items() if k != "id"}
             if self.pve_major >= 8:
                 try:
                     pj = dict(p)
                     pj["type"] = "vzdump"
-                    proxmox.cluster.jobs(self.job_id).put(**pj)
+                    proxmox.cluster.jobs(_q(self.job_id)).put(**pj)
                 except Exception:
-                    proxmox.cluster.backup(self.job_id).put(**p)
+                    proxmox.cluster.backup(_q(self.job_id)).put(**p)
             else:
-                proxmox.cluster.backup(self.job_id).put(**p)
+                proxmox.cluster.backup(_q(self.job_id)).put(**p)
             _safe_emit(self.signals.result, tr("Backup job updated"))
         except Exception as e:
-            logger.debug("job update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("job update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2249,25 +2149,18 @@ class ClusterJobDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             if self.pve_major >= 8:
                 try:
-                    proxmox.cluster.jobs(self.job_id).delete()
+                    proxmox.cluster.jobs(_q(self.job_id)).delete()
                 except Exception:
-                    proxmox.cluster.backup(self.job_id).delete()
+                    proxmox.cluster.backup(_q(self.job_id)).delete()
             else:
-                proxmox.cluster.backup(self.job_id).delete()
+                proxmox.cluster.backup(_q(self.job_id)).delete()
             _safe_emit(self.signals.result, tr("Backup job deleted"))
         except Exception as e:
-            logger.debug("job delete error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("job delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2294,19 +2187,12 @@ class AccessUsersWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             data = proxmox.access.users.get(full=1)
             _safe_emit(self.signals.users_ready, data)
         except Exception as e:
-            logger.debug("access users error", exc_info=True)
-            _safe_emit(self.signals.users_error, str(e))
+            logger.debug("access users error: %s", e)
+            _safe_emit(self.signals.users_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2330,19 +2216,12 @@ class AccessUserCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             proxmox.access.users.post(**self.params)
             _safe_emit(self.signals.result, tr("User created"))
         except Exception as e:
-            logger.debug("user create error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("user create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2367,19 +2246,12 @@ class AccessUserUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.users(self.userid).put(**self.params)
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.users(_q(self.userid)).put(**self.params)
             _safe_emit(self.signals.result, tr("User updated"))
         except Exception as e:
-            logger.debug("user update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("user update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2403,19 +2275,12 @@ class AccessUserDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.users(self.userid).delete()
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.users(_q(self.userid)).delete()
             _safe_emit(self.signals.result, tr("User deleted"))
         except Exception as e:
-            logger.debug("user delete error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("user delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2443,19 +2308,12 @@ class AccessTokensWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            data = proxmox.access.users(self.userid).token.get()
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            data = proxmox.access.users(_q(self.userid)).token.get()
             _safe_emit(self.signals.tokens_ready, data)
         except Exception as e:
-            logger.debug("access tokens error", exc_info=True)
-            _safe_emit(self.signals.tokens_error, str(e))
+            logger.debug("access tokens error: %s", e)
+            _safe_emit(self.signals.tokens_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2481,21 +2339,14 @@ class AccessTokenCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            data = proxmox.access.users(self.userid).token(self.tokenid).post(**self.params)
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            data = proxmox.access.users(_q(self.userid)).token(_q(self.tokenid)).post(**self.params)
             full = data.get("full-tokenid", "")
             value = data.get("value", "")
             _safe_emit(self.signals.result, tr("Token created"), full, value)
         except Exception as e:
-            logger.debug("token create error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("token create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2521,21 +2372,14 @@ class AccessTokenUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            data = proxmox.access.users(self.userid).token(self.tokenid).put(**self.params)
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            data = proxmox.access.users(_q(self.userid)).token(_q(self.tokenid)).put(**self.params)
             full = (data or {}).get("full-tokenid", "")
             value = (data or {}).get("value", "")
             _safe_emit(self.signals.result, tr("Token updated"), full, value)
         except Exception as e:
-            logger.debug("token update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("token update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2560,19 +2404,12 @@ class AccessTokenDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.users(self.userid).token(self.tokenid).delete()
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.users(_q(self.userid)).token(_q(self.tokenid)).delete()
             _safe_emit(self.signals.result, tr("Token deleted"))
         except Exception as e:
-            logger.debug("token delete error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("token delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2599,19 +2436,12 @@ class AccessGroupsWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             data = proxmox.access.groups.get()
             _safe_emit(self.signals.groups_ready, data)
         except Exception as e:
-            logger.debug("access groups error", exc_info=True)
-            _safe_emit(self.signals.groups_error, str(e))
+            logger.debug("access groups error: %s", e)
+            _safe_emit(self.signals.groups_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2635,19 +2465,12 @@ class AccessGroupCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             proxmox.access.groups.post(**self.params)
             _safe_emit(self.signals.result, tr("Group created"))
         except Exception as e:
-            logger.debug("group create error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("group create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2672,19 +2495,12 @@ class AccessGroupUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.groups(self.groupid).put(**self.params)
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.groups(_q(self.groupid)).put(**self.params)
             _safe_emit(self.signals.result, tr("Group updated"))
         except Exception as e:
-            logger.debug("group update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("group update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2708,19 +2524,12 @@ class AccessGroupDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.groups(self.groupid).delete()
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.groups(_q(self.groupid)).delete()
             _safe_emit(self.signals.result, tr("Group deleted"))
         except Exception as e:
-            logger.debug("group delete error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("group delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2747,19 +2556,12 @@ class AccessRolesWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             data = proxmox.access.roles.get()
             _safe_emit(self.signals.roles_ready, data)
         except Exception as e:
-            logger.debug("access roles error", exc_info=True)
-            _safe_emit(self.signals.roles_error, str(e))
+            logger.debug("access roles error: %s", e)
+            _safe_emit(self.signals.roles_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2783,19 +2585,12 @@ class AccessRoleCreateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             proxmox.access.roles.post(**self.params)
             _safe_emit(self.signals.result, tr("Role created"))
         except Exception as e:
-            logger.debug("role create error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("role create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2820,19 +2615,12 @@ class AccessRoleUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.roles(self.roleid).put(**self.params)
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.roles(_q(self.roleid)).put(**self.params)
             _safe_emit(self.signals.result, tr("Role updated"))
         except Exception as e:
-            logger.debug("role update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("role update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2856,19 +2644,12 @@ class AccessRoleDeleteWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
-            proxmox.access.roles(self.roleid).delete()
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.access.roles(_q(self.roleid)).delete()
             _safe_emit(self.signals.result, tr("Role deleted"))
         except Exception as e:
-            logger.debug("role delete error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("role delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2895,19 +2676,12 @@ class AccessAclWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             data = proxmox.access.acl.get()
             _safe_emit(self.signals.acl_ready, data)
         except Exception as e:
-            logger.debug("access acl error", exc_info=True)
-            _safe_emit(self.signals.acl_error, str(e))
+            logger.debug("access acl error: %s", e)
+            _safe_emit(self.signals.acl_error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)
@@ -2931,21 +2705,14 @@ class AccessAclUpdateWorker(QRunnable):
     def run(self):
         proxmox = None
         try:
-            proxmox = ProxmoxAPI(
-                self.host_cfg["host"],
-                user=self.host_cfg["user"],
-                token_name=self.host_cfg["token_name"],
-                token_value=self.host_cfg["token_value"],
-                verify_ssl=_verify_ssl(self.host_cfg),
-                timeout=15,
-            )
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
             proxmox.access.acl.put(**self.params)
             is_delete = int(self.params.get("delete", 0) or 0)
             msg = tr("Permissions removed") if is_delete else tr("Permissions added")
             _safe_emit(self.signals.result, msg)
         except Exception as e:
-            logger.debug("acl update error", exc_info=True)
-            _safe_emit(self.signals.error, str(e))
+            logger.debug("acl update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
         finally:
             _close_proxmox(proxmox)
             _safe_emit(self.signals.finished)

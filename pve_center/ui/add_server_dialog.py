@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -68,6 +69,9 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(host_lbl, 0, 0)
         self.host_input = QLineEdit()
         self.host_input.setPlaceholderText("pve01.example.com")
+        self.host_input.setValidator(QRegularExpressionValidator(
+            r"^[A-Za-z0-9._:\-]{1,255}$"
+        ))
         conn_grid.addWidget(self.host_input, 0, 1)
 
         user_lbl = QLabel(tr("User:"))
@@ -90,8 +94,8 @@ class AddServerDialog(QDialog):
         conn_grid.addWidget(info_label, 3, 0, 1, 2)
 
         self.trust_ssl_cb = QCheckBox(tr("Trust SSL certificate"))
-        self.trust_ssl_cb.setChecked(True)
-        self.trust_ssl_cb.setToolTip(tr("Accept self-signed certificates. Uncheck for CA-issued certs."))
+        self.trust_ssl_cb.setChecked(False)
+        self.trust_ssl_cb.setToolTip(tr("Accept self-signed certificates. Check only for internal PVE hosts with self-signed certs."))
         conn_grid.addWidget(self.trust_ssl_cb, 4, 0, 1, 2)
 
         self.auth_btn = QPushButton(tr("Get token"))
@@ -118,9 +122,17 @@ class AddServerDialog(QDialog):
         tv_lbl = QLabel(tr("Value:"))
         tv_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         token_grid.addWidget(tv_lbl, 1, 0)
+        self._token_value_real = ""
         self.token_value_label = QLabel("—")
         self.token_value_label.setStyleSheet(f"font-family: monospace; color: {Color.STATUS_OK};")
         token_grid.addWidget(self.token_value_label, 1, 1)
+
+        self._token_show_btn = QPushButton(tr("Show"))
+        self._token_show_btn.setFixedWidth(60)
+        self._token_show_btn.setCheckable(True)
+        self._token_show_btn.clicked.connect(self._toggle_token_visibility)
+        self._token_show_btn.setVisible(False)
+        token_grid.addWidget(self._token_show_btn, 1, 2)
 
         self.status_label = QLabel("")
         self.status_label.setStyleSheet(f"color: {Color.TEXT_SEC};")
@@ -211,14 +223,26 @@ class AddServerDialog(QDialog):
     def _on_token_ready(self, result):
         self._token_data = result
         self.token_name_label.setText(result["token_name"])
-        self.token_value_label.setText(result["token_value"])
+        self._token_value_real = result["token_value"]
+        self.token_value_label.setText("•" * 8)
+        self._token_show_btn.setVisible(True)
+        self._token_show_btn.setChecked(False)
         self._set_status(tr("Token created"), Color.STATUS_OK)
         self.auth_btn.setEnabled(True)
         self.auth_btn.setText(tr("Update token"))
         self.add_btn.setEnabled(True)
+        self.pwd_input.clear()
 
         if not self.name_input.text().strip():
             self.name_input.setText(self.host_input.text().strip())
+
+    def _toggle_token_visibility(self):
+        if self._token_show_btn.isChecked():
+            self.token_value_label.setText(self._token_value_real)
+            self._token_show_btn.setText(tr("Hide"))
+        else:
+            self.token_value_label.setText("•" * 8)
+            self._token_show_btn.setText(tr("Show"))
 
     def _on_token_error(self, error):
         self._set_status(error, Color.STATUS_ERR)

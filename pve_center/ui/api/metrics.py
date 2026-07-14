@@ -4,12 +4,10 @@ import threading
 import urllib.parse
 
 import requests
-import urllib3
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from ...backend import _suppress_ssl_warnings
 from ..i18n import tr
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +17,12 @@ PVE_PORT = 8006
 
 def _verify_ssl(cfg):
     """Return verify_ssl value for requests.
-    trust_ssl=True (default) → accept cert, verify_ssl=False.
-    trust_ssl=False → strict verification, verify_ssl=True."""
-    return not bool(cfg.get("trust_ssl", True))
+    trust_ssl=False (default) → strict verification, verify_ssl=True.
+    trust_ssl=True → accept any cert, verify_ssl=False."""
+    trust = cfg.get("trust_ssl", False)
+    if trust:
+        _suppress_ssl_warnings()
+    return not bool(trust)
 
 
 def _check_response(resp):
@@ -75,7 +76,7 @@ class StorageMetricsWorker(QRunnable):
                 f"nodes/{self.node_name}/storage/{encoded_name}/rrddata"
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10)
+            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
             _check_response(resp)
             rrd_response = resp.json()['data']
 
@@ -125,7 +126,7 @@ class StorageContentListWorker(QRunnable):
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
-            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=_verify_ssl(self.host_cfg), timeout=60)
+            resp = session.get(url, headers=headers, params={"content": self.content_type}, verify=_verify_ssl(self.host_cfg), timeout=60, allow_redirects=False)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -172,7 +173,7 @@ class StorageBackupWorker(QRunnable):
             encoded_name = urllib.parse.quote(self.storage_name, safe='')
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/storage/{encoded_name}/content")
-            resp = session.get(url, headers=headers, params={"content": "backup"}, verify=_verify_ssl(self.host_cfg), timeout=60)
+            resp = session.get(url, headers=headers, params={"content": "backup"}, verify=_verify_ssl(self.host_cfg), timeout=60, allow_redirects=False)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -215,7 +216,7 @@ class HostNetworkWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/network")
-            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10, allow_redirects=False)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -258,7 +259,7 @@ class HostServicesWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/services")
-            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10, allow_redirects=False)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -301,7 +302,7 @@ class HostDisksWorker(QRunnable):
             headers = {"Authorization": auth_token}
             url = (f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
                    f"nodes/{self.node_name}/disks/list")
-            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+            resp = session.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10, allow_redirects=False)
             _check_response(resp)
             data = resp.json().get('data', [])
             try:
@@ -394,7 +395,7 @@ class HostSnapshotsWorker(QRunnable):
                     s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(self.node_name, safe="")
                     url = f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/snapshot"
-                    r = s.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+                    r = s.get(url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10, allow_redirects=False)
                     _check_response(r)
                     data = r.json().get("data", [])
                     vm_snaps = []
@@ -411,7 +412,7 @@ class HostSnapshotsWorker(QRunnable):
                             continue
                         try:
                             cfg_url = f"{url}/{urllib.parse.quote(snap_name, safe='')}/config"
-                            rc = s.get(cfg_url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10)
+                            rc = s.get(cfg_url, headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10, allow_redirects=False)
                             _check_response(rc)
                             cfg = rc.json().get("data", {})
                             total_bytes = 0
@@ -589,7 +590,7 @@ class HostMetricsWorker(QRunnable):
                 f"nodes/{self.node_name}/rrddata"
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10)
+            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
             _check_response(resp)
             rrd_response = resp.json()['data']
 
@@ -650,7 +651,7 @@ class MetricsWorker(QRunnable):
                 f"nodes/{self.node_name}/{self.vm_type}/{self.vmid}/rrddata"
             )
             params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10)
+            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
             _check_response(resp)
             rrd_response = resp.json()['data']
 
@@ -766,7 +767,7 @@ class HealthCheckWorker(QRunnable):
 
             try:
                 resp = session.get(f"{base}/nodes/{self.node_name}/services",
-                                   headers=headers, timeout=10)
+                                   headers=headers, timeout=10, allow_redirects=False)
                 _check_response(resp)
                 services = resp.json().get("data", [])
                 for svc in services:
@@ -779,7 +780,7 @@ class HealthCheckWorker(QRunnable):
 
             try:
                 resp = session.get(f"{base}/nodes/{self.node_name}/subscription",
-                                   headers=headers, timeout=10)
+                                   headers=headers, timeout=10, allow_redirects=False)
                 _check_response(resp)
                 sub = resp.json().get("data", {})
                 sub_status = sub.get("status", "")
@@ -790,7 +791,7 @@ class HealthCheckWorker(QRunnable):
 
             try:
                 resp = session.get(f"{base}/nodes/{self.node_name}/apt/update",
-                                   headers=headers, timeout=10)
+                                   headers=headers, timeout=10, allow_redirects=False)
                 _check_response(resp)
                 updates = resp.json().get("data", [])
                 if updates:

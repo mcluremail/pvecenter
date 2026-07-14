@@ -1,3 +1,4 @@
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -48,6 +49,9 @@ class UserDialog(QDialog):
         else:
             self._userid_edit = QLineEdit()
             self._userid_edit.setPlaceholderText("name@realm")
+            self._userid_edit.setValidator(QRegularExpressionValidator(
+                r"^[A-Za-z0-9._\-@]{1,256}$"
+            ))
         form.addRow(tr("User ID:"), self._userid_edit)
 
         if not self._is_edit:
@@ -94,6 +98,7 @@ class UserDialog(QDialog):
         form.addRow(tr("Expire (days):"), self._expire_spin)
 
         self._comment_edit = QLineEdit()
+        self._comment_edit.setMaxLength(255)
         form.addRow(tr("Comment:"), self._comment_edit)
 
         layout.addLayout(form)
@@ -124,12 +129,16 @@ class UserDialog(QDialog):
             if idx >= 0:
                 self._groups_combo.setCurrentIndex(idx)
         enable_val = u.get("enable", 1)
-        if isinstance(enable_val, str):
+        try:
             enable_val = int(enable_val)
+        except (TypeError, ValueError):
+            enable_val = 1
         self._enabled_check.setChecked(bool(enable_val))
         expire = u.get("expire", 0)
-        if isinstance(expire, str):
+        try:
             expire = int(expire)
+        except (TypeError, ValueError):
+            expire = 0
         if expire and expire > 0:
             import time
             remaining = max(0, (expire - int(time.time())) // 86400)

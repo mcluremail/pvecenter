@@ -72,6 +72,7 @@ class VzdumpDialog(QDialog):
 
         self._notes_edit = QLineEdit()
         self._notes_edit.setPlaceholderText(tr("Optional notes"))
+        self._notes_edit.setMaxLength(255)
         form.addRow(tr("Notes:"), self._notes_edit)
 
         self._remove_check = QCheckBox(tr("Remove old backups"))

@@ -5,6 +5,8 @@ from PySide6.QtWidgets import QApplication
 
 from .config import load_config, load_ui_state
 
+logger = logging.getLogger(__name__)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s %(name)s: %(message)s",
@@ -12,7 +14,15 @@ logging.basicConfig(
 )
 
 
+def _excepthook(exc_type, exc_value, tb):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, tb)
+        return
+    logger.error("Unhandled exception: %s: %s", exc_type.__name__, exc_value)
+
+
 def main():
+    sys.excepthook = _excepthook
     app = QApplication(sys.argv)
 
     from .ui.i18n import set_language

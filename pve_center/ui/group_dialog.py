@@ -1,3 +1,4 @@
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -38,9 +39,13 @@ class GroupDialog(QDialog):
         else:
             self._groupid_edit = QLineEdit()
             self._groupid_edit.setPlaceholderText("e.g. admins")
+            self._groupid_edit.setValidator(QRegularExpressionValidator(
+                r"^[A-Za-z0-9_\-]{1,64}$"
+            ))
         form.addRow(tr("Group ID:"), self._groupid_edit)
 
         self._comment_edit = QLineEdit()
+        self._comment_edit.setMaxLength(255)
         form.addRow(tr("Comment:"), self._comment_edit)
 
         if self._is_edit:

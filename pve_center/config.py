@@ -26,14 +26,20 @@ def _base_dir():
 def _config_dir():
     if sys.platform == "win32":
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
-        d = os.path.join(base, "pve-center")
     elif sys.platform == "darwin":
         home = os.path.expanduser("~")
-        d = os.path.join(home, "Library", "Application Support", "pve-center")
+        base = os.path.join(home, "Library", "Application Support")
     else:
         xdg = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-        d = os.path.join(xdg, "pve-center")
+        base = xdg
+    if not os.path.isabs(base):
+        base = os.path.join(os.path.expanduser("~"), base)
+    d = os.path.join(base, "pve-center")
     os.makedirs(d, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)
+    except OSError:
+        pass
     return d
 
 
@@ -109,6 +115,10 @@ def _delete_token(name: str):
 def _init_db():
     path = _db_path()
     conn = sqlite3.connect(path, timeout=5)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS nodes (
@@ -163,6 +173,19 @@ def _migrate_old_db():
 _NODE_FIELDS = ("name", "host", "user", "token_name", "cluster", "cluster_rep", "skip")
 
 
+def _validate_field(value):
+    if not isinstance(value, str):
+        return True
+    return "\r" not in value and "\n" not in value and "\x00" not in value
+
+
+def _sanitize_cfg(cfg):
+    for field in ("host", "user", "token_name", "token_value"):
+        val = cfg.get(field, "")
+        if val and not _validate_field(val):
+            raise ValueError(f"Invalid characters in {field}")
+
+
 def load_config() -> list[dict]:
     """Load nodes from sqlite, attach token_value from keyring.
     Returns list of node dicts (never None — no password dialog needed)."""
@@ -200,6 +223,7 @@ def save_config(config_list: list[dict]):
             name = cfg.get("name", "")
             if not name:
                 continue
+            _sanitize_cfg(cfg)
             store = {k: v for k, v in cfg.items() if k != "token_value"}
             conn.execute("INSERT OR REPLACE INTO nodes (name, data) VALUES (?, ?)",
                          (name, json.dumps(store, ensure_ascii=False)))
@@ -259,6 +283,9 @@ def _ask_password(mode="enter"):
 
     if mode == "set":
         layout.addWidget(QLabel(tr("Set password to encrypt configuration:")))
+        min_len_label = QLabel(tr("Minimum 8 characters"))
+        min_len_label.setStyleSheet(f"color: {Color.GRAY_400}; font-size: 11px;")
+        layout.addWidget(min_len_label)
     else:
         layout.addWidget(QLabel(tr("Enter password:")))
 
@@ -293,6 +320,9 @@ def _ask_password(mode="enter"):
         if not pwd:
             error_label.setText(tr("Password cannot be empty"))
             return
+        if mode == "set" and len(pwd) < 8:
+            error_label.setText(tr("Password must be at least 8 characters"))
+            return
         if confirm_input is not None and pwd != confirm_input.text():
             error_label.setText(tr("Passwords do not match"))
             return
@@ -312,6 +342,9 @@ def _ask_password(mode="enter"):
 
 def export_config(dest_path: str) -> bool:
     """Export all nodes (with token_value) as encrypted bundle."""
+    if os.path.islink(dest_path):
+        return False
+    dest_path = os.path.realpath(dest_path)
     config = load_config()
     if not config:
         return False
@@ -331,7 +364,33 @@ def export_config(dest_path: str) -> bool:
     raw = _encrypt_bundle(config, password)
     with open(dest_path, "wb") as f:
         f.write(raw)
+    try:
+        os.chmod(dest_path, 0o600)
+    except OSError:
+        pass
     return True
+
+
+_ALLOWED_IMPORT_FIELDS = frozenset({
+    "name", "host", "user", "token_name", "token_value",
+    "cluster", "cluster_rep", "skip", "trust_ssl",
+})
+
+
+def _validate_imported(imported):
+    result = []
+    for cfg in imported:
+        if not isinstance(cfg, dict):
+            continue
+        name = cfg.get("name", "")
+        host = cfg.get("host", "")
+        user = cfg.get("user", "")
+        if not name or not host or not user:
+            continue
+        _sanitize_cfg(cfg)
+        clean = {k: v for k, v in cfg.items() if k in _ALLOWED_IMPORT_FIELDS}
+        result.append(clean)
+    return result
 
 
 def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
@@ -339,7 +398,9 @@ def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
     from PySide6.QtWidgets import QMessageBox
 
     from .ui.i18n import tr
-    if not os.path.exists(src_path):
+    if not os.path.exists(src_path) or os.path.islink(src_path):
+        return None
+    if os.path.getsize(src_path) > 10 * 1024 * 1024:
         return None
 
     while True:
@@ -347,11 +408,19 @@ def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
         if password is None:
             return None
         try:
-            imported = _decrypt_bundle(open(src_path, "rb").read(), password)
+            with open(src_path, "rb") as f:
+                raw = f.read()
+            imported = _decrypt_bundle(raw, password)
             break
         except Exception:
             QMessageBox.warning(None, tr("Error"),
                                  tr("Wrong password. Try again."))
+
+    imported = _validate_imported(imported)
+    if not imported:
+        QMessageBox.warning(None, tr("Error"),
+                             tr("No valid server entries found in the bundle."))
+        return None
 
     if not merge:
         save_config(imported)
@@ -477,7 +546,11 @@ def seed_translations(lang: str, translations: dict[str, str], version: int = 0)
                     "SELECT value FROM ui_state WHERE key = 'i18n_version'"
                 )
                 row = cur.fetchone()
-                stored = int(row[0]) if row else 0
+                stored = 0
+                try:
+                    stored = int(row[0]) if row else 0
+                except (TypeError, ValueError):
+                    stored = 0
                 if stored != version:
                     conn.execute("DELETE FROM translations")
                     conn.execute(

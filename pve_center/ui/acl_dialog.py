@@ -1,3 +1,4 @@
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -35,6 +36,9 @@ class AclDialog(QDialog):
         form.setSpacing(8)
 
         self._path_edit = QLineEdit("/")
+        self._path_edit.setValidator(QRegularExpressionValidator(
+            r"^/[A-Za-z0-9/_.\-]*$"
+        ))
         form.addRow(tr("Path:"), self._path_edit)
 
         path_hint = QLabel(tr("e.g. /, /vms, /storage/local, /nodes/pve01"))

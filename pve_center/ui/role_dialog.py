@@ -1,3 +1,4 @@
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -68,6 +69,9 @@ class RoleDialog(QDialog):
         else:
             self._roleid_edit = QLineEdit()
             self._roleid_edit.setPlaceholderText("e.g. MyCustomRole")
+            self._roleid_edit.setValidator(QRegularExpressionValidator(
+                r"^[A-Za-z0-9_]{1,64}$"
+            ))
         form.addRow(tr("Role ID:"), self._roleid_edit)
 
         if self._is_special:

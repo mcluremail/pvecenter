@@ -1,4 +1,5 @@
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QGuiApplication, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -60,9 +61,13 @@ class TokenDialog(QDialog):
         else:
             self._tokenid_edit = QLineEdit()
             self._tokenid_edit.setPlaceholderText("e.g. my-token")
+            self._tokenid_edit.setValidator(QRegularExpressionValidator(
+                r"^[A-Za-z0-9_\-]{1,64}$"
+            ))
         form.addRow(tr("Token ID:"), self._tokenid_edit)
 
         self._comment_edit = QLineEdit()
+        self._comment_edit.setMaxLength(255)
         form.addRow(tr("Comment:"), self._comment_edit)
 
         self._privsep_check = QCheckBox(tr("Privilege separation"))
@@ -103,12 +108,16 @@ class TokenDialog(QDialog):
         t = self._token
         self._comment_edit.setText(t.get("comment", "") or "")
         privsep = t.get("privsep", 1)
-        if isinstance(privsep, str):
+        try:
             privsep = int(privsep)
+        except (TypeError, ValueError):
+            privsep = 1
         self._privsep_check.setChecked(bool(privsep))
         expire = t.get("expire", 0)
-        if isinstance(expire, str):
+        try:
             expire = int(expire)
+        except (TypeError, ValueError):
+            expire = 0
         if expire and expire > 0:
             import time
             remaining = max(0, (expire - int(time.time())) // 86400)
@@ -186,14 +195,45 @@ class TokenValueDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        copy_btn = QPushButton(tr("Copy auth string"))
-        copy_btn.clicked.connect(lambda: QGuiApplication.clipboard().setText(
-            f"{self._full}={self._value}"
-        ))
-        btn_layout.addWidget(copy_btn)
+        self._copy_btn = QPushButton(tr("Copy auth string"))
+        self._copy_btn.clicked.connect(self._copy_and_clear)
+        btn_layout.addWidget(self._copy_btn)
         close_btn = QPushButton(tr("Close"))
         close_btn.setObjectName("accentBtn")
         close_btn.setFixedWidth(120)
-        close_btn.clicked.connect(self.accept)
+        close_btn.clicked.connect(self._cleanup_and_accept)
         btn_layout.addWidget(close_btn)
         layout.addLayout(btn_layout)
+
+    def _copy_and_clear(self):
+        QGuiApplication.clipboard().setText(f"{self._full}={self._value}")
+        self._copy_btn.setEnabled(False)
+        self._copy_btn.setText(tr("Copied (clears in 30s)"))
+        QTimer.singleShot(30000, self._clear_clipboard)
+
+    def _clear_clipboard(self):
+        try:
+            current = QGuiApplication.clipboard().text()
+            expected = f"{self._full}={self._value}"
+            if current == expected:
+                QGuiApplication.clipboard().clear()
+        except Exception:
+            pass
+        self._copy_btn.setEnabled(True)
+        self._copy_btn.setText(tr("Copy auth string"))
+
+    def _cleanup_and_accept(self):
+        try:
+            current = QGuiApplication.clipboard().text()
+            expected = f"{self._full}={self._value}"
+            if current == expected:
+                QGuiApplication.clipboard().clear()
+        except Exception:
+            pass
+        self._value = ""
+        self._full = ""
+        self.accept()
+
+    def closeEvent(self, event):
+        self._cleanup_and_accept()
+        super().closeEvent(event)

@@ -127,6 +127,7 @@ class BackupJobDialog(QDialog):
         extra_form.setSpacing(8)
 
         self._notes_edit = QLineEdit()
+        self._notes_edit.setMaxLength(255)
         self._notes_edit.setPlaceholderText(tr("Optional notes"))
         extra_form.addRow(tr("Notes:"), self._notes_edit)
 
@@ -179,10 +180,10 @@ class BackupJobDialog(QDialog):
     def _fill_from_job(self):
         job = self._job
         enabled_raw = job.get("enabled", 1)
-        if isinstance(enabled_raw, str):
-            enabled_val = int(enabled_raw)
-        else:
+        try:
             enabled_val = int(enabled_raw or 0)
+        except (TypeError, ValueError):
+            enabled_val = 1
         self._enabled_check.setChecked(bool(enabled_val))
         vmid = job.get("vmid", "")
         self._vmid_edit.setText(str(vmid) if vmid else "")
@@ -199,7 +200,10 @@ class BackupJobDialog(QDialog):
         if idx >= 0:
             self._compress_combo.setCurrentIndex(idx)
         self._notes_edit.setText(job.get("comment", "") or "")
-        remove = int(job.get("remove", 0) or 0)
+        try:
+            remove = int(job.get("remove", 0) or 0)
+        except (TypeError, ValueError):
+            remove = 0
         self._remove_check.setChecked(bool(remove))
         if remove:
             prune = job.get("prune-backups", "keep-last=3")
@@ -214,7 +218,10 @@ class BackupJobDialog(QDialog):
                             retain = 3
                         break
             self._retain_spin.setValue(retain)
-        bwlimit = int(job.get("bwlimit", 0) or 0)
+        try:
+            bwlimit = int(job.get("bwlimit", 0) or 0)
+        except (TypeError, ValueError):
+            bwlimit = 0
         self._bwlimit_spin.setValue(bwlimit)
         schedule = job.get("schedule", "")
         if schedule:
