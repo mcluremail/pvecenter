@@ -435,6 +435,7 @@ class VMTabs:
         panel.hardware_widget.set_iso_list(iso_set)
         node_storages = [s for s in panel.all_storages
                          if s.get("node") == node_name
+                         and s.get("host_name") == host_name
                          and "images" in (s.get("content", "") or "").split(",")]
         panel.hardware_widget.set_storage_list(node_storages)
         panel.options_widget.set_context(host_name, vmid, node_name)
@@ -1126,6 +1127,7 @@ class VMTabs:
             return
         storages = [s for s in panel.all_storages
                     if s.get("node") == node_name
+                    and s.get("host_name") == host_name
                     and "iso" in (s.get("content") or "").split(",")]
         from ..api.metrics import StorageContentListWorker
         for storage_info in storages:
@@ -1160,6 +1162,7 @@ class VMTabs:
         backup_storages = [
             s for s in panel.all_storages
             if s.get("node") == node_name
+            and s.get("host_name") == host_name
             and "backup" in (s.get("content", "") or "").split(",")
         ]
         if not backup_storages:
@@ -1242,7 +1245,9 @@ class VMTabs:
         if not cfg:
             return
         from ..vzdump_dialog import VzdumpDialog
-        storages = [s for s in panel.all_storages if s.get("node") == node_name]
+        storages = [s for s in panel.all_storages
+                    if s.get("node") == node_name
+                    and s.get("host_name") == host_name]
         dlg = VzdumpDialog(panel, vmid=vmid, storages=storages)
         if dlg.exec() != VzdumpDialog.Accepted:
             return
@@ -1303,7 +1308,9 @@ class VMTabs:
         used_vmids = {v.get("vmid") for v in panel.all_vms if v.get("vmid")}
         next_vmid = self._next_free_vmid(used_vmids)
         from ..vm_restore_dialog import VmRestoreDialog
-        storages = [s for s in panel.all_storages if s.get("node") == node_name]
+        storages = [s for s in panel.all_storages
+                    if s.get("node") == node_name
+                    and s.get("host_name") == host_name]
         dlg = VmRestoreDialog(panel, volid=volid, vm_type=vm_type,
                               storages=storages, next_vmid=next_vmid)
         if dlg.exec() != VmRestoreDialog.Accepted:

@@ -309,7 +309,12 @@ class DetailPanel(QWidget):
                     hosts.append(node)
             self._host_tabs.update_cluster_summary_cells(hosts)
         elif self.current_obj_type == "host":
-            host_data = next((n for n in self.all_nodes if n.get("node") == self.current_obj_name), None)
+            host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
+            host_data = next((n for n in self.all_nodes
+                              if n.get("node") == self.current_obj_name
+                              and n.get("host_name") == host_cfg_name), None)
+            if host_data is None and self.current_obj_data:
+                host_data = self.current_obj_data
             if host_data:
                 if host_data.get("status") == "error":
                     self._host_tabs.show_host_info(self.current_obj_name, host_data)
@@ -347,7 +352,12 @@ class DetailPanel(QWidget):
 
     def _on_timeframe_changed(self, new_timeframe):
         if self.current_obj_type == "host":
-            host_data = next((n for n in self.all_nodes if n.get("node") == self.current_obj_name), None)
+            host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
+            host_data = next((n for n in self.all_nodes
+                              if n.get("node") == self.current_obj_name
+                              and n.get("host_name") == host_cfg_name), None)
+            if host_data is None and self.current_obj_data:
+                host_data = self.current_obj_data
             if host_data:
                 self._host_tabs.fetch_host_metrics(host_data)
         elif self._last_vm_data is not None:

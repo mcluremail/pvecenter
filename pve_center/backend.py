@@ -508,9 +508,12 @@ class FetchWorker(QRunnable):
             # -- Parallel phase 3: ISO images --
             def fetch_iso_for_node(n):
                 nname = n["node"]
+                nhost = n.get("host_name", "")
                 iso_storages = [
                     s["storage"] for s in storages
-                    if s.get("node") == nname and "iso" in (s.get("content", "") or "").split(",")
+                    if s.get("node") == nname
+                    and s.get("host_name") == nhost
+                    and "iso" in (s.get("content", "") or "").split(",")
                 ]
                 if not iso_storages:
                     with iso_lock:

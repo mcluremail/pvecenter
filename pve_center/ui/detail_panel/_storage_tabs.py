@@ -587,8 +587,10 @@ class StorageTabs:
         if workers_launched > 0:
             panel._storage_content_pending[storage_name] = {ct: None for ct in allowed if ct in tab_map and ct != "backup"}
         if "images" in allowed or "rootdir" in allowed:
-            nodes_with_sto = set(s.get("node") for s in filtered)
-            node_vms = [vm for vm in panel.all_vms if vm.get("node") in nodes_with_sto]
+            host_names_with_sto = {s.get("host_name") for s in filtered}
+            node_vms = [vm for vm in panel.all_vms
+                        if vm.get("node") in {s.get("node") for s in filtered}
+                        and vm.get("host_name") in host_names_with_sto]
             self.fetch_storage_disks_simple(storage_name, node_name, host_name, cfg, node_vms)
 
         toolbar_map = {
@@ -997,7 +999,9 @@ class StorageTabs:
         is_disk = table is panel.storage_disks_table
         target_storages = [
             s for s in panel.all_storages
-            if s.get("node") == node_name and s.get("storage") != storage_name
+            if s.get("node") == node_name
+            and s.get("host_name") == host_name
+            and s.get("storage") != storage_name
         ]
         dlg = StorageMoveDialog(volid_full, target_storages, is_disk, self.panel)
         if dlg.exec() != QDialog.Accepted:

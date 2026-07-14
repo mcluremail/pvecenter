@@ -228,7 +228,7 @@ class CreateVmDialog(QDialog):
         self.node_combo = QComboBox()
         for n in self._nodes:
             label = n.get("_display_name") or n.get("node", "?")
-            self.node_combo.addItem(label, n.get("node", ""))
+            self.node_combo.addItem(label, (n.get("node", ""), n.get("host_name", "")))
         self.node_combo.currentIndexChanged.connect(self._on_node_changed)
         g1.addWidget(self.node_combo, 0, 1)
         g1.addWidget(QLabel(tr("VM ID:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
@@ -450,10 +450,13 @@ class CreateVmDialog(QDialog):
         self._on_node_changed(0)
 
     def _on_node_changed(self, idx):
-        node = self.node_combo.currentData()
-        if not node:
+        data = self.node_combo.currentData()
+        if not data:
             return
-        node_storages = [s for s in self._storages if s.get("node") == node]
+        node, host_name = data if isinstance(data, tuple) else (data, "")
+        node_storages = [s for s in self._storages
+                         if s.get("node") == node
+                         and s.get("host_name") == host_name]
         if not node_storages:
             node_storages = self._storages
 
@@ -480,12 +483,12 @@ class CreateVmDialog(QDialog):
 
         self._populate_iso_combo(node)
 
-        host_name = None
+        ha_host_name = None
         for n in self._nodes:
-            if n.get("node") == node:
-                host_name = n.get("host_name")
+            if n.get("node") == node and n.get("host_name") == host_name:
+                ha_host_name = n.get("host_name")
                 break
-        self._update_ha_combo(host_name)
+        self._update_ha_combo(ha_host_name)
 
     def _on_bios_changed(self, text):
         is_ovmf = self.bios_combo.currentData() == "ovmf"
@@ -613,7 +616,10 @@ class CreateVmDialog(QDialog):
         return params
 
     def get_node(self):
-        return self.node_combo.currentData()
+        data = self.node_combo.currentData()
+        if isinstance(data, tuple):
+            return data[0]
+        return data
 
     def get_ha_group(self):
         return self.ha_combo.currentData()

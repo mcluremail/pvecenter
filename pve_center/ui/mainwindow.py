@@ -593,7 +593,9 @@ class MainWindow(QMainWindow):
     def _get_cluster_nodes(self, host_name, current_node):
         cfg = self._cfg_by_name.get(host_name)
         if not cfg:
-            return [n for n in self.all_nodes if n.get("node") != current_node]
+            return [n for n in self.all_nodes
+                    if n.get("node") != current_node
+                    and n.get("host_name") == host_name]
         cluster = cfg.get("cluster", "")
         if not cluster or cluster in (False, None, "Standalone"):
             return []
@@ -653,7 +655,9 @@ class MainWindow(QMainWindow):
             "node": node,
         }
         cluster_nodes = self._get_cluster_nodes(host_name, node)
-        node_storages = [s for s in self.all_storages if s.get("node") == node]
+        node_storages = [s for s in self.all_storages
+                         if s.get("node") == node
+                         and s.get("host_name") == host_name]
         from .clone_vm_dialog import CloneVMDialog
         dialog = CloneVMDialog(self, vm_info=vm_info,
                                cluster_nodes=cluster_nodes,

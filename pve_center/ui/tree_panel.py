@@ -507,8 +507,10 @@ class TreePanel(QWidget):
                     cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
                     cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
                     continue
+                cluster_host_names = {n.get("host_name") for n in nodes_in_cl}
                 vms_in_cl = [vm for vm in self.all_vms
-                             if any(vm.get("node") == n.get("node") for n in nodes_in_cl)]
+                             if vm.get("node") in {n.get("node") for n in nodes_in_cl}
+                             and vm.get("host_name") in cluster_host_names]
                 cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
                 cl_item.setIcon(0, get_icon("cluster"))
                 cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))

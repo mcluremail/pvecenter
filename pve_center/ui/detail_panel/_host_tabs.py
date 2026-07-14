@@ -635,7 +635,12 @@ class HostTabs:
 
     def show_host_info(self, host_name, host_data):
         panel = self.panel
-        node = next((n for n in panel.all_nodes if n.get("node") == host_name), None)
+        host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
+        node = next((n for n in panel.all_nodes
+                     if n.get("node") == host_name
+                     and n.get("host_name") == host_cfg_name), None)
+        if node is None:
+            node = host_data if host_data else None
         display_name = node.get("_display_name") if node else host_name
         panel.detail_label.setText(display_name)
         panel.detail_sublabel.setText(" · ".join(self._host_subtitle(host_data, host_name)))
@@ -725,9 +730,14 @@ class HostTabs:
             ram_pct = safe_pct(mem_bytes, maxmem_bytes)
             panel.card_ram.set_progress(ram_pct)
 
-            vms_count = sum(1 for v in panel.all_vms if v.get("node") == host_name)
+            host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
+            vms_count = sum(1 for v in panel.all_vms
+                           if v.get("node") == host_name
+                           and v.get("host_name") == host_cfg_name)
             vms_running = sum(1 for v in panel.all_vms
-                              if v.get("node") == host_name and v.get("status") == "running")
+                              if v.get("node") == host_name
+                              and v.get("host_name") == host_cfg_name
+                              and v.get("status") == "running")
             panel.card_disk.set_title(tr("VMs"))
             panel.card_disk.set_value(f"{vms_running}/{vms_count}")
             panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
@@ -814,6 +824,7 @@ class HostTabs:
         if host_cfg:
             is_cluster_host = bool(host_cfg.get("cluster"))
             if not is_cluster_host:
+                panel._backup_jobs_host_cfg = host_data.get("host_name", "") if host_data else host_name
                 self._fetch_backup_jobs(host_cfg, host_name)
             else:
                 cluster_name = host_cfg.get("cluster", "")
@@ -903,9 +914,13 @@ class HostTabs:
             panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
             panel.card_ram.set_progress(safe_pct(mem_bytes, maxmem_bytes))
 
-            vms_count = sum(1 for v in panel.all_vms if v.get("node") == host_name)
+            vms_count = sum(1 for v in panel.all_vms
+                           if v.get("node") == host_name
+                           and v.get("host_name") == host_cfg_name)
             vms_running = sum(1 for v in panel.all_vms
-                              if v.get("node") == host_name and v.get("status") == "running")
+                              if v.get("node") == host_name
+                              and v.get("host_name") == host_cfg_name
+                              and v.get("status") == "running")
             panel.card_disk.set_value(f"{vms_running}/{vms_count}")
             panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
 
@@ -1015,22 +1030,23 @@ class HostTabs:
         from ..api.metrics import HostNetworkWorker
         worker = HostNetworkWorker(cfg, node_name)
         worker.signals.network_ready.connect(
-            lambda nn, data, w=worker: (
-                self.on_host_network(nn, data),
+            lambda nn, data, h=host_cfg_name, w=worker: (
+                self.on_host_network(nn, data, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.network_error.connect(
-            lambda nn, err, w=worker: (
-                self.on_host_network(nn, []),
+            lambda nn, err, h=host_cfg_name, w=worker: (
+                self.on_host_network(nn, [], h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_network(self, node_name, interfaces):
+    def on_host_network(self, node_name, interfaces, host_cfg_name=""):
         panel = self.panel
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
             return
         if interfaces:
             panel.host_network_stack.setCurrentIndex(1)
@@ -1072,22 +1088,23 @@ class HostTabs:
         from ..api.metrics import HostServicesWorker
         worker = HostServicesWorker(cfg, node_name)
         worker.signals.services_ready.connect(
-            lambda nn, data, w=worker: (
-                self.on_host_services(nn, data),
+            lambda nn, data, h=host_cfg_name, w=worker: (
+                self.on_host_services(nn, data, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.services_error.connect(
-            lambda nn, err, w=worker: (
-                self.on_host_services(nn, []),
+            lambda nn, err, h=host_cfg_name, w=worker: (
+                self.on_host_services(nn, [], h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_services(self, node_name, services):
+    def on_host_services(self, node_name, services, host_cfg_name=""):
         panel = self.panel
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
             return
         if services:
             panel.host_services_stack.setCurrentIndex(1)
@@ -1124,22 +1141,23 @@ class HostTabs:
         from ..api.metrics import HealthCheckWorker
         worker = HealthCheckWorker(cfg, node_name, host_data)
         worker.signals.health_ready.connect(
-            lambda nn, data, w=worker: (
-                self.on_host_health(nn, data),
+            lambda nn, data, h=host_cfg_name, w=worker: (
+                self.on_host_health(nn, data, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.health_error.connect(
-            lambda nn, err, w=worker: (
-                self.on_host_health(nn, {"status": "error", "issues": [err], "warnings": []}),
+            lambda nn, err, h=host_cfg_name, w=worker: (
+                self.on_host_health(nn, {"status": "error", "issues": [err], "warnings": []}, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_health(self, node_name, health):
+    def on_host_health(self, node_name, health, host_cfg_name=""):
         panel = self.panel
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
             return
         issues = health.get("issues", [])
         warnings = health.get("warnings", [])
@@ -1180,22 +1198,23 @@ class HostTabs:
         from ..api.metrics import HostDisksWorker
         worker = HostDisksWorker(cfg, node_name)
         worker.signals.disks_ready.connect(
-            lambda nn, data, w=worker: (
-                self.on_host_disks(nn, data),
+            lambda nn, data, h=host_cfg_name, w=worker: (
+                self.on_host_disks(nn, data, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.disks_error.connect(
-            lambda nn, err, w=worker: (
-                self.on_host_disks(nn, []),
+            lambda nn, err, h=host_cfg_name, w=worker: (
+                self.on_host_disks(nn, [], h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_disks(self, node_name, disks):
+    def on_host_disks(self, node_name, disks, host_cfg_name=""):
         panel = self.panel
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
             return
         if disks:
             panel.host_disks_stack.setCurrentIndex(1)
@@ -1247,22 +1266,23 @@ class HostTabs:
         from ..api.metrics import HostSnapshotsWorker
         worker = HostSnapshotsWorker(cfg, node_name, vms)
         worker.signals.snapshots_ready.connect(
-            lambda nn, data, w=worker: (
-                self.on_host_snapshots(nn, data),
+            lambda nn, data, h=host_cfg_name, w=worker: (
+                self.on_host_snapshots(nn, data, h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.snapshots_error.connect(
-            lambda nn, err, w=worker: (
-                self.on_host_snapshots(nn, []),
+            lambda nn, err, h=host_cfg_name, w=worker: (
+                self.on_host_snapshots(nn, [], h),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_snapshots(self, node_name, snapshots):
+    def on_host_snapshots(self, node_name, snapshots, host_cfg_name=""):
         panel = self.panel
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name:
+        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
+        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
             return
         if snapshots:
             panel.host_snapshots_stack.setCurrentIndex(1)
@@ -1473,10 +1493,13 @@ class HostTabs:
         panel = self.panel
         storages = [s for s in panel.all_storages if s.get("cluster") == cluster_name]
         if not storages:
+            cluster_host_names = {h.get("host_name") for h in panel.all_nodes
+                                  if panel._cfg_by_name.get(h.get("host_name", ""), {}).get("cluster") == cluster_name}
             storages = [s for s in panel.all_storages
                         if not s.get("cluster")
-                        and any(s.get("node") == h.get("node") for h in panel.all_nodes
-                                if panel._cfg_by_name.get(h.get("host_name", ""), {}).get("cluster") == cluster_name)]
+                        and s.get("node") in {h.get("node") for h in panel.all_nodes
+                                              if h.get("host_name") in cluster_host_names}
+                        and s.get("host_name") in cluster_host_names]
         card_items = []
         seen = set()
         for st in storages:
@@ -1760,7 +1783,10 @@ class HostTabs:
         if panel.current_obj_type == "cluster":
             return [s for s in panel.all_storages if s.get("cluster") == ctx]
         elif panel.current_obj_type == "host":
-            return [s for s in panel.all_storages if s.get("node") == ctx]
+            host_cfg = getattr(panel, "_backup_jobs_host_cfg", "") or ctx
+            return [s for s in panel.all_storages
+                    if s.get("node") == ctx
+                    and s.get("host_name") == host_cfg]
         return panel.all_storages
 
     def _on_add_backup_job(self):
