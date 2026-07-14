@@ -306,7 +306,7 @@ class VMTabs:
             return
         node_name = panel._last_vm_data.get("node") or host_name
         panel._console_btn.setEnabled(False)
-        console_type = "VNC" if vm_type == "lxc" else "SPICE"
+        console_type = "VNC" if vm_type == "lxc" else "SPICE/VNC"
         panel.detail_label.setText(tr("VM {vmid}: opening {ctype} console...").format(
             vmid=vmid, ctype=console_type))
         from ...backend import VmConsoleWorker

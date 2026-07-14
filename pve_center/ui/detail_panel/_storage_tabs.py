@@ -2,12 +2,15 @@ from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -37,13 +40,15 @@ from ._table_utils import (
 
 
 class StorageToolbar(QWidget):
-    """Toolbar with Upload/Move/Remove buttons for storage content tables."""
+    """Toolbar with Upload/Download URL/Move/Remove buttons for storage content tables."""
 
     upload_requested = Signal()
+    download_url_requested = Signal()
     move_requested = Signal()
     remove_requested = Signal()
 
     _UPLOAD_TYPES = {"iso", "vztmpl", "backup"}
+    _DOWNLOAD_TYPES = {"iso", "vztmpl"}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -58,6 +63,16 @@ class StorageToolbar(QWidget):
         self._upload_btn.setEnabled(False)
         self._upload_btn.clicked.connect(self.upload_requested)
         self._upload_btn.setToolTip("")
+
+        self._download_btn = QToolButton()
+        self._download_btn.setText(tr("Download from URL"))
+        dl_icon = get_icon("download")
+        if dl_icon:
+            self._download_btn.setIcon(dl_icon)
+        self._download_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._download_btn.setEnabled(False)
+        self._download_btn.clicked.connect(self.download_url_requested)
+        self._download_btn.setToolTip("")
 
         self._move_btn = QPushButton(tr("Move"))
         self._move_btn.setEnabled(False)
@@ -76,6 +91,7 @@ class StorageToolbar(QWidget):
         layout.setSpacing(6)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._upload_btn)
+        layout.addWidget(self._download_btn)
         layout.addWidget(self._move_btn)
         layout.addWidget(self._remove_btn)
         layout.addStretch()
@@ -83,26 +99,40 @@ class StorageToolbar(QWidget):
     def set_content_type(self, ct):
         self._content_type = ct
         can_upload = ct in self._UPLOAD_TYPES
+        can_download = ct in self._DOWNLOAD_TYPES
         self._upload_btn.setEnabled(can_upload)
+        self._download_btn.setEnabled(can_download)
         if not can_upload:
             self._upload_btn.setToolTip(tr("Cannot upload to this storage type"))
         else:
             self._upload_btn.setToolTip("")
+        if not can_download:
+            self._download_btn.setToolTip(tr("Download from URL is only available for ISO and template storages"))
+        else:
+            self._download_btn.setToolTip("")
 
     def set_has_selection(self, has_sel):
         can_upload = self._content_type in self._UPLOAD_TYPES
+        can_download = self._content_type in self._DOWNLOAD_TYPES
         self._upload_btn.setEnabled(can_upload)
+        self._download_btn.setEnabled(can_download)
         self._move_btn.setEnabled(has_sel)
         self._remove_btn.setEnabled(has_sel)
 
     def set_context(self, node_name, storage_name, host_name, cfg, content_type):
         self._content_type = content_type
         can_upload = content_type in self._UPLOAD_TYPES
+        can_download = content_type in self._DOWNLOAD_TYPES
         self._upload_btn.setEnabled(can_upload)
+        self._download_btn.setEnabled(can_download)
         if not can_upload:
             self._upload_btn.setToolTip(tr("Cannot upload to this storage type"))
         else:
             self._upload_btn.setToolTip("")
+        if not can_download:
+            self._download_btn.setToolTip(tr("Download from URL is only available for ISO and template storages"))
+        else:
+            self._download_btn.setToolTip("")
 
 
 class StorageTabs:
@@ -610,12 +640,16 @@ class StorageTabs:
                 connected.add(id(tb))
                 if tb.receivers(tb.upload_requested) > 0:
                     tb.upload_requested.disconnect()
+                if tb.receivers(tb.download_url_requested) > 0:
+                    tb.download_url_requested.disconnect()
                 if tb.receivers(tb.move_requested) > 0:
                     tb.move_requested.disconnect()
                 if tb.receivers(tb.remove_requested) > 0:
                     tb.remove_requested.disconnect()
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
+                tb.download_url_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
+                    self._on_download_url(n, s, h, ct))
                 tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
                     self._on_move(n, s, h))
                 tb.remove_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
@@ -982,6 +1016,73 @@ class StorageTabs:
             lambda err, k=key: (
                 panel.transfer_finished.emit(k, False, err),
                 panel.config_update_result.emit(tr("Upload failed: {err}").format(err=err), ),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def _on_download_url(self, node_name, storage_name, host_name, content_type):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        if content_type not in ("iso", "vztmpl"):
+            return
+        dlg = QDialog(self.panel)
+        dlg.setWindowTitle(tr("Download from URL"))
+        dlg.setMinimumWidth(450)
+        layout = QFormLayout(dlg)
+        url_edit = QLineEdit()
+        url_edit.setPlaceholderText("https://...")
+        filename_edit = QLineEdit()
+        filename_edit.setPlaceholderText(tr("Auto-detect from URL"))
+        checksum_edit = QLineEdit()
+        checksum_edit.setPlaceholderText(tr("Optional"))
+        verify_cb = QCheckBox()
+        verify_cb.setChecked(True)
+        layout.addRow(tr("URL:"), url_edit)
+        layout.addRow(tr("Filename:"), filename_edit)
+        layout.addRow(tr("Checksum:"), checksum_edit)
+        layout.addRow(tr("Verify certificates"), verify_cb)
+        btns = QHBoxLayout()
+        ok_btn = QPushButton(tr("Download"))
+        ok_btn.setEnabled(False)
+        cancel_btn = QPushButton(tr("Cancel"))
+        btns.addStretch()
+        btns.addWidget(ok_btn)
+        btns.addWidget(cancel_btn)
+        layout.addRow(btns)
+        cancel_btn.clicked.connect(dlg.reject)
+        url_edit.textChanged.connect(lambda t: ok_btn.setEnabled(bool(t.strip())))
+        ok_btn.clicked.connect(dlg.accept)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        url = url_edit.text().strip()
+        if not url:
+            return
+        filename = filename_edit.text().strip() or None
+        checksum = checksum_edit.text().strip() or None
+        verify = verify_cb.isChecked()
+        display_name = filename or url.split("/")[-1].split("?")[0] or "file"
+        key = f"download:{storage_name}:{display_name}"
+        panel.transfer_started.emit(key, tr("Download {name}").format(name=display_name))
+        from ...backend import StorageDownloadUrlWorker
+        worker = StorageDownloadUrlWorker(
+            cfg, node_name, storage_name, content_type, url,
+            filename=filename, checksum=checksum, verify_certificates=verify
+        )
+        worker.signals.result.connect(
+            lambda msg, k=key: (
+                panel.transfer_finished.emit(k, True, msg),
+                panel.config_update_result.emit(msg),
+                self._reload_storage_content(),
+                panel._workers_mgr.discard_worker(worker),
+            )
+        )
+        worker.signals.error.connect(
+            lambda err, k=key: (
+                panel.transfer_finished.emit(k, False, err),
+                panel.config_update_result.emit(tr("Download failed: {err}").format(err=err)),
                 panel._workers_mgr.discard_worker(worker),
             )
         )

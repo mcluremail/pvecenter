@@ -322,10 +322,15 @@ class FetchWorker(QRunnable):
                 try:
                     result = []
                     for g in proxmox.cluster.ha.groups.get():
-                        gn = g.get("group")
-                        if gn:
-                            result.append(gn)
-                    result.sort()
+                        result.append({
+                            "group": g.get("group", ""),
+                            "nodes": g.get("nodes", ""),
+                            "restricted": g.get("restricted", 0),
+                            "nofailback": g.get("nofailback", 0),
+                            "comment": g.get("comment", ""),
+                            "digest": g.get("digest", ""),
+                        })
+                    result.sort(key=lambda x: x["group"])
                     with ha_lock:
                         ha_groups = result
                 except Exception:
@@ -1271,7 +1276,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
 
 
 # ----------------------------------------------------------------------
-# VmConsoleWorker (SPICE)
+# VmConsoleWorker (SPICE/VNC)
 # ----------------------------------------------------------------------
 class VmConsoleSignals(QObject):
     console_ready = Signal(str)
@@ -1280,7 +1285,11 @@ class VmConsoleSignals(QObject):
 
 
 class VmConsoleWorker(QRunnable):
-    """Запрашивает SPICE/VNC proxy у PVE, пишет .vv файл и запускает remote-viewer."""
+    """Запрашивает SPICE/VNC proxy у PVE, пишет .vv файл и запускает remote-viewer.
+
+    QEMU: сначала SPICE, при ошибке — fallback на VNC.
+    LXC:  всегда VNC.
+    """
     def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
         super().__init__()
         self.host_cfg = host_cfg
@@ -1289,6 +1298,45 @@ class VmConsoleWorker(QRunnable):
         self.vm_type = vm_type
         self.signals = VmConsoleSignals()
 
+    @staticmethod
+    def _build_vv_lines(config, host_fallback):
+        """Строит строки .vv файла для VNC-подключения."""
+        lines = ["[virt-viewer]", "type=vnc"]
+        port = config.get("port")
+        if port:
+            lines.append(f"port={port}")
+        host_raw = config.get("host") or host_fallback
+        if host_raw:
+            lines.append(f"host={host_raw}")
+        ticket = config.get("ticket")
+        if ticket:
+            lines.append(f"password={ticket}")
+        delete_file = config.get("delete-this-file")
+        if delete_file is not None:
+            lines.append(f"delete-this-file={delete_file}")
+        return lines
+
+    @staticmethod
+    def _build_spice_vv_lines(config):
+        """Строит строки .vv файла для SPICE-подключения."""
+        lines = ["[virt-viewer]"]
+        host_raw = config.get("host", "")
+        if host_raw:
+            lines.append(f"host={host_raw}")
+        for key in ("password", "proxy", "secure-attention",
+                    "tls-port", "type", "delete-this-file",
+                    "host-subject", "toggle-fullscreen", "release-cursor"):
+            val = config.get(key)
+            if val is not None:
+                lines.append(f"{key}={val}")
+        title = config.get("title")
+        if title:
+            lines.append(f"title={title}")
+        ca = config.get("ca", "")
+        if ca:
+            lines.append("ca=" + ca.replace("\n", "\\n"))
+        return lines
+
     def run(self):
         import os
         import subprocess
@@ -1296,6 +1344,7 @@ class VmConsoleWorker(QRunnable):
         import tempfile
         vv_path = None
         proxmox = None
+        used_vnc = False
         try:
             try:
                 proxmox = _make_proxmox(self.host_cfg, timeout=10)
@@ -1303,10 +1352,21 @@ class VmConsoleWorker(QRunnable):
                     config = proxmox.nodes(_q(self.node_name)).lxc(self.vmid).vncproxy.post(
                         proxy=self.host_cfg["host"]
                     )
+                    used_vnc = True
                 else:
-                    config = proxmox.nodes(_q(self.node_name)).qemu(self.vmid).spiceproxy.post(
-                        proxy=self.host_cfg["host"]
-                    )
+                    try:
+                        config = proxmox.nodes(_q(self.node_name)).qemu(self.vmid).spiceproxy.post(
+                            proxy=self.host_cfg["host"]
+                        )
+                    except Exception as spice_err:
+                        spice_msg = str(spice_err).lower()
+                        if "not supported" in spice_msg or "spice" in spice_msg:
+                            config = proxmox.nodes(_q(self.node_name)).qemu(self.vmid).vncproxy.post(
+                                proxy=self.host_cfg["host"]
+                            )
+                            used_vnc = True
+                        else:
+                            raise
             except Exception as e:
                 msg = str(e).lower()
                 if "permission check failed" in msg or "403" in msg:
@@ -1325,37 +1385,10 @@ class VmConsoleWorker(QRunnable):
                 proxmox = None
 
             try:
-                if self.vm_type == "lxc":
-                    lines = ["[virt-viewer]", "type=vnc"]
-                    port = config.get("port")
-                    if port:
-                        lines.append(f"port={port}")
-                    host_raw = config.get("host") or self.host_cfg.get("host", "")
-                    if host_raw:
-                        lines.append(f"host={host_raw}")
-                    ticket = config.get("ticket")
-                    if ticket:
-                        lines.append(f"password={ticket}")
-                    delete_file = config.get("delete-this-file")
-                    if delete_file is not None:
-                        lines.append(f"delete-this-file={delete_file}")
+                if used_vnc:
+                    lines = self._build_vv_lines(config, self.host_cfg.get("host", ""))
                 else:
-                    lines = ["[virt-viewer]"]
-                    host_raw = config.get("host", "")
-                    if host_raw:
-                        lines.append(f"host={host_raw}")
-                    for key in ("password", "proxy", "secure-attention",
-                                "tls-port", "type", "delete-this-file",
-                                "host-subject", "toggle-fullscreen", "release-cursor"):
-                        val = config.get(key)
-                        if val is not None:
-                            lines.append(f"{key}={val}")
-                    title = config.get("title")
-                    if title:
-                        lines.append(f"title={title}")
-                    ca = config.get("ca", "")
-                    if ca:
-                        lines.append("ca=" + ca.replace("\n", "\\n"))
+                    lines = self._build_spice_vv_lines(config)
 
                 fd, vv_path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -1452,7 +1485,10 @@ class VmConsoleWorker(QRunnable):
                 return
 
             try:
-                self.signals.console_ready.emit(tr("SPICE console launched"))
+                if used_vnc:
+                    self.signals.console_ready.emit(tr("VNC console launched"))
+                else:
+                    self.signals.console_ready.emit(tr("SPICE console launched"))
             except RuntimeError:
                 pass
         finally:
@@ -1584,6 +1620,290 @@ class DeleteVmWorker(QRunnable):
                 self.signals.finished.emit()
             except RuntimeError:
                 pass
+
+
+# ----------------------------------------------------------------------
+# HaResourcesWorker — GET /cluster/ha/resources
+# ----------------------------------------------------------------------
+class HaResourcesSignals(QObject):
+    ha_resources_ready = Signal(list)
+    ha_resources_error = Signal(str)
+    finished = Signal()
+
+
+class HaResourcesWorker(QRunnable):
+    def __init__(self, host_cfg):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.signals = HaResourcesSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            data = proxmox.cluster.ha.resources.get()
+            _safe_emit(self.signals.ha_resources_ready, data)
+        except Exception as e:
+            logger.debug("HA resources error: %s", e)
+            _safe_emit(self.signals.ha_resources_error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# HaResourceAddWorker — POST /cluster/ha/resources
+# ----------------------------------------------------------------------
+class HaResourceAddSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class HaResourceAddWorker(QRunnable):
+    def __init__(self, host_cfg, sid, group, state="default",
+                 max_restart=1, max_relocate=1, comment=""):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.sid = sid
+        self.group = group
+        self.state = state
+        self.max_restart = max_restart
+        self.max_relocate = max_relocate
+        self.comment = comment
+        self.signals = HaResourceAddSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            params = {
+                "sid": self.sid,
+                "group": self.group,
+            }
+            if self.state and self.state != "default":
+                params["state"] = self.state
+            if self.max_restart is not None:
+                params["max_restart"] = self.max_restart
+            if self.max_relocate is not None:
+                params["max_relocate"] = self.max_relocate
+            if self.comment:
+                params["comment"] = self.comment
+            proxmox.cluster.ha.resources.post(**params)
+            _safe_emit(self.signals.result,
+                       tr("{sid} added to HA group {group}").format(sid=self.sid, group=self.group))
+        except Exception as e:
+            logger.debug("HA resource add error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# HaResourceDeleteWorker — DELETE /cluster/ha/resources/{sid}
+# ----------------------------------------------------------------------
+class HaResourceDeleteSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class HaResourceDeleteWorker(QRunnable):
+    def __init__(self, host_cfg, sid):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.sid = sid
+        self.signals = HaResourceDeleteSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.cluster.ha.resources(_q(self.sid)).delete()
+            _safe_emit(self.signals.result,
+                       tr("{sid} removed from HA").format(sid=self.sid))
+        except Exception as e:
+            logger.debug("HA resource delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# Network CRUD workers — /nodes/{node}/network
+# ----------------------------------------------------------------------
+class NetworkCrudSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class NetworkCreateWorker(QRunnable):
+    """POST /nodes/{node}/network — create network interface."""
+    def __init__(self, host_cfg, node_name, params):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.params = params
+        self.signals = NetworkCrudSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.nodes(_q(self.node_name)).network.post(**self.params)
+            iface = self.params.get("iface", "")
+            _safe_emit(self.signals.result,
+                       tr("Network interface {iface} created").format(iface=iface))
+        except Exception as e:
+            logger.debug("network create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+class NetworkUpdateWorker(QRunnable):
+    """PUT /nodes/{node}/network/{iface} — update network interface."""
+    def __init__(self, host_cfg, node_name, iface, params, digest=None):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.iface = iface
+        self.params = params
+        self.digest = digest
+        self.signals = NetworkCrudSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            p = dict(self.params)
+            if self.digest:
+                p["digest"] = self.digest
+            proxmox.nodes(_q(self.node_name)).network(_q(self.iface)).put(**p)
+            _safe_emit(self.signals.result,
+                       tr("Network interface {iface} updated").format(iface=self.iface))
+        except Exception as e:
+            logger.debug("network update error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+class NetworkDeleteWorker(QRunnable):
+    """DELETE /nodes/{node}/network/{iface} — delete network interface."""
+    def __init__(self, host_cfg, node_name, iface, digest=None):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.iface = iface
+        self.digest = digest
+        self.signals = NetworkCrudSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            params = {}
+            if self.digest:
+                params["digest"] = self.digest
+            proxmox.nodes(_q(self.node_name)).network(_q(self.iface)).delete(**params)
+            _safe_emit(self.signals.result,
+                       tr("Network interface {iface} deleted").format(iface=self.iface))
+        except Exception as e:
+            logger.debug("network delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+class NetworkApplyWorker(QRunnable):
+    """PUT /nodes/{node}/network — apply pending network changes."""
+    def __init__(self, host_cfg, node_name):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.signals = NetworkCrudSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
+            proxmox.nodes(_q(self.node_name)).network.put()
+            _safe_emit(self.signals.result, tr("Network changes applied"))
+        except Exception as e:
+            logger.debug("network apply error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+class NetworkRevertWorker(QRunnable):
+    """DELETE /nodes/{node}/network — revert pending network changes."""
+    def __init__(self, host_cfg, node_name):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.signals = NetworkCrudSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=15)
+            proxmox.nodes(_q(self.node_name)).network.delete()
+            _safe_emit(self.signals.result, tr("Network changes reverted"))
+        except Exception as e:
+            logger.debug("network revert error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
+
+
+# ----------------------------------------------------------------------
+# ClusterStatusWorker — GET /cluster/status + GET /cluster/config/nodes
+# ----------------------------------------------------------------------
+class ClusterStatusSignals(QObject):
+    cluster_status_ready = Signal(dict)
+    cluster_status_error = Signal(str)
+    finished = Signal()
+
+
+class ClusterStatusWorker(QRunnable):
+    """Fetches cluster quorum status and corosync node config."""
+    def __init__(self, host_cfg, timeout=15):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.timeout = timeout
+        self.signals = ClusterStatusSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=self.timeout)
+            status = proxmox.cluster.status.get()
+            corosync_nodes = []
+            try:
+                corosync_nodes = proxmox.cluster.config.nodes.get()
+            except Exception:
+                pass
+            result = {
+                "status": status,
+                "corosync_nodes": corosync_nodes,
+            }
+            _safe_emit(self.signals.cluster_status_ready, result)
+        except Exception as e:
+            logger.debug("cluster status error: %s", e)
+            _safe_emit(self.signals.cluster_status_error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
 
 
 # ----------------------------------------------------------------------
@@ -2011,8 +2331,70 @@ class StorageUploadWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
-# StorageMoveWorker — POST /nodes/{node}/storage/{storage}/content/{volid}
+# StorageDownloadUrlWorker — POST /nodes/{node}/storage/{storage}/download-url
 # ----------------------------------------------------------------------
+class StorageDownloadUrlSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class StorageDownloadUrlWorker(QRunnable):
+    """Скачивает файл с URL на storage через PVE API.
+
+    POST /nodes/{node}/storage/{storage}/download-url
+    Параметры: url, content (iso/vztmpl), filename (optional), checksum (optional),
+    verify-certificates (optional, default 1).
+    """
+    def __init__(self, host_cfg, node_name, storage_name, content_type, url,
+                 filename=None, checksum=None, verify_certificates=True, timeout=600):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.storage_name = storage_name
+        self.content_type = content_type
+        self.url = url
+        self.filename = filename
+        self.checksum = checksum
+        self.verify_certificates = verify_certificates
+        self.timeout = timeout
+        self.signals = StorageDownloadUrlSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
+            params = {
+                "url": self.url,
+                "content": self.content_type,
+                "verify-certificates": 1 if self.verify_certificates else 0,
+            }
+            if self.filename:
+                params["filename"] = self.filename
+            if self.checksum:
+                params["checksum"] = self.checksum
+            result = proxmox.nodes(_q(self.node_name)).storage(_q(self.storage_name)) \
+                .post("download-url", **params)
+            if isinstance(result, str) and result.startswith("UPID:"):
+                status, exitstatus = _poll_task(
+                    proxmox, self.node_name, result, timeout=self.timeout
+                )
+                if status == "stopped" and exitstatus == "OK":
+                    name = self.filename or self.url.split("/")[-1].split("?")[0] or "file"
+                    _safe_emit(self.signals.result,
+                               tr("Download complete: {name}").format(name=name))
+                else:
+                    err = exitstatus or status
+                    _safe_emit(self.signals.error,
+                               tr("Download failed: {err}").format(err=err))
+            else:
+                _safe_emit(self.signals.result, tr("Download complete"))
+        except Exception as e:
+            logger.debug("download-url error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            _close_proxmox(proxmox)
+            _safe_emit(self.signals.finished)
 class StorageMoveSignals(QObject):
     result = Signal(str)
     error = Signal(str)

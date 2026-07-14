@@ -3,13 +3,20 @@ from datetime import datetime
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
+    QLineEdit,
     QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QStackedWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -108,11 +115,43 @@ class HostTabs:
     def build_network_tab(self):
         loading = loading_label()
         table = make_table(
-            [tr("Interface"), tr("Type"), tr("State"), tr("Method"), tr("CIDR")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Interactive, 50), (QHeaderView.Interactive, 75),
-             (QHeaderView.Stretch, None)],
+            [tr("Interface"), tr("Type"), tr("State"), tr("Method"), tr("Address"),
+             tr("Gateway"), tr("Bridge ports"), tr("VLAN"), tr("MTU"), tr("Pending")],
+            [(QHeaderView.Interactive, 100), (QHeaderView.Interactive, 65),
+             (QHeaderView.Interactive, 50), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 50),
+             (QHeaderView.Interactive, 55), (QHeaderView.Interactive, 65)],
         )
+        table.setSortingEnabled(True)
+
+        toolbar = QWidget()
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(0, 0, 0, 0)
+        tb_layout.setSpacing(4)
+        add_btn = QPushButton(get_icon("add"), tr("Add"))
+        add_btn.setMinimumHeight(28)
+        add_btn.clicked.connect(self._on_network_add)
+        edit_btn = QPushButton(tr("Edit"))
+        edit_btn.setMinimumHeight(28)
+        edit_btn.clicked.connect(self._on_network_edit)
+        delete_btn = QPushButton(get_icon("remove"), tr("Delete"))
+        delete_btn.setMinimumHeight(28)
+        delete_btn.clicked.connect(self._on_network_delete)
+        apply_btn = QPushButton(tr("Apply"))
+        apply_btn.setMinimumHeight(28)
+        apply_btn.setStyleSheet(f"QPushButton {{ color: {Color.STATUS_OK}; font-weight: 600; }}")
+        apply_btn.clicked.connect(self._on_network_apply)
+        revert_btn = QPushButton(tr("Revert"))
+        revert_btn.setMinimumHeight(28)
+        revert_btn.clicked.connect(self._on_network_revert)
+        tb_layout.addWidget(add_btn)
+        tb_layout.addWidget(edit_btn)
+        tb_layout.addWidget(delete_btn)
+        tb_layout.addStretch()
+        tb_layout.addWidget(apply_btn)
+        tb_layout.addWidget(revert_btn)
+
         stack = QStackedWidget()
         stack.addWidget(loading)
         stack.addWidget(table)
@@ -120,11 +159,22 @@ class HostTabs:
         self.panel.host_network_loading = loading
         self.panel.host_network_table = table
         self.panel.host_network_stack = stack
+        self.panel.host_network_add_btn = add_btn
+        self.panel.host_network_edit_btn = edit_btn
+        self.panel.host_network_delete_btn = delete_btn
+        self.panel.host_network_apply_btn = apply_btn
+        self.panel.host_network_revert_btn = revert_btn
+
+        table.itemSelectionChanged.connect(
+            lambda: self._on_network_selection_changed()
+        )
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
         layout.addWidget(stack)
         tab.setWidget(container)
         return tab
@@ -332,18 +382,37 @@ class HostTabs:
         self.panel.card_cluster_cpu = MetricCard(tr("CPU"), "—", show_progress=True)
         self.panel.card_cluster_ram = MetricCard(tr("RAM"), "—", show_progress=True)
         self.panel.card_cluster_disk = MetricCard(tr("Storage"), "—", show_progress=True)
+        self.panel.card_cluster_quorum = MetricCard(tr("Quorum"), "—")
         cards_grid.addWidget(self.panel.card_cluster_hosts, 0, 0)
         cards_grid.addWidget(self.panel.card_cluster_vms, 0, 1)
         cards_grid.addWidget(self.panel.card_cluster_cpu, 0, 2)
         cards_grid.addWidget(self.panel.card_cluster_ram, 1, 0)
         cards_grid.addWidget(self.panel.card_cluster_disk, 1, 1)
+        cards_grid.addWidget(self.panel.card_cluster_quorum, 1, 2)
         self.panel.cluster_summary_cards.setVisible(False)
+
+        self.panel.cluster_quorum_widget = QWidget()
+        self.panel.cluster_quorum_widget.setVisible(False)
+        quorum_layout = QVBoxLayout(self.panel.cluster_quorum_widget)
+        quorum_layout.setContentsMargins(0, 0, 0, 0)
+        quorum_layout.setSpacing(0)
+        self.panel.cluster_quorum_label = QLabel("")
+        self.panel.cluster_quorum_label.setStyleSheet("font-size: 12px; padding: 4px 8px;")
+        quorum_layout.addWidget(self.panel.cluster_quorum_label)
+        self.panel.cluster_quorum_table = make_table(
+            [tr("Node"), tr("Online"), tr("Quorum votes"), tr("Ring 0 addr"), tr("Ring 1 addr")],
+            [(QHeaderView.Interactive, 120), (QHeaderView.Interactive, 60),
+             (QHeaderView.Interactive, 90), (QHeaderView.Stretch, None),
+             (QHeaderView.Stretch, None)],
+        )
+        quorum_layout.addWidget(self.panel.cluster_quorum_table)
 
         container = QWidget()
         cl = QVBoxLayout(container)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(8)
         cl.addWidget(self.panel.cluster_summary_cards)
+        cl.addWidget(self.panel.cluster_quorum_widget)
         cl.addWidget(self.panel.summary_stack, 1)
 
         scroll = QScrollArea()
@@ -623,8 +692,10 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.HEALTH, True)
         panel.tabs.setTabVisible(TabIndex.BACKUP_JOBS, True)
         panel.tabs.setTabVisible(TabIndex.ACCESS, True)
+        panel.tabs.setTabVisible(TabIndex.HA, True)
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, False)
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
+        panel._current_cluster_cfg = cluster_cfg
         self.populate_host_summary(hosts)
         self._populate_cluster_summary_cards(hosts)
         self._populate_cluster_vms(cluster_name, hosts)
@@ -633,9 +704,13 @@ class HostTabs:
         self._fetch_cluster_health(hosts)
         self._fetch_backup_jobs(cluster_cfg, cluster_name)
         self._fetch_access_all(cluster_cfg)
+        if cluster_cfg:
+            self.fetch_ha(cluster_cfg)
+            self._fetch_cluster_status(cluster_cfg)
 
     def show_host_info(self, host_name, host_data):
         panel = self.panel
+        panel.cluster_quorum_widget.setVisible(False)
         host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
         node = panel._nodes_by_pair.get((host_cfg_name, host_name))
         if node is None:
@@ -679,6 +754,7 @@ class HostTabs:
         panel.tabs.setTabVisible(TabIndex.HEALTH, True)
         panel.tabs.setTabVisible(TabIndex.BACKUP_JOBS, True)
         panel.tabs.setTabVisible(TabIndex.ACCESS, True)
+        panel.tabs.setTabVisible(TabIndex.HA, False)
         panel.tabs.setCurrentIndex(TabIndex.MONITOR)
 
         panel.host_network_stack.setCurrentIndex(0)
@@ -1055,9 +1131,11 @@ class HostTabs:
 
     def populate_host_network_table(self, interfaces):
         table = self.panel.host_network_table
+        table.setSortingEnabled(False)
         table.setRowCount(len(interfaces))
         for i, iface in enumerate(interfaces):
-            iface_item = QTableWidgetItem(iface.get("iface", ""))
+            iface_name = iface.get("iface", "")
+            iface_item = QTableWidgetItem(iface_name)
             iface_item.setIcon(get_icon("network"))
             table.setItem(i, 0, iface_item)
             table.setItem(i, 1, QTableWidgetItem(iface.get("type", "")))
@@ -1065,14 +1143,33 @@ class HostTabs:
             state_str = tr("on") if state == 1 else tr("off")
             table.setItem(i, 2, QTableWidgetItem(state_str))
             table.setItem(i, 3, QTableWidgetItem(iface.get("method", "")))
-            addresses = iface.get("address", "")
-            cidr = iface.get("cidr", "")
-            table.setItem(i, 4, QTableWidgetItem(f"{addresses}/{cidr}" if cidr else addresses))
+            address = iface.get("address", "")
+            netmask = iface.get("netmask", "")
+            if address and netmask:
+                addr_str = f"{address}/{netmask}"
+            elif address:
+                addr_str = address
+            else:
+                addr_str = ""
+            table.setItem(i, 4, QTableWidgetItem(addr_str))
+            table.setItem(i, 5, QTableWidgetItem(iface.get("gateway", "")))
+            table.setItem(i, 6, QTableWidgetItem(iface.get("bridge_ports", "")))
+            vlan = iface.get("vlan_id", "")
+            table.setItem(i, 7, QTableWidgetItem(str(vlan) if vlan else ""))
+            mtu = iface.get("mtu", "")
+            table.setItem(i, 8, QTableWidgetItem(str(mtu) if mtu else ""))
+            pending = iface.get("pending", 0)
+            pending_str = tr("Yes") if pending else ""
+            pending_item = QTableWidgetItem(pending_str)
+            if pending:
+                pending_item.setForeground(QColor(Color.STATUS_WARN))
+            table.setItem(i, 9, pending_item)
         table.resizeRowsToContents()
         for r in range(table.rowCount()):
             if table.rowHeight(r) > 24:
                 table.setRowHeight(r, 24)
         table.setSortingEnabled(True)
+        self._on_network_selection_changed()
 
     def fetch_host_services(self, host_name, host_data):
         panel = self.panel
@@ -1803,10 +1900,387 @@ class HostTabs:
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
-            panel.config_update_result.emit(tr("Job create failed: {err}").format(err=err)),
+            panel.config_update_result.emit(tr("HA error: {err}").format(err=err)),
             panel._workers_mgr.discard_worker(w),
         ))
         panel._workers_mgr.run_host_worker(worker)
+
+    # ------------------------------------------------------------------
+    # Cluster status (quorum, corosync)
+    # ------------------------------------------------------------------
+
+    def _fetch_cluster_status(self, cluster_cfg):
+        from ...backend import ClusterStatusWorker
+        worker = ClusterStatusWorker(cluster_cfg)
+        worker.signals.cluster_status_ready.connect(
+            lambda data, w=worker: (
+                self._on_cluster_status(data),
+                self.panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.cluster_status_error.connect(
+            lambda err, w=worker: (
+                self._on_cluster_status_error(err),
+                self.panel._workers_mgr.discard_worker(w),
+            )
+        )
+        self.panel._workers_mgr.run_host_worker(worker)
+
+    def _on_cluster_status(self, data):
+        panel = self.panel
+        status_list = data.get("status", [])
+        corosync_nodes = data.get("corosync_nodes", [])
+
+        quorum_state = "unknown"
+        quorum_votes = 0
+        expected_votes = 0
+        nodes_info = []
+
+        for item in status_list:
+            if isinstance(item, dict):
+                if item.get("type") == "cluster":
+                    quorum_state = "ok" if item.get("quorate", 0) else "lost"
+                    quorum_votes = item.get("votes", 0)
+                    expected_votes = item.get("expected_votes", 0)
+                elif item.get("type") == "node":
+                    nodes_info.append({
+                        "name": item.get("name", ""),
+                        "online": item.get("online", 0),
+                        "quorum_votes": item.get("quorum_votes", 0),
+                        "ip": item.get("ip", ""),
+                    })
+
+        corosync_map = {}
+        for cn in corosync_nodes:
+            if isinstance(cn, dict):
+                name = cn.get("name", "")
+                corosync_map[name] = {
+                    "ring0_addr": cn.get("ring0_addr", ""),
+                    "ring1_addr": cn.get("ring1_addr", ""),
+                    "quorum_votes": cn.get("quorum_votes", cn.get("votes", "")),
+                    "nodeid": cn.get("nodeid", ""),
+                }
+
+        if quorum_state == "ok":
+            color = Color.STATUS_OK
+            quorum_text = tr("Quorum: OK")
+        elif quorum_state == "lost":
+            color = Color.STATUS_ERR
+            quorum_text = tr("Quorum: LOST")
+        else:
+            color = Color.STATUS_WARN
+            quorum_text = tr("Quorum: unknown")
+
+        panel.card_cluster_quorum.set_value(
+            f"{quorum_votes}/{expected_votes}",
+            subtitle=quorum_text,
+        )
+        panel.cluster_quorum_label.setText(
+            f"<b>{quorum_text}</b> · {tr('Votes')}: {quorum_votes}/{expected_votes}"
+        )
+        panel.cluster_quorum_label.setStyleSheet(
+            f"font-size: 12px; padding: 4px 8px; color: {color};"
+        )
+
+        table = panel.cluster_quorum_table
+        table.setSortingEnabled(False)
+        table.setRowCount(len(nodes_info))
+        for i, ni in enumerate(nodes_info):
+            name = ni["name"]
+            table.setItem(i, 0, QTableWidgetItem(name))
+            online_str = tr("Yes") if ni["online"] else tr("No")
+            online_item = QTableWidgetItem(online_str)
+            if ni["online"]:
+                online_item.setForeground(QColor(Color.STATUS_OK))
+            else:
+                online_item.setForeground(QColor(Color.STATUS_ERR))
+            table.setItem(i, 1, online_item)
+            cs = corosync_map.get(name, {})
+            votes = cs.get("quorum_votes", ni.get("quorum_votes", ""))
+            table.setItem(i, 2, QTableWidgetItem(str(votes)))
+            table.setItem(i, 3, QTableWidgetItem(cs.get("ring0_addr", ni.get("ip", ""))))
+            table.setItem(i, 4, QTableWidgetItem(cs.get("ring1_addr", "")))
+        table.resizeRowsToContents()
+        table.setSortingEnabled(True)
+
+        panel.cluster_quorum_widget.setVisible(True)
+
+    def _on_cluster_status_error(self, err):
+        panel = self.panel
+        panel.cluster_quorum_label.setText(tr("Cluster status unavailable"))
+        panel.cluster_quorum_label.setStyleSheet(
+            f"font-size: 12px; padding: 4px 8px; color: {Color.STATUS_WARN};"
+        )
+        panel.cluster_quorum_table.setRowCount(0)
+        panel.cluster_quorum_widget.setVisible(True)
+
+    # ------------------------------------------------------------------
+    # Network CRUD
+    # ------------------------------------------------------------------
+
+    def _on_network_selection_changed(self):
+        panel = self.panel
+        has_sel = panel.host_network_table.currentRow() >= 0
+        panel.host_network_edit_btn.setEnabled(has_sel)
+        panel.host_network_delete_btn.setEnabled(has_sel)
+
+    def _get_network_cfg(self):
+        panel = self.panel
+        host_data = panel.current_obj_data
+        if not host_data:
+            return None, None
+        host_name = host_data.get("host_name", "") or host_data.get("node", "")
+        cfg = panel._cfg_by_name.get(host_name)
+        node_name = host_data.get("node", "") or host_name
+        return cfg, node_name
+
+    def _on_network_add(self):
+        panel = self.panel
+        cfg, node_name = self._get_network_cfg()
+        if not cfg:
+            return
+        params = self._network_edit_dialog(panel, node_name, is_create=True)
+        if params is None:
+            return
+        from ...backend import NetworkCreateWorker
+        worker = NetworkCreateWorker(cfg, node_name, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Network error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_network_edit(self):
+        panel = self.panel
+        cfg, node_name = self._get_network_cfg()
+        if not cfg:
+            return
+        table = panel.host_network_table
+        row = table.currentRow()
+        if row < 0:
+            return
+        iface_name = table.item(row, 0).text() if table.item(row, 0) else ""
+        if not iface_name:
+            return
+        iface_data = {}
+        for i, key in enumerate(["iface", "type", "state", "method", "address",
+                                 "gateway", "bridge_ports", "vlan", "mtu", "pending"]):
+            item = table.item(row, i)
+            if item:
+                iface_data[key] = item.text()
+        params = self._network_edit_dialog(panel, node_name, is_create=False, iface_data=iface_data)
+        if params is None:
+            return
+        from ...backend import NetworkUpdateWorker
+        worker = NetworkUpdateWorker(cfg, node_name, iface_name, params)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Network error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_network_delete(self):
+        panel = self.panel
+        cfg, node_name = self._get_network_cfg()
+        if not cfg:
+            return
+        table = panel.host_network_table
+        row = table.currentRow()
+        if row < 0:
+            return
+        iface_name = table.item(row, 0).text() if table.item(row, 0) else ""
+        if not iface_name:
+            return
+        ret = QMessageBox.question(
+            panel, tr("Delete interface"),
+            tr("Delete network interface {iface}?").format(iface=iface_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...backend import NetworkDeleteWorker
+        worker = NetworkDeleteWorker(cfg, node_name, iface_name)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Network error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_network_apply(self):
+        panel = self.panel
+        cfg, node_name = self._get_network_cfg()
+        if not cfg:
+            return
+        ret = QMessageBox.question(
+            panel, tr("Apply network changes"),
+            tr("Apply all pending network changes? This will reload network configuration on the node."),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...backend import NetworkApplyWorker
+        worker = NetworkApplyWorker(cfg, node_name)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Network error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_network_revert(self):
+        panel = self.panel
+        cfg, node_name = self._get_network_cfg()
+        if not cfg:
+            return
+        ret = QMessageBox.question(
+            panel, tr("Revert network changes"),
+            tr("Revert all pending network changes?"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...backend import NetworkRevertWorker
+        worker = NetworkRevertWorker(cfg, node_name)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("Network error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _network_edit_dialog(self, parent, node_name, is_create=True, iface_data=None):
+        dlg = QDialog(parent)
+        dlg.setWindowTitle(tr("Create interface") if is_create else tr("Edit interface"))
+        dlg.setMinimumWidth(420)
+        layout = QFormLayout(dlg)
+
+        iface_edit = QLineEdit(iface_data.get("iface", "") if iface_data else "")
+        iface_edit.setEnabled(is_create)
+        layout.addRow(tr("Interface name:"), iface_edit)
+
+        type_combo = QComboBox()
+        type_combo.addItem("eth", "eth")
+        type_combo.addItem("bridge", "bridge")
+        type_combo.addItem("bond", "bond")
+        type_combo.addItem("vlan", "vlan")
+        type_combo.addItem("OVSBridge", "OVSBridge")
+        type_combo.addItem("OVSPort", "OVSPort")
+        type_combo.addItem("OVSBond", "OVSBond")
+        if iface_data:
+            idx = type_combo.findData(iface_data.get("type", "eth"))
+            if idx >= 0:
+                type_combo.setCurrentIndex(idx)
+        layout.addRow(tr("Type:"), type_combo)
+
+        method_combo = QComboBox()
+        method_combo.addItem(tr("Static"), "static")
+        method_combo.addItem(tr("DHCP"), "dhcp")
+        method_combo.addItem(tr("Manual"), "manual")
+        if iface_data:
+            idx = method_combo.findData(iface_data.get("method", "manual"))
+            if idx >= 0:
+                method_combo.setCurrentIndex(idx)
+        layout.addRow(tr("Method:"), method_combo)
+
+        address_edit = QLineEdit(iface_data.get("address", "") if iface_data else "")
+        layout.addRow(tr("Address:"), address_edit)
+
+        netmask_edit = QLineEdit()
+        layout.addRow(tr("Netmask:"), netmask_edit)
+
+        gateway_edit = QLineEdit(iface_data.get("gateway", "") if iface_data else "")
+        layout.addRow(tr("Gateway:"), gateway_edit)
+
+        bridge_ports_edit = QLineEdit(iface_data.get("bridge_ports", "") if iface_data else "")
+        layout.addRow(tr("Bridge ports:"), bridge_ports_edit)
+
+        vlan_edit = QLineEdit(iface_data.get("vlan", "") if iface_data else "")
+        layout.addRow(tr("VLAN ID:"), vlan_edit)
+
+        mtu_edit = QLineEdit(iface_data.get("mtu", "") if iface_data else "")
+        layout.addRow(tr("MTU:"), mtu_edit)
+
+        comment_edit = QLineEdit()
+        layout.addRow(tr("Comment:"), comment_edit)
+
+        autostart_cb = QCheckBox(tr("Autostart"))
+        autostart_cb.setChecked(True)
+        layout.addRow(autostart_cb)
+
+        btns = QHBoxLayout()
+        ok_btn = QPushButton(tr("OK"))
+        cancel_btn = QPushButton(tr("Cancel"))
+        btns.addStretch()
+        btns.addWidget(ok_btn)
+        btns.addWidget(cancel_btn)
+        layout.addRow(btns)
+        cancel_btn.clicked.connect(dlg.reject)
+        ok_btn.clicked.connect(dlg.accept)
+        if is_create:
+            iface_edit.textChanged.connect(lambda t: ok_btn.setEnabled(bool(t.strip())))
+            ok_btn.setEnabled(False)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        params = {"type": type_combo.currentData()}
+        if is_create:
+            iface = iface_edit.text().strip()
+            if not iface:
+                return None
+            params["iface"] = iface
+        method = method_combo.currentData()
+        if method:
+            params["method"] = method
+        addr = address_edit.text().strip()
+        if addr:
+            params["address"] = addr
+        nm = netmask_edit.text().strip()
+        if nm:
+            params["netmask"] = nm
+        gw = gateway_edit.text().strip()
+        if gw:
+            params["gateway"] = gw
+        bp = bridge_ports_edit.text().strip()
+        if bp:
+            params["bridge_ports"] = bp
+        vlan = vlan_edit.text().strip()
+        if vlan:
+            params["vlan_id"] = vlan
+        mtu = mtu_edit.text().strip()
+        if mtu:
+            try:
+                params["mtu"] = int(mtu)
+            except ValueError:
+                pass
+        cmt = comment_edit.text().strip()
+        if cmt:
+            params["comments"] = cmt
+        if not autostart_cb.isChecked():
+            params["autostart"] = 0
+        return params
 
     def _on_edit_backup_job(self):
         panel = self.panel
@@ -2997,6 +3471,281 @@ class HostTabs:
         ))
         worker.signals.error.connect(lambda err, w=worker: (
             panel.config_update_result.emit(tr("Permission remove failed: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    # ------------------------------------------------------------------
+    # HA tab
+    # ------------------------------------------------------------------
+
+    def build_ha_tab(self):
+        panel = self.panel
+        loading = loading_label()
+
+        groups_table = make_table(
+            [tr("Group"), tr("Nodes"), tr("Restricted"), tr("No failback"), tr("Comment")],
+            [(QHeaderView.Interactive, 150), (QHeaderView.Stretch, None),
+             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 90),
+             (QHeaderView.Stretch, None)],
+        )
+        panel.ha_groups_table = groups_table
+
+        resources_table = make_table(
+            [tr("VM"), tr("Group"), tr("State"), tr("Max restart"), tr("Max relocate"),
+             tr("Comment")],
+            [(QHeaderView.Interactive, 120), (QHeaderView.Interactive, 150),
+             (QHeaderView.Interactive, 80), (QHeaderView.Interactive, 80),
+             (QHeaderView.Interactive, 80), (QHeaderView.Stretch, None)],
+        )
+        panel.ha_resources_table = resources_table
+
+        ha_add_btn = QPushButton(get_icon("add"), tr("Add VM to HA"))
+        ha_add_btn.setMinimumHeight(28)
+        ha_add_btn.clicked.connect(self._on_ha_add_resource)
+        ha_remove_btn = QPushButton(get_icon("remove"), tr("Remove from HA"))
+        ha_remove_btn.setMinimumHeight(28)
+        ha_remove_btn.clicked.connect(self._on_ha_remove_resource)
+        ha_refresh_btn = QPushButton(tr("Refresh"))
+        ha_refresh_btn.setMinimumHeight(28)
+        ha_refresh_btn.clicked.connect(self._on_ha_refresh)
+
+        toolbar = QWidget()
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(0, 0, 0, 0)
+        tb_layout.setSpacing(4)
+        tb_layout.addWidget(ha_add_btn)
+        tb_layout.addWidget(ha_remove_btn)
+        tb_layout.addStretch()
+        tb_layout.addWidget(ha_refresh_btn)
+        panel.ha_add_btn = ha_add_btn
+        panel.ha_remove_btn = ha_remove_btn
+
+        stack = QStackedWidget()
+        stack.addWidget(loading)
+        inner = QWidget()
+        inner_layout = QVBoxLayout(inner)
+        inner_layout.setContentsMargins(0, 0, 0, 0)
+        inner_layout.setSpacing(6)
+        inner_layout.addWidget(QLabel(tr("HA Groups")))
+        inner_layout.addWidget(groups_table)
+        inner_layout.addSpacing(8)
+        inner_layout.addWidget(QLabel(tr("HA Resources")))
+        inner_layout.addWidget(resources_table)
+        stack.addWidget(inner)
+        stack.setCurrentIndex(0)
+        panel.ha_loading = loading
+        panel.ha_stack = stack
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(toolbar)
+        layout.addWidget(stack)
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        tab.setWidget(container)
+        return tab
+
+    def fetch_ha(self, cfg):
+        from ...backend import HaResourcesWorker
+        worker = HaResourcesWorker(cfg)
+        worker.signals.ha_resources_ready.connect(
+            lambda data, w=worker: (
+                self._on_ha_resources(data),
+                self.panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.ha_resources_error.connect(
+            lambda err, w=worker: (
+                self._on_ha_error(err),
+                self.panel._workers_mgr.discard_worker(w),
+            )
+        )
+        self.panel._workers_mgr.run_host_worker(worker)
+
+    def _on_ha_resources(self, data):
+        panel = self.panel
+        panel.ha_stack.setCurrentIndex(1)
+
+        ha_groups = []
+        for _h, groups in panel.all_ha_groups.items():
+            for g in groups:
+                if isinstance(g, dict):
+                    ha_groups.append(g)
+        ha_groups.sort(key=lambda x: x.get("group", ""))
+        groups_table = panel.ha_groups_table
+        groups_table.setRowCount(len(ha_groups))
+        for i, g in enumerate(ha_groups):
+            groups_table.setItem(i, 0, QTableWidgetItem(g.get("group", "")))
+            groups_table.setItem(i, 1, QTableWidgetItem(g.get("nodes", "")))
+            restricted = tr("Yes") if g.get("restricted") else tr("No")
+            groups_table.setItem(i, 2, QTableWidgetItem(restricted))
+            nofailback = tr("Yes") if g.get("nofailback") else tr("No")
+            groups_table.setItem(i, 3, QTableWidgetItem(nofailback))
+            groups_table.setItem(i, 4, QTableWidgetItem(g.get("comment", "")))
+        groups_table.resizeRowsToContents()
+
+        resources_table = panel.ha_resources_table
+        resources_table.setRowCount(len(data))
+        for i, r in enumerate(data):
+            resources_table.setItem(i, 0, QTableWidgetItem(r.get("sid", "")))
+            resources_table.setItem(i, 1, QTableWidgetItem(r.get("group", "")))
+            resources_table.setItem(i, 2, QTableWidgetItem(r.get("state", "")))
+            resources_table.setItem(i, 3, QTableWidgetItem(str(r.get("max_restart", ""))))
+            resources_table.setItem(i, 4, QTableWidgetItem(str(r.get("max_relocate", ""))))
+            resources_table.setItem(i, 5, QTableWidgetItem(r.get("comment", "")))
+        resources_table.resizeRowsToContents()
+
+        panel.ha_remove_btn.setEnabled(len(data) > 0)
+
+    def _on_ha_error(self, err):
+        panel = self.panel
+        panel.ha_loading.setText(err)
+        panel.ha_stack.setCurrentIndex(0)
+
+    def _on_ha_refresh(self):
+        panel = self.panel
+        cluster_cfg = panel._current_cluster_cfg
+        if not cluster_cfg:
+            return
+        self.fetch_ha(cluster_cfg)
+
+    def _on_ha_add_resource(self):
+        panel = self.panel
+        cluster_cfg = panel._current_cluster_cfg
+        if not cluster_cfg:
+            return
+
+        ha_groups_raw = []
+        for _h, groups in panel.all_ha_groups.items():
+            for g in groups:
+                if isinstance(g, dict) and g.get("group"):
+                    ha_groups_raw.append(g["group"])
+                elif isinstance(g, str) and g:
+                    ha_groups_raw.append(g)
+        if not ha_groups_raw:
+            QMessageBox.information(panel, tr("HA"), tr("No HA groups available"))
+            return
+
+        vms = []
+        for vm in panel.all_vms:
+            host_name = vm.get("host_name", "")
+            if host_name:
+                cfg = panel._cfg_by_name.get(host_name)
+                if cfg and cfg.get("cluster"):
+                    vms.append(vm)
+        if not vms:
+            QMessageBox.information(panel, tr("HA"), tr("No VMs available"))
+            return
+
+        dlg = QDialog(panel)
+        dlg.setWindowTitle(tr("Add VM to HA"))
+        dlg.setMinimumWidth(400)
+        layout = QFormLayout(dlg)
+
+        vm_combo = QComboBox()
+        for vm in sorted(vms, key=lambda v: v.get("vmid", 0)):
+            vmid = vm.get("vmid", "?")
+            name = vm.get("name", "")
+            label = f"vm:{vmid}" if not name else f"{name} (vm:{vmid})"
+            vm_combo.addItem(label, f"vm:{vmid}")
+        layout.addRow(tr("VM:"), vm_combo)
+
+        group_combo = QComboBox()
+        for g in sorted(set(ha_groups_raw)):
+            group_combo.addItem(g, g)
+        layout.addRow(tr("HA group:"), group_combo)
+
+        state_combo = QComboBox()
+        state_combo.addItem(tr("Default"), "default")
+        state_combo.addItem(tr("Started"), "started")
+        state_combo.addItem(tr("Stopped"), "stopped")
+        state_combo.addItem(tr("Enabled"), "enabled")
+        state_combo.addItem(tr("Ignored"), "ignored")
+        layout.addRow(tr("State:"), state_combo)
+
+        max_restart_spin = QSpinBox()
+        max_restart_spin.setRange(0, 10)
+        max_restart_spin.setValue(1)
+        layout.addRow(tr("Max restart:"), max_restart_spin)
+
+        max_relocate_spin = QSpinBox()
+        max_relocate_spin.setRange(0, 10)
+        max_relocate_spin.setValue(1)
+        layout.addRow(tr("Max relocate:"), max_relocate_spin)
+
+        comment_edit = QLineEdit()
+        layout.addRow(tr("Comment:"), comment_edit)
+
+        btns = QHBoxLayout()
+        ok_btn = QPushButton(tr("Add"))
+        cancel_btn = QPushButton(tr("Cancel"))
+        btns.addStretch()
+        btns.addWidget(ok_btn)
+        btns.addWidget(cancel_btn)
+        layout.addRow(btns)
+        cancel_btn.clicked.connect(dlg.reject)
+        ok_btn.clicked.connect(dlg.accept)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        sid = vm_combo.currentData()
+        group = group_combo.currentData()
+        state = state_combo.currentData()
+        max_restart = max_restart_spin.value()
+        max_relocate = max_relocate_spin.value()
+        comment = comment_edit.text().strip()
+
+        from ...backend import HaResourceAddWorker
+        worker = HaResourceAddWorker(
+            cluster_cfg, sid, group, state=state,
+            max_restart=max_restart, max_relocate=max_relocate, comment=comment,
+        )
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_ha(cluster_cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("HA error: {err}").format(err=err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_host_worker(worker)
+
+    def _on_ha_remove_resource(self):
+        panel = self.panel
+        cluster_cfg = panel._current_cluster_cfg
+        if not cluster_cfg:
+            return
+        table = panel.ha_resources_table
+        row = table.currentRow()
+        if row < 0:
+            QMessageBox.information(panel, tr("HA"), tr("Select a resource to remove"))
+            return
+        sid_item = table.item(row, 0)
+        if not sid_item:
+            return
+        sid = sid_item.text()
+        if not sid:
+            return
+        ret = QMessageBox.question(
+            panel, tr("Remove from HA"),
+            tr("Remove {sid} from HA?").format(sid=sid),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...backend import HaResourceDeleteWorker
+        worker = HaResourceDeleteWorker(cluster_cfg, sid)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.fetch_ha(cluster_cfg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(tr("HA error: {err}").format(err=err)),
             panel._workers_mgr.discard_worker(w),
         ))
         panel._workers_mgr.run_host_worker(worker)

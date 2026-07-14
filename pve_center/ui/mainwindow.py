@@ -111,6 +111,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
         self.tree_panel.vm_clone_from_template_requested.connect(self._on_vm_clone_from_template)
         self.tree_panel.console_requested.connect(self._on_console_from_tree)
+        self.tree_panel.vm_ha_add_requested.connect(self._on_vm_ha_add)
+        self.tree_panel.vm_ha_remove_requested.connect(self._on_vm_ha_remove)
 
         self._notifications = NotificationManager(self)
 
@@ -353,7 +355,10 @@ class MainWindow(QMainWindow):
                      "vm_created", "vm_error", "vm_deleted",
                      "vm_migrated", "vm_cloned",
                      "token_ready", "token_error",
-                     "update_available"):
+                     "update_available",
+                     "ha_resources_ready", "ha_resources_error",
+                     "result", "error",
+                     "cluster_status_ready", "cluster_status_error"):
             sig = getattr(sigs, attr, None)
             if sig is None:
                 continue
@@ -828,6 +833,110 @@ class MainWindow(QMainWindow):
             ))
             self._run_worker(worker)
             self.status_label.setText(tr("Converting template {vmid} to VM...").format(vmid=vmid))
+
+    def _on_vm_ha_add(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        if not cfg.get("cluster"):
+            self._notifications.show(tr("HA is only available for cluster hosts"), error=True)
+            return
+        ha_groups_raw = self.all_ha_groups.get(host_name, [])
+        ha_group_names = []
+        for g in ha_groups_raw:
+            if isinstance(g, dict) and g.get("group"):
+                ha_group_names.append(g["group"])
+            elif isinstance(g, str) and g:
+                ha_group_names.append(g)
+        if not ha_group_names:
+            self._notifications.show(tr("No HA groups available"), error=True)
+            return
+        from PySide6.QtWidgets import (
+            QComboBox,
+            QDialog,
+            QFormLayout,
+            QHBoxLayout,
+            QPushButton,
+            QSpinBox,
+        )
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("Add VM {vmid} to HA").format(vmid=vmid))
+        dlg.setMinimumWidth(380)
+        layout = QFormLayout(dlg)
+        group_combo = QComboBox()
+        for g in sorted(set(ha_group_names)):
+            group_combo.addItem(g, g)
+        layout.addRow(tr("HA group:"), group_combo)
+        state_combo = QComboBox()
+        state_combo.addItem(tr("Default"), "default")
+        state_combo.addItem(tr("Started"), "started")
+        state_combo.addItem(tr("Stopped"), "stopped")
+        layout.addRow(tr("State:"), state_combo)
+        max_restart_spin = QSpinBox()
+        max_restart_spin.setRange(0, 10)
+        max_restart_spin.setValue(1)
+        layout.addRow(tr("Max restart:"), max_restart_spin)
+        max_relocate_spin = QSpinBox()
+        max_relocate_spin.setRange(0, 10)
+        max_relocate_spin.setValue(1)
+        layout.addRow(tr("Max relocate:"), max_relocate_spin)
+        btns = QHBoxLayout()
+        ok_btn = QPushButton(tr("Add"))
+        cancel_btn = QPushButton(tr("Cancel"))
+        btns.addStretch()
+        btns.addWidget(ok_btn)
+        btns.addWidget(cancel_btn)
+        layout.addRow(btns)
+        cancel_btn.clicked.connect(dlg.reject)
+        ok_btn.clicked.connect(dlg.accept)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        group = group_combo.currentData()
+        state = state_combo.currentData()
+        max_restart = max_restart_spin.value()
+        max_relocate = max_relocate_spin.value()
+        from ..backend import HaResourceAddWorker
+        worker = HaResourceAddWorker(
+            cfg, f"vm:{vmid}", group, state=state,
+            max_restart=max_restart, max_relocate=max_relocate,
+        )
+        worker.signals.result.connect(lambda m: (
+            self._notifications.show(m),
+            self.status_label.setText(m),
+        ))
+        worker.signals.error.connect(lambda e: (
+            self._notifications.show(tr("HA error: {}").format(e), error=True),
+            self.status_label.setText(tr("Error: {}").format(e)),
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Adding VM {vmid} to HA...").format(vmid=vmid))
+
+    def _on_vm_ha_remove(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        from PySide6.QtWidgets import QMessageBox
+        ret = QMessageBox.question(
+            self, tr("Remove from HA"),
+            tr("Remove VM {vmid} from HA?").format(vmid=vmid),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ..backend import HaResourceDeleteWorker
+        worker = HaResourceDeleteWorker(cfg, f"vm:{vmid}")
+        worker.signals.result.connect(lambda m: (
+            self._notifications.show(m),
+            self.status_label.setText(m),
+        ))
+        worker.signals.error.connect(lambda e: (
+            self._notifications.show(tr("HA error: {}").format(e), error=True),
+            self.status_label.setText(tr("Error: {}").format(e)),
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Removing VM {vmid} from HA...").format(vmid=vmid))
 
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":

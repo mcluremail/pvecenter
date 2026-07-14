@@ -512,7 +512,15 @@ class CreateVmDialog(QDialog):
                 self.iso_combo.addItem(display, volid)
 
     def _update_ha_combo(self, host_name):
-        groups = self._ha_groups.get(host_name, []) if host_name else []
+        groups_raw = self._ha_groups.get(host_name, []) if host_name else []
+        groups = []
+        for g in groups_raw:
+            if isinstance(g, dict):
+                gn = g.get("group", "")
+                if gn:
+                    groups.append(gn)
+            elif isinstance(g, str) and g:
+                groups.append(g)
         visible = bool(groups)
         self.ha_label.setVisible(visible)
         self.ha_combo.setVisible(visible)

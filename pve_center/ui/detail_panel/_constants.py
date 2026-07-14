@@ -40,6 +40,7 @@ class TabIndex(IntEnum):
     VM_BACKUP = 20
     BACKUP_JOBS = 21
     ACCESS = 22
+    HA = 23
 
 
 def _fmt_pveversion(val):

@@ -33,6 +33,8 @@ class DetailPanel(QWidget):
     navigate_requested = Signal(object)        # key_data tuple for tree navigation
     vm_clone_requested = Signal(str, str, int)  # (host_name, node, vmid)
     vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
+    vm_ha_add_requested = Signal(str, str, int)  # (host_name, node, vmid)
+    vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -59,6 +61,7 @@ class DetailPanel(QWidget):
         self._generation = 0
         self.all_pools = []
         self.all_ha_groups = []
+        self._current_cluster_cfg = None
 
         self._workers_mgr = WorkerManager()
         self._host_tabs = HostTabs(self)
@@ -222,6 +225,9 @@ class DetailPanel(QWidget):
         # 22: Access Management
         tabs.addTab(self._host_tabs.build_access_tab(), get_icon("user"), tr("Access"))
         tabs.setTabVisible(TabIndex.ACCESS, False)
+        # 23: HA
+        tabs.addTab(self._host_tabs.build_ha_tab(), get_icon("ha"), tr("HA"))
+        tabs.setTabVisible(TabIndex.HA, False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -281,7 +287,7 @@ class DetailPanel(QWidget):
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,
                         TabIndex.HEALTH, TabIndex.VM_SNAPSHOTS,
                         TabIndex.VM_BACKUP, TabIndex.BACKUP_JOBS,
-                        TabIndex.ACCESS):
+                        TabIndex.ACCESS, TabIndex.HA):
                 self.tabs.setTabVisible(idx, False)
 
             if obj_type == "cluster_folder":

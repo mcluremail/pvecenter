@@ -60,6 +60,8 @@ class TreePanel(QWidget):
     vm_clone_requested = Signal(str, str, int)
     vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
     vm_clone_from_template_requested = Signal(str, str)  # (host_name, node)
+    vm_ha_add_requested = Signal(str, str, int)  # (host_name, node, vmid)
+    vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
     console_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
@@ -225,6 +227,22 @@ class TreePanel(QWidget):
                             self.vm_convert_requested.emit(hn, nd, vid, "to_template")
                     )
                     menu.addAction(convert_act)
+            menu.addSeparator()
+            ha_add_act = QAction(tr("Add to HA"), self.tree)
+            ha_add_act.setIcon(get_icon("ha"))
+            ha_add_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid:
+                    self.vm_ha_add_requested.emit(hn, nd, vid)
+            )
+            ha_add_act.setEnabled(not is_template)
+            menu.addAction(ha_add_act)
+            ha_remove_act = QAction(tr("Remove from HA"), self.tree)
+            ha_remove_act.setIcon(get_icon("ha"))
+            ha_remove_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid:
+                    self.vm_ha_remove_requested.emit(hn, nd, vid)
+            )
+            menu.addAction(ha_remove_act)
             menu.addSeparator()
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
