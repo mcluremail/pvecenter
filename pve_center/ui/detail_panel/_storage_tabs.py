@@ -688,11 +688,12 @@ class StorageTabs:
 
     def on_storage_timeframe_changed(self, idx):
         panel = self.panel
-        if panel.current_obj_type == "storage":
-            storage_name = panel.current_obj_name
+        if panel.current_obj_type == "storage" and isinstance(panel.current_obj_id, StorageId):
+            sid = panel.current_obj_id
+            storage_name = sid.storage
+            host_name_filter = sid.host_name
             data = panel.current_obj_data or {}
             cluster = data.get("cluster")
-            host_name_filter = data.get("host_name")
             if cluster:
                 filtered = [s for s in panel.all_storages
                             if s.get("storage") == storage_name and s.get("cluster") == cluster]
@@ -852,10 +853,13 @@ class StorageTabs:
 
     def update_storage_cells(self):
         panel = self.panel
-        storage_name = panel.current_obj_name
+        if not isinstance(panel.current_obj_id, StorageId):
+            return
+        sid = panel.current_obj_id
+        storage_name = sid.storage
+        host_name_filter = sid.host_name
         data = panel.current_obj_data or {}
         cluster = data.get("cluster")
-        host_name_filter = data.get("host_name")
         if cluster:
             filtered = [s for s in panel.all_storages
                         if s.get("storage") == storage_name and s.get("cluster") == cluster]
@@ -1067,12 +1071,13 @@ class StorageTabs:
 
     def _reload_storage_content(self):
         panel = self.panel
-        if panel.current_obj_type != "storage":
+        if panel.current_obj_type != "storage" or not isinstance(panel.current_obj_id, StorageId):
             return
-        storage_name = panel.current_obj_name
+        sid = panel.current_obj_id
+        storage_name = sid.storage
+        host_name_filter = sid.host_name
         data = panel.current_obj_data or {}
         cluster = data.get("cluster")
-        host_name_filter = data.get("host_name")
         if cluster:
             filtered = [s for s in panel.all_storages
                         if s.get("storage") == storage_name and s.get("cluster") == cluster]

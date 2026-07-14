@@ -347,8 +347,11 @@ class DetailPanel(QWidget):
         elif self.current_obj_type == "vm":
             vm_data = self.current_obj_data
             if vm_data:
-                lookup_host = vm_data.get("host_name") or vm_data.get("node")
-                fresh = self._vms_by_key.get((lookup_host, vm_data.get("vmid")))
+                if isinstance(self.current_obj_id, VmId):
+                    fresh = self._vms_by_key.get((self.current_obj_id.host_name, self.current_obj_id.vmid))
+                else:
+                    lookup_host = vm_data.get("host_name") or vm_data.get("node")
+                    fresh = self._vms_by_key.get((lookup_host, vm_data.get("vmid")))
                 if fresh:
                     self.current_obj_data = fresh
                     self.hardware_widget.set_vm_status(fresh.get("status", ""))
