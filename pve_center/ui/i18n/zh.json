@@ -1013,5 +1013,9 @@
   "Lifecycle actions are not available for templates": "模板不可用生命周期操作",
   "Migration is not available for templates": "模板不可用迁移",
   "VM must be stopped before converting to template": "转换为模板前必须停止虚拟机",
-  "VM {vmid}: opening {ctype} console...": "虚拟机 {vmid}：正在打开 {ctype} 控制台..."
+  "VM {vmid}: opening {ctype} console...": "虚拟机 {vmid}：正在打开 {ctype} 控制台...",
+  "Update available": "有可用更新",
+  "A new version of PVE Center is available: v{version}": "PVE Center 新版本可用：v{version}",
+  "Download": "下载",
+  "Later": "稍后"
 }

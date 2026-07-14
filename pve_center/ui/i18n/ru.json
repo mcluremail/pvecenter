@@ -1002,5 +1002,9 @@
   "Lifecycle actions are not available for templates": "Действия жизненного цикла недоступны для шаблонов",
   "Migration is not available for templates": "Миграция недоступна для шаблонов",
   "VM must be stopped before converting to template": "ВМ должна быть остановлена перед конвертацией в шаблон",
-  "VM {vmid}: opening {ctype} console...": "ВМ {vmid}: открытие консоли {ctype}..."
+  "VM {vmid}: opening {ctype} console...": "ВМ {vmid}: открытие консоли {ctype}...",
+  "Update available": "Доступно обновление",
+  "A new version of PVE Center is available: v{version}": "Доступна новая версия PVE Center: v{version}",
+  "Download": "Скачать",
+  "Later": "Позже"
 }

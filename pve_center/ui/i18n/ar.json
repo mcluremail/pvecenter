@@ -1013,5 +1013,9 @@
   "Lifecycle actions are not available for templates": "إجراءات دورة الحياة غير متاحة للقوالب",
   "Migration is not available for templates": "الترحيل غير متاح للقوالب",
   "VM must be stopped before converting to template": "يجب إيقاف الجهاز الافتراضي قبل تحويله إلى قالب",
-  "VM {vmid}: opening {ctype} console...": "جهاز افتراضي {vmid}: فتح وحدة تحكم {ctype}..."
+  "VM {vmid}: opening {ctype} console...": "جهاز افتراضي {vmid}: فتح وحدة تحكم {ctype}...",
+  "Update available": "تحديث متاح",
+  "A new version of PVE Center is available: v{version}": "إصدار جديد من PVE Center متاح: v{version}",
+  "Download": "تنزيل",
+  "Later": "لاحقاً"
 }

@@ -1013,5 +1013,9 @@
   "Lifecycle actions are not available for templates": "Las acciones de ciclo de vida no están disponibles para plantillas",
   "Migration is not available for templates": "La migración no está disponible para plantillas",
   "VM must be stopped before converting to template": "La VM debe estar detenida antes de convertir a plantilla",
-  "VM {vmid}: opening {ctype} console...": "VM {vmid}: abriendo consola {ctype}..."
+  "VM {vmid}: opening {ctype} console...": "VM {vmid}: abriendo consola {ctype}...",
+  "Update available": "Actualización disponible",
+  "A new version of PVE Center is available: v{version}": "Hay una nueva versión de PVE Center disponible: v{version}",
+  "Download": "Descargar",
+  "Later": "Más tarde"
 }

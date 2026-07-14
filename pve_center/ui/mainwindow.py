@@ -268,6 +268,9 @@ class MainWindow(QMainWindow):
         self.refresh_timer.timeout.connect(self.soft_refresh)
         self.refresh_timer.start()
 
+        # Проверка обновлений через 3 секунды после старта
+        QTimer.singleShot(3000, self._check_version)
+
         # Детектор зависания главного потока
         self._last_heartbeat = time.time()
         self._heartbeat_timer = QTimer(self)
@@ -349,7 +352,8 @@ class MainWindow(QMainWindow):
                      "console_ready", "console_error",
                      "vm_created", "vm_error", "vm_deleted",
                      "vm_migrated", "vm_cloned",
-                     "token_ready", "token_error"):
+                     "token_ready", "token_error",
+                     "update_available"):
             sig = getattr(sigs, attr, None)
             if sig is None:
                 continue
@@ -371,6 +375,28 @@ class MainWindow(QMainWindow):
     def _on_about(self):
         from .about_dialog import AboutDialog
         AboutDialog(self).exec()
+
+    def _check_version(self):
+        from .. import __version__
+        from ..backend import VersionCheckWorker
+        worker = VersionCheckWorker(__version__)
+        worker.signals.update_available.connect(self._on_update_available)
+        self._run_worker(worker)
+
+    def _on_update_available(self, latest_version, release_url):
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setWindowTitle(tr("Update available"))
+        msg_box.setText(tr(
+            "A new version of PVE Center is available: v{version}"
+        ).format(version=latest_version))
+        download_btn = msg_box.addButton(tr("Download"), QMessageBox.AcceptRole)
+        msg_box.addButton(tr("Later"), QMessageBox.RejectRole)
+        msg_box.setDefaultButton(download_btn)
+        msg_box.exec()
+        if msg_box.clickedButton() == download_btn:
+            import webbrowser
+            webbrowser.open(release_url)
 
     def _on_export_config(self):
         path, _ = QFileDialog.getSaveFileName(
