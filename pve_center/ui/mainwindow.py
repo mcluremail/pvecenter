@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         )
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
+        self.detail_panel.navigate_requested.connect(self.tree_panel.find_and_select)
 
         self.tree_panel.add_server_requested_context.connect(self._on_add_server)
 

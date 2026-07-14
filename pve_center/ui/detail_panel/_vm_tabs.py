@@ -223,6 +223,7 @@ class VMTabs:
     def build_pool_tab(self):
         panel = self.panel
         panel.pool_widget = VmPoolWidget()
+        panel.pool_widget.navigate_requested.connect(panel.navigate_requested.emit)
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         tab.setWidget(panel.pool_widget)

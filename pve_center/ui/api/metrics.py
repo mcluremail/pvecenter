@@ -404,6 +404,8 @@ class HostSnapshotsWorker(QRunnable):
                             continue
                         snap["vmid"] = vmid
                         snap["vm_name"] = vm_name
+                        snap["host_name"] = vm.get("host_name", "")
+                        snap["node"] = vm.get("node", self.node_name)
                         snap["size"] = 0
                         vm_snaps.append(dict(snap))
                     for snap in vm_snaps:
@@ -519,7 +521,9 @@ class StorageDisksWorker(QRunnable):
                                         "vm_name": vm_name,
                                         "volid": f"{self.storage_name}:{volid}",
                                         "bus": key,
-                                        "size": size_bytes
+                                        "size": size_bytes,
+                                        "host_name": vm.get("host_name", ""),
+                                        "node": vm_node,
                                     })
                 except Exception:
                     pass

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -18,6 +18,8 @@ from .metric_card import MetricCard
 
 
 class VmPoolWidget(QWidget):
+    navigate_requested = Signal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._summary_cards: dict[str, MetricCard] = {}
@@ -56,6 +58,7 @@ class VmPoolWidget(QWidget):
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)
+        self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(summary_widget)
@@ -70,6 +73,14 @@ class VmPoolWidget(QWidget):
         for i, vm in enumerate(vms):
             name_item = QTableWidgetItem(str(vm.get("name", "")))
             name_item.setIcon(get_icon("vm", vm.get("status")))
+            host_name = vm.get("host_name", "")
+            node = vm.get("node", "")
+            vmid = vm.get("vmid")
+            if host_name and vmid is not None:
+                try:
+                    name_item.setData(Qt.UserRole, (host_name, int(vmid), node))
+                except (ValueError, TypeError):
+                    pass
             self.table.setItem(i, 0, name_item)
             self.table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
 
@@ -164,3 +175,11 @@ class VmPoolWidget(QWidget):
         if secs or not parts:
             parts.append(f"{secs}s")
         return " ".join(parts)
+
+    def _on_cell_double_clicked(self, row, _col):
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        key = item.data(Qt.UserRole)
+        if isinstance(key, tuple) and len(key) == 3:
+            self.navigate_requested.emit(key)

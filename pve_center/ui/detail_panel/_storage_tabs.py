@@ -123,6 +123,7 @@ class StorageTabs:
             ],
         }
         self.panel.storage_list = CardList(columns)
+        self.panel.storage_list.cardDoubleClicked.connect(self._on_storage_card_nav)
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         tab.setWidget(self.panel.storage_list)
@@ -222,6 +223,7 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_backups_table = table
+        table.cellDoubleClicked.connect(self._on_storage_table_nav)
         toolbar = StorageToolbar()
         panel.storage_backups_toolbar = toolbar
         stack = QStackedWidget()
@@ -254,6 +256,7 @@ class StorageTabs:
             sortable=True,
         )
         panel.storage_disks_table = table
+        table.cellDoubleClicked.connect(self._on_storage_table_nav)
         toolbar = StorageToolbar()
         panel.storage_disks_toolbar = toolbar
         stack = QStackedWidget()
@@ -348,6 +351,10 @@ class StorageTabs:
             used_gb = round(used / (1024**3), 1) if used else 0
             total_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
+            if cluster:
+                nav_key = ("storage", name, "cluster", cluster)
+            else:
+                nav_key = ("storage", name, "host", st.get("host_name", ""))
             card_items.append({
                 "name": name,
                 "type_text": st.get("type", ""),
@@ -356,8 +363,25 @@ class StorageTabs:
                 "used_text": f"{used_gb} GiB",
                 "total_text": f"{total_gb} GiB",
                 "usage_text": f"{pct}%",
+                "nav_key": nav_key,
             })
         self.panel.storage_list.set_items(card_items)
+
+    def _on_storage_card_nav(self, data):
+        nav_key = data.get("nav_key")
+        if nav_key:
+            self.panel.navigate_requested.emit(nav_key)
+
+    def _on_storage_table_nav(self, row, _col):
+        for tbl in (self.panel.storage_disks_table, self.panel.storage_backups_table):
+            item = tbl.item(row, 0)
+            if not item:
+                continue
+            for role in (Qt.UserRole, Qt.UserRole + 1):
+                key = item.data(role)
+                if isinstance(key, tuple) and len(key) == 3:
+                    self.panel.navigate_requested.emit(key)
+                    return
 
     def show_storage_folder(self):
         panel = self.panel
@@ -723,31 +747,31 @@ class StorageTabs:
         worker = StorageBackupWorker(cfg, node_name, storage_name)
         worker.signals.backups_ready.connect(
             lambda sn, data, w=worker: (
-                self.on_storage_backups(sn, data),
+                self.on_storage_backups(sn, data, host_name, node_name),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.backups_error.connect(
             lambda sn, err, w=worker: (
-                self.on_storage_backups(sn, []),
+                self.on_storage_backups(sn, [], host_name, node_name),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_worker(worker)
 
-    def on_storage_backups(self, storage_name, backups):
+    def on_storage_backups(self, storage_name, backups, host_name="", node=""):
         panel = self.panel
         if panel.current_obj_type != "storage" or panel.current_obj_name != storage_name:
             return
         if backups:
             panel.storage_backups_stack.setCurrentIndex(1)
-            self.populate_storage_backups_table(backups)
+            self.populate_storage_backups_table(backups, host_name, node)
         else:
             panel.storage_backups_stack.widget(0).setText(tr("No data"))
             panel.storage_backups_stack.setCurrentIndex(0)
             panel.storage_backups_table.setRowCount(0)
 
-    def populate_storage_backups_table(self, backups):
+    def populate_storage_backups_table(self, backups, host_name="", node=""):
         table = self.panel.storage_backups_table
         table.setRowCount(len(backups))
         for i, b in enumerate(backups):
@@ -756,6 +780,12 @@ class StorageTabs:
             volid = b.get("volid", "")
             if volid:
                 vm_item.setData(Qt.UserRole, volid)
+            vmid = b.get("vmid")
+            if host_name and vmid is not None:
+                try:
+                    vm_item.setData(Qt.UserRole + 1, (host_name, int(vmid), node))
+                except (ValueError, TypeError):
+                    pass
             table.setItem(i, 0, vm_item)
             table.setItem(i, 1, QTableWidgetItem(b.get("subtype") or b.get("type", "")))
             table.setItem(i, 2, QTableWidgetItem(b.get("format", "")))
@@ -807,6 +837,14 @@ class StorageTabs:
         for i, d in enumerate(disks):
             vmid_item = QTableWidgetItem(str(d.get("vmid", "")))
             vmid_item.setIcon(get_icon("disk"))
+            host_name = d.get("host_name", "")
+            node = d.get("node", "")
+            vmid = d.get("vmid")
+            if host_name and vmid is not None:
+                try:
+                    vmid_item.setData(Qt.UserRole, (host_name, int(vmid), node))
+                except (ValueError, TypeError):
+                    pass
             table.setItem(i, 0, vmid_item)
             table.setItem(i, 1, QTableWidgetItem(d.get("vm_name", "")))
             table.setItem(i, 2, QTableWidgetItem(d.get("volid", "")))

@@ -768,6 +768,19 @@ class TreePanel(QWidget):
             return vm_key
         return item.data(0, ITEM_KEY_ROLE)
 
+    def find_and_select(self, key_data):
+        """Find a tree item by key tuple, expand parents, scroll to it, and select it."""
+        item = self.find_item_by_key(key_data)
+        if not item:
+            return
+        parent = item.parent()
+        while parent:
+            parent.setExpanded(True)
+            parent = parent.parent()
+        self.tree.scrollToItem(item)
+        self.tree.setCurrentItem(item)
+        self._on_item_clicked(item, 0)
+
     def request_delete_current(self):
         """Trigger delete on currently selected item (for Del shortcut)."""
         item = self.tree.currentItem()

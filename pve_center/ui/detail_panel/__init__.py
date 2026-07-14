@@ -22,6 +22,7 @@ class DetailPanel(QWidget):
     transfer_progress = Signal(str, int)      # (key, percent)
     transfer_started = Signal(str, str)       # (key, description)
     transfer_finished = Signal(str, bool, str) # (key, success, message)
+    navigate_requested = Signal(object)        # key_data tuple for tree navigation
 
     def __init__(self, nodes_cfg):
         super().__init__()

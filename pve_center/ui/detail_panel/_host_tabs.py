@@ -66,6 +66,7 @@ class HostTabs:
             ],
         }
         self.panel.host_vm_list = CardList(columns)
+        self.panel.host_vm_list.cardDoubleClicked.connect(self._on_vm_card_nav)
         from ..widgets.metric_card import MetricCard
         self.panel.vm_stats_widget = QWidget()
         stats_grid = QGridLayout(self.panel.vm_stats_widget)
@@ -200,6 +201,7 @@ class HostTabs:
         self.panel.host_snapshots_loading = loading
         self.panel.host_snapshots_tree = tree
         self.panel.host_snapshots_stack = stack
+        tree.itemDoubleClicked.connect(self._on_snap_tree_nav)
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         container = QWidget()
@@ -262,6 +264,7 @@ class HostTabs:
             ],
         }
         self.panel.host_summary_list = CardList(host_columns, filterable=True)
+        self.panel.host_summary_list.cardDoubleClicked.connect(self._on_host_card_nav)
 
         compare_columns = {
             "key": "_key",
@@ -289,6 +292,7 @@ class HostTabs:
             ],
         }
         self.panel.node_compare_list = CardList(compare_columns, filterable=True)
+        self.panel.node_compare_list.cardDoubleClicked.connect(self._on_host_card_nav)
 
         cluster_columns = {
             "key": "name",
@@ -309,6 +313,7 @@ class HostTabs:
             ],
         }
         self.panel.cluster_summary_list = CardList(cluster_columns)
+        self.panel.cluster_summary_list.cardDoubleClicked.connect(self._on_cluster_card_nav)
 
         from PySide6.QtWidgets import QGridLayout, QScrollArea, QStackedWidget
         self.panel.summary_stack = QStackedWidget()
@@ -788,6 +793,8 @@ class HostTabs:
                 "ram_text": ram_str,
                 "disk_text": disk_str,
                 "uptime_text": uptime_str,
+                "host_name": host_cfg_name,
+                "node": vm.get("node", host_name),
             })
         panel.host_vm_list.set_items(card_items)
         self._populate_vm_stats(vms_of_host)
@@ -1230,6 +1237,7 @@ class HostTabs:
         panel = self.panel
         node_name = host_data.get("node", "")
         host_cfg_name = host_data.get("host_name", "")
+        panel._snap_nav_ctx = (host_cfg_name, node_name)
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_snapshots_stack.widget(0).setText(tr("No data"))
@@ -1267,6 +1275,8 @@ class HostTabs:
         from PySide6.QtWidgets import QTreeWidgetItem
         tree = self.panel.host_snapshots_tree
         tree.clear()
+        nav_ctx = getattr(self.panel, "_snap_nav_ctx", ("", ""))
+        host_name, node = nav_ctx
         vms_map = {}
         for snap in snapshots:
             vmid = snap.get("vmid", 0)
@@ -1292,6 +1302,11 @@ class HostTabs:
             first = vm_snaps[0]
             vm_label = f"{vmid} {first.get('vm_name', '')}"
             vm_item = QTreeWidgetItem([vm_label, "", "", "", "", ""])
+            if host_name and vmid:
+                try:
+                    vm_item.setData(0, Qt.UserRole, (host_name, int(vmid), node))
+                except (ValueError, TypeError):
+                    pass
             font = vm_item.font(0)
             font.setBold(True)
             vm_item.setFont(0, font)
@@ -1448,6 +1463,8 @@ class HostTabs:
                 "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
                 "disk_text": f"{disk_gb} GiB",
                 "uptime_text": _format_uptime(uptime) if uptime else "—",
+                "host_name": vm.get("host_name", ""),
+                "node": vm.get("node", ""),
             })
         panel.host_vm_list.set_items(card_items)
         self._populate_vm_stats(vms)
@@ -1483,8 +1500,36 @@ class HostTabs:
                 "used_text": f"{used_gb} GiB",
                 "total_text": f"{total_gb} GiB",
                 "usage_text": f"{pct}%",
+                "nav_key": ("storage", name, "cluster", cluster_name),
             })
         panel.storage_list.set_items(card_items)
+
+    def _on_vm_card_nav(self, data):
+        vmid = data.get("vmid")
+        host_name = data.get("host_name")
+        node = data.get("node", "")
+        if vmid is not None and host_name:
+            try:
+                self.panel.navigate_requested.emit((host_name, int(vmid), node))
+            except (ValueError, TypeError):
+                pass
+
+    def _on_host_card_nav(self, data):
+        key = data.get("_key", "")
+        node = data.get("node", "")
+        if "@" in key and node:
+            host_name = key.split("@", 1)[1]
+            self.panel.navigate_requested.emit(("host", node, host_name))
+
+    def _on_cluster_card_nav(self, data):
+        name = data.get("name", "")
+        if name:
+            self.panel.navigate_requested.emit(("cluster", name))
+
+    def _on_snap_tree_nav(self, item, _col):
+        key = item.data(0, Qt.UserRole)
+        if isinstance(key, tuple) and len(key) == 3:
+            self.panel.navigate_requested.emit(key)
 
     def _fetch_cluster_snapshots(self, hosts):
         panel = self.panel
@@ -1530,6 +1575,13 @@ class HostTabs:
             vm_label = f"{vmid} {vm_name}".strip()
             vm_item = QTreeWidgetItem(tree, [vm_label, "", "", "", "", ""])
             vm_item.setIcon(0, get_icon("snapshot"))
+            snap_host = snaps[0].get("host_name", "")
+            snap_node = snaps[0].get("node", "")
+            if snap_host and vmid:
+                try:
+                    vm_item.setData(0, Qt.UserRole, (snap_host, int(vmid), snap_node))
+                except (ValueError, TypeError):
+                    pass
             for snap in snaps:
                 name = snap.get("name", "")
                 desc = snap.get("description", "") or ""
