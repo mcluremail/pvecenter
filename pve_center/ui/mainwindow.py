@@ -296,6 +296,10 @@ class MainWindow(QMainWindow):
                 self.detail_panel.all_vms[:] = self.all_vms
                 self.detail_panel.all_storages[:] = self.all_storages
                 self.detail_panel._vms_by_key = self._vms_by_key
+                self.detail_panel._nodes_by_pair = {
+                    (n.get("host_name", ""), n.get("node", "")): n
+                    for n in self.all_nodes
+                }
                 self.tree_panel.update_node_statuses(self.all_nodes, self.all_vms)
                 self._offline_mode = True
                 self._offline_ts = cached_ts
@@ -1053,6 +1057,10 @@ class MainWindow(QMainWindow):
                     self.detail_panel.all_vms[:] = self._soft_vms
                     self.detail_panel.all_storages[:] = self._soft_storages
                     self.detail_panel._vms_by_key = self._vms_by_key
+                    self.detail_panel._nodes_by_pair = {
+                        (n.get("host_name", ""), n.get("node", "")): n
+                        for n in self._soft_nodes
+                    }
                     self.detail_panel.refresh_current_view()
                     # Пробрасываем уже собранные на hard refresh пулы/HA —
                     # soft refresh не имеет ProxmoxAPI, пересобрать не может

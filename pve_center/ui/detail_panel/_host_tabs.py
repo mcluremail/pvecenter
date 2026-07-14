@@ -636,9 +636,7 @@ class HostTabs:
     def show_host_info(self, host_name, host_data):
         panel = self.panel
         host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
-        node = next((n for n in panel.all_nodes
-                     if n.get("node") == host_name
-                     and n.get("host_name") == host_cfg_name), None)
+        node = panel._nodes_by_pair.get((host_cfg_name, host_name))
         if node is None:
             node = host_data if host_data else None
         display_name = node.get("_display_name") if node else host_name

@@ -32,6 +32,7 @@ class DetailPanel(QWidget):
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
+        self._nodes_by_pair = {}
         self.details_cache = {}
         self.config_cache = {}
         self.metrics_cache = {}
@@ -208,6 +209,7 @@ class DetailPanel(QWidget):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
         self._vms_by_key = build_vm_index(all_vms)
+        self._nodes_by_pair = {(n.get("host_name", ""), n.get("node", "")): n for n in all_nodes}
         self.all_storages = all_storages or []
         self.details_cache.clear()
         self.config_cache.clear()
@@ -310,9 +312,7 @@ class DetailPanel(QWidget):
             self._host_tabs.update_cluster_summary_cells(hosts)
         elif self.current_obj_type == "host":
             host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
-            host_data = next((n for n in self.all_nodes
-                              if n.get("node") == self.current_obj_name
-                              and n.get("host_name") == host_cfg_name), None)
+            host_data = self._nodes_by_pair.get((host_cfg_name, self.current_obj_name))
             if host_data is None and self.current_obj_data:
                 host_data = self.current_obj_data
             if host_data:
@@ -353,9 +353,7 @@ class DetailPanel(QWidget):
     def _on_timeframe_changed(self, new_timeframe):
         if self.current_obj_type == "host":
             host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
-            host_data = next((n for n in self.all_nodes
-                              if n.get("node") == self.current_obj_name
-                              and n.get("host_name") == host_cfg_name), None)
+            host_data = self._nodes_by_pair.get((host_cfg_name, self.current_obj_name))
             if host_data is None and self.current_obj_data:
                 host_data = self.current_obj_data
             if host_data:
