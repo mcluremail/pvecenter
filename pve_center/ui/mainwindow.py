@@ -321,6 +321,14 @@ class MainWindow(QMainWindow):
 
     def _run_worker(self, worker):
         if len(self._workers) >= MAX_WORKERS:
+            try:
+                worker.signals.deleteLater()
+            except Exception:
+                pass
+            self._notifications.show(
+                tr("Too many concurrent operations. Please wait and try again."),
+                error=True,
+            )
             return
         self._workers.add(worker)
         if hasattr(worker.signals, "finished"):
@@ -455,6 +463,7 @@ class MainWindow(QMainWindow):
         vm = self._vms_by_key.get((host_name, vmid))
         vm_name = vm.get("name") if vm else f"VM {vmid}"
         vm_status = vm.get("status", "") if vm else ""
+        vm_type = vm.get("type", "qemu") if vm else "qemu"
         is_running = vm_status == "running"
 
         # Найти конфиг хоста
@@ -532,7 +541,7 @@ class MainWindow(QMainWindow):
         if not confirmed[0]:
             return
 
-        worker = DeleteVmWorker(cfg, node, vmid)
+        worker = DeleteVmWorker(cfg, node, vmid, vm_type)
         worker.signals.vm_deleted.connect(lambda msg, w=worker: (
             self._notifications.show(msg),
             self.status_label.setText(msg),
@@ -576,6 +585,9 @@ class MainWindow(QMainWindow):
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
         vm = self._vms_by_key.get((host_name, vmid))
+        if vm and vm.get("template"):
+            self._notifications.show(tr("Lifecycle actions are not available for templates"), error=True)
+            return
         vm_type = (vm.get("type", "qemu") if vm else "qemu")
         if not confirm_vm_action(action, vmid, parent=self):
             return
@@ -622,6 +634,9 @@ class MainWindow(QMainWindow):
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
         vm = self._vms_by_key.get((host_name, vmid))
+        if vm and vm.get("template"):
+            self._notifications.show(tr("Migration is not available for templates"), error=True)
+            return
         vm_info = {
             "name": vm.get("name", "") if vm else "",
             "vmid": vmid,
@@ -718,8 +733,11 @@ class MainWindow(QMainWindow):
         form = QFormLayout()
         tmpl_combo = QComboBox()
         for vm in sorted(templates, key=lambda v: v.get("vmid", 0)):
-            label = f"{vm.get('name', 'VM ' + str(vm.get('vmid', '')))} ({vm.get('vmid')})"
-            tmpl_combo.addItem(label, vm.get("vmid"))
+            name = vm.get("name") or f"VM {vm.get('vmid', '?')}"
+            vmid = vm.get("vmid")
+            node_name = vm.get("node", node)
+            label = f"{name} ({vmid}) [{node_name}]"
+            tmpl_combo.addItem(label, vmid)
         form.addRow(QLabel(tr("Template:")), tmpl_combo)
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -738,7 +756,12 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
+        vm = self._vms_by_key.get((host_name, vmid))
         if direction == "to_template":
+            if vm and vm.get("status") == "running":
+                self._notifications.show(
+                    tr("VM must be stopped before converting to template"), error=True)
+                return
             from PySide6.QtWidgets import QMessageBox
             msg = QMessageBox(QMessageBox.Question, tr("Confirm"),
                              tr("Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.")

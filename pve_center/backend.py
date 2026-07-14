@@ -1280,7 +1280,7 @@ class VmConsoleSignals(QObject):
 
 
 class VmConsoleWorker(QRunnable):
-    """Запрашивает SPICE proxy у PVE, пишет .vv файл и запускает remote-viewer."""
+    """Запрашивает SPICE/VNC proxy у PVE, пишет .vv файл и запускает remote-viewer."""
     def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
         super().__init__()
         self.host_cfg = host_cfg
@@ -1299,19 +1299,22 @@ class VmConsoleWorker(QRunnable):
         try:
             try:
                 proxmox = _make_proxmox(self.host_cfg, timeout=10)
-                endpoint = (proxmox.nodes(_q(self.node_name)).lxc if self.vm_type == "lxc"
-                            else proxmox.nodes(_q(self.node_name)).qemu)
-                config = endpoint(self.vmid).spiceproxy.post(
-                    proxy=self.host_cfg["host"]
-                )
+                if self.vm_type == "lxc":
+                    config = proxmox.nodes(_q(self.node_name)).lxc(self.vmid).vncproxy.post(
+                        proxy=self.host_cfg["host"]
+                    )
+                else:
+                    config = proxmox.nodes(_q(self.node_name)).qemu(self.vmid).spiceproxy.post(
+                        proxy=self.host_cfg["host"]
+                    )
             except Exception as e:
                 msg = str(e).lower()
                 if "permission check failed" in msg or "403" in msg:
-                    err = tr("PVE permission denied for SPICE (requires VM.Console)")
-                elif "not supported" in msg or "spice" in msg:
-                    err = tr("SPICE not supported for this VM")
+                    err = tr("PVE permission denied for console (requires VM.Console)")
+                elif "not supported" in msg or "spice" in msg or "vnc" in msg:
+                    err = tr("Console not supported for this VM")
                 else:
-                    err = tr("SPICE proxy error: {}").format(e)
+                    err = tr("Console proxy error: {}").format(e)
                 try:
                     self.signals.console_error.emit(err)
                 except RuntimeError:
@@ -1322,22 +1325,37 @@ class VmConsoleWorker(QRunnable):
                 proxmox = None
 
             try:
-                lines = ["[virt-viewer]"]
-                host_raw = config.get("host", "")
-                if host_raw:
-                    lines.append(f"host={host_raw}")
-                for key in ("password", "proxy", "secure-attention",
-                            "tls-port", "type", "delete-this-file",
-                            "host-subject", "toggle-fullscreen", "release-cursor"):
-                    val = config.get(key)
-                    if val is not None:
-                        lines.append(f"{key}={val}")
-                title = config.get("title")
-                if title:
-                    lines.append(f"title={title}")
-                ca = config.get("ca", "")
-                if ca:
-                    lines.append("ca=" + ca.replace("\n", "\\n"))
+                if self.vm_type == "lxc":
+                    lines = ["[virt-viewer]", "type=vnc"]
+                    port = config.get("port")
+                    if port:
+                        lines.append(f"port={port}")
+                    host_raw = config.get("host") or self.host_cfg.get("host", "")
+                    if host_raw:
+                        lines.append(f"host={host_raw}")
+                    ticket = config.get("ticket")
+                    if ticket:
+                        lines.append(f"password={ticket}")
+                    delete_file = config.get("delete-this-file")
+                    if delete_file is not None:
+                        lines.append(f"delete-this-file={delete_file}")
+                else:
+                    lines = ["[virt-viewer]"]
+                    host_raw = config.get("host", "")
+                    if host_raw:
+                        lines.append(f"host={host_raw}")
+                    for key in ("password", "proxy", "secure-attention",
+                                "tls-port", "type", "delete-this-file",
+                                "host-subject", "toggle-fullscreen", "release-cursor"):
+                        val = config.get(key)
+                        if val is not None:
+                            lines.append(f"{key}={val}")
+                    title = config.get("title")
+                    if title:
+                        lines.append(f"title={title}")
+                    ca = config.get("ca", "")
+                    if ca:
+                        lines.append("ca=" + ca.replace("\n", "\\n"))
 
                 fd, vv_path = tempfile.mkstemp(suffix=".vv", prefix="pve_")
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -1532,20 +1550,23 @@ class DeleteVmSignals(QObject):
 
 
 class DeleteVmWorker(QRunnable):
-    """Удаляет QEMU VM через DELETE /nodes/{node}/qemu/{vmid}."""
-    def __init__(self, host_cfg, node_name, vmid):
+    """Удаляет QEMU VM или LXC контейнер через DELETE /nodes/{node}/{qemu|lxc}/{vmid}."""
+    def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
         super().__init__()
         self.host_cfg = host_cfg
         self.node_name = node_name
         self.vmid = vmid
+        self.vm_type = vm_type
         self.signals = DeleteVmSignals()
 
     def run(self):
         proxmox = None
         try:
             proxmox = _make_proxmox(self.host_cfg, timeout=30)
-
-            proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).delete(purge=1)
+            if self.vm_type == "lxc":
+                proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).delete(purge=1)
+            else:
+                proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).delete(purge=1)
             msg = tr("VM {vmid} deleted from {node}").format(vmid=self.vmid, node=self.node_name)
             try:
                 self.signals.vm_deleted.emit(msg)

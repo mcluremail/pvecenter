@@ -54,14 +54,13 @@ VM_EXTRA_ACTION_TOOLTIPS = {
     "convert_vm": tr("Convert this template back to a VM"),
 }
 
-_CONFIRM_ACTIONS = ("stop", "reset", "shutdown", "reboot", "suspend")
+_CONFIRM_ACTIONS = ("stop", "reset", "shutdown", "reboot")
 
 _CONFIRM_MESSAGES = {
     "stop": "Force stop VM {vmid}? Unsaved data will be lost.",
     "reset": "Force reset VM {vmid}?",
     "shutdown": "Send ACPI shutdown to VM {vmid}?",
     "reboot": "Send ACPI reboot to VM {vmid}?",
-    "suspend": "Suspend VM {vmid}?",
 }
 
 

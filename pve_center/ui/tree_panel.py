@@ -59,7 +59,7 @@ class TreePanel(QWidget):
     vm_migrate_requested = Signal(str, str, int)
     vm_clone_requested = Signal(str, str, int)
     vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
-    vm_clone_from_template_requested = Signal(str, str)  # (node, host_name)
+    vm_clone_from_template_requested = Signal(str, str)  # (host_name, node)
     console_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
@@ -266,7 +266,7 @@ class TreePanel(QWidget):
                     clone_from_tmpl.setIcon(get_icon("template"))
                     clone_from_tmpl.triggered.connect(
                         lambda checked, nn=item_name, hn=host_name:
-                            self.vm_clone_from_template_requested.emit(nn, hn)
+                            self.vm_clone_from_template_requested.emit(hn, nn)
                     )
                     menu.addAction(clone_from_tmpl)
                 menu.addSeparator()
@@ -714,7 +714,10 @@ class TreePanel(QWidget):
                 host_name, vmid, _node = vm_key
                 vm = vms_by_key.get((host_name, vmid))
                 if vm:
-                    item.setIcon(0, get_icon("vm", vm.get("status")))
+                    if vm.get("template"):
+                        item.setIcon(0, get_icon("template"))
+                    else:
+                        item.setIcon(0, get_icon("vm", vm.get("status")))
             else:
                 key = item.data(0, ITEM_KEY_ROLE)
                 if key and isinstance(key, tuple) and key[0] == "host":
