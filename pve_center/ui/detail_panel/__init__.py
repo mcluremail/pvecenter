@@ -7,7 +7,14 @@ from ..i18n import tr
 from ..icons import get_icon
 from ..object_id import HostId, StorageId, VmId
 from ..utils import build_cfg_index, build_vm_index
-from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
+from ..vm_actions import (
+    VM_ACTION_BUTTON_LABELS,
+    VM_ACTION_ICONS,
+    VM_ACTION_TOOLTIPS,
+    VM_EXTRA_ACTION_ICONS,
+    VM_EXTRA_ACTION_LABELS,
+    VM_EXTRA_ACTION_TOOLTIPS,
+)
 from ._constants import TabIndex
 from ._host_tabs import HostTabs
 from ._storage_tabs import StorageTabs
@@ -24,6 +31,8 @@ class DetailPanel(QWidget):
     transfer_started = Signal(str, str)       # (key, description)
     transfer_finished = Signal(str, bool, str) # (key, success, message)
     navigate_requested = Signal(object)        # key_data tuple for tree navigation
+    vm_clone_requested = Signal(str, str, int)  # (host_name, node, vmid)
+    vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -91,6 +100,16 @@ class DetailPanel(QWidget):
         self._console_btn.setToolTip(tr("Open SPICE/VNC console"))
         self._console_btn.clicked.connect(self._on_vm_console)
         action_layout.addWidget(self._console_btn)
+
+        self._extra_action_buttons = {}
+        for action_key, label in VM_EXTRA_ACTION_LABELS.items():
+            btn = QPushButton(get_icon(VM_EXTRA_ACTION_ICONS[action_key]), label)
+            btn.setMinimumHeight(30)
+            btn.setToolTip(VM_EXTRA_ACTION_TOOLTIPS[action_key])
+            btn.clicked.connect(lambda checked, a=action_key: self._on_vm_extra_action(a))
+            btn.setVisible(False)
+            action_layout.addWidget(btn)
+            self._extra_action_buttons[action_key] = btn
 
         self.tabs = QTabWidget()
         self._build_tabs()
@@ -368,8 +387,34 @@ class DetailPanel(QWidget):
     def _on_vm_action(self, action):
         self._vm_tabs.on_vm_action(action)
 
+    def _on_vm_extra_action(self, action):
+        vm_data = self._last_vm_data
+        if not vm_data:
+            return
+        host_name = vm_data.get("host_name") or vm_data.get("node")
+        node = vm_data.get("node") or host_name
+        vmid = vm_data.get("vmid")
+        if action == "clone":
+            self.vm_clone_requested.emit(host_name, node, vmid)
+        elif action == "convert_template":
+            self.vm_convert_requested.emit(host_name, node, vmid, "to_template")
+        elif action == "convert_vm":
+            self.vm_convert_requested.emit(host_name, node, vmid, "to_vm")
+
     def _update_action_buttons(self, vm_data=None):
         self._vm_tabs.update_action_buttons(vm_data)
+        is_template = bool(vm_data and vm_data.get("template"))
+        is_qemu = vm_data and vm_data.get("type", "qemu") == "qemu"
+        is_running = vm_data and vm_data.get("status") == "running"
+        clone_btn = self._extra_action_buttons.get("clone")
+        if clone_btn:
+            clone_btn.setVisible(bool(vm_data))
+        tmpl_btn = self._extra_action_buttons.get("convert_template")
+        if tmpl_btn:
+            tmpl_btn.setVisible(bool(vm_data) and not is_template and is_qemu and not is_running)
+        vm_btn = self._extra_action_buttons.get("convert_vm")
+        if vm_btn:
+            vm_btn.setVisible(bool(vm_data) and is_template and is_qemu)
 
     def _on_vm_console(self):
         self._vm_tabs.on_vm_console()

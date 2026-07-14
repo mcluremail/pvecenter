@@ -95,6 +95,8 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.item_selected.connect(self.detail_panel.show_details)
         self.detail_panel.navigate_requested.connect(self.tree_panel.find_and_select)
+        self.detail_panel.vm_clone_requested.connect(self._on_vm_clone)
+        self.detail_panel.vm_convert_requested.connect(self._on_vm_convert)
 
         self.tree_panel.add_server_requested_context.connect(self._on_add_server)
 
@@ -106,6 +108,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
         self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
         self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
+        self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
+        self.tree_panel.vm_clone_from_template_requested.connect(self._on_vm_clone_from_template)
         self.tree_panel.console_requested.connect(self._on_console_from_tree)
 
         self._notifications = NotificationManager(self)
@@ -689,6 +693,92 @@ class MainWindow(QMainWindow):
         ))
         self._run_worker(worker)
         self.status_label.setText(tr("Cloning VM {vmid}...").format(vmid=vmid))
+
+    def _on_vm_clone_from_template(self, node, host_name):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        templates = [vm for vm in self.all_vms
+                     if vm.get("template") and vm.get("host_name") == host_name]
+        if not templates:
+            return
+        from PySide6.QtWidgets import (
+            QComboBox,
+            QDialog,
+            QDialogButtonBox,
+            QFormLayout,
+            QLabel,
+            QVBoxLayout,
+        )
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("Clone from Template"))
+        dlg.setMinimumWidth(350)
+        layout = QVBoxLayout(dlg)
+        form = QFormLayout()
+        tmpl_combo = QComboBox()
+        for vm in sorted(templates, key=lambda v: v.get("vmid", 0)):
+            label = f"{vm.get('name', 'VM ' + str(vm.get('vmid', '')))} ({vm.get('vmid')})"
+            tmpl_combo.addItem(label, vm.get("vmid"))
+        form.addRow(QLabel(tr("Template:")), tmpl_combo)
+        layout.addLayout(form)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        vmid = tmpl_combo.currentData()
+        if not vmid:
+            return
+        self._on_vm_clone(host_name, node, vmid)
+
+    def _on_vm_convert(self, host_name, node, vmid, direction):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        if direction == "to_template":
+            from PySide6.QtWidgets import QMessageBox
+            msg = QMessageBox(QMessageBox.Question, tr("Confirm"),
+                             tr("Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.")
+                             .format(vmid=vmid),
+                             QMessageBox.Yes | QMessageBox.No, parent=self)
+            if msg.exec() != QMessageBox.Yes:
+                return
+            from ..backend import ConvertToTemplateWorker
+            worker = ConvertToTemplateWorker(cfg, node, vmid)
+            worker.signals.result.connect(lambda m: (
+                self._notifications.show(m),
+                self.status_label.setText(m),
+                QTimer.singleShot(2000, self.refresh_data)
+            ))
+            worker.signals.error.connect(lambda e: (
+                self._notifications.show(tr("Convert error: {}").format(e), error=True),
+                self.status_label.setText(tr("Error: {}").format(e))
+            ))
+            self._run_worker(worker)
+            self.status_label.setText(tr("Converting VM {vmid} to template...").format(vmid=vmid))
+        elif direction == "to_vm":
+            from PySide6.QtWidgets import QMessageBox
+            msg = QMessageBox(QMessageBox.Question, tr("Confirm"),
+                             tr("Convert template {vmid} to VM?").format(vmid=vmid),
+                             QMessageBox.Yes | QMessageBox.No, parent=self)
+            if msg.exec() != QMessageBox.Yes:
+                return
+            from ..backend import ConvertToVmWorker
+            worker = ConvertToVmWorker(cfg, node, vmid)
+            worker.signals.result.connect(lambda m: (
+                self._notifications.show(m),
+                self.status_label.setText(m),
+                QTimer.singleShot(2000, self.refresh_data)
+            ))
+            worker.signals.error.connect(lambda e: (
+                self._notifications.show(tr("Convert error: {}").format(e), error=True),
+                self.status_label.setText(tr("Error: {}").format(e))
+            ))
+            self._run_worker(worker)
+            self.status_label.setText(tr("Converting template {vmid} to VM...").format(vmid=vmid))
 
     def _on_host_remove(self, item_type, item_name):
         if item_type == "host":

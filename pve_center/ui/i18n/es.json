@@ -995,5 +995,19 @@
   "yes": "sí",
   "{count} package updates available": "Actualizaciones de paquetes disponibles: {count}",
   "— none —": "— ninguno —",
-  "❌ {} is unavailable": "❌ {} no está disponible"
+  "❌ {} is unavailable": "❌ {} no está disponible",
+  "Convert to Template": "Convertir en plantilla",
+  "Convert to VM": "Convertir en VM",
+  "Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.": "¿Convertir VM {vmid} en plantilla? La VM debe estar detenida. Esta acción es reversible.",
+  "Convert template {vmid} to VM?": "¿Convertir plantilla {vmid} en VM?",
+  "Convert error: {}": "Error de conversión: {}",
+  "Converting VM {vmid} to template...": "Convirtiendo VM {vmid} en plantilla...",
+  "Converting template {vmid} to VM...": "Convirtiendo plantilla {vmid} en VM...",
+  "VM {vmid} converted to template": "VM {vmid} convertida en plantilla",
+  "Template {vmid} converted to VM": "Plantilla {vmid} convertida en VM",
+  "Clone this VM": "Clonar esta VM",
+  "Convert this VM to a template (VM must be stopped)": "Convertir esta VM en plantilla (la VM debe estar detenida)",
+  "Convert this template back to a VM": "Convertir esta plantilla de nuevo en VM",
+  "Clone from Template": "Clonar desde plantilla",
+  "Template:": "Plantilla:"
 }

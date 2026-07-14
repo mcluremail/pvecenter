@@ -995,5 +995,19 @@
   "yes": "是",
   "{count} package updates available": "有 {count} 个软件包更新可用",
   "— none —": "— 无 —",
-  "❌ {} is unavailable": "❌ {} 不可用"
+  "❌ {} is unavailable": "❌ {} 不可用",
+  "Convert to Template": "转换为模板",
+  "Convert to VM": "转换为虚拟机",
+  "Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.": "将虚拟机 {vmid} 转换为模板？虚拟机必须已停止。此操作可撤销。",
+  "Convert template {vmid} to VM?": "将模板 {vmid} 转换为虚拟机？",
+  "Convert error: {}": "转换错误：{}",
+  "Converting VM {vmid} to template...": "正在将虚拟机 {vmid} 转换为模板...",
+  "Converting template {vmid} to VM...": "正在将模板 {vmid} 转换为虚拟机...",
+  "VM {vmid} converted to template": "虚拟机 {vmid} 已转换为模板",
+  "Template {vmid} converted to VM": "模板 {vmid} 已转换为虚拟机",
+  "Clone this VM": "克隆此虚拟机",
+  "Convert this VM to a template (VM must be stopped)": "将此虚拟机转换为模板（虚拟机必须已停止）",
+  "Convert this template back to a VM": "将此模板转换回虚拟机",
+  "Clone from Template": "从模板克隆",
+  "Template:": "模板："
 }

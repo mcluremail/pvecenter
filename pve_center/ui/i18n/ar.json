@@ -995,5 +995,19 @@
   "yes": "نعم",
   "{count} package updates available": "تحديثات الحزم المتاحة: {count}",
   "— none —": "— لا شيء —",
-  "❌ {} is unavailable": "❌ {} غير متاح"
+  "❌ {} is unavailable": "❌ {} غير متاح",
+  "Convert to Template": "تحويل إلى قالب",
+  "Convert to VM": "تحويل إلى جهاز افتراضي",
+  "Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.": "تحويل الجهاز الافتراضي {vmid} إلى قالب؟ يجب إيقاف الجهاز. يمكن التراجع عن هذا الإجراء.",
+  "Convert template {vmid} to VM?": "تحويل القالب {vmid} إلى جهاز افتراضي؟",
+  "Convert error: {}": "خطأ في التحويل: {}",
+  "Converting VM {vmid} to template...": "تحويل الجهاز الافتراضي {vmid} إلى قالب...",
+  "Converting template {vmid} to VM...": "تحويل القالب {vmid} إلى جهاز افتراضي...",
+  "VM {vmid} converted to template": "تم تحويل الجهاز الافتراضي {vmid} إلى قالب",
+  "Template {vmid} converted to VM": "تم تحويل القالب {vmid} إلى جهاز افتراضي",
+  "Clone this VM": "استنساخ هذا الجهاز الافتراضي",
+  "Convert this VM to a template (VM must be stopped)": "تحويل هذا الجهاز الافتراضي إلى قالب (يجب إيقاف الجهاز)",
+  "Convert this template back to a VM": "تحويل هذا القالب مرة أخرى إلى جهاز افتراضي",
+  "Clone from Template": "استنساخ من قالب",
+  "Template:": "القالب:"
 }

@@ -1704,6 +1704,94 @@ class CloneVmWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# ConvertToTemplateWorker — convert QEMU VM to template
+# POST /nodes/{node}/qemu/{vmid}/template
+# ----------------------------------------------------------------------
+class ConvertToTemplateSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class ConvertToTemplateWorker(QRunnable):
+    """Convert a QEMU VM to a template.
+    Only QEMU is supported (LXC has no template conversion in PVE API).
+    The VM must be stopped before conversion."""
+    def __init__(self, host_cfg, node_name, vmid):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.signals = ConvertToTemplateSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
+            proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).template.post()
+            msg = tr("VM {vmid} converted to template").format(vmid=self.vmid)
+            try:
+                self.signals.result.emit(msg)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("convert-to-template error: %s", e)
+            try:
+                self.signals.error.emit(_sanitize_error(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
+# ConvertToVmWorker — convert template back to VM
+# DELETE template flag via config update: POST /nodes/{node}/qemu/{vmid}/config {template: 0}
+# ----------------------------------------------------------------------
+class ConvertToVmSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class ConvertToVmWorker(QRunnable):
+    """Convert a QEMU template back to a regular VM by clearing the template flag."""
+    def __init__(self, host_cfg, node_name, vmid):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.signals = ConvertToVmSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
+            proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).config.post(template=0)
+            msg = tr("Template {vmid} converted to VM").format(vmid=self.vmid)
+            try:
+                self.signals.result.emit(msg)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("convert-to-vm error: %s", e)
+            try:
+                self.signals.error.emit(_sanitize_error(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # StorageContentDeleteWorker — destroy disk image via DELETE /storage/{storage}/content/{volid}
 # ----------------------------------------------------------------------
 class StorageContentDeleteSignals(QObject):

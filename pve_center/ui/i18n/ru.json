@@ -984,5 +984,19 @@
   "yes": "да",
   "{count} package updates available": "Доступно обновлений пакетов: {count}",
   "— none —": "— нет —",
-  "❌ {} is unavailable": "❌ {} недоступен"
+  "❌ {} is unavailable": "❌ {} недоступен",
+  "Convert to Template": "Конвертировать в шаблон",
+  "Convert to VM": "Конвертировать в ВМ",
+  "Convert VM {vmid} to template? The VM must be stopped. This action can be reversed.": "Конвертировать ВМ {vmid} в шаблон? ВМ должна быть остановлена. Действие обратимо.",
+  "Convert template {vmid} to VM?": "Конвертировать шаблон {vmid} в ВМ?",
+  "Convert error: {}": "Ошибка конвертации: {}",
+  "Converting VM {vmid} to template...": "Конвертация ВМ {vmid} в шаблон...",
+  "Converting template {vmid} to VM...": "Конвертация шаблона {vmid} в ВМ...",
+  "VM {vmid} converted to template": "ВМ {vmid} конвертирована в шаблон",
+  "Template {vmid} converted to VM": "Шаблон {vmid} конвертирован в ВМ",
+  "Clone this VM": "Клонировать эту ВМ",
+  "Convert this VM to a template (VM must be stopped)": "Конвертировать ВМ в шаблон (ВМ должна быть остановлена)",
+  "Convert this template back to a VM": "Конвертировать шаблон обратно в ВМ",
+  "Clone from Template": "Клонировать из шаблона",
+  "Template:": "Шаблон:"
 }

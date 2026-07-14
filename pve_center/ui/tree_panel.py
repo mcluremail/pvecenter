@@ -58,6 +58,8 @@ class TreePanel(QWidget):
     vm_action_requested = Signal(str, str, int, str)
     vm_migrate_requested = Signal(str, str, int)
     vm_clone_requested = Signal(str, str, int)
+    vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
+    vm_clone_from_template_requested = Signal(str, str)  # (node, host_name)
     console_requested = Signal(str, str, int)
 
     def __init__(self, nodes_cfg):
@@ -162,6 +164,8 @@ class TreePanel(QWidget):
                 f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
             )
             vm_status = vm.get("status", "") if vm else ""
+            is_template = bool(vm and vm.get("template"))
+            is_qemu = vm and vm.get("type", "qemu") == "qemu"
             for act_key, act_label in [("start", tr("Start")), ("shutdown", tr("Shutdown")),
                                        ("reboot", tr("Reboot")), ("stop", tr("Stop")),
                                        ("reset", tr("Reset")), ("resume", tr("Resume"))]:
@@ -171,7 +175,9 @@ class TreePanel(QWidget):
                     lambda checked, hn=host_name, nd=node, vid=vmid, a=act_key:
                         self.vm_action_requested.emit(hn, nd, vid, a)
                 )
-                if act_key in ("shutdown", "reboot", "stop", "reset") and vm_status != "running":
+                if is_template:
+                    act.setEnabled(False)
+                elif act_key in ("shutdown", "reboot", "stop", "reset") and vm_status != "running":
                     act.setEnabled(False)
                 if act_key == "resume" and vm_status != "paused":
                     act.setEnabled(False)
@@ -184,7 +190,7 @@ class TreePanel(QWidget):
                 lambda checked, hn=host_name, nd=node, vid=vmid:
                     self.console_requested.emit(hn, nd, vid)
             )
-            console_act.setEnabled(vm_status == "running")
+            console_act.setEnabled(vm_status == "running" and not is_template)
             menu.addAction(console_act)
             menu.addSeparator()
             migrate_act = QAction(tr("Migrate"), self.tree)
@@ -192,6 +198,7 @@ class TreePanel(QWidget):
             migrate_act.triggered.connect(
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_migrate_requested.emit(hn, nd, vid)
             )
+            migrate_act.setEnabled(not is_template)
             menu.addAction(migrate_act)
             clone_act = QAction(tr("Clone"), self.tree)
             clone_act.setIcon(get_icon("clone"))
@@ -199,6 +206,25 @@ class TreePanel(QWidget):
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_clone_requested.emit(hn, nd, vid)
             )
             menu.addAction(clone_act)
+            if is_qemu:
+                menu.addSeparator()
+                if is_template:
+                    convert_act = QAction(tr("Convert to VM"), self.tree)
+                    convert_act.setIcon(get_icon("vm"))
+                    convert_act.triggered.connect(
+                        lambda checked, hn=host_name, nd=node, vid=vmid:
+                            self.vm_convert_requested.emit(hn, nd, vid, "to_vm")
+                    )
+                    menu.addAction(convert_act)
+                else:
+                    convert_act = QAction(tr("Convert to Template"), self.tree)
+                    convert_act.setIcon(get_icon("template"))
+                    convert_act.setEnabled(vm_status != "running")
+                    convert_act.triggered.connect(
+                        lambda checked, hn=host_name, nd=node, vid=vmid:
+                            self.vm_convert_requested.emit(hn, nd, vid, "to_template")
+                    )
+                    menu.addAction(convert_act)
             menu.addSeparator()
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
@@ -233,6 +259,16 @@ class TreePanel(QWidget):
                     lambda checked, nn=item_name, hn=host_name: self.vm_create_requested.emit(nn, hn)
                 )
                 menu.addAction(create_vm_action)
+                templates = [vm for vm in self.all_vms
+                             if vm.get("template") and vm.get("host_name") == host_name]
+                if templates:
+                    clone_from_tmpl = QAction(tr("Clone from Template"), self.tree)
+                    clone_from_tmpl.setIcon(get_icon("template"))
+                    clone_from_tmpl.triggered.connect(
+                        lambda checked, nn=item_name, hn=host_name:
+                            self.vm_clone_from_template_requested.emit(nn, hn)
+                    )
+                    menu.addAction(clone_from_tmpl)
                 menu.addSeparator()
                 delete_action = QAction(tr("Delete host"), self.tree)
                 delete_action.triggered.connect(lambda: self.host_remove_requested.emit("host", host_name))
@@ -428,7 +464,10 @@ class TreePanel(QWidget):
         vm_item = QTreeWidgetItem(parent)
         vm_name = vm.get("name") or f"VM {vm.get('vmid')}"
         vm_item.setText(0, vm_name)
-        vm_item.setIcon(0, get_icon("vm", vm.get("status")))
+        if vm.get("template"):
+            vm_item.setIcon(0, get_icon("template"))
+        else:
+            vm_item.setIcon(0, get_icon("vm", vm.get("status")))
         vm_item.setData(0, VM_KEY_ROLE, (vm.get("host_name", ""), vm.get("vmid", 0), vm.get("node", "")))
         cpu = vm.get("cpu", 0)
         if isinstance(cpu, float):

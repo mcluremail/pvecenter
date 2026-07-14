@@ -36,6 +36,24 @@ VM_ACTION_TOOLTIPS = {
     "resume": tr("Resume suspended VM"),
 }
 
+VM_EXTRA_ACTION_LABELS = {
+    "clone": tr("Clone"),
+    "convert_template": tr("Convert to Template"),
+    "convert_vm": tr("Convert to VM"),
+}
+
+VM_EXTRA_ACTION_ICONS = {
+    "clone": "clone",
+    "convert_template": "template",
+    "convert_vm": "vm",
+}
+
+VM_EXTRA_ACTION_TOOLTIPS = {
+    "clone": tr("Clone this VM"),
+    "convert_template": tr("Convert this VM to a template (VM must be stopped)"),
+    "convert_vm": tr("Convert this template back to a VM"),
+}
+
 _CONFIRM_ACTIONS = ("stop", "reset", "shutdown", "reboot", "suspend")
 
 _CONFIRM_MESSAGES = {

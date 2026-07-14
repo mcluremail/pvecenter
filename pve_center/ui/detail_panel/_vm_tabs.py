@@ -265,9 +265,12 @@ class VMTabs:
         if vm_data is None:
             vm_data = panel._last_vm_data or {}
         status = vm_data.get("status", "") if vm_data else ""
+        is_template = bool(vm_data and vm_data.get("template"))
         for key, btn in panel._action_buttons.items():
             btn.setEnabled(True)
-            if key == "start":
+            if is_template:
+                btn.setEnabled(False)
+            elif key == "start":
                 btn.setEnabled(status not in ("running",))
             elif key in ("shutdown", "stop"):
                 btn.setEnabled(status == "running")
@@ -277,7 +280,7 @@ class VMTabs:
                 btn.setEnabled(status == "paused")
         vm_type = vm_data.get("type", "qemu") if vm_data else "qemu"
         panel._console_btn.setEnabled(
-            vm_type in ("qemu", "lxc") and status == "running"
+            vm_type in ("qemu", "lxc") and status == "running" and not is_template
         )
 
     def on_action_finished(self, msg):
