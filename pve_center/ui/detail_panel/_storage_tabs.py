@@ -605,18 +605,12 @@ class StorageTabs:
             if tb and id(tb) not in connected:
                 tb.set_context(node_name, storage_name, host_name, cfg, ct)
                 connected.add(id(tb))
-                try:
+                if tb.receivers(tb.upload_requested) > 0:
                     tb.upload_requested.disconnect()
-                except (TypeError, RuntimeError):
-                    pass
-                try:
+                if tb.receivers(tb.move_requested) > 0:
                     tb.move_requested.disconnect()
-                except (TypeError, RuntimeError):
-                    pass
-                try:
+                if tb.receivers(tb.remove_requested) > 0:
                     tb.remove_requested.disconnect()
-                except (TypeError, RuntimeError):
-                    pass
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
                 tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
@@ -631,10 +625,8 @@ class StorageTabs:
                 }
                 tbl = table_map_tb.get(tb)
                 if tbl:
-                    try:
+                    if tbl.receivers(tbl.itemSelectionChanged) > 0:
                         tbl.itemSelectionChanged.disconnect()
-                    except (TypeError, RuntimeError):
-                        pass
                     tbl.itemSelectionChanged.connect(
                         lambda t=tbl, b=tb: b.set_has_selection(len(t.selectedItems()) > 0 and t.currentRow() >= 0)
                     )

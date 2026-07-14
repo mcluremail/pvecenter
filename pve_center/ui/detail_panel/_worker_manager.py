@@ -27,6 +27,7 @@ class WorkerManager:
     def run_host_worker(self, worker):
         """Run a host-detail worker that is tracked for cancellation on tab switch."""
         if len(self._workers) >= _MAX_WORKERS_DP:
+            logger.warning("run_host_worker: pool full (%d/%d), worker not started", len(self._workers), _MAX_WORKERS_DP)
             return
         self._workers.add(worker)
         self.current_host_workers.add(worker)
@@ -79,3 +80,13 @@ class WorkerManager:
         for w in list(self.current_host_workers):
             self.discard_worker(w)
         self.current_host_workers.clear()
+
+    def cancel_general_workers(self):
+        """Discard all general workers (run_worker) from pool tracking
+        so new workers can be scheduled.  Running workers keep going
+        but their results are dropped by generation/tab guards."""
+        for w in list(self._workers):
+            # Don't touch current_worker etc. — they have dedicated cancel methods
+            if w not in (self.current_worker, self.current_config_worker,
+                         self.current_hist_worker, self.current_snap_worker):
+                self.discard_worker(w)

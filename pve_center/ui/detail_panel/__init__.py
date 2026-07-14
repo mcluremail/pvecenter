@@ -244,6 +244,7 @@ class DetailPanel(QWidget):
             self._workers_mgr.cancel_history_worker()
             self._workers_mgr.cancel_snapshots_worker()
             self._workers_mgr.cancel_host_workers()
+            self._workers_mgr.cancel_general_workers()
             self.metrics_widget.clear_curves()
             self.metrics_widget.setVisible(obj_type in ("vm", "host"))
 
