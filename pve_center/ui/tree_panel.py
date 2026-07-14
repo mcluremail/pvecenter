@@ -65,6 +65,7 @@ class TreePanel(QWidget):
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.all_nodes = []
+        self._nodes_by_pair = {}
         self.all_vms = []
         self._vms_by_key = {}
 
@@ -332,6 +333,7 @@ class TreePanel(QWidget):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
         self._vms_by_key = build_vm_index(all_vms)
+        self._nodes_by_pair = {(n.get("host_name", ""), n.get("node", "")): n for n in all_nodes}
         self.all_storages = all_storages or []
         if final:
             self._loading_hosts.clear()
@@ -651,6 +653,8 @@ class TreePanel(QWidget):
     def update_node_statuses(self, all_nodes, all_vms):
         vms_by_key = build_vm_index(all_vms)
         nodes_by_pair, nodes_by_host = build_node_index(all_nodes)
+        self.all_nodes = all_nodes
+        self._nodes_by_pair = nodes_by_pair
         for node in list(all_nodes):
             hn = node.get("host_name", "")
             self._loading_hosts.discard(hn)
@@ -845,9 +849,7 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name_key = key[2] if len(key) > 2 else None
             if host_name_key:
-                host_data = next((n for n in self.all_nodes
-                                  if n.get("host_name") == host_name_key
-                                  and n.get("node") == item_name), None)
+                host_data = self._nodes_by_pair.get((host_name_key, item_name))
                 if host_data is None:
                     host_data = next((n for n in self.all_nodes
                                       if n.get("host_name") == host_name_key), None)

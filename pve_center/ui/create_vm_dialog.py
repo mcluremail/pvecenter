@@ -481,13 +481,9 @@ class CreateVmDialog(QDialog):
                 self.storage_combo.setCurrentIndex(i)
                 break
 
-        self._populate_iso_combo(node)
+        self._populate_iso_combo(host_name)
 
-        ha_host_name = None
-        for n in self._nodes:
-            if n.get("node") == node and n.get("host_name") == host_name:
-                ha_host_name = n.get("host_name")
-                break
+        ha_host_name = host_name
         self._update_ha_combo(ha_host_name)
 
     def _on_bios_changed(self, text):
@@ -497,12 +493,12 @@ class CreateVmDialog(QDialog):
         if is_ovmf and self.chipset_combo.currentData() != "q35":
             self.chipset_combo.setCurrentIndex(0)
 
-    def _populate_iso_combo(self, node):
+    def _populate_iso_combo(self, host_name):
         self.iso_combo.clear()
         self.iso_combo.addItem(tr("No media"), "")
         self.iso_combo.addItem(tr("Physical drive"), "__cdrom__")
-        if node:
-            for iso in self._iso_images.get(node, []):
+        if host_name:
+            for iso in self._iso_images.get(host_name, []):
                 volid = iso["volid"]
                 fname = volid.split("/")[-1]
                 fmt = iso.get("format", "")

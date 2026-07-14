@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self._vms_by_key = {}
         self.all_nodes = []
+        self._nodes_by_pair = {}
         self.all_vms = []
         self.all_storages = []
         self.all_iso_images = {}
@@ -292,6 +293,10 @@ class MainWindow(QMainWindow):
                 self.all_vms[:] = cached_res.get("vms", [])
                 self.all_storages[:] = cached_res.get("storages", [])
                 self._vms_by_key = build_vm_index(self.all_vms)
+                self._nodes_by_pair = {
+                    (n.get("host_name", ""), n.get("node", "")): n
+                    for n in self.all_nodes
+                }
                 self.detail_panel.all_nodes[:] = self.all_nodes
                 self.detail_panel.all_vms[:] = self.all_vms
                 self.detail_panel.all_storages[:] = self.all_storages
@@ -844,6 +849,7 @@ class MainWindow(QMainWindow):
                 else:
                     existing_node_keys.add(key)
                     self.all_nodes.append(node)
+                self._nodes_by_pair[(host, node.get("node", ""))] = node
             for vm in data.get("vms", []):
                 vm["host_name"] = host
                 # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
@@ -862,10 +868,10 @@ class MainWindow(QMainWindow):
                 if pn and pn not in known:
                     known.add(pn)
                     self.all_pools.append({"poolid": pn})
-            # Собираем ISO-образы (node -> list volid)
-            for nname, isos in data.get("iso_images", {}).items():
+            # Собираем ISO-образы (host_name -> list volid)
+            for iso_host, isos in data.get("iso_images", {}).items():
                 if isos:
-                    self.all_iso_images[nname] = isos
+                    self.all_iso_images[iso_host] = isos
             # Собираем HA группы (host_name -> [group, ...])
             ha_list = data.get("ha_groups", [])
             if ha_list:
@@ -875,14 +881,16 @@ class MainWindow(QMainWindow):
             err_msg = data.get("error", "Unknown error")
             err_key = (host, host)
             if not any((n.get("node"), n.get("host_name")) == err_key for n in self.all_nodes):
-                self.all_nodes.append({
+                err_node = {
                     "node": host,
                     "status": "error",
                     "error": err_msg,
                     "host_name": host,
                     "_display_name": host,
                     "_is_cluster": is_cluster_err
-                })
+                }
+                self.all_nodes.append(err_node)
+                self._nodes_by_pair[(host, host)] = err_node
             from ..utils import parse_pve_error
             reason = parse_pve_error(err_msg)
             self._notifications.show(
@@ -1053,6 +1061,10 @@ class MainWindow(QMainWindow):
                     self.all_vms[:] = self._soft_vms
                     self.all_storages[:] = self._soft_storages
                     self._vms_by_key = build_vm_index(self.all_vms)
+                    self._nodes_by_pair = {
+                        (n.get("host_name", ""), n.get("node", "")): n
+                        for n in self._soft_nodes
+                    }
                     self.detail_panel.all_nodes[:] = self._soft_nodes
                     self.detail_panel.all_vms[:] = self._soft_vms
                     self.detail_panel.all_storages[:] = self._soft_storages

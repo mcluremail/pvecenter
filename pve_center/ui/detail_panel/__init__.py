@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBo
 
 from ..i18n import tr
 from ..icons import get_icon
+from ..object_id import HostId, StorageId, VmId
 from ..utils import build_cfg_index, build_vm_index
 from ..vm_actions import VM_ACTION_BUTTON_LABELS, VM_ACTION_ICONS, VM_ACTION_TOOLTIPS
 from ._constants import TabIndex
@@ -39,12 +40,13 @@ class DetailPanel(QWidget):
         self.task_history_cache = {}
         self.vm_snapshots_cache = {}
         self._storage_content_pending = {}
-        self._iso_by_node = {}
+        self._iso_by_host = {}
         self._all_iso_catalog = {}
         self._last_vm_data = None
         self.current_obj_type = None
         self.current_obj_name = None
         self.current_obj_data = None
+        self.current_obj_id = None
         self._generation = 0
         self.all_pools = []
         self.all_ha_groups = []
@@ -236,6 +238,7 @@ class DetailPanel(QWidget):
             self.current_obj_type = obj_type
             self.current_obj_name = obj_name
             self.current_obj_data = data
+            self.current_obj_id = self._build_obj_id(obj_type, obj_name, data)
             self._generation += 1
             gen = self._generation
             self.metrics_widget.setVisible(True)
@@ -290,6 +293,21 @@ class DetailPanel(QWidget):
             self.info_label.setText(tr("An error occurred while loading information"))
             self.info_stack.setCurrentIndex(0)
 
+    def _build_obj_id(self, obj_type, obj_name, data):
+        """Build a typed ID for the current object based on type."""
+        if obj_type == "host":
+            host_name = (data.get("host_name") if data else "") or obj_name
+            return HostId(host_name, obj_name)
+        elif obj_type == "vm":
+            host_name = (data.get("host_name") if data else "") or (data.get("node", "") if data else "")
+            vmid = data.get("vmid", 0) if data else 0
+            return VmId(host_name, vmid)
+        elif obj_type == "storage":
+            host_name = (data.get("host_name") if data else "") or ""
+            node = data.get("node", "") if data else ""
+            return StorageId(host_name, node, obj_name)
+        return obj_name
+
     def refresh_current_view(self):
         if self.current_obj_type is None:
             return
@@ -311,13 +329,16 @@ class DetailPanel(QWidget):
                     hosts.append(node)
             self._host_tabs.update_cluster_summary_cells(hosts)
         elif self.current_obj_type == "host":
-            host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
-            host_data = self._nodes_by_pair.get((host_cfg_name, self.current_obj_name))
+            if isinstance(self.current_obj_id, HostId):
+                host_data = self._nodes_by_pair.get((self.current_obj_id.host_name, self.current_obj_id.node))
+            else:
+                host_data = None
             if host_data is None and self.current_obj_data:
                 host_data = self.current_obj_data
             if host_data:
+                node_name = self.current_obj_id.node if isinstance(self.current_obj_id, HostId) else self.current_obj_name
                 if host_data.get("status") == "error":
-                    self._host_tabs.show_host_info(self.current_obj_name, host_data)
+                    self._host_tabs.show_host_info(node_name, host_data)
                 else:
                     self._host_tabs.update_host_cells(host_data)
                     self._host_tabs.fetch_host_metrics(host_data)
@@ -351,9 +372,8 @@ class DetailPanel(QWidget):
         self._vm_tabs.on_vm_console()
 
     def _on_timeframe_changed(self, new_timeframe):
-        if self.current_obj_type == "host":
-            host_cfg_name = (self.current_obj_data.get("host_name") if self.current_obj_data else "") or self.current_obj_name
-            host_data = self._nodes_by_pair.get((host_cfg_name, self.current_obj_name))
+        if self.current_obj_type == "host" and isinstance(self.current_obj_id, HostId):
+            host_data = self._nodes_by_pair.get((self.current_obj_id.host_name, self.current_obj_id.node))
             if host_data is None and self.current_obj_data:
                 host_data = self.current_obj_data
             if host_data:

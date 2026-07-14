@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from ..i18n import tr
 from ..icons import get_icon
+from ..object_id import StorageId
 from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
 from ._constants import _HAS_PG, TabIndex, _progress_style
@@ -571,14 +572,14 @@ class StorageTabs:
             if ct in tab_map:
                 worker = StorageContentListWorker(cfg, node_name, storage_name, ct)
                 worker.signals.result.connect(
-                    lambda sn, content_type, data, w=worker: (
-                        self.on_storage_content_piece(sn, content_type, data),
+                    lambda sn, content_type, data, h=host_name, nd=node_name, w=worker: (
+                        self.on_storage_content_piece(sn, content_type, data, h, nd),
                         panel._workers_mgr.discard_worker(w)
                     )
                 )
                 worker.signals.error.connect(
-                    lambda sn, content_type, err, w=worker: (
-                        self.on_storage_content_piece(sn, content_type, []),
+                    lambda sn, content_type, err, h=host_name, nd=node_name, w=worker: (
+                        self.on_storage_content_piece(sn, content_type, [], h, nd),
                         panel._workers_mgr.discard_worker(w)
                     )
                 )
@@ -633,9 +634,9 @@ class StorageTabs:
                         lambda t=tbl, b=tb: b.set_has_selection(len(t.selectedItems()) > 0 and t.currentRow() >= 0)
                     )
 
-    def on_storage_content_piece(self, storage_name, content_type, data):
+    def on_storage_content_piece(self, storage_name, content_type, data, host_name="", node=""):
         panel = self.panel
-        if panel.current_obj_type != "storage" or panel.current_obj_name != storage_name:
+        if panel.current_obj_type != "storage" or panel.current_obj_id != StorageId(host_name, node, storage_name):
             return
         pending = panel._storage_content_pending.get(storage_name)
         if pending:
@@ -755,7 +756,7 @@ class StorageTabs:
 
     def on_storage_backups(self, storage_name, backups, host_name="", node=""):
         panel = self.panel
-        if panel.current_obj_type != "storage" or panel.current_obj_name != storage_name:
+        if panel.current_obj_type != "storage" or panel.current_obj_id != StorageId(host_name, node, storage_name):
             return
         if backups:
             panel.storage_backups_stack.setCurrentIndex(1)
@@ -800,22 +801,22 @@ class StorageTabs:
         from ..api.metrics import StorageDisksWorker
         worker = StorageDisksWorker(cfg, node_name, storage_name, node_vms)
         worker.signals.disks_ready.connect(
-            lambda sn, data, w=worker: (
-                self.on_storage_disks(sn, data),
+            lambda sn, data, h=host_name, nd=node_name, w=worker: (
+                self.on_storage_disks(sn, data, h, nd),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.disks_error.connect(
-            lambda sn, err, w=worker: (
-                self.on_storage_disks(sn, []),
+            lambda sn, err, h=host_name, nd=node_name, w=worker: (
+                self.on_storage_disks(sn, [], h, nd),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         panel._workers_mgr.run_worker(worker)
 
-    def on_storage_disks(self, storage_name, disks):
+    def on_storage_disks(self, storage_name, disks, host_name="", node=""):
         panel = self.panel
-        if panel.current_obj_type != "storage" or panel.current_obj_name != storage_name:
+        if panel.current_obj_type != "storage" or panel.current_obj_id != StorageId(host_name, node, storage_name):
             return
         if disks:
             panel.storage_disks_stack.setCurrentIndex(1)

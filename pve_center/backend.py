@@ -517,7 +517,7 @@ class FetchWorker(QRunnable):
                 ]
                 if not iso_storages:
                     with iso_lock:
-                        iso_images[nname] = []
+                        iso_images[nhost] = []
                     return
                 try:
                     seen = {}
@@ -532,10 +532,10 @@ class FetchWorker(QRunnable):
                                         "size": item.get("size", 0),
                                     }
                     with iso_lock:
-                        iso_images[nname] = sorted(seen.values(), key=lambda x: x["volid"])
+                        iso_images[nhost] = sorted(seen.values(), key=lambda x: x["volid"])
                 except Exception:
                     with iso_lock:
-                        iso_images[nname] = []
+                        iso_images[nhost] = []
 
             iso_threads = [threading.Thread(target=fetch_iso_for_node, args=(n,), daemon=True)
                            for n in nodes]

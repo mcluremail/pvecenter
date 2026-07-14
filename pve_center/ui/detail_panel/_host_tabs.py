@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from ..i18n import tr
 from ..icons import get_icon
+from ..object_id import HostId
 from ..theme import Color
 from ..utils import format_uptime as _format_uptime
 from ..utils import status_text
@@ -1043,8 +1044,7 @@ class HostTabs:
 
     def on_host_network(self, node_name, interfaces, host_cfg_name=""):
         panel = self.panel
-        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
+        if panel.current_obj_type != "host" or panel.current_obj_id != HostId(host_cfg_name, node_name):
             return
         if interfaces:
             panel.host_network_stack.setCurrentIndex(1)
@@ -1101,8 +1101,7 @@ class HostTabs:
 
     def on_host_services(self, node_name, services, host_cfg_name=""):
         panel = self.panel
-        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
+        if panel.current_obj_type != "host" or panel.current_obj_id != HostId(host_cfg_name, node_name):
             return
         if services:
             panel.host_services_stack.setCurrentIndex(1)
@@ -1154,8 +1153,7 @@ class HostTabs:
 
     def on_host_health(self, node_name, health, host_cfg_name=""):
         panel = self.panel
-        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
+        if panel.current_obj_type != "host" or panel.current_obj_id != HostId(host_cfg_name, node_name):
             return
         issues = health.get("issues", [])
         warnings = health.get("warnings", [])
@@ -1211,8 +1209,7 @@ class HostTabs:
 
     def on_host_disks(self, node_name, disks, host_cfg_name=""):
         panel = self.panel
-        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
+        if panel.current_obj_type != "host" or panel.current_obj_id != HostId(host_cfg_name, node_name):
             return
         if disks:
             panel.host_disks_stack.setCurrentIndex(1)
@@ -1279,8 +1276,7 @@ class HostTabs:
 
     def on_host_snapshots(self, node_name, snapshots, host_cfg_name=""):
         panel = self.panel
-        cur_cfg = panel.current_obj_data.get("host_name", "") if panel.current_obj_data else ""
-        if panel.current_obj_type != "host" or panel.current_obj_name != node_name or cur_cfg != host_cfg_name:
+        if panel.current_obj_type != "host" or panel.current_obj_id != HostId(host_cfg_name, node_name):
             return
         if snapshots:
             panel.host_snapshots_stack.setCurrentIndex(1)

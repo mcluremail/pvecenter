@@ -363,7 +363,7 @@ class VMTabs:
 
         vmid = vm_data.get("vmid")
         host_name = vm_data.get("host_name") or vm_data.get("node")
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
 
         self.show_vm_metrics(vm_data)
 
@@ -427,11 +427,11 @@ class VMTabs:
             detail = panel.details_cache.get(detail_key)
             panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], detail)
             panel.options_widget.set_options_data(panel.config_cache[detail_key])
-        if node_name not in panel._iso_by_node and panel._all_iso_catalog:
-            panel._iso_by_node[node_name] = {
-                iso["volid"] for iso in panel._all_iso_catalog.get(node_name, [])
+        if host_name not in panel._iso_by_host and panel._all_iso_catalog:
+            panel._iso_by_host[host_name] = {
+                iso["volid"] for iso in panel._all_iso_catalog.get(host_name, [])
             }
-        iso_set = panel._iso_by_node.setdefault(node_name, set())
+        iso_set = panel._iso_by_host.setdefault(host_name, set())
         panel.hardware_widget.set_iso_list(iso_set)
         node_storages = [s for s in panel.all_storages
                          if s.get("node") == node_name
@@ -505,7 +505,7 @@ class VMTabs:
         panel._last_vm_data = merged
         self.update_action_buttons(merged)
         self.update_vm_cells(merged)
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.details_cache[detail_key] = data
         self.display_full_vm_info(merged, data)
 
@@ -514,7 +514,7 @@ class VMTabs:
         if gen != panel._generation:
             return
         vmid = detail.get("vmid")
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         vm_data = panel._vms_by_key.get((host_name, vmid), {})
         if detail.get("status") == "ok":
             data = detail.get("data", {})
@@ -690,7 +690,7 @@ class VMTabs:
         panel = self.panel
         if gen != panel._generation:
             return
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.config_cache[detail_key] = config
         if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
             detail = panel.details_cache.get(detail_key)
@@ -701,7 +701,7 @@ class VMTabs:
         panel = self.panel
         if gen != panel._generation:
             return
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.task_history_cache[detail_key] = tasks
         if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
             panel.task_history_widget.set_tasks(tasks)
@@ -710,7 +710,7 @@ class VMTabs:
         panel = self.panel
         if gen != panel._generation:
             return
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.vm_snapshots_cache[detail_key] = snapshots
         if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
             self.populate_vm_snapshots_tree(snapshots)
@@ -721,14 +721,14 @@ class VMTabs:
             return
         if not panel._last_vm_data or panel._last_vm_data.get("vmid") != vmid or panel._last_vm_data.get("host_name") != host_name:
             return
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.vm_snapshots_cache.pop(detail_key, None)
         panel.vm_snapshots_loading.setText(parse_pve_error(err))
         panel.vm_snapshots_stack.setCurrentIndex(0)
 
     def reload_snapshots(self, vmid, host_name):
         panel = self.panel
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.vm_snapshots_cache.pop(detail_key, None)
         panel.vm_snapshots_tree.clear()
         panel.vm_snapshots_loading.setText(tr("Loading..."))
@@ -938,7 +938,7 @@ class VMTabs:
 
     def reload_config(self, vmid, host_name):
         panel = self.panel
-        detail_key = (vmid, host_name)
+        detail_key = (host_name, vmid)
         panel.config_cache.pop(detail_key, None)
         cfg = panel._cfg_by_name.get(host_name)
         if cfg and panel._last_vm_data:
@@ -1049,7 +1049,7 @@ class VMTabs:
         panel = self.panel
         if not vm_data:
             return
-        detail_key = (vm_data.get("vmid"), vm_data.get("host_name") or vm_data.get("node"))
+        detail_key = (vm_data.get("host_name") or vm_data.get("node"), vm_data.get("vmid"))
         detail = panel.details_cache.get(detail_key)
         if not detail:
             return
@@ -1121,7 +1121,7 @@ class VMTabs:
 
     def load_iso_for_node(self, host_name, node_name):
         panel = self.panel
-        panel._iso_by_node[node_name] = set()
+        panel._iso_by_host[host_name] = set()
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -1136,18 +1136,18 @@ class VMTabs:
                 continue
             worker = StorageContentListWorker(cfg, node_name, storage, "iso")
             worker.signals.result.connect(
-                lambda sn, ct, data, n=node_name: self.on_vm_iso_loaded(n, data)
+                lambda sn, ct, data, h=host_name: self.on_vm_iso_loaded(h, data)
             )
             worker.signals.error.connect(
-                lambda sn, ct, err, n=node_name: logger.warning("ISO load failed for %s/%s: %s", n, sn, err)
+                lambda sn, ct, err, h=host_name: logger.warning("ISO load failed for %s/%s: %s", h, sn, err)
             )
             panel._workers_mgr.run_worker(worker)
 
-    def on_vm_iso_loaded(self, node_name, data):
+    def on_vm_iso_loaded(self, host_name, data):
         panel = self.panel
         vols = {v.get("volid") for v in (data or []) if v.get("volid")}
-        if node_name in panel._iso_by_node:
-            panel._iso_by_node[node_name].update(vols)
+        if host_name in panel._iso_by_host:
+            panel._iso_by_host[host_name].update(vols)
 
     # --- VM backup (vzdump + restore) ---
 
