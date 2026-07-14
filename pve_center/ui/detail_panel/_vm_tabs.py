@@ -100,6 +100,8 @@ class VMTabs:
         tab.setWidget(panel.hardware_widget)
         panel.hardware_widget.config_changed.connect(panel._on_vm_config_change_requested)
         panel.hardware_widget.remove_device.connect(self._on_remove_with_destroy)
+        panel.hardware_widget.disk_resize.connect(self.on_disk_resize)
+        panel.hardware_widget.disk_move.connect(self.on_disk_move)
         return tab
 
     def build_options_tab(self):
@@ -612,6 +614,70 @@ class VMTabs:
             lambda err, w=worker: (
                 panel.config_update_result.emit(
                     tr("Destroy failed: {err}").format(err=err)
+                ),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def on_disk_resize(self, host_name, vmid_str, disk, size):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        vmid = int(vmid_str)
+        vm = panel._vms_by_key.get((host_name, vmid))
+        node = vm.get("node") if vm else host_name
+        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+
+        from ...backend import VmDiskResizeWorker
+        worker = VmDiskResizeWorker(cfg, node, vmid, disk, size, vm_type)
+        worker.signals.disk_resized.connect(
+            lambda vid, upid, w=worker: (
+                panel.config_update_result.emit(
+                    tr("VM {vid}: disk {disk} resized by {size}").format(
+                        vid=vid, disk=disk, size=size)
+                ),
+                self.reload_config(vmid, host_name),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.disk_resize_error.connect(
+            lambda vid, err, w=worker: (
+                panel.config_update_result.emit(
+                    tr("Resize failed: {err}").format(err=err)
+                ),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        panel._workers_mgr.run_worker(worker)
+
+    def on_disk_move(self, host_name, vmid_str, disk, storage, delete):
+        panel = self.panel
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        vmid = int(vmid_str)
+        vm = panel._vms_by_key.get((host_name, vmid))
+        node = vm.get("node") if vm else host_name
+        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+
+        from ...backend import VmDiskMoveWorker
+        worker = VmDiskMoveWorker(cfg, node, vmid, disk, storage, delete, vm_type)
+        worker.signals.disk_moved.connect(
+            lambda vid, upid, w=worker: (
+                panel.config_update_result.emit(
+                    tr("VM {vid}: disk {disk} moved to {storage}").format(
+                        vid=vid, disk=disk, storage=storage)
+                ),
+                self.reload_config(vmid, host_name),
+                panel._workers_mgr.discard_worker(w),
+            )
+        )
+        worker.signals.disk_move_error.connect(
+            lambda vid, err, w=worker: (
+                panel.config_update_result.emit(
+                    tr("Move failed: {err}").format(err=err)
                 ),
                 panel._workers_mgr.discard_worker(w),
             )

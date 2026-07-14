@@ -282,12 +282,19 @@ class VmCdromEditorDialog(QDialog):
 
 class VmDiskEditorDialog(QDialog):
     """Disk parameter editor (virtio0, scsi0, ...)."""
-    def __init__(self, key, label, current_value, parent=None):
+
+    RESIZE_RESULT = 10
+    MOVE_RESULT = 11
+
+    def __init__(self, key, label, current_value, storages=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("Edit: ") + label)
         self.setMinimumWidth(450)
         self._key = key
         self._parsed = _parse_disk(current_value)
+        self._storages = storages or []
+        self._resize_params = None
+        self._move_params = None
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -323,7 +330,18 @@ class VmDiskEditorDialog(QDialog):
 
         layout.addLayout(form)
 
-        info = QLabel(tr("Disk size, storage and format cannot be changed here"))
+        action_row = QHBoxLayout()
+        action_row.setSpacing(8)
+        resize_btn = QPushButton(tr("Resize Disk"))
+        resize_btn.clicked.connect(self._on_resize)
+        action_row.addWidget(resize_btn)
+        move_btn = QPushButton(tr("Move Disk"))
+        move_btn.clicked.connect(self._on_move)
+        action_row.addWidget(move_btn)
+        action_row.addStretch()
+        layout.addLayout(action_row)
+
+        info = QLabel(tr("Cache can be changed here. Use Resize or Move for size/storage."))
         info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -340,6 +358,25 @@ class VmDiskEditorDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         layout.addLayout(btn_layout)
+
+    def _on_resize(self):
+        dlg = VmDiskResizeDialog(self._key, self._key, self._parsed.get("storage", "") + ":" + self._parsed.get("size", ""), self)
+        if dlg.exec() == VmDiskResizeDialog.Accepted:
+            self._resize_params = dlg.get_resize_params()
+            self.done(self.RESIZE_RESULT)
+
+    def _on_move(self):
+        raw_val = self._parsed.get("storage", "") + ":" + self._parsed.get("size", "")
+        dlg = VmDiskMoveDialog(self._key, self._key, raw_val, self._storages, self)
+        if dlg.exec() == VmDiskMoveDialog.Accepted:
+            self._move_params = dlg.get_move_params()
+            self.done(self.MOVE_RESULT)
+
+    def get_resize_params(self):
+        return self._resize_params
+
+    def get_move_params(self):
+        return self._move_params
 
     def _on_ok(self):
         self.accept()
@@ -358,6 +395,139 @@ class VmDiskEditorDialog(QDialog):
         if parts:
             new_val += "," + ",".join(parts)
         return (self._key, new_val)
+
+
+class VmDiskResizeDialog(QDialog):
+    """Resize a VM disk — grow only, shrink requires VM stop + special flags."""
+
+    def __init__(self, key, label, current_value, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Resize Disk"))
+        self.setMinimumWidth(450)
+        self._key = key
+        self._parsed = _parse_disk(current_value)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{label}</b>")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        storage_edit = QLineEdit(self._parsed["storage"])
+        storage_edit.setReadOnly(True)
+        form.addRow(tr("Storage:"), storage_edit)
+
+        cur_size = self._parsed["size"]
+        size_edit = QLineEdit(cur_size)
+        size_edit.setReadOnly(True)
+        form.addRow(tr("Current size:"), size_edit)
+
+        self._add_spin = QSpinBox()
+        self._add_spin.setRange(1, 1048576)
+        self._add_spin.setValue(10)
+        self._add_spin.setSuffix(" GB")
+        form.addRow(tr("Add space:"), self._add_spin)
+
+        layout.addLayout(form)
+
+        info = QLabel(tr("Disk can only be enlarged. To shrink, stop the VM and use the PVE CLI."))
+        info.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton(tr("Resize"))
+        ok_btn.setObjectName("accentBtn")
+        ok_btn.setFixedWidth(120)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def get_resize_params(self):
+        gb = self._add_spin.value()
+        return (self._key, f"+{gb}G")
+
+
+class VmDiskMoveDialog(QDialog):
+    """Move a VM disk to another storage."""
+
+    def __init__(self, key, label, current_value, storages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Move Disk"))
+        self.setMinimumWidth(450)
+        self._key = key
+        self._parsed = _parse_disk(current_value)
+        self._storages = storages or []
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel(f"<b>{label}</b>")
+        layout.addWidget(header)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        cur_storage = QLineEdit(self._parsed["storage"])
+        cur_storage.setReadOnly(True)
+        form.addRow(tr("Current storage:"), cur_storage)
+
+        self._storage_combo = QComboBox()
+        for s in self._storages:
+            name = s.get("storage", "") if isinstance(s, dict) else str(s)
+            if name and name != self._parsed["storage"]:
+                self._storage_combo.addItem(name, name)
+        form.addRow(tr("Target storage:"), self._storage_combo)
+
+        self._delete_check = QCheckBox(tr("Delete source disk after move"))
+        self._delete_check.setChecked(True)
+        form.addRow("", self._delete_check)
+
+        layout.addLayout(form)
+
+        if self._storage_combo.count() == 0:
+            warn = QLabel(tr("No other storage available on this node."))
+            warn.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+            warn.setWordWrap(True)
+            layout.addWidget(warn)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self._ok_btn = QPushButton(tr("Move"))
+        self._ok_btn.setObjectName("accentBtn")
+        self._ok_btn.setFixedWidth(120)
+        self._ok_btn.clicked.connect(self._on_ok)
+        btn_layout.addWidget(self._ok_btn)
+        cancel_btn = QPushButton(tr("Cancel"))
+        cancel_btn.setFixedWidth(120)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        if self._storage_combo.count() == 0:
+            self._ok_btn.setEnabled(False)
+
+    def _on_ok(self):
+        if not self._storage_combo.currentData():
+            return
+        self.accept()
+
+    def get_move_params(self):
+        return (
+            self._key,
+            self._storage_combo.currentData(),
+            self._delete_check.isChecked(),
+        )
 
 
 class VmBootEditorDialog(QDialog):

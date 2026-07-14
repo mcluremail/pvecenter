@@ -82,6 +82,8 @@ def _next_free_slot(config_data, prefix, max_count):
 class VmHardwareWidget(QWidget):
     config_changed = Signal(str, str, object)
     remove_device = Signal(str, str, str, object)
+    disk_resize = Signal(str, str, str, str)     # host, vmid, disk, size
+    disk_move = Signal(str, str, str, str, bool)  # host, vmid, disk, storage, delete
 
     _EDITABLE_WHEN_RUNNING = ("ide2", "net0", "net1", "net2", "net3")
 
@@ -500,8 +502,23 @@ class VmHardwareWidget(QWidget):
             return
 
         if is_disk_key(raw_key, current_value):
-            dlg = VmDiskEditorDialog(raw_key, label, current_value, self)
-            if dlg.exec() != VmDiskEditorDialog.Accepted:
+            # Rebuild raw value for the disk editor
+            raw_str = str(current_value) if current_value is not None else ""
+            dlg = VmDiskEditorDialog(raw_key, label, raw_str, self._storage_list, self)
+            result = dlg.exec()
+            if result == VmDiskEditorDialog.RESIZE_RESULT:
+                params = dlg.get_resize_params()
+                if params:
+                    disk, size = params
+                    self.disk_resize.emit(self._host_name, str(self._vmid), disk, size)
+                return
+            if result == VmDiskEditorDialog.MOVE_RESULT:
+                params = dlg.get_move_params()
+                if params:
+                    disk, storage, delete = params
+                    self.disk_move.emit(self._host_name, str(self._vmid), disk, storage, delete)
+                return
+            if result != VmDiskEditorDialog.Accepted:
                 return
             key, value = dlg.get_raw_value()
             if value is not None:

@@ -29,11 +29,13 @@ Export/import — encrypted bundle с паролем.
 - Delete: `DELETE /nodes/{node}/{type}/{vmid}/snapshot/{name}`
 - Подтверждение для rollback и delete
 
-### B2. VM config editor — hardware hotplug
-Редактирование CPU/RAM/disk/net без пересоздания ВМ. Сейчас только просмотр.
-- `PUT /nodes/{node}/qemu/{vmid}/config` с изменёнными параметрами
+### B2. VM config editor — hardware hotplug ✅ (v2.8.x)
+Редактирование CPU/RAM/disk/net без пересоздания ВМ.
+- `PUT /nodes/{node}/qemu/{vmid}/config` — все системные параметры
 - Hotplug для CPU/RAM/net (на работающей ВМ)
-- Disk resize для остановленных ВМ
+- Disk resize: `PUT /nodes/{node}/qemu/{vmid}/resize`
+- Disk move: `POST /nodes/{node}/qemu/{vmid}/move_disk`
+- Add/remove devices: disk, cdrom, net, usb, pci, serial, efi, tpm
 - Валидация перед применением
 
 ### B3. Bulk VM actions
@@ -42,10 +44,10 @@ Export/import — encrypted bundle с паролем.
 - Тулбар с bulk actions когда выбрано >1 ВМ
 - Прогресс-бар на операцию
 
-### B4. Storage operations
+### B4. Storage operations ✅ (v2.8.x)
 - Перемещение диска между storage (`POST /nodes/{node}/qemu/{vmid}/move_disk`)
-- Resize диска (`PUT /nodes/{node}/qemu/{vmid}/config` с `scsi0:size=+10G`)
-- Upload ISO через UI (`POST /nodes/{node}/storage/{storage}/upload`)
+- Resize диска (`PUT /nodes/{node}/qemu/{vmid}/resize`)
+- Upload ISO через UI — не реализовано (future)
 
 ### B5. HA group management
 Просмотр/создание/удаление HA groups. Сейчас только чтение.

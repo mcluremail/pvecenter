@@ -711,6 +711,112 @@ class VmConfigUpdateWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# VmDiskResizeWorker — PUT /nodes/{node}/qemu/{vmid}/resize
+# ----------------------------------------------------------------------
+class VmDiskResizeSignals(QObject):
+    disk_resized = Signal(int, str)   # vmid, upid
+    disk_resize_error = Signal(int, str)
+    finished = Signal()
+
+
+class VmDiskResizeWorker(QRunnable):
+    """Resize a VM disk via PUT /nodes/{node}/qemu/{vmid}/resize."""
+    def __init__(self, host_cfg, node_name, vmid, disk, size, vm_type="qemu"):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.disk = disk        # e.g. "scsi0", "virtio0"
+        self.size = size        # e.g. "+10G" or "20G"
+        self.vm_type = vm_type
+        self.signals = VmDiskResizeSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=30)
+            if self.vm_type == "qemu":
+                result = proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).resize.put(
+                    disk=_q(self.disk), size=_q(self.size)
+                )
+            else:
+                result = proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).resize.put(
+                    volume=_q(self.disk), size=_q(self.size)
+                )
+            try:
+                self.signals.disk_resized.emit(self.vmid, str(result))
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("backend error: %s", e)
+            try:
+                self.signals.disk_resize_error.emit(self.vmid, _sanitize_error(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
+# VmDiskMoveWorker — POST /nodes/{node}/qemu/{vmid}/move_disk
+# ----------------------------------------------------------------------
+class VmDiskMoveSignals(QObject):
+    disk_moved = Signal(int, str)   # vmid, upid
+    disk_move_error = Signal(int, str)
+    finished = Signal()
+
+
+class VmDiskMoveWorker(QRunnable):
+    """Move a VM disk to another storage via POST /nodes/{node}/qemu/{vmid}/move_disk."""
+    def __init__(self, host_cfg, node_name, vmid, disk, storage,
+                 delete=False, vm_type="qemu"):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.disk = disk            # e.g. "scsi0"
+        self.storage = storage      # target storage name
+        self.delete = delete        # delete source after move
+        self.vm_type = vm_type
+        self.signals = VmDiskMoveSignals()
+
+    def run(self):
+        proxmox = None
+        try:
+            proxmox = _make_proxmox(self.host_cfg, timeout=60)
+            if self.vm_type == "qemu":
+                params = {"disk": _q(self.disk), "storage": _q(self.storage)}
+                if self.delete:
+                    params["delete"] = 1
+                result = proxmox.nodes(_q(self.node_name)).qemu(_q(self.vmid)).move_disk.post(**params)
+            else:
+                params = {"volume": _q(self.disk), "storage": _q(self.storage)}
+                if self.delete:
+                    params["delete"] = 1
+                result = proxmox.nodes(_q(self.node_name)).lxc(_q(self.vmid)).move_volume.post(**params)
+            try:
+                self.signals.disk_moved.emit(self.vmid, str(result))
+            except RuntimeError:
+                pass
+        except Exception as e:
+            logger.debug("backend error: %s", e)
+            try:
+                self.signals.disk_move_error.emit(self.vmid, _sanitize_error(e))
+            except RuntimeError:
+                pass
+        finally:
+            _close_proxmox(proxmox)
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # VmTaskHistoryWorker
 # ----------------------------------------------------------------------
 class VmTaskHistorySignals(QObject):
