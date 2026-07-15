@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
@@ -372,28 +373,27 @@ class StorageTabs:
         card_items = []
         for st in storages:
             name = st.get("storage", st.get("id", ""))
-            content = st.get("content", "")
-            if isinstance(content, list):
-                content = ", ".join(content)
+            content = st.get("content_text", "")
+            if not content:
+                raw_content = st.get("content", "")
+                if isinstance(raw_content, list):
+                    content = ", ".join(raw_content)
+                else:
+                    content = raw_content
             cluster = st.get("cluster")
             location = cluster if cluster else st.get("node", st.get("host_name", ""))
-            used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 0
-            used_gb = round(used / (1024**3), 1) if used else 0
-            total_gb = round(total / (1024**3), 1) if total else 0
-            pct = safe_pct(used, total)
             if cluster:
                 nav_key = ("storage", name, "cluster", cluster)
             else:
                 nav_key = ("storage", name, "host", st.get("host_name", ""))
             card_items.append({
                 "name": name,
-                "type_text": st.get("type", ""),
+                "type_text": st.get("type_text", st.get("type", "")),
                 "content_text": content,
                 "location_text": location,
-                "used_text": f"{used_gb} GiB",
-                "total_text": f"{total_gb} GiB",
-                "usage_text": f"{pct}%",
+                "used_text": st.get("used_text", "0 GiB"),
+                "total_text": st.get("total_text", "0 GiB"),
+                "usage_text": st.get("usage_text", "0%"),
                 "nav_key": nav_key,
             })
         self.panel.storage_list.set_items(card_items)
@@ -468,6 +468,9 @@ class StorageTabs:
         if cluster:
             filtered = [s for s in panel.all_storages
                         if s.get("storage") == storage_name and s.get("cluster") == cluster]
+        elif host_name_filter:
+            filtered = [s for s in panel.all_storages
+                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
         else:
             filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
         if not filtered:
@@ -638,14 +641,14 @@ class StorageTabs:
             if tb and id(tb) not in connected:
                 tb.set_context(node_name, storage_name, host_name, cfg, ct)
                 connected.add(id(tb))
-                if tb.receivers(tb.upload_requested) > 0:
-                    tb.upload_requested.disconnect()
-                if tb.receivers(tb.download_url_requested) > 0:
-                    tb.download_url_requested.disconnect()
-                if tb.receivers(tb.move_requested) > 0:
-                    tb.move_requested.disconnect()
-                if tb.receivers(tb.remove_requested) > 0:
-                    tb.remove_requested.disconnect()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    for sig in (tb.upload_requested, tb.download_url_requested,
+                                tb.move_requested, tb.remove_requested):
+                        try:
+                            sig.disconnect()
+                        except (RuntimeError, TypeError):
+                            pass
                 tb.upload_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
                     self._on_upload(n, s, h, ct))
                 tb.download_url_requested.connect(lambda ct=ct, n=node_name, s=storage_name, h=host_name:
@@ -662,8 +665,12 @@ class StorageTabs:
                 }
                 tbl = table_map_tb.get(tb)
                 if tbl:
-                    if tbl.receivers(tbl.itemSelectionChanged) > 0:
-                        tbl.itemSelectionChanged.disconnect()
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", RuntimeWarning)
+                        try:
+                            tbl.itemSelectionChanged.disconnect()
+                        except (RuntimeError, TypeError):
+                            pass
                     tbl.itemSelectionChanged.connect(
                         lambda t=tbl, b=tb: b.set_has_selection(len(t.selectedItems()) > 0 and t.currentRow() >= 0)
                     )

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBo
 from ..i18n import tr
 from ..icons import get_icon
 from ..object_id import HostId, StorageId, VmId
-from ..utils import build_cfg_index, build_vm_index
+from ..utils import build_cfg_index
 from ..vm_actions import (
     VM_ACTION_BUTTON_LABELS,
     VM_ACTION_ICONS,
@@ -40,11 +40,11 @@ class DetailPanel(QWidget):
         super().__init__()
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
-        self._vms_by_key = {}
+        self._vm_repo = None
+        self._node_repo = None
         self.all_nodes = []
         self.all_vms = []
         self.all_storages = []
-        self._nodes_by_pair = {}
         self.details_cache = {}
         self.config_cache = {}
         self.metrics_cache = {}
@@ -60,7 +60,7 @@ class DetailPanel(QWidget):
         self.current_obj_id = None
         self._generation = 0
         self.all_pools = []
-        self.all_ha_groups = []
+        self.all_ha_groups = {}
         self._current_cluster_cfg = None
 
         self._workers_mgr = WorkerManager()
@@ -232,11 +232,11 @@ class DetailPanel(QWidget):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def set_lists(self, all_nodes, all_vms, all_storages=None):
+    def set_lists(self, all_nodes, all_vms, all_storages=None, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
-        self._vms_by_key = build_vm_index(all_vms)
-        self._nodes_by_pair = {(n.get("host_name", ""), n.get("node", "")): n for n in all_nodes}
+        self._node_repo = node_repo
+        self._vm_repo = vm_repo
         self.all_storages = all_storages or []
         self.details_cache.clear()
         self.config_cache.clear()
@@ -329,7 +329,19 @@ class DetailPanel(QWidget):
             return VmId(host_name, vmid)
         elif obj_type == "storage":
             host_name = (data.get("host_name") if data else "") or ""
+            cluster = (data.get("cluster") if data else "") or ""
             node = data.get("node", "") if data else ""
+            if not node:
+                for s in self.all_storages:
+                    if s.get("storage") != obj_name:
+                        continue
+                    if host_name and s.get("host_name") == host_name:
+                        node = s.get("node", "")
+                        break
+                    if cluster and s.get("cluster") == cluster:
+                        node = s.get("node", "")
+                        host_name = s.get("host_name", "") or host_name
+                        break
             return StorageId(host_name, node, obj_name)
         return obj_name
 
@@ -355,7 +367,7 @@ class DetailPanel(QWidget):
             self._host_tabs.update_cluster_summary_cells(hosts)
         elif self.current_obj_type == "host":
             if isinstance(self.current_obj_id, HostId):
-                host_data = self._nodes_by_pair.get((self.current_obj_id.host_name, self.current_obj_id.node))
+                host_data = self._node_repo.get(self.current_obj_id.host_name, self.current_obj_id.node) if self._node_repo else None
             else:
                 host_data = None
             if host_data is None and self.current_obj_data:
@@ -373,10 +385,10 @@ class DetailPanel(QWidget):
             vm_data = self.current_obj_data
             if vm_data:
                 if isinstance(self.current_obj_id, VmId):
-                    fresh = self._vms_by_key.get((self.current_obj_id.host_name, self.current_obj_id.vmid))
+                    fresh = self._vm_repo.get(self.current_obj_id.host_name, self.current_obj_id.vmid) if self._vm_repo else None
                 else:
                     lookup_host = vm_data.get("host_name") or vm_data.get("node")
-                    fresh = self._vms_by_key.get((lookup_host, vm_data.get("vmid")))
+                    fresh = self._vm_repo.get(lookup_host, vm_data.get("vmid")) if self._vm_repo else None
                 if fresh:
                     self.current_obj_data = fresh
                     self.hardware_widget.set_vm_status(fresh.get("status", ""))
@@ -427,7 +439,7 @@ class DetailPanel(QWidget):
 
     def _on_timeframe_changed(self, new_timeframe):
         if self.current_obj_type == "host" and isinstance(self.current_obj_id, HostId):
-            host_data = self._nodes_by_pair.get((self.current_obj_id.host_name, self.current_obj_id.node))
+            host_data = self._node_repo.get(self.current_obj_id.host_name, self.current_obj_id.node) if self._node_repo else None
             if host_data is None and self.current_obj_data:
                 host_data = self.current_obj_data
             if host_data:

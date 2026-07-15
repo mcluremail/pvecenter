@@ -30,6 +30,9 @@ dependencies = [
     "keyring>=24.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 [project.urls]
 "Homepage" = "https://github.com/mcluremail/pvecenter"
 "Bug Tracker" = "https://github.com/mcluremail/pvecenter/issues"
@@ -42,3 +45,6 @@ include = ["pve_center*"]
 
 [tool.setuptools.package-data]
 "pve_center.ui.i18n" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

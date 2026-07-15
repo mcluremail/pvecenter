@@ -23,7 +23,7 @@ from ..config import load_ui_state, save_ui_state
 from .i18n import tr
 from .icons import get_icon, init_icons, make_loading_icon
 from .theme import Color
-from .utils import build_cfg_index, build_node_index, build_vm_index, status_text
+from .utils import build_cfg_index, status_text
 from .vm_actions import VM_ACTION_ICONS
 
 VM_KEY_ROLE = Qt.UserRole + 1
@@ -48,7 +48,7 @@ def _node_tooltip(node):
 
 
 class TreePanel(QWidget):
-    item_selected = Signal(str, str, dict)
+    item_selected = Signal(str, str, object)
     add_server_requested_context = Signal(str)
     host_remove_requested = Signal(str, str)
     host_token_refresh_requested = Signal(str)
@@ -69,9 +69,9 @@ class TreePanel(QWidget):
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.all_nodes = []
-        self._nodes_by_pair = {}
+        self._node_repo = None
         self.all_vms = []
-        self._vms_by_key = {}
+        self._vm_repo = None
 
         self._building = False
         self._nav_timer = QTimer()
@@ -158,7 +158,7 @@ class TreePanel(QWidget):
         vm_key = item.data(0, VM_KEY_ROLE)
         if vm_key is not None:
             host_name, vmid, node = vm_key
-            vm = self._vms_by_key.get((host_name, vmid))
+            vm = self._vm_repo.get(host_name, vmid) if self._vm_repo else None
             menu = QMenu(self.tree)
             menu.setStyleSheet(
                 "QMenu { font-size: 12px; padding: 2px; }"
@@ -383,11 +383,11 @@ class TreePanel(QWidget):
         for i in range(self.tree.topLevelItemCount()):
             spin(self.tree.topLevelItem(i))
 
-    def update_data(self, all_nodes, all_vms, all_storages=None, final=False):
+    def update_data(self, all_nodes, all_vms, all_storages=None, final=False, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
         self.all_vms = all_vms
-        self._vms_by_key = build_vm_index(all_vms)
-        self._nodes_by_pair = {(n.get("host_name", ""), n.get("node", "")): n for n in all_nodes}
+        self._node_repo = node_repo
+        self._vm_repo = vm_repo
         self.all_storages = all_storages or []
         if final:
             self._loading_hosts.clear()
@@ -707,11 +707,9 @@ class TreePanel(QWidget):
         self.tree.verticalScrollBar().setValue(scroll_val)
         self._building = False
 
-    def update_node_statuses(self, all_nodes, all_vms):
-        vms_by_key = build_vm_index(all_vms)
-        nodes_by_pair, nodes_by_host = build_node_index(all_nodes)
+    def update_node_statuses(self, all_nodes, all_vms, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
-        self._nodes_by_pair = nodes_by_pair
+        self._node_repo = node_repo or self._node_repo
         for node in list(all_nodes):
             hn = node.get("host_name", "")
             self._loading_hosts.discard(hn)
@@ -730,7 +728,7 @@ class TreePanel(QWidget):
             vm_key = item.data(0, VM_KEY_ROLE)
             if vm_key is not None:
                 host_name, vmid, _node = vm_key
-                vm = vms_by_key.get((host_name, vmid))
+                vm = self._vm_repo.get(host_name, vmid) if self._vm_repo else None
                 if vm:
                     if vm.get("template"):
                         item.setIcon(0, get_icon("template"))
@@ -742,9 +740,9 @@ class TreePanel(QWidget):
                     hn = key[2] if len(key) > 2 else None
                     node_name = key[1]
                     if hn:
-                        host = nodes_by_pair.get((hn, node_name)) or nodes_by_host.get(hn)
+                        host = self._node_repo.get(hn, node_name) if self._node_repo else None
                     else:
-                        host = nodes_by_host.get(node_name)
+                        host = next((n for n in self.all_nodes if n.get("node") == node_name), None)
                     if host:
                         item.setIcon(0, get_icon("host", host.get("status")))
             it += 1
@@ -878,7 +876,7 @@ class TreePanel(QWidget):
         vm_key = item.data(0, VM_KEY_ROLE)
         if vm_key is not None:
             host_name, vmid, _node = vm_key
-            vm = self._vms_by_key.get((host_name, vmid))
+            vm = self._vm_repo.get(host_name, vmid) if self._vm_repo else None
             if vm is not None:
                 self.item_selected.emit("vm", vm.get("name") or f"VM {vmid}", vm)
                 return
@@ -909,7 +907,7 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name_key = key[2] if len(key) > 2 else None
             if host_name_key:
-                host_data = self._nodes_by_pair.get((host_name_key, item_name))
+                host_data = self._node_repo.get(host_name_key, item_name) if self._node_repo else None
                 if host_data is None:
                     host_data = next((n for n in self.all_nodes
                                       if n.get("host_name") == host_name_key), None)

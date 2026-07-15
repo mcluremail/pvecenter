@@ -505,8 +505,8 @@ class VMTabs:
             return
         vmid = detail.get("vmid")
         data = detail.get("data", {})
-        vm_data = panel._vms_by_key.get((host_name, vmid), {})
-        merged = {**vm_data, **data}
+        vm_data = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
+        merged = {**vm_data, **data} if vm_data else data
         panel._last_vm_data = merged
         self.update_action_buttons(merged)
         self.update_vm_cells(merged)
@@ -520,7 +520,7 @@ class VMTabs:
             return
         vmid = detail.get("vmid")
         detail_key = (host_name, vmid)
-        vm_data = panel._vms_by_key.get((host_name, vmid), {})
+        vm_data = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         if detail.get("status") == "ok":
             data = detail.get("data", {})
             panel.details_cache[detail_key] = data
@@ -529,7 +529,7 @@ class VMTabs:
             if detail_key in panel.config_cache:
                 panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], data)
             if panel._last_vm_data:
-                merged = {**vm_data, **data}
+                merged = {**vm_data, **data} if vm_data else data
                 panel._last_vm_data = merged
                 self.update_action_buttons(merged)
         else:
@@ -542,7 +542,7 @@ class VMTabs:
         if not cfg:
             return
         vmid = int(vmid_str)
-        vm = panel._vms_by_key.get((host_name, vmid))
+        vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.get("node") if vm else host_name
         vm_type = (vm.get("type") if vm else "qemu") or "qemu"
 
@@ -569,7 +569,7 @@ class VMTabs:
         if not cfg:
             return
         vmid = int(vmid_str)
-        vm = panel._vms_by_key.get((host_name, vmid))
+        vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.get("node") if vm else host_name
         vm_type = (vm.get("type") if vm else "qemu") or "qemu"
 
@@ -633,7 +633,7 @@ class VMTabs:
         if not cfg:
             return
         vmid = int(vmid_str)
-        vm = panel._vms_by_key.get((host_name, vmid))
+        vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.get("node") if vm else host_name
         vm_type = (vm.get("type") if vm else "qemu") or "qemu"
 
@@ -665,7 +665,7 @@ class VMTabs:
         if not cfg:
             return
         vmid = int(vmid_str)
-        vm = panel._vms_by_key.get((host_name, vmid))
+        vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.get("node") if vm else host_name
         vm_type = (vm.get("type") if vm else "qemu") or "qemu"
 
@@ -975,8 +975,8 @@ class VMTabs:
             mem_pct = safe_pct(mem_used_bytes, maxmem_bytes)
 
             cpus = detail.get("cpus") or basic.get("cpus") or 0
-            cpu_usage = basic.get("cpu") or detail.get("cpu", 0)
-            if isinstance(cpu_usage, float): cpu_usage = round(cpu_usage * 100, 1)
+            cpu_usage = basic.get("cpu_pct") or detail.get("cpu_pct",
+                round(detail.get("cpu", 0) * 100, 1) if isinstance(detail.get("cpu"), float) else 0)
 
             maxdisk_bytes = _safe_int(detail.get("maxdisk") or basic.get("maxdisk"))
             disk_used_bytes = _safe_int(detail.get("disk"))
@@ -1064,9 +1064,8 @@ class VMTabs:
         panel.card_status.set_value(status_text(status))
         panel.card_status.set_value_color(status_color)
 
-        cpu_usage = vm_data.get("cpu") or detail.get("cpu", 0)
-        if isinstance(cpu_usage, float):
-            cpu_usage = round(cpu_usage * 100, 1)
+        cpu_usage = vm_data.get("cpu_pct") or detail.get("cpu_pct",
+            round(detail.get("cpu", 0) * 100, 1) if isinstance(detail.get("cpu"), float) else 0)
         panel.card_cpu.set_value(f"{cpu_usage}%")
         panel.card_cpu.set_progress(cpu_usage)
 

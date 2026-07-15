@@ -2,6 +2,7 @@
 
 import re
 
+from ..domain._format import format_uptime  # noqa: F401  (re-export)
 from .i18n import tr
 
 _STATUS_KEYS = frozenset((
@@ -17,50 +18,10 @@ def status_text(s):
     return tr(s if s in _STATUS_KEYS else (s or "unknown"))
 
 
-def format_uptime(seconds):
-    """Format uptime in seconds to compact form: '5d 3h 20m 10s'."""
-    if not seconds or seconds <= 0:
-        return ""
-    days, rem = divmod(int(seconds), 86400)
-    hours, rem = divmod(rem, 3600)
-    mins, secs = divmod(rem, 60)
-    parts = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    if mins:
-        parts.append(f"{mins}m")
-    if secs or not parts:
-        parts.append(f"{secs}s")
-    return " ".join(parts)
-
-
 def build_cfg_index(nodes_cfg):
     """Build {name: cfg} dict from nodes_cfg list for O(1) lookup.
     On duplicate names (should not happen) last one wins."""
     return {c.get("name", ""): c for c in nodes_cfg}
-
-
-def build_vm_index(all_vms):
-    """Build {(host_name, vmid): vm} dict for O(1) lookup.
-    On duplicate keys (should not happen) last one wins."""
-    return {(v.get("host_name"), v.get("vmid")): v for v in all_vms}
-
-
-def build_node_index(all_nodes):
-    """Build {(host_name, node): node} and {host_name: node} dicts.
-    Returns (by_pair, by_host) — by_host maps host_name to first matching node.
-    """
-    by_pair = {}
-    by_host = {}
-    for n in all_nodes:
-        hn = n.get("host_name", "")
-        nn = n.get("node", "")
-        by_pair[(hn, nn)] = n
-        if hn not in by_host:
-            by_host[hn] = n
-    return by_pair, by_host
 
 
 def parse_pve_error(err):

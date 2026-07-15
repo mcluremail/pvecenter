@@ -9,6 +9,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...domain._format import (
+    format_volsize,  # noqa: F401  (re-export)
+    safe_pct,  # noqa: F401  (re-export)
+)
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..theme import Color
@@ -78,13 +82,6 @@ def compact_table(table, max_height=22):
             table.setRowHeight(r, max_height)
 
 
-def safe_pct(used, total):
-    if not total or total <= 0:
-        return 0
-    pct = int((used / total) * 100)
-    return max(0, min(100, pct))
-
-
 def set_cell_text(table, row, col, text, fg_color=None):
     item = table.item(row, col)
     if item is None:
@@ -123,15 +120,6 @@ def make_filterable_table(table):
     layout.addWidget(table)
     container._filter_debounce = debounce
     return container
-
-
-def format_volsize(size_bytes):
-    if not size_bytes:
-        return "0"
-    gb = size_bytes / (1024**3)
-    if gb >= 1024:
-        return f"{gb/1024:.1f} TiB"
-    return f"{gb:.1f} GiB"
 
 
 def set_empty_placeholder(table, col_count, text=None):

@@ -425,25 +425,21 @@ class HostTabs:
         panel.summary_stack.setCurrentIndex(0)
         card_items = []
         for node in hosts:
-            node_name = node.get("_display_name") or node.get("node", "?")
+            node_name = (node.display_name if hasattr(node, "display_name")
+                         else node.get("_display_name", "")) or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster_rep"):
                 node_name = "★ " + node_name
             status = node.get("status", "unknown")
-            cpu_frac = node.get("cpu", 0)
-            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            mem_bytes = node.get("mem", 0)
-            maxmem_bytes = node.get("maxmem", 0) or 0
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            uptime_sec = node.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
             vms_count = sum(
                 1 for v in panel.all_vms
                 if v.get("node") == node.get("node")
                 and v.get("host_name") == host_name
             )
+            cpu_text = node.cpu_text if hasattr(node, "cpu_text") else f"{node.get('cpu_pct', 0)}%"
+            ram_text = node.ram_text if hasattr(node, "ram_text") else f"{node.get('mem_gib', 0)}/{node.get('maxmem_gib', 0)} GiB"
+            uptime_text = node.uptime_str if hasattr(node, "uptime_str") else node.get("uptime_str", "—")
             card_items.append({
                 "_key": f"{node.get('node', '')}@{host_name}",
                 "node": node.get("node", ""),
@@ -451,10 +447,10 @@ class HostTabs:
                 "status": status,
                 "status_text": status_text(status),
                 "address": cfg.get("host", "") if cfg else "",
-                "cpu_text": f"{cpu_pct}%",
-                "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
+                "cpu_text": cpu_text,
+                "ram_text": ram_text,
                 "vms_text": str(vms_count),
-                "uptime_text": uptime_str,
+                "uptime_text": uptime_text,
             })
         panel.host_summary_list.set_items(card_items)
 
@@ -466,12 +462,12 @@ class HostTabs:
         panel.card_vm_total.set_value(str(total))
         panel.card_vm_total.set_subtitle(f"{running} {tr('running')} · {stopped} {tr('stopped')}")
         running_vms = [v for v in vms if v.get("status") == "running"]
-        cpu_sum = sum(v.get("cpu", 0) or 0 for v in running_vms)
+        cpu_sum = sum(v.cpu_fraction for v in running_vms if hasattr(v, "cpu_fraction"))
         cpu_pct = round(cpu_sum * 100, 1) if cpu_sum else 0
         panel.card_vm_cpu.set_value(f"{cpu_pct}%")
         panel.card_vm_cpu.set_progress(min(cpu_pct, 100))
-        mem_sum = sum(v.get("mem", 0) or 0 for v in vms)
-        maxmem_sum = sum(v.get("maxmem", 0) or 0 for v in vms)
+        mem_sum = sum(v.mem_bytes for v in vms if hasattr(v, "mem_bytes"))
+        maxmem_sum = sum(v.maxmem_bytes for v in vms if hasattr(v, "maxmem_bytes"))
         mem_gb = round(mem_sum / (1024**3), 1) if mem_sum else 0
         maxmem_gb = round(maxmem_sum / (1024**3), 1) if maxmem_sum else 0
         panel.card_vm_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
@@ -480,30 +476,28 @@ class HostTabs:
 
     def _populate_cluster_summary_cards(self, hosts):
         panel = self.panel
-        host_names = {h.get("host_name", "") for h in hosts}
-        node_names = {h.get("node", "") for h in hosts}
+        host_names = {h.host_name for h in hosts}
+        node_names = {h.node for h in hosts}
         cluster_name = ""
-        first_cfg = next((panel._cfg_by_name.get(h.get("host_name", "")) for h in hosts), None)
+        first_cfg = next((panel._cfg_by_name.get(h.host_name) for h in hosts), None)
         if first_cfg:
             cluster_name = first_cfg.get("cluster", "")
         vms = [vm for vm in panel.all_vms
-               if vm.get("node") in node_names
-               and vm.get("host_name") in host_names]
-        vms_running = sum(1 for v in vms if v.get("status") == "running")
+               if vm.get("node") in node_names and vm.get("host_name") in host_names]
+        vms_running = sum(1 for v in vms if v.status.value == "running")
         vms_stopped = len(vms) - vms_running
         panel.card_cluster_hosts.set_value(f"{len(hosts)}")
         running_hosts = sum(1 for h in hosts if h.get("status") == "online")
         panel.card_cluster_hosts.set_subtitle(f"{running_hosts} {tr('online')}")
         panel.card_cluster_vms.set_value(f"{vms_running}/{len(vms)}")
         panel.card_cluster_vms.set_subtitle(f"{vms_stopped} {tr('stopped')}")
-        total_cpu = sum(h.get("cpu", 0) or 0 for h in hosts if h.get("status") == "online")
         online_hosts = [h for h in hosts if h.get("status") == "online"]
         n_online = len(online_hosts) or 1
-        avg_cpu_pct = round((total_cpu / n_online) * 100, 1)
+        avg_cpu_pct = round(sum(h.cpu_pct for h in online_hosts) / n_online, 1)
         panel.card_cluster_cpu.set_value(f"{avg_cpu_pct}%")
         panel.card_cluster_cpu.set_progress(avg_cpu_pct)
-        total_mem = sum(h.get("mem", 0) or 0 for h in online_hosts)
-        total_maxmem = sum(h.get("maxmem", 0) or 0 for h in online_hosts)
+        total_mem = sum(h.mem_bytes for h in online_hosts)
+        total_maxmem = sum(h.maxmem_bytes for h in online_hosts)
         mem_gb = round(total_mem / (1024**3), 1) if total_mem else 0
         maxmem_gb = round(total_maxmem / (1024**3), 1) if total_maxmem else 0
         panel.card_cluster_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
@@ -567,12 +561,17 @@ class HostTabs:
                          if vm.get("host_name") in cl["host_names"]]
         cluster_items = []
         for cl_name, cl_data in sorted(clusters.items(), key=lambda x: x[0].lower()):
-            hosts_ok = sum(1 for h in cl_data["hosts"] if h.get("status") == "online")
-            vms_ok = sum(1 for v in cl_data["vms"] if v.get("status") == "running")
-            cpu_vals = [h.get("cpu", 0) for h in cl_data["hosts"] if isinstance(h.get("cpu"), float)]
-            avg_cpu = round(sum(cpu_vals) / len(cpu_vals) * 100, 1) if cpu_vals else 0
-            mem_total = sum(h.get("maxmem", 0) for h in cl_data["hosts"])
-            mem_used = sum(h.get("mem", 0) for h in cl_data["hosts"])
+            hosts = cl_data["hosts"]
+            vms = cl_data["vms"]
+            hosts_ok = sum(1 for h in hosts if h.get("status") == "online")
+            vms_ok = sum(1 for v in vms if v.get("status") == "running")
+            online_hosts = [h for h in hosts if h.get("status") == "online"]
+            if online_hosts:
+                avg_cpu = round(sum(h.cpu_pct for h in online_hosts) / len(online_hosts), 1)
+            else:
+                avg_cpu = 0
+            mem_total = sum(h.maxmem_bytes for h in hosts)
+            mem_used = sum(h.mem_bytes for h in hosts)
             mem_total_gb = round(mem_total / (1024**3), 1)
             mem_used_gb = round(mem_used / (1024**3), 1)
             cluster_items.append({
@@ -602,34 +601,27 @@ class HostTabs:
             if cl and cl not in (False, None, "Standalone"):
                 cluster_nodes.append(node)
         for node in sorted(cluster_nodes, key=_sort_key):
-            node_name = node.get("_display_name") or node.get("node", "?")
+            node_name = (node.display_name if hasattr(node, "display_name")
+                         else node.get("_display_name", "")) or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
             cluster_name = cfg.get("cluster", "") if cfg else ""
             if cluster_name in (None, "Standalone"):
                 cluster_name = tr("Standalone")
             status = node.get("status", "unknown")
-            cpu_frac = node.get("cpu", 0)
-            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            mem_bytes = node.get("mem", 0)
-            maxmem_bytes = node.get("maxmem", 0) or 0
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            mem_pct = round(mem_bytes / maxmem_bytes * 100, 1) if maxmem_bytes else 0
-            maxdisk_bytes = node.get("maxdisk", 0) or 0
-            disk_bytes = node.get("disk", 0) or 0
-            disk_gb = round(disk_bytes / (1024**3), 1) if disk_bytes else 0
-            maxdisk_gb = round(maxdisk_bytes / (1024**3), 1) if maxdisk_bytes else 0
+            cpu_pct = node.cpu_pct if hasattr(node, "cpu_pct") else 0
             vms_count = sum(
                 1 for v in panel.all_vms
                 if v.get("node") == node.get("node")
                 and v.get("host_name") == host_name
             )
-            uptime_sec = node.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
-            pve_ver = node.get("pveversion", "")
-            if pve_ver:
-                pve_ver = pve_ver.split("/")[-1] if "/" in pve_ver else pve_ver
+            mem_gib = node.mem_gib if hasattr(node, "mem_gib") else 0
+            maxmem_gib = node.maxmem_gib if hasattr(node, "maxmem_gib") else 0
+            mem_pct = node.mem_pct if hasattr(node, "mem_pct") else 0
+            disk_gib = node.disk_gib if hasattr(node, "disk_gib") else 0
+            maxdisk_gib = node.maxdisk_gib if hasattr(node, "maxdisk_gib") else 0
+            uptime_str = node.uptime_str if hasattr(node, "uptime_str") else "—"
+            pve_text = node.pve_text if hasattr(node, "pve_text") else "—"
             card_items.append({
                 "_key": f"{node.get('node', '')}@{host_name}",
                 "node": node.get("node", ""),
@@ -638,11 +630,11 @@ class HostTabs:
                 "cluster_text": cluster_name,
                 "status_text": status_text(status),
                 "cpu_text": f"{cpu_pct}%",
-                "ram_text": f"{mem_gb}/{maxmem_gb} ({mem_pct}%)",
-                "disk_text": f"{disk_gb}/{maxdisk_gb} GiB",
+                "ram_text": f"{mem_gib}/{maxmem_gib} ({mem_pct}%)",
+                "disk_text": f"{disk_gib}/{maxdisk_gib} GiB",
                 "vms_text": str(vms_count),
                 "uptime_text": uptime_str,
-                "pve_text": pve_ver or "—",
+                "pve_text": pve_text,
             })
         panel.node_compare_list.set_items(card_items)
 
@@ -712,7 +704,7 @@ class HostTabs:
         panel = self.panel
         panel.cluster_quorum_widget.setVisible(False)
         host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
-        node = panel._nodes_by_pair.get((host_cfg_name, host_name))
+        node = panel._node_repo.get(host_cfg_name, host_name) if panel._node_repo else None
         if node is None:
             node = host_data if host_data else None
         display_name = node.get("_display_name") if node else host_name
@@ -776,13 +768,9 @@ class HostTabs:
         if host_data and host_data.get("status") != "error":
             from ._constants import _fmt_pveversion
             host_cfg = panel._cfg_by_name.get(host_data.get("host_name", ""))
-            cpu_frac = host_data.get("cpu", 0)
-            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            mem_bytes = host_data.get("mem", 0)
-            maxmem_bytes = host_data.get("maxmem", 0)
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            uptime = host_data.get("uptime", 0)
+            cpu_pct = host_data.get("cpu_pct", 0)
+            mem_gb = host_data.get("mem_gib", 0)
+            maxmem_gb = host_data.get("maxmem_gib", 0)
             status = host_data.get("status", "")
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
@@ -802,8 +790,7 @@ class HostTabs:
             panel.card_cpu.set_progress(cpu_pct)
 
             panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
-            ram_pct = safe_pct(mem_bytes, maxmem_bytes)
-            panel.card_ram.set_progress(ram_pct)
+            panel.card_ram.set_progress(host_data.get("mem_pct", 0))
 
             host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
             vms_count = sum(1 for v in panel.all_vms
@@ -819,7 +806,7 @@ class HostTabs:
             panel.card_disk.set_progress(0)
 
             panel.card_net.set_title(tr("Uptime"))
-            panel.card_net.set_value(_format_uptime(uptime) if uptime else "—")
+            panel.card_net.set_value(host_data.get("uptime_str", "—"))
             panel.card_net.set_subtitle("")
 
             panel.card_uptime.set_title(tr("Address"))
@@ -841,17 +828,13 @@ class HostTabs:
         card_items = []
         for vm in vms_of_host:
             vm_status = str(vm.get("status", ""))
-            cpu_val = vm.get("cpu", 0)
-            if isinstance(cpu_val, float):
-                cpu_str = str(round(cpu_val * 100, 1))
-            else:
-                cpu_str = str(cpu_val)
+            cpu_str = str(vm.get("cpu_pct", 0))
             mem = vm.get("mem", 0) or 0
             maxmem = vm.get("maxmem", 0) or 0
             if maxmem:
                 mem_pct = round(mem / maxmem * 100, 1)
-                mem_gb = round(mem / (1024**3), 2)
-                maxmem_gb = round(maxmem / (1024**3), 2)
+                mem_gb = vm.get("mem_gib", round(mem / (1024**3), 2) if mem else 0)
+                maxmem_gb = vm.get("maxmem_gib", round(maxmem / (1024**3), 2) if maxmem else 0)
                 ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
             else:
                 ram_str = "—"
@@ -859,16 +842,14 @@ class HostTabs:
             maxdisk = vm.get("maxdisk", 0) or 0
             vm_type = vm.get("type", "qemu")
             if maxdisk:
-                maxdisk_gb = round(maxdisk / (1024**3), 2)
+                maxdisk_gb = vm.get("maxdisk_gib", round(maxdisk / (1024**3), 2))
                 if vm_type == "lxc" and disk:
-                    disk_gb = round(disk / (1024**3), 2)
+                    disk_gb = vm.get("disk_gib", round(disk / (1024**3), 2) if disk else 0)
                     disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
                 else:
                     disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
-            uptime = vm.get("uptime", 0)
-            uptime_str = _format_uptime(uptime) if uptime else "—"
             card_items.append({
                 "vmid": vm.get("vmid"),
                 "name": str(vm.get("name", "")),
@@ -877,7 +858,7 @@ class HostTabs:
                 "cpu_text": cpu_str,
                 "ram_text": ram_str,
                 "disk_text": disk_str,
-                "uptime_text": uptime_str,
+                "uptime_text": vm.get("uptime_str", "—"),
                 "host_name": host_cfg_name,
                 "node": vm.get("node", host_name),
             })
@@ -967,13 +948,9 @@ class HostTabs:
         if is_online:
             from ._constants import _fmt_pveversion
             host_cfg = panel._cfg_by_name.get(host_cfg_name)
-            cpu_frac = host_data.get("cpu", 0)
-            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            mem_bytes = host_data.get("mem", 0)
-            maxmem_bytes = host_data.get("maxmem", 0)
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            uptime = host_data.get("uptime", 0)
+            cpu_pct = host_data.get("cpu_pct", 0)
+            mem_gb = host_data.get("mem_gib", 0)
+            maxmem_gb = host_data.get("maxmem_gib", 0)
             status = host_data.get("status", "")
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
@@ -987,7 +964,7 @@ class HostTabs:
             panel.card_cpu.set_progress(cpu_pct)
 
             panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
-            panel.card_ram.set_progress(safe_pct(mem_bytes, maxmem_bytes))
+            panel.card_ram.set_progress(host_data.get("mem_pct", 0))
 
             vms_count = sum(1 for v in panel.all_vms
                            if v.get("node") == host_name
@@ -999,7 +976,7 @@ class HostTabs:
             panel.card_disk.set_value(f"{vms_running}/{vms_count}")
             panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
 
-            panel.card_net.set_value(_format_uptime(uptime) if uptime else "—")
+            panel.card_net.set_value(host_data.get("uptime_str", "—"))
 
             address = host_cfg.get("host", "") if host_cfg else ""
             panel.card_uptime.set_value(address)
@@ -1014,17 +991,13 @@ class HostTabs:
         card_updates = []
         for vm in vms_of_host:
             vm_status = str(vm.get("status", ""))
-            cpu_val = vm.get("cpu", 0)
-            if isinstance(cpu_val, float):
-                cpu_str = str(round(cpu_val * 100, 1))
-            else:
-                cpu_str = str(cpu_val)
+            cpu_str = str(vm.get("cpu_pct", 0))
             mem = vm.get("mem", 0) or 0
             maxmem = vm.get("maxmem", 0) or 0
             if maxmem:
                 mem_pct = round(mem / maxmem * 100, 1)
-                mem_gb = round(mem / (1024**3), 2)
-                maxmem_gb = round(maxmem / (1024**3), 2)
+                mem_gb = vm.get("mem_gib", round(mem / (1024**3), 2) if mem else 0)
+                maxmem_gb = vm.get("maxmem_gib", round(maxmem / (1024**3), 2) if maxmem else 0)
                 ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
             else:
                 ram_str = "—"
@@ -1032,16 +1005,14 @@ class HostTabs:
             maxdisk = vm.get("maxdisk", 0) or 0
             vm_type = vm.get("type", "qemu")
             if maxdisk:
-                maxdisk_gb = round(maxdisk / (1024**3), 2)
+                maxdisk_gb = vm.get("maxdisk_gib", round(maxdisk / (1024**3), 2))
                 if vm_type == "lxc" and disk:
-                    disk_gb = round(disk / (1024**3), 2)
+                    disk_gb = vm.get("disk_gib", round(disk / (1024**3), 2) if disk else 0)
                     disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
                 else:
                     disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
-            uptime = vm.get("uptime", 0)
-            uptime_str = _format_uptime(uptime) if uptime else "—"
             card_updates.append({
                 "vmid": vm.get("vmid"),
                 "name": str(vm.get("name", "")),
@@ -1050,7 +1021,7 @@ class HostTabs:
                 "cpu_text": cpu_str,
                 "ram_text": ram_str,
                 "disk_text": disk_str,
-                "uptime_text": uptime_str,
+                "uptime_text": vm.get("uptime_str", "—"),
             })
         panel.host_vm_list.update_all(card_updates)
 
@@ -1060,20 +1031,17 @@ class HostTabs:
             return
         card_updates = []
         for node in hosts:
-            node_name = node.get("_display_name") or node.get("node", "?")
+            node_name = (node.display_name if hasattr(node, "display_name")
+                         else node.get("_display_name", "")) or node.get("node", "?")
             host_name = node.get("host_name", "")
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster_rep"):
                 node_name = "★ " + node_name
             status = node.get("status", "unknown")
-            cpu_frac = node.get("cpu", 0)
-            cpu_pct = round(cpu_frac * 100, 1) if isinstance(cpu_frac, float) else 0
-            mem_bytes = node.get("mem", 0)
-            maxmem_bytes = node.get("maxmem", 0) or 0
-            mem_gb = round(mem_bytes / (1024**3), 2) if mem_bytes else 0
-            maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
-            uptime_sec = node.get("uptime", 0)
-            uptime_str = _format_uptime(uptime_sec) if uptime_sec else "—"
+            cpu_pct = node.cpu_pct if hasattr(node, "cpu_pct") else 0
+            mem_gb = node.mem_gib if hasattr(node, "mem_gib") else 0
+            maxmem_gb = node.maxmem_gib if hasattr(node, "maxmem_gib") else 0
+            uptime_str = node.uptime_str if hasattr(node, "uptime_str") else "—"
             vms_count = sum(
                 1 for v in panel.all_vms
                 if v.get("node") == node.get("node")
@@ -1556,24 +1524,20 @@ class HostTabs:
             vmid = vm.get("vmid", "")
             name = vm.get("name", "") or f"VM {vmid}"
             status = vm.get("status", "")
-            cpu = vm.get("cpu", 0) or 0
-            cpu_pct = round(cpu * 100, 1) if isinstance(cpu, float) else 0
-            mem = vm.get("mem", 0) or 0
-            maxmem = vm.get("maxmem", 0) or 0
-            mem_gb = round(mem / (1024**3), 1) if mem else 0
-            maxmem_gb = round(maxmem / (1024**3), 1) if maxmem else 0
-            disk = vm.get("disk", 0) or 0
-            disk_gb = round(disk / (1024**3), 1) if disk else 0
-            uptime = vm.get("uptime", 0) or 0
+            cpu_pct = vm.cpu_pct if hasattr(vm, "cpu_pct") else 0
+            mem_gib = vm.mem_gib if hasattr(vm, "mem_gib") else 0
+            maxmem_gib = vm.maxmem_gib if hasattr(vm, "maxmem_gib") else 0
+            disk_gib = vm.disk_gib if hasattr(vm, "disk_gib") else 0
+            uptime_str = vm.uptime_str if hasattr(vm, "uptime_str") else "—"
             card_items.append({
                 "vmid": vmid,
                 "name": name,
                 "status": status,
                 "status_text": status_text(status),
                 "cpu_text": f"{cpu_pct}%",
-                "ram_text": f"{mem_gb}/{maxmem_gb} GiB",
-                "disk_text": f"{disk_gb} GiB",
-                "uptime_text": _format_uptime(uptime) if uptime else "—",
+                "ram_text": f"{mem_gib}/{maxmem_gib} GiB",
+                "disk_text": f"{disk_gib} GiB",
+                "uptime_text": uptime_str,
                 "host_name": vm.get("host_name", ""),
                 "node": vm.get("node", ""),
             })

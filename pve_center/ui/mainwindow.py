@@ -35,6 +35,26 @@ from ..config import (
     save_tasks_cache,
     save_ui_state,
 )
+from ..domain import (
+    Node as DomainNode,
+)
+from ..domain import (
+    NodeRepository,
+    NodeStatus,
+    PoolRepository,
+    StorageRepository,
+    VmRepository,
+    VmStatus,
+)
+from ..domain import (
+    Pool as DomainPool,
+)
+from ..domain import (
+    Storage as DomainStorage,
+)
+from ..domain import (
+    Vm as DomainVm,
+)
 from . import theme
 from .detail_panel import DetailPanel
 from .i18n import get_language, supported_languages, tr
@@ -42,7 +62,7 @@ from .icons import get_icon
 from .notification import NotificationManager
 from .theme import Color
 from .tree_panel import TreePanel
-from .utils import build_cfg_index, build_vm_index
+from .utils import build_cfg_index
 from .vm_actions import confirm_vm_action
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 
@@ -64,19 +84,25 @@ class MainWindow(QMainWindow):
 
         self.nodes_cfg = nodes_cfg or []
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
-        self._vms_by_key = {}
         self.all_nodes = []
-        self._nodes_by_pair = {}
         self.all_vms = []
         self.all_storages = []
         self.all_iso_images = {}
         self.all_ha_groups = {}
         self.all_pools = []
 
+        # Domain repositories (typed, indexed — replace raw dict indexes)
+        self._node_repo = NodeRepository()
+        self._vm_repo = VmRepository()
+        self._storage_repo = StorageRepository()
+        self._pool_repo = PoolRepository()
+
         self._first_selection_done = False
         self._seen_storage_keys = set()
         self._last_host_statuses = {}
         self._last_vm_statuses = {}
+        self._offline_mode = False
+        self._offline_ts = None
 
         self.tree_panel = TreePanel(self.nodes_cfg)
         self.detail_panel = DetailPanel(self.nodes_cfg)
@@ -301,22 +327,33 @@ class MainWindow(QMainWindow):
                 self.all_nodes[:] = cached_res.get("nodes", [])
                 self.all_vms[:] = cached_res.get("vms", [])
                 self.all_storages[:] = cached_res.get("storages", [])
-                self._vms_by_key = build_vm_index(self.all_vms)
-                self._nodes_by_pair = {
-                    (n.get("host_name", ""), n.get("node", "")): n
-                    for n in self.all_nodes
-                }
-                self.detail_panel.all_nodes[:] = self.all_nodes
-                self.detail_panel.all_vms[:] = self.all_vms
-                self.detail_panel.all_storages[:] = self.all_storages
-                self.detail_panel._vms_by_key = self._vms_by_key
-                self.detail_panel._nodes_by_pair = {
-                    (n.get("host_name", ""), n.get("node", "")): n
-                    for n in self.all_nodes
-                }
-                self.tree_panel.update_node_statuses(self.all_nodes, self.all_vms)
+                # Fill repositories from cache
+                cluster_name_cache = {}
+                for cfg in self.nodes_cfg:
+                    cn = cfg.get("cluster", "") or ""
+                    cluster_name_cache[cfg.get("name", "")] = cn
+                for n_dict in self.all_nodes:
+                    hn = n_dict.get("host_name", "")
+                    cn = cluster_name_cache.get(hn, "")
+                    ic = n_dict.get("_is_cluster", False)
+                    self._node_repo.add(DomainNode.from_pve(n_dict, hn, cn, ic))
+                for v_dict in self.all_vms:
+                    self._vm_repo.add(DomainVm.from_pve(v_dict, v_dict.get("host_name", "")))
+                for s_dict in self.all_storages:
+                    hn = s_dict.get("host_name", "")
+                    cn = cluster_name_cache.get(hn, "")
+                    self._storage_repo.add(DomainStorage.from_pve(s_dict, hn, cn))
+                self.detail_panel.set_lists(
+                    self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
+                node_repo=self._node_repo, vm_repo=self._vm_repo
+                )
+                self.tree_panel.update_node_statuses(
+                    self._node_repo.all(), self._vm_repo.all(),
+                    node_repo=self._node_repo, vm_repo=self._vm_repo,
+                )
                 self._offline_mode = True
                 self._offline_ts = cached_ts
+                self._update_status_bar()
             except Exception:
                 self._offline_mode = False
                 self._offline_ts = None
@@ -491,7 +528,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------
     def _on_vm_delete_requested(self, host_name, node, vmid):
         # Найти ВМ по vmid + host_name
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         vm_name = vm.get("name") if vm else f"VM {vmid}"
         vm_status = vm.get("status", "") if vm else ""
         vm_type = vm.get("type", "qemu") if vm else "qemu"
@@ -615,7 +652,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         if vm and vm.get("template"):
             self._notifications.show(tr("Lifecycle actions are not available for templates"), error=True)
             return
@@ -638,7 +675,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         vm_type = (vm.get("type", "qemu") if vm else "qemu")
         from ..backend import VmConsoleWorker
         worker = VmConsoleWorker(cfg, node, vmid, vm_type)
@@ -664,7 +701,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         if vm and vm.get("template"):
             self._notifications.show(tr("Migration is not available for templates"), error=True)
             return
@@ -706,7 +743,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         vm_info = {
             "name": vm.get("name", "") if vm else "",
             "vmid": vmid,
@@ -787,7 +824,7 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        vm = self._vms_by_key.get((host_name, vmid))
+        vm = self._vm_repo.get(host_name, vmid)
         if direction == "to_template":
             if vm and vm.get("status") == "running":
                 self._notifications.show(
@@ -1046,13 +1083,16 @@ class MainWindow(QMainWindow):
         self.detail_panel.all_nodes.clear()
         self.detail_panel.all_vms.clear()
         self.detail_panel.all_storages.clear()
-        self._vms_by_key.clear()
         self.all_iso_images.clear()
         self.all_ha_groups.clear()
         self.all_pools.clear()
         self._seen_storage_keys.clear()
         self._first_selection_done = False
         self._tasks_started = False
+        self._node_repo.clear()
+        self._vm_repo.clear()
+        self._storage_repo.clear()
+        self._pool_repo.clear()
 
         self.tree_panel.start_loading()
 
@@ -1072,8 +1112,14 @@ class MainWindow(QMainWindow):
             self.all_nodes.clear()
             self.all_vms.clear()
             self.all_storages.clear()
-            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
-            self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+            self.tree_panel.update_data(
+                self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(), final=True,
+                node_repo=self._node_repo, vm_repo=self._vm_repo,
+            )
+            self.detail_panel.set_lists(
+                self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
+                node_repo=self._node_repo, vm_repo=self._vm_repo
+            )
             self.detail_panel.set_iso_catalog(self.all_iso_images)
             self._update_status_bar()
 
@@ -1085,6 +1131,7 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
+            cluster_name = worker.node_cfg.get("cluster", "") if worker else ""
             existing_node_keys = {(n.get("node"), n.get("host_name")) for n in self.all_nodes}
             for node in data.get("nodes", []):
                 node["host_name"] = host
@@ -1097,7 +1144,7 @@ class MainWindow(QMainWindow):
                 else:
                     existing_node_keys.add(key)
                     self.all_nodes.append(node)
-                self._nodes_by_pair[(host, node.get("node", ""))] = node
+                self._node_repo.add(DomainNode.from_pve(node, host, cluster_name, is_cluster))
             for vm in data.get("vms", []):
                 vm["host_name"] = host
                 # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
@@ -1108,14 +1155,17 @@ class MainWindow(QMainWindow):
                     self.all_vms[idx] = vm
                 else:
                     self.all_vms.append(vm)
-                self._vms_by_key[vm_key] = vm
+                self._vm_repo.add(DomainVm.from_pve(vm, host))
             self._dedup_storages(data.get("storages", []), host, self.all_storages)
+            for st_dict in data.get("storages", []):
+                self._storage_repo.add(DomainStorage.from_pve(st_dict, host, cluster_name))
             # Собираем уникальные имена пулов
             known = {p["poolid"] for p in self.all_pools if "poolid" in p}
             for pn in data.get("pool_names", []):
                 if pn and pn not in known:
                     known.add(pn)
                     self.all_pools.append({"poolid": pn})
+                    self._pool_repo.add(DomainPool(poolid=pn))
             # Собираем ISO-образы (host_name -> list volid)
             for iso_host, isos in data.get("iso_images", {}).items():
                 if isos:
@@ -1138,7 +1188,7 @@ class MainWindow(QMainWindow):
                     "_is_cluster": is_cluster_err
                 }
                 self.all_nodes.append(err_node)
-                self._nodes_by_pair[(host, host)] = err_node
+                self._node_repo.add(DomainNode.from_pve(err_node, host, "", is_cluster_err))
             from ..utils import parse_pve_error
             reason = parse_pve_error(err_msg)
             self._notifications.show(
@@ -1153,9 +1203,17 @@ class MainWindow(QMainWindow):
 
         # Промежуточное обновление дерева — без очистки спиннеров.
         # Не загрузившиеся кластеры остаются в дереве как заглушки со спиннерами.
-        self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=False)
-        self.detail_panel.set_lists(self.all_nodes, self.all_vms, self.all_storages)
+        self.tree_panel.update_data(
+            self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(), final=False,
+            node_repo=self._node_repo, vm_repo=self._vm_repo,
+        )
+        self.detail_panel.set_lists(
+            self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
+                node_repo=self._node_repo, vm_repo=self._vm_repo
+        )
         self.detail_panel.set_iso_catalog(self.all_iso_images)
+        self.detail_panel.all_pools = self.all_pools
+        self.detail_panel.all_ha_groups = self.all_ha_groups
 
         # Выбираем первый элемент в дереве при первой же возможности.
         if not getattr(self, '_first_selection_done', False) and self.tree_panel.tree.topLevelItemCount() > 0:
@@ -1175,7 +1233,10 @@ class MainWindow(QMainWindow):
                 self._do_first_selection()
                 self.detail_panel.refresh_current_view()
             # Все данные загружены — финальная перестройка: спиннеры гаснут, VM/пулы в дереве
-            self.tree_panel.update_data(self.all_nodes, self.all_vms, self.all_storages, final=True)
+            self.tree_panel.update_data(
+                self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(), final=True,
+                node_repo=self._node_repo, vm_repo=self._vm_repo,
+            )
             self.last_refresh_ts = time.time()
             self._soft_refresh_start = time.time()
             self._update_status_bar()
@@ -1187,8 +1248,10 @@ class MainWindow(QMainWindow):
                 self._update_status_bar()
 
     def _detect_status_changes(self, nodes=None, vms=None):
-        nodes = nodes if nodes is not None else self.all_nodes
-        vms = vms if vms is not None else self.all_vms
+        if nodes is None:
+            nodes = self._node_repo.all()
+        if vms is None:
+            vms = self._vm_repo.all()
         for node in nodes:
             name = node.get("node", "")
             status = node.get("status", "unknown")
@@ -1304,23 +1367,36 @@ class MainWindow(QMainWindow):
         if self._soft_counter >= active_count:
             if self._soft_nodes or self._soft_vms:
                 try:
-                    self.tree_panel.update_node_statuses(self._soft_nodes, self._soft_vms)
                     self.all_nodes[:] = self._soft_nodes
                     self.all_vms[:] = self._soft_vms
                     self.all_storages[:] = self._soft_storages
-                    self._vms_by_key = build_vm_index(self.all_vms)
-                    self._nodes_by_pair = {
-                        (n.get("host_name", ""), n.get("node", "")): n
-                        for n in self._soft_nodes
-                    }
-                    self.detail_panel.all_nodes[:] = self._soft_nodes
-                    self.detail_panel.all_vms[:] = self._soft_vms
-                    self.detail_panel.all_storages[:] = self._soft_storages
-                    self.detail_panel._vms_by_key = self._vms_by_key
-                    self.detail_panel._nodes_by_pair = {
-                        (n.get("host_name", ""), n.get("node", "")): n
-                        for n in self._soft_nodes
-                    }
+                    # Refill repositories with fresh domain objects
+                    self._node_repo.clear()
+                    self._vm_repo.clear()
+                    self._storage_repo.clear()
+                    cluster_name_cache = {}
+                    for cfg in self.nodes_cfg:
+                        cn = cfg.get("cluster", "") or ""
+                        cluster_name_cache[cfg.get("name", "")] = cn
+                    for n_dict in self._soft_nodes:
+                        hn = n_dict.get("host_name", "")
+                        cn = cluster_name_cache.get(hn, "")
+                        ic = n_dict.get("_is_cluster", False)
+                        self._node_repo.add(DomainNode.from_pve(n_dict, hn, cn, ic))
+                    for v_dict in self._soft_vms:
+                        self._vm_repo.add(DomainVm.from_pve(v_dict, v_dict.get("host_name", "")))
+                    for s_dict in self._soft_storages:
+                        hn = s_dict.get("host_name", "")
+                        cn = cluster_name_cache.get(hn, "")
+                        self._storage_repo.add(DomainStorage.from_pve(s_dict, hn, cn))
+                    self.tree_panel.update_node_statuses(
+                        self._node_repo.all(), self._vm_repo.all(),
+                        node_repo=self._node_repo, vm_repo=self._vm_repo,
+                    )
+                    self.detail_panel.set_lists(
+                        self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
+                node_repo=self._node_repo, vm_repo=self._vm_repo
+                    )
                     self.detail_panel.refresh_current_view()
                     # Пробрасываем уже собранные на hard refresh пулы/HA —
                     # soft refresh не имеет ProxmoxAPI, пересобрать не может
@@ -1532,19 +1608,19 @@ class MainWindow(QMainWindow):
     def _update_status_bar(self):
         from datetime import datetime
         now_str = datetime.now().strftime("%H:%M:%S")
-        hosts_ok = sum(1 for n in self.all_nodes if n.get("status") == "online")
-        hosts_total = len(self.all_nodes)
-        hosts_err = sum(1 for n in self.all_nodes if n.get("status") == "error")
-        vms_count = len(self.all_vms)
-        vms_running = sum(1 for v in self.all_vms if v.get("status") == "running")
-        clusters = set()
-        for n in self.all_nodes:
-            c = n.get("cluster") or ""
-            if c and c != "Standalone":
-                clusters.add(c)
-        total_cpu = sum(n.get("cpu", 0) * n.get("sockets", 1) for n in self.all_nodes if n.get("status") == "online")
-        total_mem = sum(n.get("mem", 0) for n in self.all_nodes if n.get("status") == "online")
-        total_maxmem = sum(n.get("maxmem", 0) for n in self.all_nodes if n.get("status") == "online")
+        nodes = self._node_repo.all()
+        vms = self._vm_repo.all()
+        hosts_ok = sum(1 for n in nodes if n.status is NodeStatus.ONLINE)
+        hosts_total = len(nodes)
+        hosts_err = sum(1 for n in nodes if n.status is NodeStatus.ERROR)
+        vms_count = len(vms)
+        vms_running = sum(1 for v in vms if v.status is VmStatus.RUNNING)
+        clusters = {n.cluster for n in nodes if n.cluster and n.cluster != "Standalone"}
+        total_cpu = sum(
+            n.cpu_fraction * n.cpu_sockets for n in nodes if n.status is NodeStatus.ONLINE
+        )
+        total_mem = sum(n.mem_bytes for n in nodes if n.status is NodeStatus.ONLINE)
+        total_maxmem = sum(n.maxmem_bytes for n in nodes if n.status is NodeStatus.ONLINE)
         mem_pct = (total_mem / total_maxmem * 100) if total_maxmem else 0
         cpu_pct = (total_cpu * 100) if total_cpu else 0
         parts = [
