@@ -7,6 +7,7 @@ import requests
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ...backend import _suppress_ssl_warnings
+from ...provider import ProxmoxSession, RrdAPI
 from ..i18n import tr
 
 logger = logging.getLogger(__name__)
@@ -62,23 +63,13 @@ class StorageMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
-        session = requests.Session()
+        session = None
         try:
-            session.verify = _verify_ssl(self.host_cfg)
-            auth_token = (
-                f"PVEAPIToken={self.host_cfg['user']}!"
-                f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
+            session = ProxmoxSession(self.host_cfg, timeout=10)
+            rrd_api = RrdAPI(session)
+            rrd_response = rrd_api.get_storage_rrddata(
+                self.node_name, self.storage_name, self.timeframe
             )
-            headers = {"Authorization": auth_token}
-            encoded_name = urllib.parse.quote(self.storage_name, safe='')
-            url = (
-                f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
-                f"nodes/{self.node_name}/storage/{encoded_name}/rrddata"
-            )
-            params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
-            _check_response(resp)
-            rrd_response = resp.json()['data']
 
             metrics = {'usage': []}
             for entry in rrd_response:
@@ -97,7 +88,8 @@ class StorageMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            session.close()
+            if session:
+                session.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -581,22 +573,11 @@ class HostMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
-        session = requests.Session()
+        session = None
         try:
-            session.verify = _verify_ssl(self.host_cfg)
-            auth_token = (
-                f"PVEAPIToken={self.host_cfg['user']}!"
-                f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
-            )
-            headers = {"Authorization": auth_token}
-            url = (
-                f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
-                f"nodes/{self.node_name}/rrddata"
-            )
-            params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
-            _check_response(resp)
-            rrd_response = resp.json()['data']
+            session = ProxmoxSession(self.host_cfg, timeout=10)
+            rrd_api = RrdAPI(session)
+            rrd_response = rrd_api.get_node_rrddata(self.node_name, self.timeframe)
 
             metrics = {
                 'cpu': [],
@@ -623,7 +604,8 @@ class HostMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            session.close()
+            if session:
+                session.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -642,22 +624,13 @@ class MetricsWorker(QRunnable):
         self.signals = MetricsSignals()
 
     def run(self):
-        session = requests.Session()
+        session = None
         try:
-            session.verify = _verify_ssl(self.host_cfg)
-            auth_token = (
-                f"PVEAPIToken={self.host_cfg['user']}!"
-                f"{self.host_cfg['token_name']}={self.host_cfg['token_value']}"
+            session = ProxmoxSession(self.host_cfg, timeout=10)
+            rrd_api = RrdAPI(session)
+            rrd_response = rrd_api.get_vm_rrddata(
+                self.node_name, self.vmid, self.vm_type, self.timeframe
             )
-            headers = {"Authorization": auth_token}
-            url = (
-                f"https://{self.host_cfg['host']}:{PVE_PORT}/api2/json/"
-                f"nodes/{self.node_name}/{self.vm_type}/{self.vmid}/rrddata"
-            )
-            params = {'timeframe': self.timeframe, 'cf': 'AVERAGE'}
-            resp = session.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
-            _check_response(resp)
-            rrd_response = resp.json()['data']
 
             metrics = {
                 'cpu': [],
@@ -685,7 +658,8 @@ class MetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            session.close()
+            if session:
+                session.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:

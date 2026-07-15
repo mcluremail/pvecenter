@@ -1,0 +1,197 @@
+"""VmAPI — VM (QEMU) and container (LXC) PVE endpoints.
+
+Covers: /nodes/{node}/qemu, /nodes/{node}/lxc, their status, config,
+resize, move_disk/move_volume, clone, migrate, template, snapshots,
+vncproxy/spiceproxy, and create/delete operations.
+"""
+
+from __future__ import annotations
+
+from ._session import ProxmoxSession, _q
+
+
+class VmAPI:
+    """VM and container PVE API methods."""
+
+    def __init__(self, session: ProxmoxSession) -> None:
+        self._s = session
+
+    def _resource(self, node: str, vmid: int | str, vm_type: str):
+        n = self._s.proxmox.nodes(_q(node))
+        return n.qemu(_q(vmid)) if vm_type == "qemu" else n.lxc(_q(vmid))
+
+    # -- list --
+
+    def list_qemu(self, node: str) -> list[dict]:
+        """GET /nodes/{node}/qemu."""
+        return self._s.call(self._s.proxmox.nodes(_q(node)).qemu.get)
+
+    def list_lxc(self, node: str) -> list[dict]:
+        """GET /nodes/{node}/lxc."""
+        return self._s.call(self._s.proxmox.nodes(_q(node)).lxc.get)
+
+    # -- status --
+
+    def get_status(self, node: str, vmid: int | str, vm_type: str) -> dict:
+        """GET /nodes/{node}/{qemu|lxc}/{vmid}/status/current."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.current.get)
+
+    def start(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/start."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.start.post)
+
+    def stop(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/stop."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.stop.post)
+
+    def reboot(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/reboot."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.reboot.post)
+
+    def shutdown(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/shutdown."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.shutdown.post)
+
+    def suspend(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/suspend."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.suspend.post)
+
+    def resume(self, node: str, vmid: int | str, vm_type: str) -> object:
+        """POST .../status/resume."""
+        return self._s.call(self._resource(node, vmid, vm_type).status.resume.post)
+
+    def perform_action(self, node: str, vmid: int | str, vm_type: str, action: str) -> object:
+        """POST .../status/{action} — generic action dispatch."""
+        call = getattr(self._resource(node, vmid, vm_type).status, action)
+        return self._s.call(call.post)
+
+    # -- config --
+
+    def get_config(self, node: str, vmid: int | str, vm_type: str) -> dict:
+        """GET .../config."""
+        return self._s.call(self._resource(node, vmid, vm_type).config.get)
+
+    def update_config(self, node: str, vmid: int | str, vm_type: str, **params) -> object:
+        """PUT .../config."""
+        return self._s.call(self._resource(node, vmid, vm_type).config.put, **params)
+
+    def post_config(self, node: str, vmid: int | str, vm_type: str, **params) -> object:
+        """POST .../config — used for template=0 conversion."""
+        return self._s.call(self._resource(node, vmid, vm_type).config.post, **params)
+
+    # -- disk operations --
+
+    def resize_disk(self, node: str, vmid: int | str, vm_type: str,
+                    disk: str, size: str) -> object:
+        """PUT .../resize (QEMU) or .../resize (LXC)."""
+        if vm_type == "qemu":
+            return self._s.call(
+                self._resource(node, vmid, vm_type).resize.put,
+                disk=_q(disk), size=_q(size),
+            )
+        return self._s.call(
+            self._resource(node, vmid, vm_type).resize.put,
+            volume=_q(disk), size=_q(size),
+        )
+
+    def move_disk(self, node: str, vmid: int | str, vm_type: str,
+                  disk: str, storage: str, delete: bool = False) -> object:
+        """POST .../move_disk (QEMU) or .../move_volume (LXC)."""
+        if vm_type == "qemu":
+            params: dict = {"disk": _q(disk), "storage": _q(storage)}
+            if delete:
+                params["delete"] = 1
+            return self._s.call(self._resource(node, vmid, vm_type).move_disk.post, **params)
+        params = {"volume": _q(disk), "storage": _q(storage)}
+        if delete:
+            params["delete"] = 1
+        return self._s.call(self._resource(node, vmid, vm_type).move_volume.post, **params)
+
+    # -- lifecycle: create / delete / clone / migrate / template --
+
+    def create_qemu(self, node: str, **params) -> object:
+        """POST /nodes/{node}/qemu."""
+        return self._s.call(self._s.proxmox.nodes(_q(node)).qemu.post, **params)
+
+    def create_lxc(self, node: str, **params) -> object:
+        """POST /nodes/{node}/lxc."""
+        return self._s.call(self._s.proxmox.nodes(_q(node)).lxc.post, **params)
+
+    def delete(self, node: str, vmid: int | str, vm_type: str, purge: bool = True) -> object:
+        """DELETE /nodes/{node}/{qemu|lxc}/{vmid}."""
+        params = {"purge": 1} if purge else {}
+        return self._s.call(self._resource(node, vmid, vm_type).delete, **params)
+
+    def clone(self, node: str, vmid: int | str, vm_type: str, **params) -> object:
+        """POST .../clone."""
+        return self._s.call(self._resource(node, vmid, vm_type).clone.post, **params)
+
+    def migrate(self, node: str, vmid: int | str, target: str,
+                with_local_disks: bool = True) -> object:
+        """POST /nodes/{node}/qemu/{vmid}/migrate (QEMU only)."""
+        params: dict = {"target": target}
+        if with_local_disks:
+            params["with-local-disks"] = 1
+        return self._s.call(
+            self._s.proxmox.nodes(_q(node)).qemu(_q(vmid)).migrate.post, **params
+        )
+
+    def convert_to_template(self, node: str, vmid: int | str) -> object:
+        """POST /nodes/{node}/qemu/{vmid}/template (QEMU only)."""
+        return self._s.call(
+            self._s.proxmox.nodes(_q(node)).qemu(_q(vmid)).template.post
+        )
+
+    # -- snapshots --
+
+    def list_snapshots(self, node: str, vmid: int | str, vm_type: str) -> list[dict]:
+        """GET .../snapshot."""
+        return self._s.call(self._resource(node, vmid, vm_type).snapshot.get)
+
+    def get_snapshot_config(self, node: str, vmid: int | str, vm_type: str,
+                             snap_name: str) -> dict:
+        """GET .../snapshot/{snap}/config."""
+        return self._s.call(
+            self._resource(node, vmid, vm_type).snapshot(snap_name).config.get
+        )
+
+    def create_snapshot(self, node: str, vmid: int | str, vm_type: str,
+                        snap_name: str, description: str = "",
+                        vmstate: bool = False) -> object:
+        """POST .../snapshot."""
+        return self._s.call(
+            self._resource(node, vmid, vm_type).snapshot.post,
+            snapname=snap_name,
+            description=description,
+            vmstate=1 if vmstate else 0,
+        )
+
+    def delete_snapshot(self, node: str, vmid: int | str, vm_type: str,
+                         snap_name: str) -> object:
+        """DELETE .../snapshot/{snap}."""
+        return self._s.call(
+            self._resource(node, vmid, vm_type).snapshot(snap_name).delete
+        )
+
+    # -- console proxies --
+
+    def get_vnc_proxy(self, node: str, vmid: int | str, vm_type: str,
+                      proxy_host: str) -> dict:
+        """POST .../vncproxy."""
+        if vm_type == "lxc":
+            return self._s.call(
+                self._s.proxmox.nodes(_q(node)).lxc(vmid).vncproxy.post,
+                proxy=proxy_host,
+            )
+        return self._s.call(
+            self._s.proxmox.nodes(_q(node)).qemu(vmid).vncproxy.post,
+            proxy=proxy_host,
+        )
+
+    def get_spice_proxy(self, node: str, vmid: int | str,
+                         proxy_host: str) -> dict:
+        """POST .../spiceproxy (QEMU only)."""
+        return self._s.call(
+            self._s.proxmox.nodes(_q(node)).qemu(vmid).spiceproxy.post,
+            proxy=proxy_host,
+        )

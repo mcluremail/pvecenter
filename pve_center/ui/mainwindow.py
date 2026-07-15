@@ -84,9 +84,6 @@ class MainWindow(QMainWindow):
 
         self.nodes_cfg = nodes_cfg or []
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
-        self.all_nodes = []
-        self.all_vms = []
-        self.all_storages = []
         self.all_iso_images = {}
         self.all_ha_groups = {}
         self.all_pools = []
@@ -96,9 +93,12 @@ class MainWindow(QMainWindow):
         self._vm_repo = VmRepository()
         self._storage_repo = StorageRepository()
         self._pool_repo = PoolRepository()
+        # Soft-refresh temporary repositories
+        self._soft_node_repo = NodeRepository()
+        self._soft_vm_repo = VmRepository()
+        self._soft_storage_repo = StorageRepository()
 
         self._first_selection_done = False
-        self._seen_storage_keys = set()
         self._last_host_statuses = {}
         self._last_vm_statuses = {}
         self._offline_mode = False
@@ -224,9 +224,6 @@ class MainWindow(QMainWindow):
         self._soft_refresh_timeout = 30
         self._soft_gen = 0
         self._soft_counter = 0
-        self._soft_nodes = []
-        self._soft_vms = []
-        self._soft_storages = []
         self._soft_had_errors = False
 
         # Восстанавливаем состояние окна: геометрия, maximized, последний выбранный элемент
@@ -324,22 +321,18 @@ class MainWindow(QMainWindow):
         cached_res, cached_ts = load_resources_cache()
         if cached_res:
             try:
-                self.all_nodes[:] = cached_res.get("nodes", [])
-                self.all_vms[:] = cached_res.get("vms", [])
-                self.all_storages[:] = cached_res.get("storages", [])
-                # Fill repositories from cache
                 cluster_name_cache = {}
                 for cfg in self.nodes_cfg:
                     cn = cfg.get("cluster", "") or ""
                     cluster_name_cache[cfg.get("name", "")] = cn
-                for n_dict in self.all_nodes:
+                for n_dict in cached_res.get("nodes", []):
                     hn = n_dict.get("host_name", "")
                     cn = cluster_name_cache.get(hn, "")
                     ic = n_dict.get("_is_cluster", False)
                     self._node_repo.add(DomainNode.from_pve(n_dict, hn, cn, ic))
-                for v_dict in self.all_vms:
+                for v_dict in cached_res.get("vms", []):
                     self._vm_repo.add(DomainVm.from_pve(v_dict, v_dict.get("host_name", "")))
-                for s_dict in self.all_storages:
+                for s_dict in cached_res.get("storages", []):
                     hn = s_dict.get("host_name", "")
                     cn = cluster_name_cache.get(hn, "")
                     self._storage_repo.add(DomainStorage.from_pve(s_dict, hn, cn))
@@ -405,14 +398,6 @@ class MainWindow(QMainWindow):
                     sig.disconnect()
             except (RuntimeError, TypeError):
                 pass
-
-    def _dedup_storages(self, new_storages, host_name, target_list):
-        for st in new_storages:
-            st["host_name"] = host_name
-            key = (st.get("storage"), st.get("node"), host_name)
-            if key not in self._seen_storage_keys:
-                self._seen_storage_keys.add(key)
-                target_list.append(st)
 
     def _on_about(self):
         from .about_dialog import AboutDialog
@@ -492,7 +477,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------
     def _on_vm_create_requested(self, node_name, host_name):
         from .create_vm_dialog import CreateVmDialog
-        dialog = CreateVmDialog(self, nodes=self.all_nodes, storages=self.all_storages,
+        dialog = CreateVmDialog(self, nodes=self._node_repo.all(), storages=self._storage_repo.all(),
                                 pools=getattr(self, 'all_pools', []),
                                 iso_images=getattr(self, 'all_iso_images', {}),
                                 ha_groups=getattr(self, 'all_ha_groups', {}))
@@ -684,17 +669,8 @@ class MainWindow(QMainWindow):
         self._run_worker(worker)
 
     def _get_cluster_nodes(self, host_name, current_node):
-        cfg = self._cfg_by_name.get(host_name)
-        if not cfg:
-            return [n for n in self.all_nodes
-                    if n.get("node") != current_node
-                    and n.get("host_name") == host_name]
-        cluster = cfg.get("cluster", "")
-        if not cluster or cluster in (False, None, "Standalone"):
-            return []
-        return [n for n in self.all_nodes
-                if n.get("node") != current_node
-                and n.get("host_name") == host_name]
+        return [n for n in self._node_repo.get_by_host(host_name)
+                if n.node != current_node]
 
     def _on_vm_migrate(self, host_name, node, vmid):
         cfg = self._cfg_by_name.get(host_name)
@@ -751,9 +727,7 @@ class MainWindow(QMainWindow):
             "node": node,
         }
         cluster_nodes = self._get_cluster_nodes(host_name, node)
-        node_storages = [s for s in self.all_storages
-                         if s.get("node") == node
-                         and s.get("host_name") == host_name]
+        node_storages = self._storage_repo.filter_by_host(host_name, node)
         from .clone_vm_dialog import CloneVMDialog
         dialog = CloneVMDialog(self, vm_info=vm_info,
                                cluster_nodes=cluster_nodes,
@@ -782,8 +756,8 @@ class MainWindow(QMainWindow):
         if not cfg:
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
-        templates = [vm for vm in self.all_vms
-                     if vm.get("template") and vm.get("host_name") == host_name]
+        templates = [vm for vm in self._vm_repo.all()
+                     if vm.template and vm.host_name == host_name]
         if not templates:
             return
         from PySide6.QtWidgets import (
@@ -1060,9 +1034,9 @@ class MainWindow(QMainWindow):
         self._soft_refresh_active = False
         self._soft_counter = 0
         self._soft_had_errors = False
-        self._soft_nodes.clear()
-        self._soft_vms.clear()
-        self._soft_storages.clear()
+        self._soft_node_repo.clear()
+        self._soft_vm_repo.clear()
+        self._soft_storage_repo.clear()
         self._spin_timer.stop()
         self._refresh_spinner.setText("")
 
@@ -1077,16 +1051,12 @@ class MainWindow(QMainWindow):
         if current_type is not None:
             self._saved_obj_type = current_type
 
-        self.all_nodes.clear()
-        self.all_vms.clear()
-        self.all_storages.clear()
         self.detail_panel.all_nodes.clear()
         self.detail_panel.all_vms.clear()
         self.detail_panel.all_storages.clear()
         self.all_iso_images.clear()
         self.all_ha_groups.clear()
         self.all_pools.clear()
-        self._seen_storage_keys.clear()
         self._first_selection_done = False
         self._tasks_started = False
         self._node_repo.clear()
@@ -1109,9 +1079,6 @@ class MainWindow(QMainWindow):
             self._run_worker(worker)
 
         if not active_cfgs:
-            self.all_nodes.clear()
-            self.all_vms.clear()
-            self.all_storages.clear()
             self.tree_panel.update_data(
                 self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(), final=True,
                 node_repo=self._node_repo, vm_repo=self._vm_repo,
@@ -1132,32 +1099,15 @@ class MainWindow(QMainWindow):
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
             cluster_name = worker.node_cfg.get("cluster", "") if worker else ""
-            existing_node_keys = {(n.get("node"), n.get("host_name")) for n in self.all_nodes}
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster
-                key = (node.get("node"), host)
-                if key in existing_node_keys:
-                    idx = next(i for i, n in enumerate(self.all_nodes)
-                               if (n.get("node"), n.get("host_name")) == key)
-                    self.all_nodes[idx] = node
-                else:
-                    existing_node_keys.add(key)
-                    self.all_nodes.append(node)
                 self._node_repo.add(DomainNode.from_pve(node, host, cluster_name, is_cluster))
             for vm in data.get("vms", []):
                 vm["host_name"] = host
-                # Дедупликация: если VM с таким (host_name, vmid) уже есть — заменяем
-                vm_key = (host, vm.get("vmid", 0))
-                idx = next((i for i, v in enumerate(self.all_vms)
-                            if (v.get("host_name"), v.get("vmid")) == vm_key), None)
-                if idx is not None:
-                    self.all_vms[idx] = vm
-                else:
-                    self.all_vms.append(vm)
                 self._vm_repo.add(DomainVm.from_pve(vm, host))
-            self._dedup_storages(data.get("storages", []), host, self.all_storages)
             for st_dict in data.get("storages", []):
+                st_dict["host_name"] = host
                 self._storage_repo.add(DomainStorage.from_pve(st_dict, host, cluster_name))
             # Собираем уникальные имена пулов
             known = {p["poolid"] for p in self.all_pools if "poolid" in p}
@@ -1177,8 +1127,7 @@ class MainWindow(QMainWindow):
         else:
             is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
             err_msg = data.get("error", "Unknown error")
-            err_key = (host, host)
-            if not any((n.get("node"), n.get("host_name")) == err_key for n in self.all_nodes):
+            if not self._node_repo.get(host, host):
                 err_node = {
                     "node": host,
                     "status": "error",
@@ -1187,7 +1136,6 @@ class MainWindow(QMainWindow):
                     "_display_name": host,
                     "_is_cluster": is_cluster_err
                 }
-                self.all_nodes.append(err_node)
                 self._node_repo.add(DomainNode.from_pve(err_node, host, "", is_cluster_err))
             from ..utils import parse_pve_error
             reason = parse_pve_error(err_msg)
@@ -1241,7 +1189,11 @@ class MainWindow(QMainWindow):
             self._soft_refresh_start = time.time()
             self._update_status_bar()
             from ..config import save_resources_cache
-            save_resources_cache(self.all_nodes, self.all_vms, self.all_storages)
+            save_resources_cache(
+                [dict(n) for n in self._node_repo.all()],
+                [dict(v) for v in self._vm_repo.all()],
+                [dict(s) for s in self._storage_repo.all()],
+            )
             if self._offline_mode:
                 self._offline_mode = False
                 self._offline_ts = None
@@ -1283,10 +1235,9 @@ class MainWindow(QMainWindow):
                 self._soft_refresh_running = False
                 self._soft_refresh_active = False
                 self._soft_counter = 0
-                self._soft_nodes.clear()
-                self._soft_vms.clear()
-                self._soft_storages.clear()
-                self._seen_storage_keys.clear()
+                self._soft_node_repo.clear()
+                self._soft_vm_repo.clear()
+                self._soft_storage_repo.clear()
             else:
                 return
         # Atomic guard: claim ownership before any nested event loop can fire.
@@ -1300,10 +1251,9 @@ class MainWindow(QMainWindow):
         self._soft_refresh_start = now
         self.last_refresh_ts = now
 
-        self._soft_nodes.clear()
-        self._soft_vms.clear()
-        self._soft_storages.clear()
-        self._seen_storage_keys.clear()
+        self._soft_node_repo.clear()
+        self._soft_vm_repo.clear()
+        self._soft_storage_repo.clear()
         self._soft_counter = 0
         self._soft_had_errors = False
 
@@ -1326,76 +1276,53 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
-            existing_keys = {(n.get("node"), n.get("host_name")) for n in self._soft_nodes}
+            cluster_name = worker.node_cfg.get("cluster", "") if worker else ""
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster
-                key = (node.get("node"), host)
-                if key in existing_keys:
-                    idx = next(i for i, n in enumerate(self._soft_nodes)
-                               if (n.get("node"), n.get("host_name")) == key)
-                    self._soft_nodes[idx] = node
-                else:
-                    existing_keys.add(key)
-                    self._soft_nodes.append(node)
+                self._soft_node_repo.add(DomainNode.from_pve(node, host, cluster_name, is_cluster))
             for vm in data.get("vms", []):
                 vm["host_name"] = host
-                vm_key = (host, vm.get("vmid", 0))
-                idx = next((i for i, v in enumerate(self._soft_vms)
-                            if (v.get("host_name"), v.get("vmid")) == vm_key), None)
-                if idx is not None:
-                    self._soft_vms[idx] = vm
-                else:
-                    self._soft_vms.append(vm)
-            self._dedup_storages(data.get("storages", []), host, self._soft_storages)
+                self._soft_vm_repo.add(DomainVm.from_pve(vm, host))
+            for st_dict in data.get("storages", []):
+                st_dict["host_name"] = host
+                self._soft_storage_repo.add(DomainStorage.from_pve(st_dict, host, cluster_name))
         else:
             self._soft_had_errors = True
             err_msg = data.get("error", "Unknown error")
-            err_key = (host, host)
-            if not any((n.get("node"), n.get("host_name")) == err_key for n in self._soft_nodes):
-                self._soft_nodes.append({
+            if not self._soft_node_repo.get(host, host):
+                err_node = {
                     "node": host,
                     "status": "error",
                     "error": err_msg,
                     "host_name": host,
-                    "_display_name": host
-                })
+                    "_display_name": host,
+                }
+                self._soft_node_repo.add(DomainNode.from_pve(err_node, host, "", False))
 
         self._soft_counter += 1
         active_count = len([cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)])
 
         if self._soft_counter >= active_count:
-            if self._soft_nodes or self._soft_vms:
+            if self._soft_node_repo or self._soft_vm_repo:
                 try:
-                    self.all_nodes[:] = self._soft_nodes
-                    self.all_vms[:] = self._soft_vms
-                    self.all_storages[:] = self._soft_storages
-                    # Refill repositories with fresh domain objects
+                    # Swap: replace main repos with soft repos' contents
                     self._node_repo.clear()
                     self._vm_repo.clear()
                     self._storage_repo.clear()
-                    cluster_name_cache = {}
-                    for cfg in self.nodes_cfg:
-                        cn = cfg.get("cluster", "") or ""
-                        cluster_name_cache[cfg.get("name", "")] = cn
-                    for n_dict in self._soft_nodes:
-                        hn = n_dict.get("host_name", "")
-                        cn = cluster_name_cache.get(hn, "")
-                        ic = n_dict.get("_is_cluster", False)
-                        self._node_repo.add(DomainNode.from_pve(n_dict, hn, cn, ic))
-                    for v_dict in self._soft_vms:
-                        self._vm_repo.add(DomainVm.from_pve(v_dict, v_dict.get("host_name", "")))
-                    for s_dict in self._soft_storages:
-                        hn = s_dict.get("host_name", "")
-                        cn = cluster_name_cache.get(hn, "")
-                        self._storage_repo.add(DomainStorage.from_pve(s_dict, hn, cn))
+                    for n in self._soft_node_repo.all():
+                        self._node_repo.add(n)
+                    for v in self._soft_vm_repo.all():
+                        self._vm_repo.add(v)
+                    for s in self._soft_storage_repo.all():
+                        self._storage_repo.add(s)
                     self.tree_panel.update_node_statuses(
                         self._node_repo.all(), self._vm_repo.all(),
                         node_repo=self._node_repo, vm_repo=self._vm_repo,
                     )
                     self.detail_panel.set_lists(
                         self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
-                node_repo=self._node_repo, vm_repo=self._vm_repo
+                        node_repo=self._node_repo, vm_repo=self._vm_repo
                     )
                     self.detail_panel.refresh_current_view()
                     # Пробрасываем уже собранные на hard refresh пулы/HA —
@@ -1403,10 +1330,14 @@ class MainWindow(QMainWindow):
                     self.detail_panel.all_pools = self.all_pools
                     self.detail_panel.all_ha_groups = self.all_ha_groups
                     self.detail_panel.set_iso_catalog(self.all_iso_images)
-                    self._detect_status_changes(self._soft_nodes, self._soft_vms)
+                    self._detect_status_changes()
                     self._update_status_bar()
                     from ..config import save_resources_cache
-                    save_resources_cache(self._soft_nodes, self._soft_vms, self._soft_storages)
+                    save_resources_cache(
+                        [dict(n) for n in self._node_repo.all()],
+                        [dict(v) for v in self._vm_repo.all()],
+                        [dict(s) for s in self._storage_repo.all()],
+                    )
                     if self._offline_mode:
                         self._offline_mode = False
                         self._offline_ts = None
@@ -1416,9 +1347,9 @@ class MainWindow(QMainWindow):
                         tr("Error: {err}").format(err=str(exc)[:100]),
                         error=True,
                     )
-            self._soft_nodes.clear()
-            self._soft_vms.clear()
-            self._soft_storages.clear()
+            self._soft_node_repo.clear()
+            self._soft_vm_repo.clear()
+            self._soft_storage_repo.clear()
             self._soft_counter = 0
             self._soft_refresh_running = False
             self._soft_refresh_active = False
@@ -1432,14 +1363,14 @@ class MainWindow(QMainWindow):
             self.tasks_widget.set_tasks(self._cached_tasks)
         elif not self._workers:
             self.tasks_widget.set_placeholder(tr("Loading tasks..."))
-        if not self.nodes_cfg or not self.all_nodes:
+        if not self.nodes_cfg or not self._node_repo:
             return
 
         node_requests = []
         seen_nodes = set()
 
         rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
-        for n in self.all_nodes:
+        for n in self._node_repo.all():
             pve_node = n.get("node", "")
             host_name = n.get("host_name", "")
             if not pve_node or pve_node in seen_nodes:
@@ -1497,13 +1428,11 @@ class MainWindow(QMainWindow):
         save_tasks_cache(tasks)
         try:
             node_map = {}
-            for n in list(self.all_nodes):
-                node_map[n.get("node")] = n.get("_display_name") or n.get("node")
+            for n in self._node_repo.all():
+                node_map[n.node] = n.display_name or n.node
             vm_map = {}
-            for vm in list(self.all_vms):
-                vm_vmid = vm.get("vmid")
-                if vm_vmid is not None:
-                    vm_map[int(vm_vmid)] = vm.get("name")
+            for vm in self._vm_repo.all():
+                vm_map[int(vm.vmid)] = vm.name
             for task in tasks:
                 node = task.get("node", "")
                 if node in node_map:

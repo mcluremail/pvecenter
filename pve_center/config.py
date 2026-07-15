@@ -475,7 +475,11 @@ _resources_cache_lock = threading.Lock()
 def save_resources_cache(nodes, vms, storages):
     try:
         data = json.dumps(
-            {"nodes": nodes, "vms": vms, "storages": storages},
+            {
+                "nodes": [dict(o) if not isinstance(o, dict) else o for o in nodes],
+                "vms": [dict(o) if not isinstance(o, dict) else o for o in vms],
+                "storages": [dict(o) if not isinstance(o, dict) else o for o in storages],
+            },
             ensure_ascii=False, default=str,
         )
         from datetime import datetime, timezone
