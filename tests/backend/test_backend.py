@@ -468,3 +468,78 @@ class TestTaskWorkers:
         assert tasks[0].task_type == "qmstart"
         assert tasks[1].task_type == "qmstop"
         assert recorded["finished"] == [True]
+
+
+class TestVmSnapshotsWorker:
+    """Snapshot flow emits domain Snapshot objects (dict→domain migration)."""
+
+    @staticmethod
+    def _make_worker(monkeypatch, snaps, cfgs=None):
+        class FakeSession:
+            def __init__(self, cfg, timeout=10):
+                pass
+
+            def close(self):
+                pass
+
+        class FakeVmAPI:
+            def __init__(self, session):
+                pass
+
+            def list_snapshots(self, node, vmid, vm_type):
+                return snaps
+
+            def get_snapshot_config(self, node, vmid, vm_type, name):
+                if cfgs and name in cfgs:
+                    return cfgs[name]
+                raise RuntimeError("no cfg")
+
+        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
+        monkeypatch.setattr(backend, "VmAPI", FakeVmAPI)
+        worker = backend.VmSnapshotsWorker({"name": "h1"}, "n1", 100)
+        recorded = {"ready": [], "error": [], "finished": []}
+        worker.signals.snapshots_ready.connect(
+            lambda v, s: recorded["ready"].append((v, s)))
+        worker.signals.snapshots_error.connect(
+            lambda v, e: recorded["error"].append(e))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        return worker, recorded
+
+    def test_emits_domain_snapshots(self, monkeypatch):
+        worker, recorded = self._make_worker(
+            monkeypatch,
+            snaps=[
+                {"name": "current", "description": "You are here!"},
+                {"name": "base", "description": "clean",
+                 "snaptime": 1700000000, "parent": "", "vmstate": 1},
+                {"name": "work", "description": "after edits",
+                 "snaptime": 1700000100, "parent": "base"},
+            ],
+            cfgs={"base": {"scsi0": "local-lvm:vm-100-disk-0,size=32G",
+                           "memory": 2048},
+                  "work": {"scsi0": "local-lvm:vm-100-disk-0,size=1T"}},
+        )
+        worker.run()
+        vmid, snapshots = recorded["ready"][0]
+        assert vmid == 100
+        assert recorded["error"] == []
+        assert all(isinstance(s, backend.Snapshot) for s in snapshots)
+        assert [s.name for s in snapshots] == ["base", "work"]  # sorted by time
+        base, work = snapshots
+        assert base.size_bytes == 32 * 1024**3
+        assert base.vmstate is True
+        assert base.is_root is True
+        assert work.parent == "base"
+        assert work.is_root is False
+        assert work.size_bytes == 1024**4
+        assert recorded["finished"] == [True]
+
+    def test_config_error_yields_zero_size(self, monkeypatch):
+        worker, recorded = self._make_worker(
+            monkeypatch,
+            snaps=[{"name": "s1", "description": "", "snaptime": 5}],
+        )
+        worker.run()
+        _, snapshots = recorded["ready"][0]
+        assert snapshots[0].size_bytes == 0
+        assert snapshots[0].size_str == "—"

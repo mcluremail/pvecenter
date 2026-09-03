@@ -944,51 +944,40 @@ class VMTabs:
             return
         snap_by_name = {}
         for snap in snapshots:
-            snap_by_name[snap.get("name", "")] = snap
+            snap_by_name[snap.name] = snap
         created_items = set()
+        item_by_name = {}
         remaining = list(snapshots)
 
         def create_item(snap):
-            name = snap.get("name", "")
-            desc = snap.get("description", "") or ""
-            snaptime = snap.get("snaptime", 0)
-            if snaptime:
-                ts = datetime.fromtimestamp(snaptime).strftime("%Y-%m-%d %H:%M:%S")
+            desc = snap.description or ""
+            if snap.snaptime:
+                ts = datetime.fromtimestamp(snap.snaptime).strftime("%Y-%m-%d %H:%M:%S")
             else:
                 ts = ""
-            vm_state = tr("yes") if snap.get("vmstate", 0) else tr("no")
-            size_val = snap.get("size", "")
-            if isinstance(size_val, (int, float)) and size_val > 0:
-                gb = size_val / (1024 ** 3)
-                if gb >= 1024:
-                    size_str = f"{gb / 1024:.1f} TiB"
-                else:
-                    size_str = f"{gb:.1f} GiB"
-            else:
-                size_str = str(size_val) if size_val else "—"
-            parent_name = snap.get("parent", "") or ""
-            item = QTreeWidgetItem([name, desc, ts, vm_state, size_str, parent_name])
+            vm_state = tr("yes") if snap.vmstate else tr("no")
+            parent_name = snap.parent or ""
+            item = QTreeWidgetItem([snap.name, desc, ts, vm_state, snap.size_str, parent_name])
             return item
 
         for _ in range(len(snapshots) + 1):
             progress = False
             still = []
             for snap in remaining:
-                parent_name = snap.get("parent", "") or ""
+                parent_name = snap.parent or ""
                 if not parent_name or parent_name == "current" or parent_name not in snap_by_name:
                     item = create_item(snap)
                     tree.addTopLevelItem(item)
-                    snap["_tree_item"] = item
-                    created_items.add(snap.get("name", ""))
+                    item_by_name[snap.name] = item
+                    created_items.add(snap.name)
                     progress = True
                 elif parent_name in created_items:
-                    parent_snap = snap_by_name[parent_name]
-                    parent_item = parent_snap.get("_tree_item")
+                    parent_item = item_by_name.get(parent_name)
                     if parent_item:
                         item = create_item(snap)
                         parent_item.addChild(item)
-                        snap["_tree_item"] = item
-                        created_items.add(snap.get("name", ""))
+                        item_by_name[snap.name] = item
+                        created_items.add(snap.name)
                         progress = True
                     else:
                         still.append(snap)

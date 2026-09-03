@@ -7,6 +7,7 @@ import urllib3
 from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from .domain.snapshot import Snapshot
 from .domain.task import Task
 from .provider import (
     AccessAPI,
@@ -936,9 +937,12 @@ class VmSnapshotsWorker(QRunnable):
             session = ProxmoxSession(self.host_cfg, timeout=10)
             vm_api = VmAPI(session)
             snaps = vm_api.list_snapshots(self.node_name, self.vmid, self.vm_type)
-            filtered = [dict(s) for s in snaps if s.get("name") != "current"]
-            for snap in filtered:
-                name = snap.get("name", "")
+            filtered = []
+            for s in snaps:
+                if s.get("name") == "current":
+                    continue
+                raw = dict(s)
+                name = raw.get("name", "")
                 if not name:
                     continue
                 try:
@@ -953,10 +957,12 @@ class VmSnapshotsWorker(QRunnable):
                             ("scsi", "ide", "sata", "virtio", "efidisk")
                         ):
                             total_bytes += _parse_disk_size(val)
-                    snap["size"] = total_bytes
+                    raw["size"] = total_bytes
                 except Exception:
-                    snap["size"] = 0
-            filtered.sort(key=lambda s: (s.get("snaptime", 0) or 0))
+                    raw["size"] = 0
+                raw["vmid"] = self.vmid
+                filtered.append(Snapshot.from_pve(raw))
+            filtered.sort(key=lambda s: (s.snaptime or 0))
             try:
                 self.signals.snapshots_ready.emit(self.vmid, filtered)
             except RuntimeError:
