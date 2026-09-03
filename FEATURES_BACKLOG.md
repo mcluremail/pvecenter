@@ -21,7 +21,11 @@ Export/import — encrypted bundle с паролем.
 
 ### B1. Snapshots management ✅ (v2.6.x)
 Просмотр (VM + хост), создание и удаление снапшотов из UI, ожидание UPID задачи.
-Откат вынесен в отдельный пункт B1a.
+
+### B1a. Snapshot rollback ✅ (v2.10.0 — main)
+Откат ВМ/контейнера к снапшоту из таба Snapshots: кнопка в тулбаре + контекстное меню.
+- `POST /nodes/{node}/{type}/{vmid}/snapshot/{name}/rollback`, ожидание UPID задачи
+- Подтверждение с предупреждением, guard для псевдо-снапшота "current"
 
 ### B2. VM config editor — hardware hotplug ✅ (v2.8.x)
 Редактирование CPU/RAM/disk/net без пересоздания ВМ.
@@ -68,12 +72,6 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 
 ## Backlog
 
-### B1a. Snapshot rollback
-Откат ВМ/контейнера к снапшоту.
-- `POST /nodes/{node}/{type}/{vmid}/snapshot/{name}/rollback`
-- Подтверждение + guard для running ВМ
-- Переводы и роль `VM.Snapshot.Rollback` уже заготовлены в i18n
-
 ### B3. Bulk VM actions
 Массовые операции над выбранными ВМ: start/stop/shutdown/migrate.
 - Ctrl+click в дереве для multi-select
@@ -113,3 +111,15 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 - Drag&drop в дереве + контекстное меню «Move to group...»
 - Сводка по группе: агрегированные метрики (аналог сводки кластера)
 - Фундамент для сущностей Site/Datacenter из VISION.md
+
+### B17. Резервное копирование и PBS (Proxmox Backup Server)
+Расширенная работа с бэкапами, включая PBS (плагин PBS заявлен в VISION.md / ARCHITECTURE.md).
+Этап 1 — через PVE API (стorage типа pbs):
+- Статус и заполненность PBS-хранилищ
+- Просмотр backup-групп и снапшотов PBS: владелец, время, verify state
+- Удаление отдельных бэкапов из UI (prune по одному)
+- Restore PBS-бэкапа в новую ВМ/контейнер (`/qemu` create с archive=pbs volid)
+Этап 2 — прямое подключение к PBS API (порт 8007), как отдельный плагин:
+- Datastores: список, использование, история
+- Sync / prune / verify jobs: просмотр, запуск, расписание
+- Server-side trash и namespace поддержка

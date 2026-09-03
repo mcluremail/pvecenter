@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (v2.10.0)
+
+**New features**
+- Snapshot rollback: revert a VM/container to a snapshot from the Snapshots tab (toolbar button + context menu, with confirmation)
+- Rollback action is guarded for the pseudo-snapshot "current" and waits for the UPID task to finish
+- i18n: 4 new keys in all 5 languages, _I18N_VERSION bumped to 21
+
 ## v2.9.0 — VM templates, cloning, audit fixes, update check
 
 **New features**
