@@ -7,6 +7,7 @@ import urllib3
 from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from .domain.task import Task
 from .provider import (
     AccessAPI,
     ClusterAPI,
@@ -850,7 +851,9 @@ class VmTaskHistoryWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             task_api = TaskAPI(session)
-            tasks = task_api.list_for_vm(self.node_name, self.vmid, limit=self.limit)
+            tasks = [Task.from_pve(t)
+                     for t in task_api.list_for_vm(self.node_name, self.vmid,
+                                                   limit=self.limit)]
             try:
                 self.signals.tasks_ready.emit(self.vmid, tasks)
             except RuntimeError:
@@ -1375,9 +1378,10 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
                             all_by_upid[upid] = t
                         else:
                             all_by_upid[f"_no_upid_{node_name}_{idx}"] = t
-                merged = sorted(all_by_upid.values(),
-                                key=lambda x: float(x.get("starttime", 0) or 0),
-                                reverse=True)
+                merged = [Task.from_pve(x)
+                          for x in sorted(all_by_upid.values(),
+                                          key=lambda x: float(x.get("starttime", 0) or 0),
+                                          reverse=True)]
                 if errors:
                     logger.warning("Task collection errors: %s", "; ".join(errors))
                 try:

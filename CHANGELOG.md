@@ -9,6 +9,7 @@
 - Bulk VM actions: multi-select in the tree (Ctrl+click / Shift+click), context menu offers mass Start / Shutdown / Reboot / Stop; progress dialog with Cancel, per-VM results summary
 - User-defined host groups: named groups above the tree sections, hosts/clusters assigned via "Move to group..." context menu (rename/delete supported) or drag&drop onto a group / the Clusters and Standalone hosts sections, grouping persisted in config.sqlite; clicking a group shows an aggregated summary with host VMs
 - i18n: 9 new keys in all 5 languages, _I18N_VERSION bumped to 23; 6 more keys for groups (_I18N_VERSION 24)
+- Internal: cluster tasks and VM task history now flow through the domain `Task` model instead of raw dicts (task history cache roundtrips via `Task.from_pve`)
 
 ## v2.9.0 — VM templates, cloning, audit fixes, update check
 

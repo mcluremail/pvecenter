@@ -39,7 +39,7 @@ class VmTaskHistoryWidget(QWidget):
     def set_tasks(self, tasks):
         self.table.setRowCount(len(tasks))
         for i, task in enumerate(tasks):
-            start_ts = task.get('starttime')
+            start_ts = task.starttime
             if start_ts:
                 try:
                     start_dt = datetime.fromtimestamp(float(start_ts))
@@ -50,7 +50,7 @@ class VmTaskHistoryWidget(QWidget):
                 start_str = ''
             self.table.setItem(i, 0, QTableWidgetItem(start_str))
 
-            end_ts = task.get('endtime')
+            end_ts = task.endtime
             if end_ts:
                 try:
                     end_dt = datetime.fromtimestamp(float(end_ts))
@@ -65,7 +65,7 @@ class VmTaskHistoryWidget(QWidget):
                 end_item.setText(tr("running..."))
             self.table.setItem(i, 1, end_item)
 
-            status = task.get('status', '')
+            status = task.status
             status_item = QTableWidgetItem()
             if status == 'OK':
                 status_item.setText("● " + tr("OK"))
@@ -78,13 +78,13 @@ class VmTaskHistoryWidget(QWidget):
                 status_item.setForeground(QColor(Color.STATUS_ERR))
             self.table.setItem(i, 2, status_item)
 
-            user = task.get('user', '')
+            user = task.user
             self.table.setItem(i, 3, QTableWidgetItem(user))
 
-            task_type = task.get('type', '')
-            node = task.get('node') or ''
-            vmid = task.get('vmid') or task.get('id') or ''
-            upid = task.get('upid', '')
+            task_type = task.task_type
+            node = task.node or ''
+            vmid = task.vmid or ''
+            upid = task.upid
 
             if vmid and node:
                 desc = f"{task_type}: VM {vmid} on {node}"

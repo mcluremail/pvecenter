@@ -41,5 +41,9 @@ class DictCompat:
         return hasattr(self, attr)
 
     def keys(self):
-        """Return PVE dict keys for ``**`` unpacking support."""
-        return list(self._FIELD_MAP.keys())
+        """Return PVE dict keys present (non-None) for ``dict()`` conversion.
+
+        None-valued fields are omitted so that ``dict(obj)`` never raises
+        and JSON roundtrips stay lossless-free.
+        """
+        return [key for key in self._FIELD_MAP if self.get(key) is not None]

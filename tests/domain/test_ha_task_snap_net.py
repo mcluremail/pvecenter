@@ -139,6 +139,35 @@ class TestTaskFromPve:
         t = Task.from_pve(d)
         assert t.vmid == 42
 
+    def test_vmid_from_upid_args_segment(self):
+        """--vmid fallback for UPIDs with empty vmid slot."""
+        d = {"upid": "UPID:pve01:0001:0002:1700000000:qmmigrate::root@pam@pve01:--vmid 105 --target pve02"}
+        t = Task.from_pve(d)
+        assert t.vmid == 105
+
+    def test_vmid_multi_vm_args_not_parsed(self):
+        """vzdump-style group tasks (100,102) intentionally have no vmid."""
+        d = {"upid": "UPID:pve01:0001:0002:1700000000:vzdump::root@pam@pve01:100,102 --mode snapshot"}
+        t = Task.from_pve(d)
+        assert t.vmid is None
+
+    def test_vmid_slot_zero_wins(self):
+        d = {"upid": "UPID:pve01:0001:0002:1700000000:vzdump:0:root@pam:"}
+        t = Task.from_pve(d)
+        assert t.vmid == 0
+
+    def test_display_fields_roundtrip(self):
+        t = Task.from_pve(TASK_DICT)
+        assert t.display_name is None
+        assert t.vm_name is None
+        d = dict(t)
+        assert d["type"] == "qmstart"
+        d["display_name"] = "pve01 (h1)"
+        d["vm_name"] = "alpha"
+        t2 = Task.from_pve(d)
+        assert t2.display_name == "pve01 (h1)"
+        assert t2.vm_name == "alpha"
+
     def test_vmid_from_id_field(self):
         t = Task.from_pve({"id": 300, "upid": ""})
         assert t.vmid == 300

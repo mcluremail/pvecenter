@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...config import load_ui_state, save_ui_state
+from ...domain.task import Task
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..theme import Color
@@ -100,27 +101,6 @@ TASK_TYPE_LABELS = {
 }
 
 TIMESTAMP_FMT = "%d.%m.%y %H:%M"
-
-
-def _vmid_from_upid(upid):
-    if not upid or not upid.startswith("UPID:"):
-        return ""
-    parts = upid.split(":")
-    if len(parts) < 7:
-        return ""
-    candidate = parts[6]
-    if candidate.isdigit():
-        return candidate
-    if len(parts) >= 9:
-        info = ":".join(parts[8:])
-        idx = info.find("--vmid ")
-        if idx >= 0:
-            rest = info[idx + 7:].lstrip()
-            end = rest.find(" ")
-            num = rest[:end] if end >= 0 else rest
-            if num.isdigit():
-                return num
-    return ""
 
 
 class NumericTableItem(QTableWidgetItem):
@@ -208,11 +188,11 @@ class ClusterTasksWidget(QWidget):
         layout.addWidget(self.table, 1)
         layout.addWidget(filter_widget)
 
-    def set_tasks(self, tasks):
+    def set_tasks(self, tasks: list[Task]):
         self._all_tasks = tasks
         self._populate_table(tasks)
 
-    def _populate_table(self, tasks):
+    def _populate_table(self, tasks: list[Task]):
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
         sort_order = self.table.horizontalHeader().sortIndicatorOrder()
 
@@ -227,7 +207,7 @@ class ClusterTasksWidget(QWidget):
         self.table.setRowCount(len(tasks))
 
         for i, task in enumerate(tasks):
-            start_ts = task.get('starttime')
+            start_ts = task.starttime
             if start_ts:
                 try:
                     start_dt = datetime.fromtimestamp(float(start_ts), tz=timezone.utc)
@@ -241,7 +221,7 @@ class ClusterTasksWidget(QWidget):
                 item0.setData(Qt.UserRole, float(start_ts))
             self.table.setItem(i, 0, item0)
 
-            end_ts = task.get('endtime')
+            end_ts = task.endtime
             if end_ts:
                 try:
                     end_dt = datetime.fromtimestamp(float(end_ts), tz=timezone.utc)
@@ -258,19 +238,14 @@ class ClusterTasksWidget(QWidget):
                 item1.setText(tr("running..."))
             self.table.setItem(i, 1, item1)
 
-            node = task.get('node', '')
-            host_display = task.get('_display_name', node) or node or '—'
+            host_display = task.display_name or task.node or '—'
             self.table.setItem(i, 2, QTableWidgetItem(host_display))
 
-            user = task.get('user', '')
-            self.table.setItem(i, 3, QTableWidgetItem(user))
+            self.table.setItem(i, 3, QTableWidgetItem(task.user))
 
-            task_type = task.get('type', '')
-            vmid = task.get('vmid') or task.get('id') or task.get('_vmid') or ''
-            if not vmid:
-                vmid = _vmid_from_upid(task.get('upid', ''))
-            vm_name = task.get('_vm_name', '')
-            label = TASK_TYPE_LABELS.get(task_type, task_type)
+            label = TASK_TYPE_LABELS.get(task.task_type, task.task_type)
+            vmid = task.vmid
+            vm_name = task.vm_name or ''
             if vmid and vm_name:
                 desc = f"{label} {vm_name} ({vmid})"
             elif vmid:
@@ -283,7 +258,7 @@ class ClusterTasksWidget(QWidget):
             item4.setFont(font)
             self.table.setItem(i, 4, item4)
 
-            status = task.get('status', '')
+            status = task.status
             item5 = QTableWidgetItem(status[:30] + '…' if len(status) > 30 else status)
             item5.setToolTip(status if len(status) > 30 else '')
             if status == 'OK':
@@ -311,23 +286,23 @@ class ClusterTasksWidget(QWidget):
         else:
             self.table.horizontalHeader().setSortIndicator(sort_col, sort_order)
 
-    def _sort_tasks(self, tasks, col, order):
+    def _sort_tasks(self, tasks: list[Task], col, order) -> list[Task]:
         """Sort task list in Python before inserting — avoids slow sortItems()."""
         if not tasks:
             return tasks
         reverse = (order == Qt.DescendingOrder)
         if col == 0:
-            key = lambda t: float(t.get('starttime') or 0)
+            key = lambda t: float(t.starttime or 0)
         elif col == 1:
-            key = lambda t: float(t.get('endtime') or 0)
+            key = lambda t: float(t.endtime or 0)
         elif col == 2:
-            key = lambda t: (t.get('_display_name') or t.get('node') or '').lower()
+            key = lambda t: (t.display_name or t.node or '').lower()
         elif col == 3:
-            key = lambda t: (t.get('user') or '').lower()
+            key = lambda t: (t.user or '').lower()
         elif col == 4:
-            key = lambda t: (t.get('type') or '').lower()
+            key = lambda t: (t.task_type or '').lower()
         elif col == 5:
-            key = lambda t: (t.get('status') or '').lower()
+            key = lambda t: (t.status or '').lower()
         else:
             return tasks
         try:
@@ -455,7 +430,7 @@ class ClusterTasksWidget(QWidget):
             return
         filtered = []
         for task in self._all_tasks:
-            status = task.get("status", "")
+            status = task.status
             if status_filter == "OK" and status != "OK":
                 continue
             if status_filter == "error" and status == "OK":
@@ -463,11 +438,11 @@ class ClusterTasksWidget(QWidget):
             if status_filter == "RUNNING" and status != "RUNNING":
                 continue
             if text:
-                node = (task.get("node", "") or "").lower()
-                user = (task.get("user", "") or "").lower()
-                ttype = (task.get("type", "") or "").lower()
-                vm_name = (task.get("_vm_name", "") or "").lower()
-                upid = (task.get("upid", "") or "").lower()
+                node = (task.node or "").lower()
+                user = (task.user or "").lower()
+                ttype = (task.task_type or "").lower()
+                vm_name = (task.vm_name or "").lower()
+                upid = (task.upid or "").lower()
                 haystack = f"{node} {user} {ttype} {vm_name} {upid} {status.lower()}"
                 if text not in haystack:
                     continue

@@ -364,3 +364,107 @@ class TestBulkVmActionWorker:
         worker.run()
         assert recorded["finished"] == [True]
         assert not worker.was_cancelled
+
+
+class TestTaskWorkers:
+    """Task flow emits domain Task objects (dict→domain migration)."""
+
+    @staticmethod
+    def _patch_task_api(monkeypatch, list_result=None, list_for_vm_result=None):
+        class FakeSession:
+            def __init__(self, cfg, timeout=10):
+                pass
+
+            def close(self):
+                pass
+
+        calls = {}
+
+        class FakeTaskAPI:
+            def __init__(self, session):
+                pass
+
+            def list(self, node_name, limit=100):
+                calls.setdefault("list", []).append(node_name)
+                return list_result or []
+
+            def list_for_vm(self, node_name, vmid, limit=50):
+                calls.setdefault("list_for_vm", []).append((node_name, vmid))
+                return list_for_vm_result or []
+
+        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
+        monkeypatch.setattr(backend, "TaskAPI", FakeTaskAPI)
+        return calls
+
+    def test_vm_task_history_emits_domain_objects(self, monkeypatch):
+        self._patch_task_api(monkeypatch, list_for_vm_result=[
+            {"upid": "UPID:n1:1:2:1700000000:qmstart:100:root@pam:",
+             "node": "n1", "type": "qmstart", "status": "OK",
+             "starttime": 1700000000, "endtime": 1700000010},
+        ])
+        worker = backend.VmTaskHistoryWorker({"name": "h1"}, "n1", 100)
+        recorded = {"ready": [], "finished": []}
+        worker.signals.tasks_ready.connect(lambda v, t: recorded["ready"].append((v, t)))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        worker.run()
+        vmid, tasks = recorded["ready"][0]
+        assert vmid == 100
+        assert len(tasks) == 1
+        task = tasks[0]
+        assert isinstance(task, backend.Task)
+        assert task.task_type == "qmstart"
+        assert task.vmid == 100
+        assert task.is_ok
+        assert recorded["finished"] == [True]
+
+    def test_cluster_tasks_merge_dedup_sort(self, monkeypatch):
+        results = {
+            "n1": [
+                {"upid": "UPID:n1:1:2:200:qmstart:100:root@pam:",
+                 "node": "n1", "type": "qmstart", "status": "OK",
+                 "starttime": 200, "endtime": 210},
+                {"upid": "UPID:n1:1:2:100:qmstop:100:root@pam:",
+                 "node": "n1", "type": "qmstop", "status": "OK",
+                 "starttime": 100, "endtime": 150},
+            ],
+            "n2": [
+                # duplicate of n1's task with the same UPID — must dedup
+                {"upid": "UPID:n1:1:2:200:qmstart:100:root@pam:",
+                 "node": "n1", "type": "qmstart", "status": "OK",
+                 "starttime": 200, "endtime": 210},
+            ],
+        }
+
+        class FakeSession:
+            def __init__(self, cfg, timeout=10):
+                pass
+
+            def close(self):
+                pass
+
+        class FakeTaskAPI:
+            def __init__(self, session):
+                pass
+
+            def list(self, node_name, limit=100):
+                return results.get(node_name, [])
+
+        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
+        monkeypatch.setattr(backend, "TaskAPI", FakeTaskAPI)
+
+        worker = backend.ClusterTasksWorker([({"name": "h1"}, "n1"),
+                                             ({"name": "h2"}, "n2")])
+        recorded = {"ready": [], "error": [], "finished": []}
+        worker.signals.tasks_ready.connect(lambda t: recorded["ready"].append(t))
+        worker.signals.tasks_error.connect(lambda e: recorded["error"].append(e))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        worker.run()
+
+        assert recorded["error"] == []
+        tasks = recorded["ready"][0]
+        assert all(isinstance(t, backend.Task) for t in tasks)
+        # dedup by UPID + sorted by starttime desc
+        assert [t.starttime for t in tasks] == [200, 100]
+        assert tasks[0].task_type == "qmstart"
+        assert tasks[1].task_type == "qmstop"
+        assert recorded["finished"] == [True]

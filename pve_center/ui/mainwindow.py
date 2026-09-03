@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 import traceback
+from dataclasses import replace
 
 from PySide6.QtCore import QSize, Qt, QThreadPool, QTimer, Slot
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
@@ -58,6 +59,9 @@ from ..domain import (
 )
 from ..domain import (
     Storage as DomainStorage,
+)
+from ..domain import (
+    Task as DomainTask,
 )
 from ..domain import (
     Vm as DomainVm,
@@ -332,7 +336,7 @@ class MainWindow(QMainWindow):
         self.tasks_timer.start()
 
         # Первая загрузка задач — стартует из on_worker_finished, когда all_nodes заполнен
-        self._cached_tasks = load_tasks_cache()
+        self._cached_tasks = [DomainTask.from_pve(d) for d in load_tasks_cache()]
 
         # Offline mode: load cached resources immediately so tree is populated
         # before the first network response arrives
@@ -1553,7 +1557,7 @@ class MainWindow(QMainWindow):
 
     def _update_cluster_tasks_widget(self, tasks):
         self._cached_tasks = tasks
-        save_tasks_cache(tasks)
+        save_tasks_cache([dict(t) for t in tasks])
         try:
             node_map = {}
             for n in self._node_repo.all():
@@ -1561,33 +1565,15 @@ class MainWindow(QMainWindow):
             vm_map = {}
             for vm in self._vm_repo.all():
                 vm_map[int(vm.vmid)] = vm.name
+            enriched = []
             for task in tasks:
-                node = task.get("node", "")
-                if node in node_map:
-                    task["_display_name"] = node_map[node]
-                # API может вернуть vmid как 'vmid', 'id' или только в UPID
-                vmid = task.get("vmid") or task.get("id")
-                if vmid is None or vmid == "":
-                    upid = task.get("upid", "")
-                    if upid.startswith("UPID:"):
-                        parts = upid.split(":")
-                        if len(parts) >= 7 and parts[6].isdigit():
-                            vmid = parts[6]
-                        if not vmid and len(parts) >= 9:
-                            info = ":".join(parts[8:])
-                            idx = info.find("--vmid ")
-                            if idx >= 0:
-                                rest = info[idx + 7:].lstrip()
-                                end = rest.find(" ")
-                                num = rest[:end] if end >= 0 else rest
-                                if num.isdigit():
-                                    vmid = num
-                if vmid is not None:
-                    try:
-                        task["_vmid"] = str(vmid)
-                        task["_vm_name"] = vm_map.get(int(vmid), "")
-                    except (ValueError, TypeError):
-                        pass
+                new = task
+                if task.node in node_map:
+                    new = replace(new, display_name=node_map[task.node])
+                if task.vmid is not None:
+                    new = replace(new, vm_name=vm_map.get(task.vmid, ""))
+                enriched.append(new)
+            tasks = enriched
         except Exception as e:
             logger.error("Ошибка при обогащении задач: %s", e)
         try:

@@ -15,6 +15,12 @@
 - Data Provider API
 - Plugin API
 
+### Техдолг миграции (осознанно не переводится на доменные модели)
+- Backups-таблица и vzdump/backup jobs — dict'ами до B17 (модели бэкапов появятся там)
+- rrddata / metrics (`ui/api/metrics.py`) — числовые сэмплы, dict оправдан
+- VmDetailWorker / вкладка Config — глубоко вложенный PVE-конфиг, моделирование дорого при малой пользе
+- Config-словари (`cfg["group"]`, тела POST-запросов) — dict по дизайну, не PVE-ответы
+
 ## v4.0 — Опциональная серверная часть
 - Inventory
 - Централизованный Cache
