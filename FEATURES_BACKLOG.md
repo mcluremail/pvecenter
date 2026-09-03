@@ -1,5 +1,13 @@
 # Идеи фичей — backlog
 
+## Version numbering
+
+| Изменение | Паттерн | Пример |
+|---|---|---|
+| Багфикс | `2.9.X` | 2.9.1, 2.9.2, ... |
+| Новая фича | `2.X.0` | 2.10.0, 2.11.0, ... |
+| Глобальные изменения | `X.0.0` | 3.0.0 |
+
 ## Done
 
 ### F1. About dialog ✅ (v1.5.0)
@@ -11,23 +19,9 @@
 Конфигурация узлов — в config.sqlite (без token_value).
 Export/import — encrypted bundle с паролем.
 
-## Version numbering
-
-| Изменение | Паттерн | Пример |
-|---|---|---|
-| Багфикс | `1.5.X` | 1.5.1, 1.5.2, ... |
-| Новая фича | `1.X.0` | 1.6.0, 1.7.0, ... |
-| Глобальные изменения | `X.0.0` | 2.0.0 |
-
-## Backlog
-
-### B1. Snapshots management
-Создание/удаление/откат снапшотов ВМ из UI. Сейчас только просмотр.
-- Контекстное меню ВМ → "Snapshots" → диалог со списком + кнопками
-- Create: `POST /nodes/{node}/{type}/{vmid}/snapshot` с именем
-- Rollback: `POST /nodes/{node}/{type}/{vmid}/snapshot/{name}/rollback`
-- Delete: `DELETE /nodes/{node}/{type}/{vmid}/snapshot/{name}`
-- Подтверждение для rollback и delete
+### B1. Snapshots management ✅ (v2.6.x)
+Просмотр (VM + хост), создание и удаление снапшотов из UI, ожидание UPID задачи.
+Откат вынесен в отдельный пункт B1a.
 
 ### B2. VM config editor — hardware hotplug ✅ (v2.8.x)
 Редактирование CPU/RAM/disk/net без пересоздания ВМ.
@@ -38,45 +32,53 @@ Export/import — encrypted bundle с паролем.
 - Add/remove devices: disk, cdrom, net, usb, pci, serial, efi, tpm
 - Валидация перед применением
 
-### B3. Bulk VM actions
-Массовые операции над выбранными ВМ: start/stop/migrate/clone.
-- Ctrl+click в дереве для multi-select
-- Тулбар с bulk actions когда выбрано >1 ВМ
-- Прогресс-бар на операцию
-
 ### B4. Storage operations ✅ (v2.8.x)
 - Перемещение диска между storage (`POST /nodes/{node}/qemu/{vmid}/move_disk`)
 - Resize диска (`PUT /nodes/{node}/qemu/{vmid}/resize`)
-- Upload ISO через UI — не реализовано (future)
 
-### B5. HA group management
-Просмотр/создание/удаление HA groups. Сейчас только чтение.
-- `GET/POST/DELETE /cluster/ha/groups`
-- Назначение ВМ в HA group
-- Редактирование приоритетов
+### B5. HA management ✅ (v2.9.x, main)
+HA-таб: группы и ресурсы, добавление/удаление ВМ в HA, контекстное меню.
+- `GET/POST/DELETE /cluster/ha/groups`, `/cluster/ha/resources`
 
-### B6. User management
-Просмотр PVE users и их токенов.
+### B6. User management ✅ (v2.8.x)
+Access-таб: пользователи, API-токены, группы, роли, ACL/permissions.
 - `GET /access/users` + `GET /access/users/{user}/token/{tokenid}`
-- Создание/удаление токенов из UI (сейчас только auto-create)
-- Просмотр permissions
+- Создание/удаление токенов из UI, просмотр permissions
 
-### B7. Node network config
-Редактирование сетевых интерфейсов хоста. Сейчас только просмотр.
-- `PUT /nodes/{node}/network/{iface}` с изменённой конфигурацией
-- Apply network changes (`POST /nodes/{node}/network` с `apply=1`)
-- Создание/удаление bridges, VLAN
+### B7. Node network config ✅ (v2.9.x, main)
+CRUD сетевых интерфейсов хоста, apply/revert, расширенные колонки таблицы.
+- `PUT /nodes/{node}/network/{iface}`, apply: `POST /nodes/{node}/network`
 
-### B8. Backup jobs
-Создание/редактирование backup jobs. Сейчас только просмотр бэкапов.
-- `POST /nodes/{node}/vzdump` — разовый бэкап
-- `GET/POST/PUT/DELETE /cluster/jobs/schedule` — scheduled jobs
-- Restore из бэкапа: `POST /nodes/{node}/qemu/{vmid}/clone` с `restore=1`
+### B8. Backup jobs ✅ (v2.8.0)
+- Разовый бэкап vzdump: storage, mode, compression, retention, bandwidth
+- Restore из бэкапа: новый VMID, target storage, force, unique MAC
+- Scheduled jobs: add/edit/remove, PVE 8+ (`/cluster/jobs`) и PVE 7 (`/cluster/backup`)
 
-### B9. VNC console
-VNC консоль как альтернатива SPICE (для ВМ без SPICE).
-- `POST /nodes/{node}/qemu/{vmid}/vncproxy`
-- Запуск external VNC viewer (vncviewer) с прокси-портом
+### B9. VNC console ✅ (v2.9.x, main)
+- QEMU: SPICE → VNC fallback (для ВМ без SPICE)
+- LXC: VNC proxy (`POST /nodes/{node}/lxc/{vmid}/vncproxy`)
+
+### B12. Cluster operations ✅ (v2.9.x, main)
+- Просмотр quorum status (`GET /cluster/status`)
+- Corosync config viewer
+- Добавление ноды в кластер — вынесено в B12a
+
+### B13. Download from URL ✅ (v2.9.x, main)
+Загрузка ISO/шаблонов по URL напрямую на storage (`POST /nodes/{node}/storage/.../download-url`).
+
+## Backlog
+
+### B1a. Snapshot rollback
+Откат ВМ/контейнера к снапшоту.
+- `POST /nodes/{node}/{type}/{vmid}/snapshot/{name}/rollback`
+- Подтверждение + guard для running ВМ
+- Переводы и роль `VM.Snapshot.Rollback` уже заготовлены в i18n
+
+### B3. Bulk VM actions
+Массовые операции над выбранными ВМ: start/stop/shutdown/migrate.
+- Ctrl+click в дереве для multi-select
+- Тулбар с bulk actions когда выбрано >1 ВМ
+- Прогресс-бар на операцию
 
 ### B10. Replication
 Настройка zfs replication между нодами.
@@ -90,7 +92,16 @@ VNC консоль как альтернатива SPICE (для ВМ без SPI
 - DatePicker для выбора периода
 - Export данных в CSV
 
-### B12. Cluster operations
-- Добавление ноды в кластер через UI (`pvecm add`)
-- Просмотр quorum status (`GET /cluster/status`)
-- Corosync config viewer
+### B12a. Add node to cluster (low priority)
+Добавление ноды в кластер через UI (`pvecm add`).
+
+### B14. Global search
+Глобальный поиск по всем кластерам из VISION.md.
+- Поиск по: VMID, имени, тегам, владельцу, IP, node, cluster, storage
+- Реализация поверх доменных репозиториев (O(1)-индексы готовы)
+- Быстрый переход к найденному объекту в дереве
+
+### B15. Dry Run
+Предварительный просмотр опасных действий (из ROADMAP v0.x).
+- Перед подтверждением показывать: какие API-запросы будут отправлены
+- Ожидаемые последствия (например, "диск X будет удалён со storage")

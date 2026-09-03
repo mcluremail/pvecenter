@@ -21,3 +21,8 @@ docs/ux_proposals_*.md
 *.pyc
 __pycache__/
 venv/
+.venv/
+# build / tooling caches
+.pytest_cache/
+.ruff_cache/
+pvecenter.egg-info/
