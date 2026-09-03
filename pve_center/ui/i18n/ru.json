@@ -1118,5 +1118,14 @@
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "Удалить токен \\\"{id}\\\" для пользователя \\\"{user}\\\"?",
   "Delete user \\\"{id}\\\"?": "Удалить пользователя \\\"{id}\\\"?",
   "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "Удалить разрешение: роль \\\"{role}\\\" для \\\"{ugid}\\\" на \\\"{path}\\\"?",
-  "{} results": "Результатов: {}"
+  "{} results": "Результатов: {}",
+  "Start all": "Запустить все",
+  "Shutdown all": "Завершить все",
+  "Reboot all": "Перезагрузить все",
+  "Stop all": "Остановить все",
+  "Apply {action} to {n} VMs?": "Применить \"{action}\" к {n} ВМ?",
+  "Bulk operation: {done}/{total} — VM {vmid}...": "Массовая операция: {done}/{total} — ВМ {vmid}...",
+  "Bulk operation completed: {ok} ok, {failed} failed": "Массовая операция завершена: {ok} успешно, {failed} с ошибками",
+  "Operation cancelled": "Операция отменена",
+  "Skipped templates and unavailable VMs: {n}": "Пропущены шаблоны и недоступные ВМ: {n}"
 }

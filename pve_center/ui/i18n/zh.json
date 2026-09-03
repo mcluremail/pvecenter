@@ -1129,5 +1129,14 @@
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "删除用户\\\"{user}\\\"的令牌\\\"{id}\\\"？",
   "Delete user \\\"{id}\\\"?": "删除用户\\\"{id}\\\"？",
   "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "移除权限：角色\\\"{role}\\\"为\\\"{ugid}\\\"在\\\"{path}\\\"上？",
-  "{} results": "{} 条结果"
+  "{} results": "{} 条结果",
+  "Start all": "全部启动",
+  "Shutdown all": "全部关闭",
+  "Reboot all": "全部重启",
+  "Stop all": "全部强制停止",
+  "Apply {action} to {n} VMs?": "对 {n} 台虚拟机执行\"{action}\"？",
+  "Bulk operation: {done}/{total} — VM {vmid}...": "批量操作：{done}/{total} — 虚拟机 {vmid}...",
+  "Bulk operation completed: {ok} ok, {failed} failed": "批量操作完成：{ok} 成功，{failed} 失败",
+  "Operation cancelled": "操作已取消",
+  "Skipped templates and unavailable VMs: {n}": "已跳过模板和不可用的虚拟机：{n}"
 }

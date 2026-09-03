@@ -63,6 +63,7 @@ class TreePanel(QWidget):
     vm_ha_add_requested = Signal(str, str, int)  # (host_name, node, vmid)
     vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
     console_requested = Signal(str, str, int)
+    bulk_vm_action_requested = Signal(list, str)  # ([(host_name, vmid, node)], action)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -114,7 +115,7 @@ class TreePanel(QWidget):
         self.tree.setColumnCount(1)
         self.tree.setHeaderHidden(True)
         self.tree.setAlternatingRowColors(True)
-        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setIndentation(20)
         self.tree.setIconSize(QSize(22, 22))
         self.tree.setRootIsDecorated(True)
@@ -168,6 +169,20 @@ class TreePanel(QWidget):
             vm_status = vm.get("status", "") if vm else ""
             is_template = bool(vm and vm.get("template"))
             is_qemu = vm and vm.get("type", "qemu") == "qemu"
+            selected_vm_keys = self.selected_vm_keys()
+            if len(selected_vm_keys) > 1:
+                for act_key, act_label in [("start", tr("Start all")),
+                                           ("shutdown", tr("Shutdown all")),
+                                           ("reboot", tr("Reboot all")),
+                                           ("stop", tr("Stop all"))]:
+                    act = QAction(act_label, self.tree)
+                    act.setIcon(get_icon(VM_ACTION_ICONS[act_key]))
+                    act.triggered.connect(
+                        lambda checked, keys=selected_vm_keys, a=act_key:
+                            self.bulk_vm_action_requested.emit(keys, a)
+                    )
+                    menu.addAction(act)
+                menu.addSeparator()
             for act_key, act_label in [("start", tr("Start")), ("shutdown", tr("Shutdown")),
                                        ("reboot", tr("Reboot")), ("stop", tr("Stop")),
                                        ("reset", tr("Reset")), ("resume", tr("Resume"))]:
@@ -831,6 +846,15 @@ class TreePanel(QWidget):
         if vm_key is not None:
             return vm_key
         return item.data(0, ITEM_KEY_ROLE)
+
+    def selected_vm_keys(self):
+        """Return VM keys (host_name, vmid, node) for all selected VM items."""
+        keys = []
+        for item in self.tree.selectedItems():
+            vm_key = item.data(0, VM_KEY_ROLE)
+            if vm_key is not None:
+                keys.append(vm_key)
+        return keys
 
     def find_and_select(self, key_data):
         """Find a tree item by key tuple, expand parents, scroll to it, and select it."""

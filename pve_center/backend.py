@@ -1041,6 +1041,72 @@ class VmActionWorker(QRunnable):
                 pass
 
 
+class BulkVmActionSignals(QObject):
+    progress = Signal(int, int, int)  # done, total, current vmid
+    vm_done = Signal(int, bool, str)  # vmid, ok, message
+    finished = Signal()
+
+
+class BulkVmActionWorker(QRunnable):
+    """Perform one action over many VMs sequentially (B3 bulk operations).
+
+    Targets: list of dicts with keys host_cfg, node, vmid, vm_type.
+    Emits progress before each VM, vm_done after each VM, finished at the end.
+    Cancellation is cooperative: cancel() stops before the next VM.
+    """
+
+    def __init__(self, targets, action):
+        super().__init__()
+        self.targets = list(targets)
+        self.action = action
+        self.signals = BulkVmActionSignals()
+        self._cancel = False
+        self.was_cancelled = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        total = len(self.targets)
+        done = 0
+        for target in self.targets:
+            if self._cancel:
+                self.was_cancelled = True
+                break
+            vmid = target["vmid"]
+            try:
+                self.signals.progress.emit(done, total, vmid)
+            except RuntimeError:
+                pass
+            session = None
+            ok = False
+            msg = ""
+            try:
+                session = ProxmoxSession(target["host_cfg"], timeout=10)
+                VmAPI(session).perform_action(
+                    target["node"], vmid, target["vm_type"], self.action,
+                )
+                ok = True
+                action_name = VM_ACTION_MESSAGE_LABELS.get(self.action, self.action)
+                msg = tr("VM {vmid}: {action} completed").format(
+                    vmid=vmid, action=action_name)
+            except Exception as e:
+                logger.debug("backend error: %s", e)
+                msg = _sanitize_error(e)
+            finally:
+                if session:
+                    session.close()
+            done += 1
+            try:
+                self.signals.vm_done.emit(vmid, ok, msg)
+            except RuntimeError:
+                pass
+        try:
+            self.signals.finished.emit()
+        except RuntimeError:
+            pass
+
+
 def _poll_task(session, node_name, upid, timeout=60, interval=1.0):
     """Poll PVE async task until it finishes or timeout.
     Returns (status, exitstatus) tuple: ('stopped', 'OK') on success.

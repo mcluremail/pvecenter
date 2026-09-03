@@ -70,13 +70,15 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 ### B13. Download from URL ✅ (v2.9.x, main)
 Загрузка ISO/шаблонов по URL напрямую на storage (`POST /nodes/{node}/storage/.../download-url`).
 
-## Backlog
+### B3. Bulk VM actions ✅ (v2.10.0, main)
+Массовые операции над выбранными ВМ (контекстное меню при multi-select >1 ВМ):
+- ExtendedSelection в дереве (Ctrl+click / Shift+click)
+- Массовые start/shutdown/reboot/stop из контекстного меню
+- Прогресс-бар с кнопкой Cancel, сводка ok/failed
+- Доменный слой: `plan_bulk_action` (фильтр шаблонов/недоступных ВМ, dedup)
+- Не вошло: bulk migrate (требует выбора target node — кандидат на отдельную задачу)
 
-### B3. Bulk VM actions
-Массовые операции над выбранными ВМ: start/stop/shutdown/migrate.
-- Ctrl+click в дереве для multi-select
-- Тулбар с bulk actions когда выбрано >1 ВМ
-- Прогресс-бар на операцию
+## Backlog
 
 ### B10. Replication
 Настройка zfs replication между нодами.

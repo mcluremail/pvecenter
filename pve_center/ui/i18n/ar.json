@@ -1129,5 +1129,14 @@
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "حذف الرمز \\\"{id}\\\" للمستخدم \\\"{user}\\\"؟",
   "Delete user \\\"{id}\\\"?": "حذف المستخدم \\\"{id}\\\"؟",
   "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "إزالة الإذن: الدور \\\"{role}\\\" لـ \\\"{ugid}\\\" على \\\"{path}\\\"؟",
-  "{} results": "{} من النتائج"
+  "{} results": "{} من النتائج",
+  "Start all": "تشغيل الكل",
+  "Shutdown all": "إيقاف الكل",
+  "Reboot all": "إعادة تشغيل الكل",
+  "Stop all": "إيقاف إجباري للكل",
+  "Apply {action} to {n} VMs?": "تطبيق \"{action}\" على {n} أجهزة افتراضية؟",
+  "Bulk operation: {done}/{total} — VM {vmid}...": "عملية جماعية: {done}/{total} — الجهاز {vmid}...",
+  "Bulk operation completed: {ok} ok, {failed} failed": "اكتملت العملية الجماعية: {ok} ناجح، {failed} فاشل",
+  "Operation cancelled": "تم إلغاء العملية",
+  "Skipped templates and unavailable VMs: {n}": "تم تخطي القوالب والأجهزة غير المتاحة: {n}"
 }

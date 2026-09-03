@@ -1,7 +1,9 @@
 """Tests for TreePanel with domain objects."""
+from PySide6.QtWidgets import QTreeWidget
+
 from pve_center.domain.enums import VmStatus
 from pve_center.domain.repositories import NodeRepository, VmRepository
-from pve_center.ui.tree_panel import TreePanel
+from pve_center.ui.tree_panel import VM_KEY_ROLE, TreePanel
 
 
 def _make_nodes_cfg(standalone_names=None, clusters=None):
@@ -172,3 +174,65 @@ class TestTreePanelVmCountStr:
         ]
         # Domain Vm uses DictCompat.get("status") which returns the string value
         assert _vm_count_str(vms) == "[2/2]"
+
+
+class TestSelectedVmKeys:
+    """TreePanel.selected_vm_keys for bulk actions (B3)."""
+
+    def _build_tree_with_vms(self, qtbot, make_node, make_vm):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node = make_node(host_name="h1", node="pve01")
+        vm1 = make_vm(vmid=100, name="alpha", host_name="h1", node="pve01",
+                      status=VmStatus.RUNNING)
+        vm2 = make_vm(vmid=101, name="beta", host_name="h1", node="pve01",
+                      status=VmStatus.STOPPED)
+
+        node_repo = NodeRepository()
+        node_repo.add(node)
+        vm_repo = VmRepository()
+        vm_repo.add(vm1)
+        vm_repo.add(vm2)
+
+        tp.update_data(node_repo.all(), vm_repo.all(), final=True,
+                       node_repo=node_repo, vm_repo=vm_repo)
+        tp._build_tree()
+
+        # Collect VM items (items carrying a VM key)
+        vm_items = []
+        for i in range(tp.tree.topLevelItemCount()):
+            top = tp.tree.topLevelItem(i)
+            for j in range(top.childCount()):
+                host = top.child(j)
+                for k in range(host.childCount()):
+                    vm = host.child(k)
+                    if vm.data(0, VM_KEY_ROLE) is not None:
+                        vm_items.append(vm)
+        assert len(vm_items) == 2
+        return tp, vm_items
+
+    def test_empty_selection(self, qtbot, make_node, make_vm):
+        tp, _vm_items = self._build_tree_with_vms(qtbot, make_node, make_vm)
+        assert tp.selected_vm_keys() == []
+
+    def test_single_selection(self, qtbot, make_node, make_vm):
+        tp, vm_items = self._build_tree_with_vms(qtbot, make_node, make_vm)
+        vm_items[0].setSelected(True)
+        keys = tp.selected_vm_keys()
+        assert len(keys) == 1
+        assert keys[0] == ("h1", 100, "pve01")
+
+    def test_multi_selection(self, qtbot, make_node, make_vm):
+        tp, vm_items = self._build_tree_with_vms(qtbot, make_node, make_vm)
+        vm_items[0].setSelected(True)
+        vm_items[1].setSelected(True)
+        keys = tp.selected_vm_keys()
+        assert len(keys) == 2
+        assert ("h1", 100, "pve01") in keys
+        assert ("h1", 101, "pve01") in keys
+
+    def test_extended_selection_mode(self, qtbot, make_node, make_vm):
+        tp, _vm_items = self._build_tree_with_vms(qtbot, make_node, make_vm)
+        assert tp.tree.selectionMode() == QTreeWidget.SelectionMode.ExtendedSelection

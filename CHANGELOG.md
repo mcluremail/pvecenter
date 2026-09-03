@@ -6,7 +6,8 @@
 - Global search: toolbar button + Ctrl+F dialog searches VMs (name, VMID, tags, pool, node), hosts, pools and storages across all clusters; selecting a result jumps to the object in the tree
 - Snapshot rollback: revert a VM/container to a snapshot from the Snapshots tab (toolbar button + context menu, with confirmation)
 - Rollback action is guarded for the pseudo-snapshot "current" and waits for the UPID task to finish
-- i18n: 9 new keys in all 5 languages, _I18N_VERSION bumped to 22
+- Bulk VM actions: multi-select in the tree (Ctrl+click / Shift+click), context menu offers mass Start / Shutdown / Reboot / Stop; progress dialog with Cancel, per-VM results summary
+- i18n: 9 new keys in all 5 languages, _I18N_VERSION bumped to 23
 
 ## v2.9.0 — VM templates, cloning, audit fixes, update check
 

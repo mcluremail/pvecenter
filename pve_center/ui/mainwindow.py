@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QSplitter,
     QSystemTrayIcon,
@@ -25,7 +26,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..backend import ClusterTasksWorker, DeleteVmWorker, FetchWorker, delete_host_token
+from ..backend import (
+    BulkVmActionWorker,
+    ClusterTasksWorker,
+    DeleteVmWorker,
+    FetchWorker,
+    delete_host_token,
+)
 from ..config import (
     export_config,
     import_config,
@@ -55,6 +62,7 @@ from ..domain import (
 from ..domain import (
     Vm as DomainVm,
 )
+from ..domain.bulk import plan_bulk_action
 from . import theme
 from .detail_panel import DetailPanel
 from .i18n import get_language, supported_languages, tr
@@ -64,7 +72,7 @@ from .search_dialog import GlobalSearchDialog
 from .theme import Color
 from .tree_panel import TreePanel
 from .utils import build_cfg_index
-from .vm_actions import confirm_vm_action
+from .vm_actions import VM_ACTION_MESSAGE_LABELS, confirm_vm_action
 from .widgets.cluster_tasks_widget import ClusterTasksWidget
 
 logger = logging.getLogger(__name__)
@@ -133,6 +141,7 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_create_requested.connect(self._on_vm_create_requested)
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
+        self.tree_panel.bulk_vm_action_requested.connect(self._on_bulk_vm_action)
         self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
         self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
@@ -660,6 +669,72 @@ class MainWindow(QMainWindow):
         worker.signals.action_error.connect(lambda err: (
             self._notifications.show(tr("Action error: {}").format(err), error=True)
         ))
+        self._run_worker(worker)
+
+    def _on_bulk_vm_action(self, vm_keys, action):
+        plan = plan_bulk_action(vm_keys, self._vm_repo, set(self._cfg_by_name.keys()))
+        if plan.skipped_count:
+            self._notifications.show(
+                tr("Skipped templates and unavailable VMs: {n}").format(n=plan.skipped_count))
+        if not plan.targets:
+            self._notifications.show(tr("No VMs available"), error=True)
+            return
+        action_label = VM_ACTION_MESSAGE_LABELS.get(action, action)
+        vmids = ", ".join(str(t.vmid) for t in plan.targets[:20])
+        if len(plan.targets) > 20:
+            vmids += "..."
+        box = QMessageBox(self)
+        if action in ("stop", "reset", "shutdown", "reboot"):
+            box.setIcon(QMessageBox.Warning)
+        else:
+            box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(action_label)
+        box.setText(tr("Apply {action} to {n} VMs?").format(
+            action=action_label, n=len(plan.targets)))
+        box.setInformativeText(vmids)
+        yes_btn = box.addButton(tr("Yes"), QMessageBox.YesRole)
+        box.addButton(tr("No"), QMessageBox.NoRole)
+        box.exec()
+        if box.clickedButton() is not yes_btn:
+            return
+        targets = [
+            {"host_cfg": self._cfg_by_name[t.host_name], "node": t.node,
+             "vmid": t.vmid, "vm_type": t.vm_type}
+            for t in plan.targets
+        ]
+        total = len(targets)
+        progress = QProgressDialog(
+            tr("Bulk operation: {done}/{total} — VM {vmid}...").format(
+                done=0, total=total, vmid=targets[0]["vmid"]),
+            tr("Cancel"), 0, total, self)
+        progress.setWindowTitle(action_label)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        stats = {"ok": 0, "fail": 0}
+        worker = BulkVmActionWorker(targets, action)
+
+        def on_progress(done, _total, vmid):
+            progress.setLabelText(
+                tr("Bulk operation: {done}/{total} — VM {vmid}...").format(
+                    done=done, total=total, vmid=vmid))
+            progress.setValue(done)
+
+        def on_vm_done(_vmid, ok, _msg):
+            stats["ok" if ok else "fail"] += 1
+
+        def on_finished():
+            progress.setValue(total)
+            if worker.was_cancelled:
+                self._notifications.show(tr("Operation cancelled"), error=True)
+            self._notifications.show(
+                tr("Bulk operation completed: {ok} ok, {failed} failed").format(
+                    ok=stats["ok"], failed=stats["fail"]))
+            self.refresh_data()
+
+        worker.signals.progress.connect(on_progress)
+        worker.signals.vm_done.connect(on_vm_done)
+        worker.signals.finished.connect(on_finished)
+        progress.canceled.connect(worker.cancel)
         self._run_worker(worker)
 
     def _on_console_from_tree(self, host_name, node, vmid):

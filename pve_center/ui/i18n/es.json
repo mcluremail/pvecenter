@@ -1129,5 +1129,14 @@
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "¿Eliminar token \\\"{id}\\\" para el usuario \\\"{user}\\\"?",
   "Delete user \\\"{id}\\\"?": "¿Eliminar usuario \\\"{id}\\\"?",
   "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "¿Quitar permiso: rol \\\"{role}\\\" para \\\"{ugid}\\\" en \\\"{path}\\\"?",
-  "{} results": "{} resultados"
+  "{} results": "{} resultados",
+  "Start all": "Iniciar todo",
+  "Shutdown all": "Apagar todo",
+  "Reboot all": "Reiniciar todo",
+  "Stop all": "Detener todo",
+  "Apply {action} to {n} VMs?": "¿Aplicar \"{action}\" a {n} VM?",
+  "Bulk operation: {done}/{total} — VM {vmid}...": "Operación masiva: {done}/{total} — VM {vmid}...",
+  "Bulk operation completed: {ok} ok, {failed} failed": "Operación masiva completada: {ok} correctas, {failed} fallidas",
+  "Operation cancelled": "Operación cancelada",
+  "Skipped templates and unavailable VMs: {n}": "Plantillas y VM no disponibles omitidas: {n}"
 }

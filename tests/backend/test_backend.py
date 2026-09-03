@@ -255,3 +255,112 @@ class TestDeleteHostToken:
         monkeypatch.setattr(backend, "AccessAPI", lambda session: api)
         assert backend.delete_host_token({"user": "u", "token_name": "t"}) is False
         sess.close.assert_called_once()
+
+
+# --- BulkVmActionWorker ---
+
+
+class TestBulkVmActionWorker:
+    @staticmethod
+    def _make_worker(monkeypatch, failures=None):
+        """Build a bulk worker with mocked ProxmoxSession/VmAPI.
+
+        failures: dict {vmid: exception} — those VMs raise in perform_action.
+        Returns (worker, recorded) where recorded collects signal emissions.
+        """
+        sessions = []
+
+        class FakeSession:
+            def __init__(self, cfg, timeout=10):
+                self.closed = False
+                sessions.append(self)
+
+            def close(self):
+                self.closed = True
+
+        calls = []
+
+        def fake_perform_action(api_self, node, vmid, vm_type, action):
+            calls.append((node, vmid, vm_type, action))
+            if failures and vmid in failures:
+                raise failures[vmid]
+
+        class FakeVmAPI:
+            def __init__(self, session):
+                self.session = session
+
+            perform_action = fake_perform_action
+
+        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
+        monkeypatch.setattr(backend, "VmAPI", FakeVmAPI)
+
+        targets = [
+            {"host_cfg": {"name": "h1"}, "node": "n1", "vmid": v, "vm_type": "qemu"}
+            for v in (100, 101, 102)
+        ]
+        worker = backend.BulkVmActionWorker(targets, "start")
+        recorded = {"progress": [], "vm_done": [], "finished": []}
+        worker.signals.progress.connect(
+            lambda d, t, v: recorded["progress"].append((d, t, v)))
+        worker.signals.vm_done.connect(
+            lambda v, ok, m: recorded["vm_done"].append((v, ok, m)))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        return worker, recorded, calls, sessions
+
+    def test_all_success(self, monkeypatch):
+        worker, recorded, calls, sessions = self._make_worker(monkeypatch)
+        worker.run()
+        assert [c[1] for c in calls] == [100, 101, 102]
+        assert all(c[3] == "start" for c in calls)
+        assert all(ok for _v, ok, _m in recorded["vm_done"])
+        assert recorded["finished"] == [True]
+        assert recorded["progress"] == [(0, 3, 100), (1, 3, 101), (2, 3, 102)]
+        assert all(s.closed for s in sessions)
+        assert not worker.was_cancelled
+
+    def test_partial_failure_continues(self, monkeypatch):
+        failures = {101: RuntimeError("vm locked")}
+        worker, recorded, calls, _sessions = self._make_worker(
+            monkeypatch, failures=failures)
+        worker.run()
+        assert [c[1] for c in calls] == [100, 101, 102]  # loop continues
+        results = {v: ok for v, ok, _m in recorded["vm_done"]}
+        assert results == {100: True, 101: False, 102: True}
+        _v, ok, msg = next(r for r in recorded["vm_done"] if not r[1])
+        assert "locked" in msg
+
+    def test_cancel_stops_loop(self, monkeypatch):
+        worker, recorded, calls, _sessions = self._make_worker(monkeypatch)
+        worker.cancel()
+        worker.run()
+        assert calls == []
+        assert recorded["vm_done"] == []
+        assert worker.was_cancelled
+        assert recorded["finished"] == [True]
+
+    def test_cancel_midway(self, monkeypatch):
+        worker, recorded, calls, _sessions = self._make_worker(monkeypatch)
+        state = {"count": 0}
+
+        def fake_perform(api_self, node, vmid, vm_type, action):
+            state["count"] += 1
+            if state["count"] >= 2:
+                worker.cancel()
+            calls.append((node, vmid, vm_type, action))
+
+        monkeypatch.setattr(backend.VmAPI, "perform_action", fake_perform)
+        worker.run()
+        # VM 100 done, VM 101 triggers cancel mid-run but still completes it;
+        # VM 102 skipped
+        assert [c[1] for c in calls] == [100, 101]
+        assert worker.was_cancelled
+        assert recorded["finished"] == [True]
+
+    def test_empty_targets(self, monkeypatch):
+        monkeypatch.setattr(backend, "ProxmoxSession", MagicMock())
+        worker = backend.BulkVmActionWorker([], "start")
+        recorded = {"finished": []}
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        worker.run()
+        assert recorded["finished"] == [True]
+        assert not worker.was_cancelled
