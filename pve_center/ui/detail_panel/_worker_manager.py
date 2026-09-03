@@ -1,4 +1,5 @@
 import logging
+from collections import deque
 
 from PySide6.QtCore import QThreadPool
 
@@ -6,10 +7,16 @@ from ._constants import _MAX_WORKERS_DP
 
 logger = logging.getLogger(__name__)
 
+# Bounded queue for workers that arrive while the pool is at capacity.
+# Prevents the old behaviour of silently dropping fetches (which left
+# tabs stuck on "Loading…") while still bounding memory under spam.
+_MAX_PENDING = _MAX_WORKERS_DP * 2
+
 
 class WorkerManager:
     def __init__(self):
         self._workers = set()
+        self._pending = deque()
         self.current_worker = None
         self.current_config_worker = None
         self.current_hist_worker = None
@@ -17,27 +24,43 @@ class WorkerManager:
         self.current_host_workers = set()
 
     def run_worker(self, worker):
-        if len(self._workers) >= _MAX_WORKERS_DP:
-            logger.warning("run_worker: pool full (%d/%d), worker not started", len(self._workers), _MAX_WORKERS_DP)
-            return
-        self._workers.add(worker)
-        worker.signals.finished.connect(lambda w=worker: self.discard_worker(w))
-        QThreadPool.globalInstance().start(worker)
+        self._try_start(worker, host=False)
+        self._pump()
 
     def run_host_worker(self, worker):
         """Run a host-detail worker that is tracked for cancellation on tab switch."""
+        self._try_start(worker, host=True)
+        self._pump()
+
+    def _try_start(self, worker, host):
         if len(self._workers) >= _MAX_WORKERS_DP:
-            logger.warning("run_host_worker: pool full (%d/%d), worker not started", len(self._workers), _MAX_WORKERS_DP)
+            if len(self._pending) >= _MAX_PENDING:
+                logger.warning(
+                    "worker pool and queue full (%d+%d), dropping worker",
+                    len(self._workers), len(self._pending),
+                )
+                return
+            self._pending.append((worker, host))
             return
         self._workers.add(worker)
-        self.current_host_workers.add(worker)
-        worker.signals.finished.connect(
-            lambda w=worker: (self.discard_worker(w), self.current_host_workers.discard(w))
-        )
+        if host:
+            self.current_host_workers.add(worker)
+            worker.signals.finished.connect(
+                lambda w=worker: (self.discard_worker(w), self.current_host_workers.discard(w))
+            )
+        else:
+            worker.signals.finished.connect(lambda w=worker: self.discard_worker(w))
         QThreadPool.globalInstance().start(worker)
+
+    def _pump(self):
+        """Start queued workers as pool slots free up."""
+        while self._pending and len(self._workers) < _MAX_WORKERS_DP:
+            worker, host = self._pending.popleft()
+            self._try_start(worker, host)
 
     def discard_worker(self, worker):
         self._workers.discard(worker)
+        self._pump()
 
     def cancel_detail_worker(self):
         if self.current_worker:
@@ -77,6 +100,7 @@ class WorkerManager:
         """Discard all host-detail workers from the pool tracking so new
         workers can be scheduled.  Running workers keep going but their
         results are dropped by the tab-type guard in the result slots."""
+        self._pending.clear()
         for w in list(self.current_host_workers):
             self.discard_worker(w)
         self.current_host_workers.clear()
@@ -85,6 +109,7 @@ class WorkerManager:
         """Discard all general workers (run_worker) from pool tracking
         so new workers can be scheduled.  Running workers keep going
         but their results are dropped by generation/tab guards."""
+        self._pending.clear()
         for w in list(self._workers):
             # Don't touch current_worker etc. — they have dedicated cancel methods
             if w not in (self.current_worker, self.current_config_worker,
