@@ -7,6 +7,7 @@ import urllib3
 from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from .domain.cluster import ClusterStatus
 from .domain.ha_resource import HaResource
 from .domain.snapshot import Snapshot
 from .domain.task import Task
@@ -2021,7 +2022,7 @@ class NetworkRevertWorker(QRunnable):
 # ClusterStatusWorker — GET /cluster/status + GET /cluster/config/nodes
 # ----------------------------------------------------------------------
 class ClusterStatusSignals(QObject):
-    cluster_status_ready = Signal(dict)
+    cluster_status_ready = Signal(object)
     cluster_status_error = Signal(str)
     finished = Signal()
 
@@ -2045,10 +2046,7 @@ class ClusterStatusWorker(QRunnable):
                 corosync_nodes = cluster_api.get_config_nodes()
             except Exception:
                 pass
-            result = {
-                "status": status,
-                "corosync_nodes": corosync_nodes,
-            }
+            result = ClusterStatus.from_pve(status, corosync_nodes)
             _safe_emit(self.signals.cluster_status_ready, result)
         except Exception as e:
             logger.debug("cluster status error: %s", e)

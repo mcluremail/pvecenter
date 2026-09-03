@@ -6,7 +6,7 @@ No Qt/i18n dependencies — safe to use in any context.
 
 from __future__ import annotations
 
-from .cluster import ClusterInfo, ClusterNode
+from .cluster import ClusterInfo, ClusterNode, ClusterStatus
 from .enums import NodeStatus, QuorumState, VmStatus, VmType
 from .ha_group import HaGroup
 from .ha_resource import HaResource
@@ -28,6 +28,7 @@ from .vm import Vm
 __all__ = [
     "ClusterInfo",
     "ClusterNode",
+    "ClusterStatus",
     "HaGroup",
     "HaResource",
     "IsoImage",

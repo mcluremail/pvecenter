@@ -92,3 +92,44 @@ class ClusterNode:
             ring1_addr=cs.get("ring1_addr", "") or "",
             nodeid=cs.get("nodeid", "") or "",
         )
+
+
+@dataclass(frozen=True)
+class ClusterStatus:
+    """Full cluster status payload: quorum info + merged corosync nodes.
+
+    Built from ``GET /cluster/status`` (list of cluster/node entries) and
+    ``GET /cluster/config/nodes`` (corosync config).
+    """
+
+    info: ClusterInfo
+    """Cluster-level quorum information."""
+
+    nodes: tuple[ClusterNode, ...]
+    """Cluster nodes with merged runtime + corosync config data."""
+
+    @staticmethod
+    def from_pve(
+        status_list: list[dict],
+        corosync_nodes: list[dict] | None = None,
+    ) -> ClusterStatus:
+        """Build a ClusterStatus from raw API lists."""
+        cluster_entry = next(
+            (e for e in status_list
+             if isinstance(e, dict) and e.get("type") == "cluster"),
+            {},
+        )
+        corosync_map = {
+            cn.get("name", ""): cn
+            for cn in (corosync_nodes or [])
+            if isinstance(cn, dict)
+        }
+        nodes = tuple(
+            ClusterNode.from_pve(e, corosync_map.get(e.get("name", "")))
+            for e in status_list
+            if isinstance(e, dict) and e.get("type") == "node"
+        )
+        return ClusterStatus(
+            info=ClusterInfo.from_pve(cluster_entry),
+            nodes=nodes,
+        )

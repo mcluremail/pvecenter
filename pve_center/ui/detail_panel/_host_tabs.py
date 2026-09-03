@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...domain import QuorumState
 from ..i18n import tr
 from ..icons import get_icon
 from ..object_id import HostId
@@ -1923,48 +1924,20 @@ class HostTabs:
 
     def _on_cluster_status(self, data):
         panel = self.panel
-        status_list = data.get("status", [])
-        corosync_nodes = data.get("corosync_nodes", [])
+        info = data.info
 
-        quorum_state = "unknown"
-        quorum_votes = 0
-        expected_votes = 0
-        nodes_info = []
-
-        for item in status_list:
-            if isinstance(item, dict):
-                if item.get("type") == "cluster":
-                    quorum_state = "ok" if item.get("quorate", 0) else "lost"
-                    quorum_votes = item.get("votes", 0)
-                    expected_votes = item.get("expected_votes", 0)
-                elif item.get("type") == "node":
-                    nodes_info.append({
-                        "name": item.get("name", ""),
-                        "online": item.get("online", 0),
-                        "quorum_votes": item.get("quorum_votes", 0),
-                        "ip": item.get("ip", ""),
-                    })
-
-        corosync_map = {}
-        for cn in corosync_nodes:
-            if isinstance(cn, dict):
-                name = cn.get("name", "")
-                corosync_map[name] = {
-                    "ring0_addr": cn.get("ring0_addr", ""),
-                    "ring1_addr": cn.get("ring1_addr", ""),
-                    "quorum_votes": cn.get("quorum_votes", cn.get("votes", "")),
-                    "nodeid": cn.get("nodeid", ""),
-                }
-
-        if quorum_state == "ok":
+        if info.quorum_state == QuorumState.OK:
             color = Color.STATUS_OK
             quorum_text = tr("Quorum: OK")
-        elif quorum_state == "lost":
+        elif info.quorum_state == QuorumState.LOST:
             color = Color.STATUS_ERR
             quorum_text = tr("Quorum: LOST")
         else:
             color = Color.STATUS_WARN
             quorum_text = tr("Quorum: unknown")
+
+        quorum_votes = info.votes
+        expected_votes = info.expected_votes
 
         panel.card_cluster_quorum.set_value(
             f"{quorum_votes}/{expected_votes}",
@@ -1979,22 +1952,18 @@ class HostTabs:
 
         table = panel.cluster_quorum_table
         table.setSortingEnabled(False)
-        table.setRowCount(len(nodes_info))
-        for i, ni in enumerate(nodes_info):
-            name = ni["name"]
-            table.setItem(i, 0, QTableWidgetItem(name))
-            online_str = tr("Yes") if ni["online"] else tr("No")
-            online_item = QTableWidgetItem(online_str)
-            if ni["online"]:
+        table.setRowCount(len(data.nodes))
+        for i, node in enumerate(data.nodes):
+            table.setItem(i, 0, QTableWidgetItem(node.name))
+            online_item = QTableWidgetItem(tr("Yes") if node.online else tr("No"))
+            if node.online:
                 online_item.setForeground(QColor(Color.STATUS_OK))
             else:
                 online_item.setForeground(QColor(Color.STATUS_ERR))
             table.setItem(i, 1, online_item)
-            cs = corosync_map.get(name, {})
-            votes = cs.get("quorum_votes", ni.get("quorum_votes", ""))
-            table.setItem(i, 2, QTableWidgetItem(str(votes)))
-            table.setItem(i, 3, QTableWidgetItem(cs.get("ring0_addr", ni.get("ip", ""))))
-            table.setItem(i, 4, QTableWidgetItem(cs.get("ring1_addr", "")))
+            table.setItem(i, 2, QTableWidgetItem(node.votes_display))
+            table.setItem(i, 3, QTableWidgetItem(node.ring0_display))
+            table.setItem(i, 4, QTableWidgetItem(node.ring1_addr))
         table.resizeRowsToContents()
         table.setSortingEnabled(True)
 

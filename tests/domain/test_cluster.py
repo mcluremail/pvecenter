@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pve_center.domain import ClusterInfo, ClusterNode, QuorumState
+from pve_center.domain import ClusterInfo, ClusterNode, ClusterStatus, QuorumState
 
 CLUSTER_ENTRY = {
     "type": "cluster",
@@ -93,3 +93,36 @@ class TestClusterNodeFromPve:
     def test_offline_node(self):
         cn = ClusterNode.from_pve({"name": "pve03", "online": 0}, None)
         assert cn.online is False
+
+
+class TestClusterStatusFromPve:
+    """ClusterStatus container merges /cluster/status + corosync nodes."""
+
+    def test_full_merge(self):
+        status_list = [CLUSTER_ENTRY, NODE_STATUS_ENTRY]
+        cs = ClusterStatus.from_pve(status_list, [COROSYNC_ENTRY])
+        assert cs.info.quorum_state == QuorumState.OK
+        assert cs.info.votes == 3
+        assert cs.info.expected_votes == 3
+        assert len(cs.nodes) == 1
+        node = cs.nodes[0]
+        assert node.name == "pve01"
+        assert node.online is True
+        assert node.ring0_display == "10.0.0.1"
+        assert node.ring1_addr == "10.0.0.2"
+        assert node.nodeid == 1
+
+    def test_no_cluster_entry(self):
+        cs = ClusterStatus.from_pve([], [])
+        assert cs.info.quorum_state == QuorumState.UNKNOWN
+        assert cs.nodes == ()
+
+    def test_node_without_corosync_entry(self):
+        cs = ClusterStatus.from_pve([NODE_STATUS_ENTRY], [])
+        node = cs.nodes[0]
+        assert node.ring0_display == NODE_STATUS_ENTRY["ip"]  # IP fallback
+        assert node.ring1_addr == ""
+
+    def test_quorum_lost(self):
+        cs = ClusterStatus.from_pve([CLUSTER_ENTRY_LOST], [])
+        assert cs.info.quorum_state == QuorumState.LOST
