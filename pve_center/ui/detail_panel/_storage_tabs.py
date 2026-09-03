@@ -762,7 +762,8 @@ class StorageTabs:
         if not _HAS_PG or not metrics_dict.get("usage"):
             return
         times = [pt["time"] for pt in metrics_dict["usage"]]
-        values = [pt["value"] / (1024**3) for pt in metrics_dict["usage"]]
+        # StorageMetricsWorker already converted bytes to GiB.
+        values = [pt["value"] for pt in metrics_dict["usage"]]
         panel.storage_plot_curve.setData(times, values)
 
     def fetch_storage_backups_simple(self, storage_name, node_name, host_name, cfg):

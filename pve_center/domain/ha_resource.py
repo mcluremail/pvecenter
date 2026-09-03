@@ -46,7 +46,7 @@ class HaResource:
             sid=d.get("sid", "") or "",
             group=d.get("group", "") or "",
             state=d.get("state", "") or "",
-            max_restart=d.get("max_restart", 1) or 1,
-            max_relocate=d.get("max_relocate", 1) or 1,
+            max_restart=d.get("max_restart", 1) if d.get("max_restart") is not None else 1,
+            max_relocate=d.get("max_relocate", 1) if d.get("max_relocate") is not None else 1,
             comment=d.get("comment", "") or "",
         )

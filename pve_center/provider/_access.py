@@ -79,8 +79,18 @@ class AccessAPI:
     # -- roles --
 
     def list_roles(self) -> list[dict]:
-        """GET /access/roles."""
-        return self._s.call(self._s.proxmox.access.roles.get)
+        """GET /access/roles.
+
+        PVE returns a mapping ``{roleid: {privs: [...], special: 0/1}}``;
+        normalize it to a list of dicts with a ``roleid`` key.
+        """
+        raw = self._s.call(self._s.proxmox.access.roles.get) or {}
+        if isinstance(raw, list):
+            return raw
+        return [
+            {"roleid": roleid, **(info or {})}
+            for roleid, info in raw.items()
+        ]
 
     def create_role(self, **params) -> object:
         """POST /access/roles."""

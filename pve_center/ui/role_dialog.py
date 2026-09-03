@@ -156,9 +156,11 @@ class RoleDialog(QDialog):
                 if cb:
                     cb.setChecked(bool(enabled))
         else:
-            privs_str = self._role.get("privs", "") or ""
-            for priv in privs_str.split(","):
-                priv = priv.strip()
+            privs = self._role.get("privs") or []
+            if isinstance(privs, str):
+                privs = privs.split(",")
+            for priv in privs:
+                priv = priv.strip() if isinstance(priv, str) else priv
                 if priv:
                     cb = self._priv_checks.get(priv)
                     if cb:

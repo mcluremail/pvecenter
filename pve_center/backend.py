@@ -475,13 +475,34 @@ class FetchWorker(QRunnable):
                     node_name = nn
                     try:
                         node_status = node_api.get_status(node_name)
-                    except Exception:
+                    except Exception as e:
+                        # Surface the failure as an error node instead of
+                        # silently emitting an empty "ok" result.
+                        with res_lock:
+                            nodes = [{
+                                "node": self.node_cfg["name"],
+                                "host_name": self.node_cfg["name"],
+                                "_display_name": self.node_cfg["name"],
+                                "status": "error",
+                                "error": str(e),
+                            }]
                         return
+                    # /nodes/{node}/status returns nested dicts (memory,
+                    # rootfs, cpuinfo); flatten to the flat keys Node.from_pve
+                    # expects (same shape as /cluster/resources entries).
+                    mem_info = node_status.get("memory") or {}
+                    rootfs_info = node_status.get("rootfs") or {}
+                    cpuinfo = node_status.get("cpuinfo") or {}
                     with res_lock:
                         nodes = [{**node_status, "node": node_name,
                                   "_display_name": self.node_cfg["name"],
                                   "host_name": self.node_cfg["name"],
-                                  "status": "online"}]
+                                  "status": "online",
+                                  "mem": mem_info.get("used", 0) or 0,
+                                  "maxmem": mem_info.get("total", 0) or 0,
+                                  "disk": rootfs_info.get("used", 0) or 0,
+                                  "maxdisk": rootfs_info.get("total", 0) or 0,
+                                  "sockets": cpuinfo.get("sockets", 0) or 0}]
                     try:
                         qemu_list = vm_api.list_qemu(node_name)
                         lxc_list = vm_api.list_lxc(node_name)

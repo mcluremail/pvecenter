@@ -1655,13 +1655,16 @@ class MainWindow(QMainWindow):
         vms_count = len(vms)
         vms_running = sum(1 for v in vms if v.status is VmStatus.RUNNING)
         clusters = {n.cluster for n in nodes if n.cluster and n.cluster != "Standalone"}
-        total_cpu = sum(
-            n.cpu_fraction * n.cpu_sockets for n in nodes if n.status is NodeStatus.ONLINE
+        online_nodes = [n for n in nodes if n.status is NodeStatus.ONLINE]
+        # cpu_fraction is per-node utilization (0..1 of that node's cores);
+        # cluster-wide CPU load is the mean across online nodes.
+        cpu_pct = (
+            sum(n.cpu_fraction for n in online_nodes) / len(online_nodes) * 100
+            if online_nodes else 0
         )
-        total_mem = sum(n.mem_bytes for n in nodes if n.status is NodeStatus.ONLINE)
-        total_maxmem = sum(n.maxmem_bytes for n in nodes if n.status is NodeStatus.ONLINE)
+        total_mem = sum(n.mem_bytes for n in online_nodes)
+        total_maxmem = sum(n.maxmem_bytes for n in online_nodes)
         mem_pct = (total_mem / total_maxmem * 100) if total_maxmem else 0
-        cpu_pct = (total_cpu * 100) if total_cpu else 0
         parts = [
             tr("Hosts: {ok}/{total}").format(ok=hosts_ok, total=hosts_total),
             tr("Clusters: {n}").format(n=len(clusters)) if clusters else "",

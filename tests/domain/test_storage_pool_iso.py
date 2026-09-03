@@ -70,6 +70,19 @@ class TestStorageFromPve:
         assert s.used_bytes == 0
         assert s.total_bytes == 0
 
+    def test_disk_maxdisk_fallback(self):
+        """When used/total are absent (per-node /storage output), fall back
+        to the disk/maxdisk keys from /cluster/resources."""
+        s = Storage.from_pve({"storage": "local", "type": "dir",
+                              "disk": 5, "maxdisk": 100}, "h", "")
+        assert s.used_bytes == 5
+        assert s.total_bytes == 100
+
+    def test_used_wins_over_disk(self):
+        s = Storage.from_pve({"used": 7, "total": 200, "disk": 5, "maxdisk": 100}, "h", "")
+        assert s.used_bytes == 7
+        assert s.total_bytes == 200
+
 
 class TestStorageComputed:
     def test_used_gib(self):

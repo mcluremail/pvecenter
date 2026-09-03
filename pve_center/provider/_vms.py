@@ -83,26 +83,30 @@ class VmAPI:
 
     def resize_disk(self, node: str, vmid: int | str, vm_type: str,
                     disk: str, size: str) -> object:
-        """PUT .../resize (QEMU) or .../resize (LXC)."""
+        """PUT .../resize (QEMU) or .../resize (LXC).
+
+        Body params are passed raw: requests form-encodes them, so
+        pre-quoting with _q() would double-encode (e.g. "+10G" -> "%252B10G").
+        """
         if vm_type == "qemu":
             return self._s.call(
                 self._resource(node, vmid, vm_type).resize.put,
-                disk=_q(disk), size=_q(size),
+                disk=disk, size=size,
             )
         return self._s.call(
             self._resource(node, vmid, vm_type).resize.put,
-            volume=_q(disk), size=_q(size),
+            disk=disk, size=size,
         )
 
     def move_disk(self, node: str, vmid: int | str, vm_type: str,
                   disk: str, storage: str, delete: bool = False) -> object:
         """POST .../move_disk (QEMU) or .../move_volume (LXC)."""
         if vm_type == "qemu":
-            params: dict = {"disk": _q(disk), "storage": _q(storage)}
+            params: dict = {"disk": disk, "storage": storage}
             if delete:
                 params["delete"] = 1
             return self._s.call(self._resource(node, vmid, vm_type).move_disk.post, **params)
-        params = {"volume": _q(disk), "storage": _q(storage)}
+        params = {"volume": disk, "storage": storage}
         if delete:
             params["delete"] = 1
         return self._s.call(self._resource(node, vmid, vm_type).move_volume.post, **params)

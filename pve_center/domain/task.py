@@ -113,11 +113,17 @@ class Task(DictCompat):
                         except (ValueError, IndexError):
                             pass
 
+        # PVE omits "status" for running tasks (it is only set on
+        # completion); normalize to "RUNNING" so filters and colors work.
+        status = d.get("status", "") or ""
+        if not status and not d.get("endtime") and d.get("starttime"):
+            status = "RUNNING"
+
         return Task(
             upid=upid,
             node=d.get("node", "") or "",
             task_type=d.get("type", "") or "",
-            status=d.get("status", "") or "",
+            status=status,
             starttime=float(d.get("starttime", 0) or 0),
             endtime=float(d.get("endtime", 0) or 0),
             user=d.get("user", "") or "",

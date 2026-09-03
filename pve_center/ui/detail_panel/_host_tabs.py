@@ -2849,6 +2849,8 @@ class HostTabs:
             id_item.setData(Qt.UserRole, role)
             table.setItem(i, 0, id_item)
             privs = role.get("privs", "") or ""
+            if isinstance(privs, list):
+                privs = ", ".join(privs)
             table.setItem(i, 1, QTableWidgetItem(privs))
             special = role.get("special", 0)
             if isinstance(special, str):

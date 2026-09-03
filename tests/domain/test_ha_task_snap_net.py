@@ -63,6 +63,12 @@ class TestHaResourceFromPve:
         assert r.max_restart == 1
         assert r.max_relocate == 1
 
+    def test_zero_restart_preserved(self):
+        """max_restart=0 is a valid PVE setting and must not become 1."""
+        r = HaResource.from_pve({"sid": "vm:201", "max_restart": 0, "max_relocate": 0})
+        assert r.max_restart == 0
+        assert r.max_relocate == 0
+
     def test_vmid_extraction(self):
         r = HaResource.from_pve(HA_RESOURCE_DICT)
         assert r.vmid == 100
@@ -113,6 +119,16 @@ class TestTaskFromPve:
 
     def test_running(self):
         t = Task.from_pve(TASK_RUNNING_DICT)
+        assert t.is_running is True
+        assert t.is_ok is False
+
+    def test_missing_status_inferred_running(self):
+        """Active tasks lack status/endtime; without inference they
+        looked finished with unknown outcome."""
+        d = {"upid": "UPID:pve02:0001:0002:1700000100:qmigrate:105:root@pam:",
+             "starttime": 1700000100}
+        t = Task.from_pve(d)
+        assert t.status == "RUNNING"
         assert t.is_running is True
         assert t.is_ok is False
 

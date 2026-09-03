@@ -129,8 +129,10 @@ class Storage(DictCompat):
             cluster=cluster,
             storage_type=d.get("type", "") or "",
             content=d.get("content", "") or "",
-            used_bytes=d.get("used", 0) or 0,
-            total_bytes=d.get("total", 0) or 0,
+            # /cluster/resources reports usage as disk/maxdisk; per-node
+            # /nodes/{node}/storage reports used/total/avail. Accept both.
+            used_bytes=d.get("used", 0) or d.get("disk", 0) or 0,
+            total_bytes=d.get("total", 0) or d.get("maxdisk", 0) or 0,
             avail_bytes=d.get("avail", 0) or 0,
             shared=bool(d.get("shared")),
         )

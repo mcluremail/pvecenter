@@ -366,8 +366,11 @@ class TestVmAPI:
         qemu_chain.return_value.resize.put = MagicMock(return_value="OK")
         api = VmAPI(mock_session)
         api.resize_disk("n1", 100, "qemu", "scsi0", "+10G")
+        # Body params must NOT be pre-quoted: requests form-encodes them,
+        # so _q() would double-encode ("+10G" -> "%252B10G") and PVE would
+        # reject the size.
         qemu_chain.return_value.resize.put.assert_called_once_with(
-            disk="scsi0", size="%2B10G"
+            disk="scsi0", size="+10G"
         )
 
     def test_resize_disk_lxc(self, mock_session):
@@ -376,8 +379,10 @@ class TestVmAPI:
         lxc_chain.return_value.resize.put = MagicMock(return_value="OK")
         api = VmAPI(mock_session)
         api.resize_disk("n1", 200, "lxc", "rootfs", "20G")
+        # PVE's LXC resize endpoint requires the parameter to be named
+        # "disk" (same as QEMU); "volume" belongs to move_volume only.
         lxc_chain.return_value.resize.put.assert_called_once_with(
-            volume="rootfs", size="20G"
+            disk="rootfs", size="20G"
         )
 
     def test_move_disk_qemu(self, mock_session):
@@ -660,6 +665,20 @@ class TestAccessAPI:
         mock_session.proxmox.access.roles.get = MagicMock(return_value=[{"roleid": "r1"}])
         api = AccessAPI(mock_session)
         assert api.list_roles() == [{"roleid": "r1"}]
+
+    def test_list_roles_mapping_normalized(self, mock_session):
+        """PVE returns {roleid: {privs, special}}; it must be flattened to a
+        list with a roleid key so the UI table and RoleDialog can consume it."""
+        mock_session.proxmox.access.roles.get = MagicMock(return_value={
+            "Administrator": {"privs": ["Permissions.Modify"], "special": 1},
+            "PVEVMUser": {"privs": ["VM.Audit", "VM.PowerMgmt"], "special": 0},
+        })
+        api = AccessAPI(mock_session)
+        roles = api.list_roles()
+        assert {r["roleid"] for r in roles} == {"Administrator", "PVEVMUser"}
+        admin = next(r for r in roles if r["roleid"] == "Administrator")
+        assert admin["privs"] == ["Permissions.Modify"]
+        assert admin["special"] == 1
 
     def test_list_acl(self, mock_session):
         mock_session.proxmox.access.acl.get = MagicMock(return_value=[{"path": "/"}])
