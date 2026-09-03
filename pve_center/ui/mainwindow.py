@@ -1333,13 +1333,16 @@ class MainWindow(QMainWindow):
         if vms is None:
             vms = self._vm_repo.all()
         for node in nodes:
-            name = node.node
+            # Key by (host_name, node): identical node names on different
+            # hosts are legal (standalone servers) and would otherwise
+            # trigger false status-change notifications.
+            key = (node.host_name, node.node)
             status = node.status_value
-            old = self._last_host_statuses.get(name)
+            old = self._last_host_statuses.get(key)
             if old is not None and old != status:
-                display = node.display_name or name
+                display = node.display_name or node.node
                 self._notifications.host_status_changed(display, old, status)
-            self._last_host_statuses[name] = status
+            self._last_host_statuses[key] = status
 
         for vm in vms:
             key = (vm.host_name, vm.vmid)

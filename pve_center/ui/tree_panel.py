@@ -178,6 +178,7 @@ class TreePanel(QWidget):
         self._node_repo = None
         self.all_vms = []
         self._vm_repo = None
+        self.all_storages = []
 
         self._building = False
         self._nav_timer = QTimer()
@@ -937,6 +938,7 @@ class TreePanel(QWidget):
     def update_node_statuses(self, all_nodes, all_vms, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
         self._node_repo = node_repo or self._node_repo
+        self._vm_repo = vm_repo or self._vm_repo
         for node in list(all_nodes):
             hn = node.host_name
             self._loading_hosts.discard(hn)

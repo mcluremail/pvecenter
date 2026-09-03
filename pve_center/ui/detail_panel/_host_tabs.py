@@ -1654,22 +1654,22 @@ class HostTabs:
             from ..api.metrics import HostSnapshotsWorker
             worker = HostSnapshotsWorker(cfg, node_name, vms)
             worker.signals.snapshots_ready.connect(
-                lambda nn, data, w=worker: (
-                    self._on_cluster_snapshots(nn, data),
+                lambda nn, data, w=worker, gen=panel._generation: (
+                    self._on_cluster_snapshots(nn, data, gen),
                     panel._workers_mgr.discard_worker(w),
                 )
             )
             worker.signals.snapshots_error.connect(
-                lambda nn, err, w=worker: (
-                    self._on_cluster_snapshots(nn, []),
+                lambda nn, err, w=worker, gen=panel._generation: (
+                    self._on_cluster_snapshots(nn, [], gen),
                     panel._workers_mgr.discard_worker(w),
                 )
             )
             panel._workers_mgr.run_host_worker(worker)
 
-    def _on_cluster_snapshots(self, node_name, data):
+    def _on_cluster_snapshots(self, node_name, data, gen=0):
         panel = self.panel
-        if panel.current_obj_type != "cluster":
+        if panel.current_obj_type != "cluster" or gen != panel._generation:
             return
         tree = panel.host_snapshots_tree
         vms_map = {}
@@ -1729,14 +1729,14 @@ class HostTabs:
             from ..api.metrics import HealthCheckWorker
             worker = HealthCheckWorker(cfg, node_name, host)
             worker.signals.health_ready.connect(
-                lambda nn, result, w=worker: (
-                    self._on_cluster_health(nn, result),
+                lambda nn, result, w=worker, gen=panel._generation: (
+                    self._on_cluster_health(nn, result, gen),
                     panel._workers_mgr.discard_worker(w),
                 )
             )
             worker.signals.health_error.connect(
-                lambda nn, err, w=worker: (
-                    self._on_cluster_health(nn, {"status": "error", "issues": [err], "warnings": []}),
+                lambda nn, err, w=worker, gen=panel._generation: (
+                    self._on_cluster_health(nn, {"status": "error", "issues": [err], "warnings": []}, gen),
                     panel._workers_mgr.discard_worker(w),
                 )
             )
@@ -1745,9 +1745,9 @@ class HostTabs:
             panel.host_health_list.set_items([])
             panel.host_health_stack.setCurrentIndex(1)
 
-    def _on_cluster_health(self, node_name, result):
+    def _on_cluster_health(self, node_name, result, gen=0):
         panel = self.panel
-        if panel.current_obj_type != "cluster":
+        if panel.current_obj_type != "cluster" or gen != panel._generation:
             return
         collected = getattr(panel, "_cluster_health_collected", None)
         if collected is None:
@@ -2005,9 +2005,9 @@ class HostTabs:
             return
         from ...backend import NetworkCreateWorker
         worker = NetworkCreateWorker(cfg, node_name, params)
-        worker.signals.result.connect(lambda msg, w=worker: (
+        worker.signals.result.connect(lambda msg, w=worker, hd=panel.current_obj_data: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
+            self.fetch_host_network(hd.host_name, hd),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2039,9 +2039,9 @@ class HostTabs:
             return
         from ...backend import NetworkUpdateWorker
         worker = NetworkUpdateWorker(cfg, node_name, iface_name, params)
-        worker.signals.result.connect(lambda msg, w=worker: (
+        worker.signals.result.connect(lambda msg, w=worker, hd=panel.current_obj_data: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
+            self.fetch_host_network(hd.host_name, hd),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2071,9 +2071,9 @@ class HostTabs:
             return
         from ...backend import NetworkDeleteWorker
         worker = NetworkDeleteWorker(cfg, node_name, iface_name)
-        worker.signals.result.connect(lambda msg, w=worker: (
+        worker.signals.result.connect(lambda msg, w=worker, hd=panel.current_obj_data: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
+            self.fetch_host_network(hd.host_name, hd),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2096,9 +2096,9 @@ class HostTabs:
             return
         from ...backend import NetworkApplyWorker
         worker = NetworkApplyWorker(cfg, node_name)
-        worker.signals.result.connect(lambda msg, w=worker: (
+        worker.signals.result.connect(lambda msg, w=worker, hd=panel.current_obj_data: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
+            self.fetch_host_network(hd.host_name, hd),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2121,9 +2121,9 @@ class HostTabs:
             return
         from ...backend import NetworkRevertWorker
         worker = NetworkRevertWorker(cfg, node_name)
-        worker.signals.result.connect(lambda msg, w=worker: (
+        worker.signals.result.connect(lambda msg, w=worker, hd=panel.current_obj_data: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
+            self.fetch_host_network(hd.host_name, hd),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (

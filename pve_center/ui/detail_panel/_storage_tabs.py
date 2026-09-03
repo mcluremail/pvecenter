@@ -746,18 +746,19 @@ class StorageTabs:
             panel.storage_plot_curve.setData([], [])
         from ..api.metrics import StorageMetricsWorker
         worker = StorageMetricsWorker(cfg, node_name, storage_name, timeframe)
+        sid = StorageId(host_name, node_name, storage_name)
         worker.signals.data_fetched.connect(
-            lambda tf, nn, md, w=worker: (
-                self.on_storage_metrics_fetched(tf, nn, md),
+            lambda tf, nn, md, w=worker, sid=sid: (
+                self.on_storage_metrics_fetched(tf, nn, md, sid),
                 panel._workers_mgr.discard_worker(w)
             )
         )
         worker.signals.error_occurred.connect(lambda err, w=worker: panel._workers_mgr.discard_worker(w))
         panel._workers_mgr.run_worker(worker)
 
-    def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict):
+    def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict, sid=None):
         panel = self.panel
-        if panel.current_obj_type != "storage":
+        if sid is None or panel.current_obj_type != "storage" or panel.current_obj_id != sid:
             return
         if not _HAS_PG or not metrics_dict.get("usage"):
             return
