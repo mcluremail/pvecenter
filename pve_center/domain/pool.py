@@ -16,7 +16,13 @@ class Pool:
     poolid: str
     """Pool identifier / name."""
 
+    comment: str = ""
+    """Optional pool comment."""
+
     @staticmethod
     def from_pve(d: dict) -> Pool:
         """Build a Pool from a raw dict (``{"poolid": "name"}``)."""
-        return Pool(poolid=d.get("poolid", "") or d.get("pool", "") or "")
+        return Pool(
+            poolid=d.get("poolid", "") or d.get("pool", "") or "",
+            comment=d.get("comment", "") or "",
+        )

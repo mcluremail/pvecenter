@@ -286,7 +286,7 @@ class FetchWorker(QRunnable):
 
         # -- Parallel phase 1: pools, HA groups, resources --
             vmid_to_pool = {}
-            pool_names = []
+            pools = []
             ha_groups = []
             nodes = []
             vms = []
@@ -299,12 +299,16 @@ class FetchWorker(QRunnable):
             res_lock = threading.Lock()
 
             def fetch_pools():
-                nonlocal vmid_to_pool, pool_names
+                nonlocal vmid_to_pool, pools
                 try:
                     pools_data = pool_api.list()
                     with pool_lock:
-                        pool_names = [p.get("poolid") or p.get("pool") for p in pools_data
-                                      if p.get("poolid") or p.get("pool")]
+                        pools = [
+                            {"poolid": p.get("poolid") or p.get("pool"),
+                             "comment": p.get("comment", "") or ""}
+                            for p in pools_data
+                            if p.get("poolid") or p.get("pool")
+                        ]
 
                     def fetch_pool_detail(p):
                         pname = p.get("poolid") or p.get("pool")
@@ -574,7 +578,7 @@ class FetchWorker(QRunnable):
                 "nodes": nodes,
                 "vms": vms,
                 "storages": storages,
-                "pool_names": pool_names,
+                "pools": pools,
                 "iso_images": iso_images,
                 "ha_groups": ha_groups
             })

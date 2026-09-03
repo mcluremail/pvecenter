@@ -111,6 +111,11 @@ class TestPoolFromPve:
         p = Pool.from_pve({})
         assert p.poolid == ""
 
+    def test_comment(self):
+        p = Pool.from_pve({"poolid": "my-pool", "comment": "web servers"})
+        assert p.comment == "web servers"
+        assert Pool.from_pve({"poolid": "x"}).comment == ""
+
 
 class TestIsoImageFromPve:
     def test_basic(self):

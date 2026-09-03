@@ -256,8 +256,7 @@ class CreateVmDialog(QDialog):
         self.pool_combo = QComboBox()
         self.pool_combo.addItem(tr("No pool"), "")
         for p in self._pools:
-            pid = p.get("poolid", "")
-            self.pool_combo.addItem(pid, pid)
+            self.pool_combo.addItem(p.poolid, p.poolid)
         g1.addWidget(self.pool_combo, 2, 3)
 
         self.ha_label = QLabel(tr("HA group:"))

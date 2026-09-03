@@ -1240,13 +1240,10 @@ class MainWindow(QMainWindow):
             for st_dict in data.get("storages", []):
                 st_dict["host_name"] = host
                 self._storage_repo.add(DomainStorage.from_pve(st_dict, host, cluster_name))
-            # Собираем уникальные имена пулов
-            known = {p["poolid"] for p in self.all_pools if "poolid" in p}
-            for pn in data.get("pool_names", []):
-                if pn and pn not in known:
-                    known.add(pn)
-                    self.all_pools.append({"poolid": pn})
-                    self._pool_repo.add(DomainPool(poolid=pn))
+            # Собираем пулы (доменные объекты, репозиторий дедуплицирует по poolid)
+            for pd in data.get("pools", []):
+                self._pool_repo.add(DomainPool.from_pve(pd))
+            self.all_pools = self._pool_repo.all()
             # Собираем ISO-образы (host_name -> list volid)
             for iso_host, isos in data.get("iso_images", {}).items():
                 if isos:
