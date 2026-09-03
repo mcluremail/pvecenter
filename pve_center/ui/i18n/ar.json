@@ -299,6 +299,7 @@
   "German": "الألمانية",
   "Get token": "الحصول على الرمز",
   "GiB": "جيجابايت",
+  "Global search": "بحث شامل",
   "Group": "مجموعة",
   "Group ID": "معرف المجموعة",
   "Group ID:": "معرف المجموعة:",
@@ -397,6 +398,7 @@
   "Loading...": "جارٍ التحميل...",
   "Local": "محلي",
   "Local time": "الوقت المحلي",
+  "Location": "الموقع",
   "Lower number starts earlier": "الرقم الأقل يبدأ أولاً",
   "MAC": "MAC",
   "MAC:": "MAC:",
@@ -470,6 +472,7 @@
   "No other storage available on this node.": "لا يوجد تخزين آخر متاح على هذه العقدة.",
   "No permissions": "لا توجد أذونات",
   "No pool": "لا يوجد تجمع",
+  "No results": "لا توجد نتائج",
   "No roles": "لا توجد أدوار",
   "No servers added.": "لم تتم إضافة خوادم.\nاضغط + للإضافة",
   "No servers added.\nPress + to add": "لم تتم إضافة خوادم.\nاضغط + للإضافة",
@@ -667,6 +670,7 @@
   "Save this value — it cannot be retrieved later!": "احفظ هذه القيمة — لا يمكن استردادها لاحقاً!",
   "Schedule": "الجدولة",
   "SeaBIOS": "SeaBIOS",
+  "Search VMs, hosts, pools, storages...": "بحث في الأجهزة الافتراضية والمضيفات والمجموعات ومساحات التخزين...",
   "Security": "الأمان",
   "Select ISO": "اختيار ISO",
   "Select ISO:": "اختر ISO:",
@@ -1124,5 +1128,6 @@
   "Delete role \\\"{id}\\\"?": "حذف الدور \\\"{id}\\\"؟",
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "حذف الرمز \\\"{id}\\\" للمستخدم \\\"{user}\\\"؟",
   "Delete user \\\"{id}\\\"?": "حذف المستخدم \\\"{id}\\\"؟",
-  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "إزالة الإذن: الدور \\\"{role}\\\" لـ \\\"{ugid}\\\" على \\\"{path}\\\"؟"
+  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "إزالة الإذن: الدور \\\"{role}\\\" لـ \\\"{ugid}\\\" على \\\"{path}\\\"؟",
+  "{} results": "{} من النتائج"
 }

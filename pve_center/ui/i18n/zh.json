@@ -299,6 +299,7 @@
   "German": "德语",
   "Get token": "获取令牌",
   "GiB": "GiB",
+  "Global search": "全局搜索",
   "Group": "组",
   "Group ID": "组 ID",
   "Group ID:": "组 ID:",
@@ -397,6 +398,7 @@
   "Loading...": "正在加载...",
   "Local": "本地",
   "Local time": "本地时间",
+  "Location": "位置",
   "Lower number starts earlier": "数字越小启动越早",
   "MAC": "MAC",
   "MAC:": "MAC：",
@@ -470,6 +472,7 @@
   "No other storage available on this node.": "此节点上没有其他可用存储。",
   "No permissions": "无权限",
   "No pool": "无资源池",
+  "No results": "无结果",
   "No roles": "无角色",
   "No servers added.": "未添加服务器。\n按 + 添加",
   "No servers added.\nPress + to add": "未添加服务器。\n按 + 添加",
@@ -667,6 +670,7 @@
   "Save this value — it cannot be retrieved later!": "保存此值 — 以后无法再次获取！",
   "Schedule": "计划",
   "SeaBIOS": "SeaBIOS",
+  "Search VMs, hosts, pools, storages...": "搜索虚拟机、主机、资源池、存储...",
   "Security": "安全",
   "Select ISO": "选择 ISO",
   "Select ISO:": "选择ISO：",
@@ -1124,5 +1128,6 @@
   "Delete role \\\"{id}\\\"?": "删除角色\\\"{id}\\\"？",
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "删除用户\\\"{user}\\\"的令牌\\\"{id}\\\"？",
   "Delete user \\\"{id}\\\"?": "删除用户\\\"{id}\\\"？",
-  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "移除权限：角色\\\"{role}\\\"为\\\"{ugid}\\\"在\\\"{path}\\\"上？"
+  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "移除权限：角色\\\"{role}\\\"为\\\"{ugid}\\\"在\\\"{path}\\\"上？",
+  "{} results": "{} 条结果"
 }

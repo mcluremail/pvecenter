@@ -93,11 +93,18 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 ### B12a. Add node to cluster (low priority)
 Добавление ноды в кластер через UI (`pvecm add`).
 
-### B14. Global search
+### B14. Global search ✅ Done
 Глобальный поиск по всем кластерам из VISION.md.
 - Поиск по: VMID, имени, тегам, владельцу, IP, node, cluster, storage
 - Реализация поверх доменных репозиториев (O(1)-индексы готовы)
 - Быстрый переход к найденному объекту в дереве
+
+Реализовано: `domain/search.py` (чистая функция поверх репозиториев —
+поиск по имени, VMID, тегам, пулу, node, config-хосту, кластеру, storage,
+poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Name/Location)
++ кнопка в тулбаре и Ctrl+F; выбор результата прыгает в дерево через
+`TreePanel.find_and_select`. 14 тестов в `tests/domain/test_search.py`.
+Не вошло (следующий шаг): поиск по IP (нет в list-level данных), владелец.
 
 ### B15. Dry Run
 Предварительный просмотр опасных действий (из ROADMAP v0.x).

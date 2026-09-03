@@ -408,6 +408,12 @@ _ACL = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rend
 <circle cx="8" cy="10" r="1" fill="{c2}"/>
 </svg>"""
 
+_SEARCH = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+<circle cx="7" cy="7" r="4.5" fill="none" stroke="{c}" stroke-width="1.4"/>
+<line x1="10.4" y1="10.4" x2="14" y2="14" stroke="{c}" stroke-width="1.4" stroke-linecap="round"/>
+<circle cx="7" cy="7" r="1" fill="{c2}"/>
+</svg>"""
+
 def get_icon(name, status=None):
     if status and name in _SVG_TEMPLATES:
         return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
@@ -470,4 +476,5 @@ def init_icons():
         "group": _make_icon(_GROUP.format(c=_C, c2=_C2)),
         "role": _make_icon(_ROLE.format(c=_C, c2=_C2)),
         "acl": _make_icon(_ACL.format(c=_C, c2=_C2)),
+        "search": _make_icon(_SEARCH.format(c=_C, c2=_C2), 14),
     }

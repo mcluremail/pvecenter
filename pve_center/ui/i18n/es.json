@@ -299,6 +299,7 @@
   "German": "Alemán",
   "Get token": "Obtener token",
   "GiB": "GiB",
+  "Global search": "Búsqueda global",
   "Group": "Grupo",
   "Group ID": "ID de grupo",
   "Group ID:": "ID de grupo:",
@@ -397,6 +398,7 @@
   "Loading...": "Cargando...",
   "Local": "Local",
   "Local time": "Hora local",
+  "Location": "Ubicación",
   "Lower number starts earlier": "El número más bajo comienza antes",
   "MAC": "MAC",
   "MAC:": "MAC:",
@@ -470,6 +472,7 @@
   "No other storage available on this node.": "No hay otro almacenamiento disponible en este nodo.",
   "No permissions": "Sin permisos",
   "No pool": "Sin pool",
+  "No results": "Sin resultados",
   "No roles": "Sin roles",
   "No servers added.": "No se añadieron servidores.\nPresione + para añadir",
   "No servers added.\nPress + to add": "No se añadieron servidores.\nPresione + para añadir",
@@ -667,6 +670,7 @@
   "Save this value — it cannot be retrieved later!": "¡Guarde este valor — no se puede recuperar más tarde!",
   "Schedule": "Programación",
   "SeaBIOS": "SeaBIOS",
+  "Search VMs, hosts, pools, storages...": "Buscar VMs, hosts, pools, almacenamientos...",
   "Security": "Seguridad",
   "Select ISO": "Seleccionar ISO",
   "Select ISO:": "Seleccionar ISO:",
@@ -1124,5 +1128,6 @@
   "Delete role \\\"{id}\\\"?": "¿Eliminar rol \\\"{id}\\\"?",
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "¿Eliminar token \\\"{id}\\\" para el usuario \\\"{user}\\\"?",
   "Delete user \\\"{id}\\\"?": "¿Eliminar usuario \\\"{id}\\\"?",
-  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "¿Quitar permiso: rol \\\"{role}\\\" para \\\"{ugid}\\\" en \\\"{path}\\\"?"
+  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "¿Quitar permiso: rol \\\"{role}\\\" para \\\"{ugid}\\\" en \\\"{path}\\\"?",
+  "{} results": "{} resultados"
 }

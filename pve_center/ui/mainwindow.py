@@ -60,6 +60,7 @@ from .detail_panel import DetailPanel
 from .i18n import get_language, supported_languages, tr
 from .icons import get_icon
 from .notification import NotificationManager
+from .search_dialog import GlobalSearchDialog
 from .theme import Color
 from .tree_panel import TreePanel
 from .utils import build_cfg_index
@@ -247,6 +248,11 @@ class MainWindow(QMainWindow):
         refresh_action.triggered.connect(self.refresh_data)
         self._toolbar.addAction(refresh_action)
 
+        search_action = QAction(get_icon("search"), tr("Global search"), self)
+        search_action.setToolTip(tr("Global search") + " (Ctrl+F)")
+        search_action.triggered.connect(self._open_global_search)
+        self._toolbar.addAction(search_action)
+
         self._toolbar.addSeparator()
 
         export_action = QAction(get_icon("export"), tr("Export configuration"), self)
@@ -286,6 +292,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Q"), self, activated=self._tray_quit)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=lambda: self._on_add_server())
         QShortcut(QKeySequence("Del"), self, activated=self.tree_panel.request_delete_current)
+        QShortcut(QKeySequence("Ctrl+F"), self, activated=self._open_global_search)
 
         # Таймер автообновления основных данных
         self.refresh_timer = QTimer(self)
@@ -1027,6 +1034,16 @@ class MainWindow(QMainWindow):
         save_config(self.nodes_cfg)
         self.tree_panel.set_servers(self.nodes_cfg)
         self.refresh_data()
+
+    def _open_global_search(self):
+        """Open the global search dialog and jump to the chosen object."""
+        dlg = GlobalSearchDialog(
+            lambda: (self._node_repo, self._vm_repo, self._storage_repo, self._pool_repo),
+            self,
+        )
+        dlg.object_selected.connect(self.tree_panel.find_and_select)
+        dlg.exec()
+
     def refresh_data(self):
         # Отменяем все pending soft_refresh — их результаты устарели
         self._soft_gen += 1

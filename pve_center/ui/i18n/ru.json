@@ -297,6 +297,7 @@
   "German": "Немецкая",
   "Get token": "Получить токен",
   "GiB": "ГиБ",
+  "Global search": "Глобальный поиск",
   "Group": "Группа",
   "Group ID": "ID группы",
   "Group ID:": "ID группы:",
@@ -395,6 +396,7 @@
   "Loading...": "Загрузка...",
   "Local": "Локальное",
   "Local time": "Локальное время",
+  "Location": "Расположение",
   "Lower number starts earlier": "Чем меньше число, тем раньше запустится ВМ",
   "MAC": "MAC",
   "MAC:": "MAC:",
@@ -468,6 +470,7 @@
   "No other storage available on this node.": "На этом узле нет другого хранилища.",
   "No permissions": "Нет прав",
   "No pool": "— нет —",
+  "No results": "Ничего не найдено",
   "No roles": "Нет ролей",
   "No servers added.": "Нет добавленных серверов.\nНажмите + чтобы добавить",
   "No servers added.\nPress + to add": "Серверы не добавлены.\nНажмите + для добавления",
@@ -665,6 +668,7 @@
   "Save this value — it cannot be retrieved later!": "Сохраните это значение — его нельзя получить позже!",
   "Schedule": "Расписание",
   "SeaBIOS": "SeaBIOS",
+  "Search VMs, hosts, pools, storages...": "Поиск ВМ, хостов, пулов, хранилищ...",
   "Security": "Безопасность",
   "Select ISO": "Выбор ISO",
   "Select ISO:": "Выбрать ISO:",
@@ -1113,5 +1117,6 @@
   "Delete role \\\"{id}\\\"?": "Удалить роль \\\"{id}\\\"?",
   "Delete token \\\"{id}\\\" for user \\\"{user}\\\"?": "Удалить токен \\\"{id}\\\" для пользователя \\\"{user}\\\"?",
   "Delete user \\\"{id}\\\"?": "Удалить пользователя \\\"{id}\\\"?",
-  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "Удалить разрешение: роль \\\"{role}\\\" для \\\"{ugid}\\\" на \\\"{path}\\\"?"
+  "Remove permission: role \\\"{role}\\\" for \\\"{ugid}\\\" on \\\"{path}\\\"?": "Удалить разрешение: роль \\\"{role}\\\" для \\\"{ugid}\\\" на \\\"{path}\\\"?",
+  "{} results": "Результатов: {}"
 }
