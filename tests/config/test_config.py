@@ -84,6 +84,19 @@ class TestNodesConfig:
         with pytest.raises(ValueError, match="Invalid characters"):
             config.save_config([make_cfg("h1", "10.0.0.1", user="root\x00")])
 
+    def test_group_field_roundtrip(self, cfg_dir, fake_keyring):
+        cfg = make_cfg("h1", "10.0.0.1")
+        cfg["group"] = "Site A"
+        config.save_config([cfg])
+        loaded = config.load_config()
+        assert loaded[0]["group"] == "Site A"
+
+    def test_save_rejects_newline_in_group(self, cfg_dir, fake_keyring):
+        cfg = make_cfg("h1", "10.0.0.1")
+        cfg["group"] = "Site\nA"
+        with pytest.raises(ValueError, match="Invalid characters in group"):
+            config.save_config([cfg])
+
     def test_load_ignores_corrupt_rows(self, cfg_dir, fake_keyring):
         config.save_config([make_cfg("h1", "10.0.0.1")])
         conn = sqlite3.connect(str(cfg_dir / "config.sqlite"))

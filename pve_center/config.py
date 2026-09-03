@@ -180,7 +180,7 @@ def _validate_field(value):
 
 
 def _sanitize_cfg(cfg):
-    for field in ("host", "user", "token_name", "token_value"):
+    for field in ("host", "user", "token_name", "token_value", "group"):
         val = cfg.get(field, "")
         if val and not _validate_field(val):
             raise ValueError(f"Invalid characters in {field}")

@@ -1138,5 +1138,11 @@
   "Bulk operation: {done}/{total} — VM {vmid}...": "عملية جماعية: {done}/{total} — الجهاز {vmid}...",
   "Bulk operation completed: {ok} ok, {failed} failed": "اكتملت العملية الجماعية: {ok} ناجح، {failed} فاشل",
   "Operation cancelled": "تم إلغاء العملية",
-  "Skipped templates and unavailable VMs: {n}": "تم تخطي القوالب والأجهزة غير المتاحة: {n}"
+  "Skipped templates and unavailable VMs: {n}": "تم تخطي القوالب والأجهزة غير المتاحة: {n}",
+  "Move to group": "نقل إلى مجموعة",
+  "New group…": "مجموعة جديدة…",
+  "Remove from group": "إزالة من المجموعة",
+  "Rename group…": "إعادة تسمية المجموعة…",
+  "Delete group": "حذف المجموعة",
+  "Group name": "اسم المجموعة"
 }

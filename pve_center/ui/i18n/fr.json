@@ -1138,5 +1138,11 @@
   "Bulk operation: {done}/{total} — VM {vmid}...": "Opération groupée : {done}/{total} — VM {vmid}...",
   "Bulk operation completed: {ok} ok, {failed} failed": "Opération groupée terminée : {ok} réussies, {failed} échouées",
   "Operation cancelled": "Opération annulée",
-  "Skipped templates and unavailable VMs: {n}": "Modèles et VM indisponibles ignorés : {n}"
+  "Skipped templates and unavailable VMs: {n}": "Modèles et VM indisponibles ignorés : {n}",
+  "Move to group": "Déplacer vers le groupe",
+  "New group…": "Nouveau groupe…",
+  "Remove from group": "Retirer du groupe",
+  "Rename group…": "Renommer le groupe…",
+  "Delete group": "Supprimer le groupe",
+  "Group name": "Nom du groupe"
 }

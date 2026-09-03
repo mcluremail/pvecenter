@@ -1127,5 +1127,11 @@
   "Bulk operation: {done}/{total} — VM {vmid}...": "Массовая операция: {done}/{total} — ВМ {vmid}...",
   "Bulk operation completed: {ok} ok, {failed} failed": "Массовая операция завершена: {ok} успешно, {failed} с ошибками",
   "Operation cancelled": "Операция отменена",
-  "Skipped templates and unavailable VMs: {n}": "Пропущены шаблоны и недоступные ВМ: {n}"
+  "Skipped templates and unavailable VMs: {n}": "Пропущены шаблоны и недоступные ВМ: {n}",
+  "Move to group": "Переместить в группу",
+  "New group…": "Новая группа…",
+  "Remove from group": "Убрать из группы",
+  "Rename group…": "Переименовать группу…",
+  "Delete group": "Удалить группу",
+  "Group name": "Название группы"
 }

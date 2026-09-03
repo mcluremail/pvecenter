@@ -1138,5 +1138,11 @@
   "Bulk operation: {done}/{total} — VM {vmid}...": "Operación masiva: {done}/{total} — VM {vmid}...",
   "Bulk operation completed: {ok} ok, {failed} failed": "Operación masiva completada: {ok} correctas, {failed} fallidas",
   "Operation cancelled": "Operación cancelada",
-  "Skipped templates and unavailable VMs: {n}": "Plantillas y VM no disponibles omitidas: {n}"
+  "Skipped templates and unavailable VMs: {n}": "Plantillas y VM no disponibles omitidas: {n}",
+  "Move to group": "Mover a grupo",
+  "New group…": "Nuevo grupo…",
+  "Remove from group": "Quitar del grupo",
+  "Rename group…": "Renombrar grupo…",
+  "Delete group": "Eliminar grupo",
+  "Group name": "Nombre del grupo"
 }

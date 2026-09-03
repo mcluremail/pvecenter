@@ -298,6 +298,8 @@ class DetailPanel(QWidget):
                 self._host_tabs.show_standalone_folder(obj_name)
             elif obj_type == "cluster":
                 self._host_tabs.show_cluster(obj_name)
+            elif obj_type == "group":
+                self._host_tabs.show_group(obj_name)
             elif obj_type == "host":
                 self._host_tabs.show_host_info(obj_name, data)
             elif obj_type == "pool":

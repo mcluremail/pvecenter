@@ -3,7 +3,8 @@ from PySide6.QtWidgets import QTreeWidget
 
 from pve_center.domain.enums import VmStatus
 from pve_center.domain.repositories import NodeRepository, VmRepository
-from pve_center.ui.tree_panel import VM_KEY_ROLE, TreePanel
+from pve_center.ui.i18n import tr
+from pve_center.ui.tree_panel import ITEM_KEY_ROLE, VM_KEY_ROLE, TreePanel
 
 
 def _make_nodes_cfg(standalone_names=None, clusters=None):
@@ -236,3 +237,139 @@ class TestSelectedVmKeys:
     def test_extended_selection_mode(self, qtbot, make_node, make_vm):
         tp, _vm_items = self._build_tree_with_vms(qtbot, make_node, make_vm)
         assert tp.tree.selectionMode() == QTreeWidget.SelectionMode.ExtendedSelection
+
+
+class TestHostGroups:
+    """B16: user-defined host groups in the tree."""
+
+    def _collect_items(self, tp):
+        """Return {key_tuple: item} for all tree items."""
+        result = {}
+
+        def walk(item):
+            key = item.data(0, ITEM_KEY_ROLE)
+            if key is not None:
+                result[key] = item
+            for i in range(item.childCount()):
+                walk(item.child(i))
+
+        for i in range(tp.tree.topLevelItemCount()):
+            walk(tp.tree.topLevelItem(i))
+        return result
+
+    def test_grouped_standalone_host(self, qtbot, make_node, make_vm):
+        cfg = [{"name": "h1", "cluster": "", "skip": False, "group": "Site A"}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node = make_node(host_name="h1", node="pve01")
+        node_repo = NodeRepository()
+        node_repo.add(node)
+        vm_repo = VmRepository()
+        vm_repo.add(make_vm(vmid=100, name="alpha", host_name="h1",
+                            node="pve01", status=VmStatus.RUNNING))
+
+        tp.update_data(node_repo.all(), vm_repo.all(), final=True,
+                       node_repo=node_repo, vm_repo=vm_repo)
+        tp._build_tree()
+
+        items = self._collect_items(tp)
+        group_key = next((k for k in items if k[0] == "group"), None)
+        assert group_key is not None
+        assert group_key[1] == "Site A"
+        # Group shows aggregated VM count
+        assert "[1/1]" in items[group_key].text(0)
+        # Host is under the group, not under Standalone hosts
+        host_key = next((k for k in items if k[0] == "host"), None)
+        assert host_key == ("host", "pve01", "h1")
+        assert items[host_key].parent() is items[group_key]
+        standalone_key = next((k for k in items if k[0] == "section"
+                               and "Standalone" in k[1]), None)
+        assert standalone_key in items
+        assert items[host_key].parent() is not items[standalone_key]
+
+    def test_grouped_cluster(self, qtbot, make_node, make_vm):
+        cfg = [
+            {"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False,
+             "group": "DC West"},
+            {"name": "h2", "cluster": "cl1", "cluster_rep": False, "skip": False,
+             "group": "DC West"},
+        ]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="pve01"))
+        vm_repo = VmRepository()
+        vm_repo.add(make_vm(vmid=100, name="alpha", host_name="h1",
+                            node="pve01", status=VmStatus.RUNNING))
+
+        tp.update_data(node_repo.all(), vm_repo.all(), final=True,
+                       node_repo=node_repo, vm_repo=vm_repo)
+        tp._build_tree()
+
+        items = self._collect_items(tp)
+        group_key = next((k for k in items if k[0] == "group"), None)
+        assert group_key is not None
+        assert group_key[1] == "DC West"
+        # Cluster item lives inside the group
+        cluster_key = next((k for k in items if k[0] == "cluster"), None)
+        assert cluster_key == ("cluster", "cl1")
+        assert items[cluster_key].parent() is items[group_key]
+        # Clusters section must not contain it
+        clusters_section = next((k for k in items if k[0] == "section"
+                                 and k[1] == tr("Clusters")), None)
+        assert clusters_section is not None
+        assert items[cluster_key].parent() is not items[clusters_section]
+
+    def test_ungrouped_hosts_in_sections(self, qtbot, make_node):
+        cfg = [
+            {"name": "h1", "cluster": "", "skip": False, "group": "Site A"},
+            {"name": "h2", "cluster": "", "skip": False},
+        ]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        node_repo.add(make_node(host_name="h2", node="n2"))
+
+        tp.update_data(node_repo.all(), [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp._build_tree()
+
+        items = self._collect_items(tp)
+        group_key = next((k for k in items if k[0] == "group"), None)
+        assert group_key == ("group", "Site A")
+        hosts = [k for k in items if k[0] == "host"]
+        host_parents = {k: items[k].parent() for k in hosts}
+        h1_key = next(k for k in hosts if k[2] == "h1")
+        h2_key = next(k for k in hosts if k[2] == "h2")
+        assert host_parents[h1_key] is items[group_key]
+        standalone_key = next((k for k in items if k[0] == "section"
+                               and "Standalone" in k[1]), None)
+        assert host_parents[h2_key] is items[standalone_key]
+
+    def test_group_of_cluster_applies_to_all_members(self, qtbot, make_node):
+        """Partial cfg grouping: group on rep cfg only still pulls the cluster."""
+        cfg = [
+            {"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False,
+             "group": "DC"},
+            {"name": "h2", "cluster": "cl1", "cluster_rep": False, "skip": False},
+        ]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="pve01"))
+        node_repo.add(make_node(host_name="h2", node="pve02"))
+
+        tp.update_data(node_repo.all(), [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp._build_tree()
+
+        items = self._collect_items(tp)
+        cluster_key = next((k for k in items if k[0] == "cluster"), None)
+        assert cluster_key == ("cluster", "cl1")
+        group_key = next(k for k in items if k[0] == "group")
+        assert items[cluster_key].parent() is items[group_key]

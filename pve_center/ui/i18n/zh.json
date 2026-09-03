@@ -1138,5 +1138,11 @@
   "Bulk operation: {done}/{total} — VM {vmid}...": "批量操作：{done}/{total} — 虚拟机 {vmid}...",
   "Bulk operation completed: {ok} ok, {failed} failed": "批量操作完成：{ok} 成功，{failed} 失败",
   "Operation cancelled": "操作已取消",
-  "Skipped templates and unavailable VMs: {n}": "已跳过模板和不可用的虚拟机：{n}"
+  "Skipped templates and unavailable VMs: {n}": "已跳过模板和不可用的虚拟机：{n}",
+  "Move to group": "移动到分组",
+  "New group…": "新建分组…",
+  "Remove from group": "移出分组",
+  "Rename group…": "重命名分组…",
+  "Delete group": "删除分组",
+  "Group name": "分组名称"
 }

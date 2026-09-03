@@ -700,6 +700,37 @@ class HostTabs:
             self.fetch_ha(cluster_cfg)
             self._fetch_cluster_status(cluster_cfg)
 
+    def show_group(self, group_name):
+        """B16: aggregated summary for a user-defined host group."""
+        panel = self.panel
+        hosts = []
+        for node in panel.all_nodes:
+            cfg = panel._cfg_by_name.get(node.get("host_name", ""))
+            if cfg and (cfg.get("group") or "").strip() == group_name:
+                hosts.append(node)
+        panel.detail_label.setText(group_name)
+        hosts_count = len(hosts)
+        running = sum(1 for h in hosts if h.get("status") == "online")
+        panel.detail_sublabel.setText(f"{hosts_count} {tr('hosts')} · {running} {tr('online')}")
+        panel.detail_sublabel.setVisible(True)
+        panel._cluster_view_toggle.setVisible(False)
+        panel.tabs.setTabVisible(TabIndex.MONITOR, False)
+        panel.tabs.setTabVisible(TabIndex.HARDWARE, False)
+        panel.tabs.setTabVisible(TabIndex.HOST_VMS, True)
+        panel.tabs.setTabVisible(TabIndex.SUMMARY, True)
+        panel.tabs.setTabVisible(TabIndex.STORAGES, False)
+        panel.tabs.setTabVisible(TabIndex.SNAPSHOTS, False)
+        panel.tabs.setTabVisible(TabIndex.HEALTH, False)
+        panel.tabs.setTabVisible(TabIndex.BACKUP_JOBS, False)
+        panel.tabs.setTabVisible(TabIndex.ACCESS, False)
+        panel.tabs.setTabVisible(TabIndex.HA, False)
+        panel.tabs.setTabVisible(TabIndex.POOL_VMS, False)
+        panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
+        panel._current_cluster_cfg = None
+        self.populate_host_summary(hosts)
+        self._populate_cluster_summary_cards(hosts)
+        self._populate_cluster_vms(group_name, hosts)
+
     def show_host_info(self, host_name, host_data):
         panel = self.panel
         panel.cluster_quorum_widget.setVisible(False)

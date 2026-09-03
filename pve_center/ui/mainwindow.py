@@ -142,6 +142,9 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
         self.tree_panel.bulk_vm_action_requested.connect(self._on_bulk_vm_action)
+        self.tree_panel.group_move_requested.connect(self._on_group_move)
+        self.tree_panel.group_rename_requested.connect(self._on_group_rename)
+        self.tree_panel.group_delete_requested.connect(self._on_group_delete)
         self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
         self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
@@ -736,6 +739,39 @@ class MainWindow(QMainWindow):
         worker.signals.finished.connect(on_finished)
         progress.canceled.connect(worker.cancel)
         self._run_worker(worker)
+
+    # ------------------------------------------------------------
+    # Группы серверов (B16)
+    def _on_group_move(self, kind, name, group):
+        if kind == "host":
+            names = [name]
+        else:
+            names = [c.get("name", "") for c in self.nodes_cfg if c.get("cluster") == name]
+        for n in names:
+            cfg = self._cfg_by_name.get(n)
+            if cfg is None:
+                continue
+            if group:
+                cfg["group"] = group
+            else:
+                cfg.pop("group", None)
+        save_config(self.nodes_cfg)
+        self.tree_panel.set_servers(self.nodes_cfg)
+        self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+
+    def _on_group_rename(self, old_name, new_name):
+        for cfg in self.nodes_cfg:
+            if cfg.get("group") == old_name:
+                cfg["group"] = new_name
+        save_config(self.nodes_cfg)
+        self.tree_panel.set_servers(self.nodes_cfg)
+
+    def _on_group_delete(self, group_name):
+        for cfg in self.nodes_cfg:
+            if cfg.get("group") == group_name:
+                cfg.pop("group", None)
+        save_config(self.nodes_cfg)
+        self.tree_panel.set_servers(self.nodes_cfg)
 
     def _on_console_from_tree(self, host_name, node, vmid):
         cfg = self._cfg_by_name.get(host_name)

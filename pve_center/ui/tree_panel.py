@@ -8,6 +8,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMenu,
     QPushButton,
@@ -64,6 +65,9 @@ class TreePanel(QWidget):
     vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
     console_requested = Signal(str, str, int)
     bulk_vm_action_requested = Signal(list, str)  # ([(host_name, vmid, node)], action)
+    group_move_requested = Signal(str, str, str)  # kind ("host"|"cluster"), name, group ("" = none)
+    group_rename_requested = Signal(str, str)     # old group name, new group name
+    group_delete_requested = Signal(str)          # group name
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -323,6 +327,7 @@ class TreePanel(QWidget):
                     lambda checked, hn=host_name: self.host_trust_ssl_changed.emit(hn, not trust_ssl_current)
                 )
                 menu.addAction(trust_action)
+                self._add_group_menu(menu, "host", host_name)
 
         elif item_type == "cluster":
             cl_hosts = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
@@ -340,6 +345,17 @@ class TreePanel(QWidget):
                 menu.addSeparator()
             delete_action = QAction(tr("Delete cluster"), self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
+            menu.addAction(delete_action)
+            self._add_group_menu(menu, "cluster", item_name)
+
+        elif item_type == "group":
+            rename_action = QAction(tr("Rename group…"), self.tree)
+            rename_action.triggered.connect(
+                lambda checked=False, g=item_name: self._rename_group_dialog(g))
+            menu.addAction(rename_action)
+            delete_action = QAction(tr("Delete group"), self.tree)
+            delete_action.triggered.connect(
+                lambda checked=False, g=item_name: self.group_delete_requested.emit(g))
             menu.addAction(delete_action)
 
         elif item_type == "section" and item_name in (tr("Clusters"), tr("Standalone hosts")):
@@ -514,41 +530,218 @@ class TreePanel(QWidget):
         vm_item.setToolTip(0, tr("Status") + f": {status_text(status)}\n" + tr("CPU") + f": {cpu_pct}%\n" + tr("RAM") + f": {mem_pct}%")
         return vm_item
 
+    def _add_group_menu(self, menu, kind, name):
+        """B16: 'Move to group' submenu for host/cluster items."""
+        groups = sorted({(c.get("group") or "").strip() for c in self.nodes_cfg
+                         if (c.get("group") or "").strip()}, key=str.lower)
+        current = ""
+        if kind == "host":
+            cfg = next((c for c in self.nodes_cfg if c.get("name") == name), None)
+            current = (cfg.get("group") or "").strip() if cfg else ""
+        else:
+            current = next(((c.get("group") or "").strip() for c in self.nodes_cfg
+                            if c.get("cluster") == name and (c.get("group") or "").strip()), "")
+        submenu = menu.addMenu(tr("Move to group"))
+        none_act = submenu.addAction(tr("Remove from group"))
+        none_act.setEnabled(bool(current))
+        none_act.triggered.connect(
+            lambda checked=False, k=kind, n=name: self.group_move_requested.emit(k, n, ""))
+        submenu.addSeparator()
+        for g in groups:
+            act = submenu.addAction(g)
+            act.setCheckable(True)
+            act.setChecked(g == current)
+            act.triggered.connect(
+                lambda checked=False, gg=g, k=kind, n=name:
+                    self.group_move_requested.emit(k, n, gg))
+        submenu.addSeparator()
+        new_act = submenu.addAction(tr("New group…"))
+        new_act.triggered.connect(
+            lambda checked=False, k=kind, n=name: self._new_group_dialog(k, n))
+
+    def _new_group_dialog(self, kind, name):
+        text, ok = QInputDialog.getText(self, tr("New group…"), tr("Group name"))
+        if not ok:
+            return
+        group = text.strip()
+        if group:
+            self.group_move_requested.emit(kind, name, group)
+
+    def _rename_group_dialog(self, old_name):
+        text, ok = QInputDialog.getText(self, tr("Rename group…"), tr("Group name"),
+                                        text=old_name)
+        if not ok:
+            return
+        new_name = text.strip()
+        if new_name and new_name != old_name:
+            self.group_rename_requested.emit(old_name, new_name)
+
+    def _make_cluster_item(self, parent, cluster_name, nodes_in_cl):
+        """Create a cluster item (with hosts, pools and VMs) under parent."""
+        cl_item = QTreeWidgetItem(parent)
+        if not nodes_in_cl:
+            cl_item.setText(0, cluster_name)
+            cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
+            cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+            return cl_item
+        cluster_host_names = {n.get("host_name") for n in nodes_in_cl}
+        vms_in_cl = [vm for vm in self.all_vms
+                     if vm.get("node") in {n.get("node") for n in nodes_in_cl}
+                     and vm.get("host_name") in cluster_host_names]
+        cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
+        cl_item.setIcon(0, get_icon("cluster"))
+        cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+
+        for node in sorted(nodes_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
+            node_name = node.get("node", "?")
+            display_name = node.get("_display_name") or node_name
+            vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name and vm.get("host_name") == node.get("host_name")]
+            host_item = QTreeWidgetItem(cl_item)
+            host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
+            host_item.setIcon(0, get_icon("host", node.get("status")))
+            host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.get("host_name", "")))
+            host_item.setToolTip(0, _node_tooltip(node))
+
+        pool_groups = defaultdict(list)
+        no_pool_vms = []
+        for vm in vms_in_cl:
+            pool = vm.get("pool")
+            if pool and pool not in ("", "No pool"):
+                pool_groups[pool].append(vm)
+            else:
+                no_pool_vms.append(vm)
+
+        for pool_name in sorted(pool_groups.keys(), key=str.lower):
+            vms_list = pool_groups[pool_name]
+            pool_item = QTreeWidgetItem(cl_item)
+            pool_item.setText(0, f"{pool_name}  {_vm_count_str(vms_list)}")
+            pool_item.setIcon(0, get_icon("pool"))
+            pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
+
+            for vm in sorted(vms_list, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                self._add_vm_item(pool_item, vm)
+
+        for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+            self._add_vm_item(cl_item, vm)
+        return cl_item
+
+    def _make_host_item(self, parent, node):
+        """Create a standalone host item (with pools and VMs) under parent."""
+        node_name = node.get("node", "?")
+        display_name = node.get("_display_name") or node_name
+        host_name = node.get("host_name", "")
+        vms_on_host = [vm for vm in self.all_vms
+                       if vm.get("node") == node_name
+                       and vm.get("host_name") == host_name]
+        host_item = QTreeWidgetItem(parent)
+        if node.get("status") == "loading":
+            host_item.setText(0, display_name)
+            host_item.setIcon(0, make_loading_icon(self._spinner_angle))
+            host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
+            return host_item
+        host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
+        host_item.setIcon(0, get_icon("host", node.get("status")))
+        host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
+        host_item.setToolTip(0, _node_tooltip(node))
+
+        pool_groups = defaultdict(list)
+        no_pool_vms = []
+        for vm in vms_on_host:
+            pool = vm.get("pool")
+            if pool and pool not in ("", "No pool"):
+                pool_groups[pool].append(vm)
+            else:
+                no_pool_vms.append(vm)
+
+        for pool_name in sorted(pool_groups.keys(), key=str.lower):
+            pool_item = QTreeWidgetItem(host_item)
+            pool_item.setText(0, f"{pool_name}  {_vm_count_str(pool_groups[pool_name])}")
+            pool_item.setIcon(0, get_icon("pool"))
+            pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
+
+            for vm in sorted(pool_groups[pool_name], key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+                self._add_vm_item(pool_item, vm)
+
+        for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+            self._add_vm_item(host_item, vm)
+        return host_item
+
     def _build_tree(self):
         self._building = True
         saved_key = self.get_current_item_key()
         scroll_val = self.tree.verticalScrollBar().value()
         self.tree.clear()
 
+        # B16: host groups — cfg["group"] per host; cluster group via any member cfg
+        host_group = {}
+        cluster_group = {}
+        for cfg in self.nodes_cfg:
+            g = (cfg.get("group") or "").strip()
+            if not g or not cfg.get("name"):
+                continue
+            host_group[cfg["name"]] = g
+            cl = cfg.get("cluster")
+            if cl and cl not in (False, None, "Standalone"):
+                cluster_group.setdefault(cl, g)
+
         cluster_nodes = defaultdict(list)
         standalone_nodes = []
+        group_clusters = defaultdict(dict)     # group -> {cluster_name: [nodes]}
+        group_standalone = defaultdict(list)   # group -> [nodes]
 
         for node in self.all_nodes:
             host_name = node.get("host_name", "")
             cfg = self._cfg_by_name.get(host_name)
             cluster_name = cfg.get("cluster") if cfg else None
             if cluster_name and cluster_name not in (False, None, "Standalone"):
-                cluster_nodes[cluster_name].append(node)
+                g = cluster_group.get(cluster_name)
+                if g:
+                    group_clusters[g].setdefault(cluster_name, []).append(node)
+                else:
+                    cluster_nodes[cluster_name].append(node)
             else:
-                standalone_nodes.append(node)
+                g = host_group.get(host_name)
+                if g:
+                    group_standalone[g].append(node)
+                else:
+                    standalone_nodes.append(node)
 
         for cfg in self.nodes_cfg:
             if cfg.get("skip"):
                 continue
             cluster_name = cfg.get("cluster")
             if cluster_name and cluster_name not in (False, None, "Standalone"):
-                if cluster_name not in cluster_nodes:
+                g = cluster_group.get(cluster_name)
+                if g:
+                    if cluster_name not in group_clusters[g]:
+                        group_clusters[g][cluster_name] = []
+                        if f"cluster:{cluster_name}" not in self._loading_hosts:
+                            self._loading_hosts.add(f"cluster:{cluster_name}")
+                elif cluster_name not in cluster_nodes:
                     cluster_nodes[cluster_name] = []
                     if f"cluster:{cluster_name}" not in self._loading_hosts:
                         self._loading_hosts.add(f"cluster:{cluster_name}")
 
         standalone_names = {n.get("host_name", "") for n in standalone_nodes}
+        grouped_standalone_names = {n.get("host_name", "") for nodes in group_standalone.values() for n in nodes}
         for cfg in self.nodes_cfg:
             if cfg.get("skip"):
                 continue
             host_name = cfg.get("name", "")
             cluster = cfg.get("cluster")
             if cluster and cluster not in (False, None, "Standalone"):
+                continue
+            g = host_group.get(host_name)
+            if g:
+                if host_name not in grouped_standalone_names:
+                    group_standalone[g].append({
+                        "node": host_name,
+                        "host_name": host_name,
+                        "_display_name": host_name,
+                        "status": "loading",
+                    })
+                    self._loading_hosts.add(host_name)
+                    grouped_standalone_names.add(host_name)
                 continue
             if host_name not in standalone_names:
                 standalone_nodes.append({
@@ -569,98 +762,32 @@ class TreePanel(QWidget):
                     if cl_name:
                         self._loading_hosts.discard(f"cluster:{cl_name}")
 
+        # B16: group items at top level, above Clusters/Standalone sections
+        group_names = sorted(set(group_clusters) | set(group_standalone), key=str.lower)
+        for g in group_names:
+            g_item = QTreeWidgetItem(self.tree)
+            g_item.setData(0, ITEM_KEY_ROLE, ("group", g))
+            g_nodes = group_standalone.get(g, [])
+            g_cl_nodes = [n for nodes in group_clusters.get(g, {}).values() for n in nodes]
+            g_host_names = {n.get("host_name") for n in g_nodes + g_cl_nodes}
+            g_vms = [vm for vm in self.all_vms if vm.get("host_name") in g_host_names]
+            g_item.setText(0, f"{g}  {_vm_count_str(g_vms)}")
+            g_item.setIcon(0, get_icon("folder"))
+            for cl_name in sorted(group_clusters.get(g, {}), key=str.lower):
+                self._make_cluster_item(g_item, cl_name, group_clusters[g][cl_name])
+            for node in sorted(g_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
+                self._make_host_item(g_item, node)
+
         cluster_folder = self._make_section_item(self.tree, tr("Clusters"))
         standalone_folder = self._make_section_item(self.tree, tr("Standalone hosts"))
 
         if cluster_nodes:
             for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
-                cl_item = QTreeWidgetItem(cluster_folder)
-                nodes_in_cl = cluster_nodes[cluster_name]
-                if not nodes_in_cl:
-                    cl_item.setText(0, cluster_name)
-                    cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
-                    cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
-                    continue
-                cluster_host_names = {n.get("host_name") for n in nodes_in_cl}
-                vms_in_cl = [vm for vm in self.all_vms
-                             if vm.get("node") in {n.get("node") for n in nodes_in_cl}
-                             and vm.get("host_name") in cluster_host_names]
-                cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
-                cl_item.setIcon(0, get_icon("cluster"))
-                cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
-
-                hosts_in_cl = cluster_nodes[cluster_name]
-                for node in sorted(hosts_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
-                    node_name = node.get("node", "?")
-                    display_name = node.get("_display_name") or node_name
-                    vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name and vm.get("host_name") == node.get("host_name")]
-                    host_item = QTreeWidgetItem(cl_item)
-                    host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
-                    host_item.setIcon(0, get_icon("host", node.get("status")))
-                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.get("host_name", "")))
-                    host_item.setToolTip(0, _node_tooltip(node))
-
-                pool_groups = defaultdict(list)
-                no_pool_vms = []
-                for vm in vms_in_cl:
-                    pool = vm.get("pool")
-                    if pool and pool not in ("", "No pool"):
-                        pool_groups[pool].append(vm)
-                    else:
-                        no_pool_vms.append(vm)
-
-                for pool_name in sorted(pool_groups.keys(), key=str.lower):
-                    vms_list = pool_groups[pool_name]
-                    pool_item = QTreeWidgetItem(cl_item)
-                    pool_item.setText(0, f"{pool_name}  {_vm_count_str(vms_list)}")
-                    pool_item.setIcon(0, get_icon("pool"))
-                    pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
-
-                    for vm in sorted(vms_list, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
-                        self._add_vm_item(pool_item, vm)
-
-                for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
-                    self._add_vm_item(cl_item, vm)
+                self._make_cluster_item(cluster_folder, cluster_name, cluster_nodes[cluster_name])
 
         if standalone_nodes:
             for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
-                node_name = node.get("node", "?")
-                display_name = node.get("_display_name") or node_name
-                host_name = node.get("host_name", "")
-                vms_on_host = [vm for vm in self.all_vms
-                               if vm.get("node") == node_name
-                               and vm.get("host_name") == host_name]
-                host_item = QTreeWidgetItem(standalone_folder)
-                if node.get("status") == "loading":
-                    host_item.setText(0, display_name)
-                    host_item.setIcon(0, make_loading_icon(self._spinner_angle))
-                    host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
-                    continue
-                host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
-                host_item.setIcon(0, get_icon("host", node.get("status")))
-                host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
-                host_item.setToolTip(0, _node_tooltip(node))
-
-                pool_groups = defaultdict(list)
-                no_pool_vms = []
-                for vm in vms_on_host:
-                    pool = vm.get("pool")
-                    if pool and pool not in ("", "No pool"):
-                        pool_groups[pool].append(vm)
-                    else:
-                        no_pool_vms.append(vm)
-
-                for pool_name in sorted(pool_groups.keys(), key=str.lower):
-                    pool_item = QTreeWidgetItem(host_item)
-                    pool_item.setText(0, f"{pool_name}  {_vm_count_str(pool_groups[pool_name])}")
-                    pool_item.setIcon(0, get_icon("pool"))
-                    pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
-
-                    for vm in sorted(pool_groups[pool_name], key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
-                        self._add_vm_item(pool_item, vm)
-
-                for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
-                    self._add_vm_item(host_item, vm)
+                self._make_host_item(standalone_folder, node)
 
         if self.all_storages:
             st_folder = self._make_section_item(self.tree, tr("Storage"))
@@ -926,6 +1053,10 @@ class TreePanel(QWidget):
 
         if item_type == "cluster":
             self.item_selected.emit("cluster", item_name, {})
+            return
+
+        if item_type == "group":
+            self.item_selected.emit("group", item_name, {})
             return
 
         if item_type == "host":
