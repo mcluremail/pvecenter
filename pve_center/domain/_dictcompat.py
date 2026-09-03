@@ -1,7 +1,8 @@
-"""Mixin providing dict-compatible ``.get()`` and ``__getitem__`` on frozen dataclasses.
+"""Mixin providing dict-compatible ``.get()``, ``keys()`` and ``dict()`` on frozen dataclasses.
 
-Allows domain objects to be passed anywhere a PVE dict was expected,
-enabling gradual migration without touching every ``.get("field")`` call.
+The UI reads domain objects via typed attributes; this mixin remains for
+the JSON cache roundtrip (``dict(obj)`` -> ``keys()``/``get()``) and as a
+safety fallback for PVE keys not yet mapped to a typed field.
 """
 
 from __future__ import annotations
