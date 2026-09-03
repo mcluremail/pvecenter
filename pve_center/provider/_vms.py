@@ -173,6 +173,13 @@ class VmAPI:
             self._resource(node, vmid, vm_type).snapshot(snap_name).delete
         )
 
+    def rollback_snapshot(self, node: str, vmid: int | str, vm_type: str,
+                          snap_name: str) -> object:
+        """POST .../snapshot/{snap}/rollback."""
+        return self._s.call(
+            self._resource(node, vmid, vm_type).snapshot(snap_name).rollback.post
+        )
+
     # -- console proxies --
 
     def get_vnc_proxy(self, node: str, vmid: int | str, vm_type: str,

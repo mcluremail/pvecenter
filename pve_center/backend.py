@@ -1187,6 +1187,74 @@ class VmSnapshotDeleteWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# VmSnapshotRollbackWorker
+# ----------------------------------------------------------------------
+class VmSnapshotRollbackSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+
+class VmSnapshotRollbackWorker(QRunnable):
+    def __init__(self, host_cfg, node_name, vmid, vm_type, snap_name):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.snap_name = snap_name
+        self.signals = VmSnapshotRollbackSignals()
+
+    def run(self):
+        session = None
+        try:
+            session = ProxmoxSession(self.host_cfg, timeout=10)
+            vm_api = VmAPI(session)
+            upid = vm_api.rollback_snapshot(
+                self.node_name, self.vmid, self.vm_type, self.snap_name
+            )
+            if isinstance(upid, dict):
+                upid = upid.get("data", upid)
+            if isinstance(upid, str) and upid.startswith("UPID:"):
+                status, exitstatus = _poll_task(session, self.node_name, upid, timeout=180)
+                if status == "stopped" and exitstatus == "OK":
+                    try:
+                        self.signals.result.emit(
+                            tr("Rolled back to snapshot \"{name}\"").format(name=self.snap_name)
+                        )
+                    except RuntimeError:
+                        pass
+                else:
+                    err = exitstatus or status
+                    try:
+                        self.signals.error.emit(
+                            tr("Snapshot rollback failed: {err}").format(err=err)
+                        )
+                    except RuntimeError:
+                        pass
+            else:
+                try:
+                    self.signals.result.emit(
+                        tr("Rolled back to snapshot \"{name}\"").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
+        except Exception as e:
+            logger.debug("backend error: %s", e)
+            try:
+                self.signals.error.emit(_sanitize_error(e))
+            except RuntimeError:
+                pass
+        finally:
+            if session:
+                session.close()
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # ClusterTasksWorker
 # ----------------------------------------------------------------------
 class ClusterTasksSignals(QObject):

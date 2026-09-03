@@ -435,6 +435,36 @@ class TestVmAPI:
             snapname="snap1", description="test", vmstate=1
         )
 
+    def test_delete_snapshot(self, mock_session):
+        chain = mock_session.proxmox.nodes
+        qemu_chain = chain.return_value.qemu
+        qemu_chain.return_value.snapshot.return_value.delete = MagicMock(
+            return_value="UPID:123"
+        )
+        api = VmAPI(mock_session)
+        api.delete_snapshot("n1", 100, "qemu", "snap1")
+        qemu_chain.return_value.snapshot.return_value.delete.assert_called_once_with()
+
+    def test_rollback_snapshot(self, mock_session):
+        chain = mock_session.proxmox.nodes
+        qemu_chain = chain.return_value.qemu
+        qemu_chain.return_value.snapshot.return_value.rollback.post = MagicMock(
+            return_value="UPID:123"
+        )
+        api = VmAPI(mock_session)
+        api.rollback_snapshot("n1", 100, "qemu", "snap1")
+        qemu_chain.return_value.snapshot.return_value.rollback.post.assert_called_once_with()
+
+    def test_rollback_snapshot_lxc(self, mock_session):
+        chain = mock_session.proxmox.nodes
+        lxc_chain = chain.return_value.lxc
+        lxc_chain.return_value.snapshot.return_value.rollback.post = MagicMock(
+            return_value="UPID:123"
+        )
+        api = VmAPI(mock_session)
+        api.rollback_snapshot("n1", 200, "lxc", "snap1")
+        lxc_chain.return_value.snapshot.return_value.rollback.post.assert_called_once_with()
+
     def test_get_vnc_proxy_lxc(self, mock_session):
         chain = mock_session.proxmox.nodes
         lxc_chain = chain.return_value.lxc

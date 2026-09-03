@@ -142,6 +142,7 @@ class VMTabs:
         tree.header().setSectionResizeMode(5, QHeaderView.Stretch)
         tree.setContextMenuPolicy(Qt.CustomContextMenu)
         tree.customContextMenuRequested.connect(self._on_snapshot_context_menu)
+        tree.itemSelectionChanged.connect(self._update_rollback_btn_state)
         stack = QStackedWidget()
         stack.addWidget(loading)
         stack.addWidget(tree)
@@ -157,8 +158,14 @@ class VMTabs:
         create_btn.setMinimumHeight(28)
         create_btn.clicked.connect(self.on_snapshot_create)
         btn_layout.addWidget(create_btn)
+        rollback_btn = QPushButton(get_icon("restore"), tr("Rollback to Snapshot"))
+        rollback_btn.setMinimumHeight(28)
+        rollback_btn.setEnabled(False)
+        rollback_btn.clicked.connect(self.on_snapshot_rollback)
+        btn_layout.addWidget(rollback_btn)
         btn_layout.addStretch()
         panel.vm_snapshots_create_btn = create_btn
+        panel.vm_snapshots_rollback_btn = rollback_btn
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         container = QWidget()
@@ -841,9 +848,19 @@ class VMTabs:
             "QMenu::item { padding: 4px 12px; }"
             f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
         )
-        delete_act = QAction(tr("Delete snapshot"), tree)
-        delete_act.triggered.connect(lambda: self.on_snapshot_delete(snap_name))
-        menu.addAction(delete_act)
+        if snap_name == "current":
+            delete_act = QAction(tr("Delete snapshot"), tree)
+            delete_act.triggered.connect(lambda: self.on_snapshot_delete(snap_name))
+            menu.addAction(delete_act)
+        else:
+            rollback_act = QAction(tr("Rollback to Snapshot"), tree)
+            rollback_act.triggered.connect(
+                lambda: self.on_snapshot_rollback(snap_name)
+            )
+            menu.addAction(rollback_act)
+            delete_act = QAction(tr("Delete snapshot"), tree)
+            delete_act.triggered.connect(lambda: self.on_snapshot_delete(snap_name))
+            menu.addAction(delete_act)
         menu.exec(tree.viewport().mapToGlobal(pos))
 
     def on_snapshot_delete(self, snap_name):
@@ -871,6 +888,50 @@ class VMTabs:
             panel.config_update_result.emit(parse_pve_error(err)),
             panel._workers_mgr.discard_worker(w),
         ))
+        panel._workers_mgr.run_worker(worker)
+
+    def _update_rollback_btn_state(self):
+        panel = self.panel
+        btn = getattr(panel, "vm_snapshots_rollback_btn", None)
+        if not btn:
+            return
+        item = panel.vm_snapshots_tree.currentItem()
+        btn.setEnabled(bool(item) and item.text(0) not in ("", "current"))
+
+    def on_snapshot_rollback(self, snap_name=None):
+        panel = self.panel
+        tree = panel.vm_snapshots_tree
+        if not snap_name:
+            item = tree.currentItem()
+            if not item:
+                return
+            snap_name = item.text(0)
+        if not snap_name or snap_name == "current":
+            return
+        if not panel._last_vm_data:
+            return
+        vmid = panel._last_vm_data.get("vmid")
+        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        node_name = panel._last_vm_data.get("node") or host_name
+        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        from ..vm_actions import confirm_snapshot_rollback
+        if not confirm_snapshot_rollback(snap_name, parent=panel):
+            return
+        from ...backend import VmSnapshotRollbackWorker
+        worker = VmSnapshotRollbackWorker(cfg, node_name, vmid, vm_type, snap_name)
+        worker.signals.result.connect(lambda msg, w=worker: (
+            panel.config_update_result.emit(msg),
+            self.reload_snapshots(vmid, host_name),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.finished.connect(self._update_rollback_btn_state)
         panel._workers_mgr.run_worker(worker)
 
     def populate_vm_snapshots_tree(self, snapshots):

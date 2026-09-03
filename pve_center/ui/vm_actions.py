@@ -90,3 +90,17 @@ def confirm_snapshot_delete(snap_name, parent=None):
     msg.setDefaultButton(yes)
     msg.exec()
     return msg.clickedButton() == yes
+
+
+def confirm_snapshot_rollback(snap_name, parent=None):
+    """Show confirmation dialog for snapshot rollback."""
+    from PySide6.QtWidgets import QMessageBox
+    msg_text = tr("Roll back to snapshot \"{name}\"?").format(name=snap_name)
+    info_text = tr("The VM will be reverted to the state saved in this snapshot.")
+    msg = QMessageBox(QMessageBox.Warning, tr("Confirm"), msg_text, parent=parent)
+    msg.setInformativeText(info_text)
+    yes = msg.addButton(tr("Yes"), QMessageBox.YesRole)
+    msg.addButton(tr("No"), QMessageBox.NoRole)
+    msg.setDefaultButton(yes)
+    msg.exec()
+    return msg.clickedButton() == yes
