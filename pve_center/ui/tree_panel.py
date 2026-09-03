@@ -3,8 +3,8 @@ import re
 from collections import defaultdict
 from datetime import timedelta
 
-from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QMimeData, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QDrag
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -46,6 +46,111 @@ def _node_tooltip(node):
     uptime = node.get("uptime", 0)
     uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
     return tr("CPU") + f": {cpu}%\n" + tr("RAM") + f": {mem_pct}%\n" + tr("Uptime") + f": {uptime_str}"
+
+
+GROUP_MIME = "application/x-pvecenter-hostgroup"
+
+
+class GroupTreeWidget(QTreeWidget):
+    """QTreeWidget with drag&drop for host groups (B16).
+
+    Dragging a host/cluster item onto a group item emits
+    group_move_requested(kind, name, group); dropping onto the
+    Clusters/Standalone hosts section removes the item from its group.
+    The tree is never mutated directly — the panel rebuilds it.
+    """
+
+    def __init__(self, panel):
+        super().__init__()
+        self._panel = panel
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+
+    def _drag_payload(self, item):
+        """Payload dict for a draggable item, or None if not draggable."""
+        if item is None:
+            return None
+        key = item.data(0, ITEM_KEY_ROLE)
+        if not isinstance(key, tuple):
+            return None
+        if key[0] == "host" and len(key) > 2:
+            return {"kind": "host", "name": key[2]}
+        if key[0] == "cluster" and len(key) > 1:
+            return {"kind": "cluster", "name": key[1]}
+        return None
+
+    def startDrag(self, supported_actions):
+        payload = self._drag_payload(self.currentItem())
+        if not payload:
+            return
+        mime = QMimeData()
+        mime.setData(GROUP_MIME, json.dumps(payload).encode("utf-8"))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.DropAction.MoveAction)
+
+    def _decode(self, event):
+        mime = event.mimeData()
+        if mime is None or not mime.hasFormat(GROUP_MIME):
+            return None
+        try:
+            payload = json.loads(bytes(mime.data(GROUP_MIME)).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if payload.get("kind") not in ("host", "cluster") or not payload.get("name"):
+            return None
+        return payload
+
+    def _drop_group(self, item):
+        """Group name for the drop target item:
+        group item -> its name; Clusters/Standalone hosts section -> ''
+        (remove from group); host/cluster directly inside a group -> that
+        group; anything else -> None (drop not allowed)."""
+        while item is not None:
+            key = item.data(0, ITEM_KEY_ROLE)
+            if isinstance(key, tuple):
+                if key[0] == "group":
+                    return key[1]
+                if key[0] == "section":
+                    if key[1] in (tr("Clusters"), tr("Standalone hosts")):
+                        return ""
+                    return None
+                if key[0] in ("host", "cluster"):
+                    parent = item.parent()
+                    if parent is not None:
+                        pkey = parent.data(0, ITEM_KEY_ROLE)
+                        if isinstance(pkey, tuple) and pkey[0] == "group":
+                            return pkey[1]
+                    return None
+            item = item.parent()
+        return None
+
+    def dragEnterEvent(self, event):
+        if self._decode(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if not self._decode(event):
+            event.ignore()
+            return
+        if self._drop_group(self.itemAt(event.position().toPoint())) is None:
+            event.ignore()
+        else:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        payload = self._decode(event)
+        if not payload:
+            event.ignore()
+            return
+        group = self._drop_group(self.itemAt(event.position().toPoint()))
+        if group is None:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self._panel.group_move_requested.emit(payload["kind"], payload["name"], group)
 
 
 class TreePanel(QWidget):
@@ -115,7 +220,7 @@ class TreePanel(QWidget):
         self._empty_label.setStyleSheet(f"color: {Color.GRAY_400}; font-size: 13px; padding: 40px 20px;")
         layout.addWidget(self._empty_label)
 
-        self.tree = QTreeWidget()
+        self.tree = GroupTreeWidget(self)
         self.tree.setColumnCount(1)
         self.tree.setHeaderHidden(True)
         self.tree.setAlternatingRowColors(True)

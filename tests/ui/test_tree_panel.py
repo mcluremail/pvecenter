@@ -1,10 +1,19 @@
 """Tests for TreePanel with domain objects."""
-from PySide6.QtWidgets import QTreeWidget
+import json
+
+from PySide6.QtCore import QMimeData, QPointF
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
 from pve_center.domain.enums import VmStatus
 from pve_center.domain.repositories import NodeRepository, VmRepository
 from pve_center.ui.i18n import tr
-from pve_center.ui.tree_panel import ITEM_KEY_ROLE, VM_KEY_ROLE, TreePanel
+from pve_center.ui.tree_panel import (
+    GROUP_MIME,
+    ITEM_KEY_ROLE,
+    VM_KEY_ROLE,
+    GroupTreeWidget,
+    TreePanel,
+)
 
 
 def _make_nodes_cfg(standalone_names=None, clusters=None):
@@ -373,3 +382,137 @@ class TestHostGroups:
         assert cluster_key == ("cluster", "cl1")
         group_key = next(k for k in items if k[0] == "group")
         assert items[cluster_key].parent() is items[group_key]
+
+
+class _FakeDropEvent:
+    """Mimics QDropEvent for GroupTreeWidget._decode/_drop_group tests."""
+
+    def __init__(self, mime):
+        self._mime = mime
+        self.accepted = False
+        self.ignored = False
+
+    def mimeData(self):
+        return self._mime
+
+    def position(self):
+        return QPointF(0, 0)
+
+    def acceptProposedAction(self):
+        self.accepted = True
+
+    def ignore(self):
+        self.ignored = True
+
+
+class TestGroupDragDrop:
+    """B16: drag&drop hosts/clusters into groups."""
+
+    def _make_widget(self, qtbot):
+        cfg = [
+            {"name": "h1", "cluster": "", "skip": False, "group": "G"},
+            {"name": "h2", "cluster": "", "skip": False},
+        ]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        gt = tp.tree
+        assert isinstance(gt, GroupTreeWidget)
+
+        group = QTreeWidgetItem(["G"])
+        group.setData(0, ITEM_KEY_ROLE, ("group", "G"))
+        gt.addTopLevelItem(group)
+        host_in_group = QTreeWidgetItem(["h1"])
+        host_in_group.setData(0, ITEM_KEY_ROLE, ("host", "n1", "h1"))
+        group.addChild(host_in_group)
+        cluster_in_group = QTreeWidgetItem(["cl1"])
+        cluster_in_group.setData(0, ITEM_KEY_ROLE, ("cluster", "cl1"))
+        group.addChild(cluster_in_group)
+
+        section = QTreeWidgetItem([tr("Standalone hosts")])
+        section.setData(0, ITEM_KEY_ROLE, ("section", tr("Standalone hosts")))
+        gt.addTopLevelItem(section)
+        host_in_section = QTreeWidgetItem(["h2"])
+        host_in_section.setData(0, ITEM_KEY_ROLE, ("host", "n2", "h2"))
+        section.addChild(host_in_section)
+
+        storage = QTreeWidgetItem([tr("Storage")])
+        storage.setData(0, ITEM_KEY_ROLE, ("section", tr("Storage")))
+        gt.addTopLevelItem(storage)
+
+        items = {
+            "group": group,
+            "host_in_group": host_in_group,
+            "cluster_in_group": cluster_in_group,
+            "section": section,
+            "host_in_section": host_in_section,
+            "storage": storage,
+        }
+        return tp, gt, items
+
+    def test_drag_payload(self, qtbot):
+        _tp, gt, items = self._make_widget(qtbot)
+        assert gt._drag_payload(items["host_in_group"]) == {"kind": "host", "name": "h1"}
+        assert gt._drag_payload(items["cluster_in_group"]) == {"kind": "cluster", "name": "cl1"}
+        # Non-draggable: group, section, plain items
+        assert gt._drag_payload(items["group"]) is None
+        assert gt._drag_payload(items["section"]) is None
+        assert gt._drag_payload(QTreeWidgetItem(["vm"])) is None
+        assert gt._drag_payload(None) is None
+
+    def test_decode_valid_and_invalid(self, qtbot):
+        _tp, gt, _items = self._make_widget(qtbot)
+        mime = QMimeData()
+        mime.setData(GROUP_MIME, json.dumps({"kind": "host", "name": "h1"}).encode())
+        assert gt._decode(_FakeDropEvent(mime)) == {"kind": "host", "name": "h1"}
+
+        wrong_mime = QMimeData()
+        wrong_mime.setData("text/plain", b"x")
+        assert gt._decode(_FakeDropEvent(wrong_mime)) is None
+
+        bad_json = QMimeData()
+        bad_json.setData(GROUP_MIME, b"{not json")
+        assert gt._decode(_FakeDropEvent(bad_json)) is None
+
+        bad_kind = QMimeData()
+        bad_kind.setData(GROUP_MIME, json.dumps({"kind": "vm", "name": "x"}).encode())
+        assert gt._decode(_FakeDropEvent(bad_kind)) is None
+
+    def test_drop_group_resolution(self, qtbot):
+        _tp, gt, items = self._make_widget(qtbot)
+        assert gt._drop_group(items["group"]) == "G"
+        assert gt._drop_group(items["host_in_group"]) == "G"
+        assert gt._drop_group(items["cluster_in_group"]) == "G"
+        # Sections: ungroup targets vs. Storage
+        assert gt._drop_group(items["section"]) == ""
+        assert gt._drop_group(items["storage"]) is None
+        # Host still under Standalone hosts -> no target
+        assert gt._drop_group(items["host_in_section"]) is None
+        assert gt._drop_group(None) is None
+
+    def test_drop_event_emits_group_move(self, qtbot):
+        tp, gt, items = self._make_widget(qtbot)
+        gt.itemAt = lambda _p: items["host_in_group"]
+        emitted = []
+        tp.group_move_requested.connect(lambda k, n, g: emitted.append((k, n, g)))
+
+        mime = QMimeData()
+        mime.setData(GROUP_MIME, json.dumps({"kind": "host", "name": "h9"}).encode())
+        event = _FakeDropEvent(mime)
+        gt.dropEvent(event)
+
+        assert event.accepted and not event.ignored
+        assert emitted == [("host", "h9", "G")]
+
+    def test_drop_event_ignored_on_invalid_target(self, qtbot):
+        tp, gt, items = self._make_widget(qtbot)
+        gt.itemAt = lambda _p: items["storage"]
+        emitted = []
+        tp.group_move_requested.connect(lambda k, n, g: emitted.append((k, n, g)))
+
+        mime = QMimeData()
+        mime.setData(GROUP_MIME, json.dumps({"kind": "host", "name": "h9"}).encode())
+        event = _FakeDropEvent(mime)
+        gt.dropEvent(event)
+
+        assert event.ignored and not event.accepted
+        assert emitted == []
