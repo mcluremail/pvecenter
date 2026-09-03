@@ -15,6 +15,8 @@ class NodeStatus(Enum):
     OFFLINE = "offline"
     ERROR = "error"
     UNKNOWN = "unknown"
+    LOADING = "loading"
+    """Pseudo-status for tree placeholders while a host is being fetched."""
 
     @staticmethod
     def from_pve(value: str | None) -> NodeStatus:

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...domain import Vm
 from ..i18n import tr
 from ..icons import get_icon
 from ..theme import Color
@@ -242,15 +243,15 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
         if not confirm_vm_action(action, vmid, parent=panel):
             return
-        node_name = panel._last_vm_data.get("node") or host_name
-        vm_type = panel._last_vm_data.get("type", "qemu")
+        node_name = panel._last_vm_data.node or host_name
+        vm_type = panel._last_vm_data.vm_type.value
         from ...backend import VmActionWorker
         worker = VmActionWorker(cfg, node_name, vmid, vm_type, action)
         for btn in panel._action_buttons.values():
@@ -270,9 +271,9 @@ class VMTabs:
     def update_action_buttons(self, vm_data=None):
         panel = self.panel
         if vm_data is None:
-            vm_data = panel._last_vm_data or {}
-        status = vm_data.get("status", "") if vm_data else ""
-        is_template = bool(vm_data and vm_data.get("template"))
+            vm_data = panel._last_vm_data
+        status = vm_data.status_value if vm_data else ""
+        is_template = bool(vm_data and vm_data.template)
         for key, btn in panel._action_buttons.items():
             btn.setEnabled(True)
             if is_template:
@@ -285,15 +286,15 @@ class VMTabs:
                 btn.setEnabled(status == "running")
             elif key == "resume":
                 btn.setEnabled(status == "paused")
-        vm_type = vm_data.get("type", "qemu") if vm_data else "qemu"
+        vm_type = vm_data.vm_type.value if vm_data else "qemu"
         panel._console_btn.setEnabled(
             vm_type in ("qemu", "lxc") and status == "running" and not is_template
         )
 
     def on_action_finished(self, msg):
         panel = self.panel
-        vm = panel._last_vm_data or {}
-        panel.detail_label.setText(tr("VM/CT: {name}").format(name=vm.get('name', vm.get('vmid', ''))) + " — " + msg)
+        vm = panel._last_vm_data
+        panel.detail_label.setText(tr("VM/CT: {name}").format(name=(vm.name or vm.vmid) if vm else "") + " — " + msg)
         self.update_action_buttons(vm)
 
     def on_action_error(self, err):
@@ -305,13 +306,13 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        vm_type = panel._last_vm_data.get("type", "qemu")
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
+        vm_type = panel._last_vm_data.vm_type.value
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        node_name = panel._last_vm_data.get("node") or host_name
+        node_name = panel._last_vm_data.node or host_name
         panel._console_btn.setEnabled(False)
         console_type = "VNC" if vm_type == "lxc" else "SPICE/VNC"
         panel.detail_label.setText(tr("VM {vmid}: opening {ctype} console...").format(
@@ -334,10 +335,10 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        vmid = panel._last_vm_data.get("vmid")
-        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
-        node_name = panel._last_vm_data.get("node") or host_name
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        vmid = panel._last_vm_data.vmid
+        vm_type = panel._last_vm_data.vm_type.value
+        node_name = panel._last_vm_data.node or host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -373,8 +374,8 @@ class VMTabs:
             panel.info_stack.setCurrentIndex(0)
             return
 
-        vmid = vm_data.get("vmid")
-        host_name = vm_data.get("host_name") or vm_data.get("node")
+        vmid = vm_data.vmid
+        host_name = vm_data.host_name or vm_data.node
         detail_key = (host_name, vmid)
 
         self.show_vm_metrics(vm_data)
@@ -384,8 +385,8 @@ class VMTabs:
             if cfg:
                 panel.info_label.setText(tr("Loading detailed info..."))
                 panel.info_stack.setCurrentIndex(0)
-                node_name = vm_data.get("node") or host_name
-                vm_type = vm_data.get("type", "qemu")
+                node_name = vm_data.node or host_name
+                vm_type = vm_data.vm_type.value
                 from ...backend import VmDetailWorker
                 worker = VmDetailWorker(cfg, node_name, vmid, vm_type)
                 worker.signals.detail_ready.connect(lambda d, g=gen, h=host_name, w=worker: (self.on_detail_loaded(d, g, h), panel._workers_mgr.discard_worker(w)))
@@ -397,9 +398,9 @@ class VMTabs:
         else:
             self.display_full_vm_info(vm_data, panel.details_cache[detail_key])
 
-        node_name = vm_data.get("node") or host_name
+        node_name = vm_data.node or host_name
 
-        vm_type = vm_data.get("type", "qemu") or "qemu"
+        vm_type = vm_data.vm_type.value
         if detail_key not in panel.vm_snapshots_cache:
             panel.vm_snapshots_tree.clear()
             panel.vm_snapshots_loading.setText(tr("Loading..."))
@@ -421,14 +422,14 @@ class VMTabs:
         self.load_iso_for_node(host_name, node_name)
         self.load_vm_backups(vmid, node_name, host_name)
 
-        panel.hardware_widget.set_vm_status(vm_data.get("status", ""))
+        panel.hardware_widget.set_vm_status(vm_data.status_value)
         panel.hardware_widget.set_context(host_name, vmid, node_name)
         if detail_key not in panel.config_cache:
             panel.hardware_widget.set_hardware_data(None)
             panel.options_widget.set_options_data(None)
             cfg = panel._cfg_by_name.get(host_name)
             if cfg:
-                vm_type = vm_data.get("type", "qemu")
+                vm_type = vm_data.vm_type.value
                 from ...backend import VmConfigWorker
                 worker = VmConfigWorker(cfg, node_name, vmid, vm_type)
                 worker.signals.config_ready.connect(lambda vid, c, g=gen, h=host_name, w=worker: (self.on_config_loaded(vid, c, g, h), panel._workers_mgr.discard_worker(w)))
@@ -446,9 +447,9 @@ class VMTabs:
         iso_set = panel._iso_by_host.setdefault(host_name, set())
         panel.hardware_widget.set_iso_list(iso_set)
         node_storages = [s for s in panel.all_storages
-                         if s.get("node") == node_name
-                         and s.get("host_name") == host_name
-                         and "images" in (s.get("content", "") or "").split(",")]
+                         if s.node == node_name
+                         and s.host_name == host_name
+                         and "images" in s.content_list]
         panel.hardware_widget.set_storage_list(node_storages)
         panel.options_widget.set_context(host_name, vmid, node_name)
 
@@ -456,7 +457,7 @@ class VMTabs:
             panel.task_history_widget.set_tasks([])
             cfg = panel._cfg_by_name.get(host_name)
             if cfg:
-                node_name = vm_data.get("node") or host_name
+                node_name = vm_data.node or host_name
                 from ...backend import VmTaskHistoryWorker
                 panel._workers_mgr.current_hist_worker = VmTaskHistoryWorker(cfg, node_name, vmid, limit=50)
                 panel._workers_mgr.current_hist_worker.signals.tasks_ready.connect(lambda vid, t, g=gen, h=host_name, w=panel._workers_mgr.current_hist_worker: (self.on_tasks_loaded(vid, t, g, h), panel._workers_mgr.discard_worker(w)))
@@ -470,8 +471,8 @@ class VMTabs:
         if not panel.metrics_widget._has_plot:
             return
         panel.metrics_widget.show_disk_io(True)
-        vmid = vm_data.get("vmid")
-        host_name = vm_data.get("host_name") or vm_data.get("node")
+        vmid = vm_data.vmid
+        host_name = vm_data.host_name or vm_data.node
         timeframe = panel.metrics_widget.timeframe_combo.currentData()
         cache_key = (vmid, host_name, timeframe)
         if cache_key in panel.metrics_cache:
@@ -481,8 +482,8 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        node_name = vm_data.get("node") or host_name
-        vm_type = vm_data.get("type", "qemu")
+        node_name = vm_data.node or host_name
+        vm_type = vm_data.vm_type.value
 
         from ..api.metrics import MetricsWorker
         worker = MetricsWorker(cfg, node_name, vmid, vm_type, timeframe)
@@ -496,8 +497,8 @@ class VMTabs:
             return
         if not panel._last_vm_data:
             return
-        current_host = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        current_vmid = panel._last_vm_data.get("vmid")
+        current_host = panel._last_vm_data.host_name or panel._last_vm_data.node
+        current_vmid = panel._last_vm_data.vmid
         if current_vmid != vmid or current_host != host_name:
             return
         cache_key = (vmid, host_name, timeframe)
@@ -513,13 +514,14 @@ class VMTabs:
         vmid = detail.get("vmid")
         data = detail.get("data", {})
         vm_data = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
-        merged = {**vm_data, **data} if vm_data else data
-        panel._last_vm_data = merged
-        self.update_action_buttons(merged)
-        self.update_vm_cells(merged)
+        if vm_data is None:
+            vm_data = Vm.from_pve(data, host_name)
+        panel._last_vm_data = vm_data
+        self.update_action_buttons(vm_data)
+        self.update_vm_cells(vm_data)
         detail_key = (host_name, vmid)
         panel.details_cache[detail_key] = data
-        self.display_full_vm_info(merged, data)
+        self.display_full_vm_info(vm_data, data)
 
     def on_detail_loaded(self, detail, gen, host_name):
         panel = self.panel
@@ -531,14 +533,15 @@ class VMTabs:
         if detail.get("status") == "ok":
             data = detail.get("data", {})
             panel.details_cache[detail_key] = data
+            if vm_data is None:
+                vm_data = Vm.from_pve(data, host_name)
             self.display_full_vm_info(vm_data, data)
             panel.tabs.setCurrentIndex(TabIndex.MONITOR)
             if detail_key in panel.config_cache:
                 panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], data)
             if panel._last_vm_data:
-                merged = {**vm_data, **data} if vm_data else data
-                panel._last_vm_data = merged
-                self.update_action_buttons(merged)
+                panel._last_vm_data = vm_data
+                self.update_action_buttons(vm_data)
         else:
             panel.info_label.setText(parse_pve_error(detail.get("error", "")))
             panel.info_stack.setCurrentIndex(0)
@@ -550,8 +553,8 @@ class VMTabs:
             return
         vmid = int(vmid_str)
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
-        node = vm.get("node") if vm else host_name
-        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+        node = vm.node if vm else host_name
+        vm_type = (vm.vm_type.value if vm else "qemu")
 
         from ...backend import VmConfigUpdateWorker
         worker = VmConfigUpdateWorker(cfg, node, vmid, params, vm_type)
@@ -577,8 +580,8 @@ class VMTabs:
             return
         vmid = int(vmid_str)
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
-        node = vm.get("node") if vm else host_name
-        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+        node = vm.node if vm else host_name
+        vm_type = (vm.vm_type.value if vm else "qemu")
 
         from ...backend import VmConfigUpdateWorker
         worker = VmConfigUpdateWorker(cfg, node, vmid, {"delete": key}, vm_type)
@@ -641,8 +644,8 @@ class VMTabs:
             return
         vmid = int(vmid_str)
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
-        node = vm.get("node") if vm else host_name
-        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+        node = vm.node if vm else host_name
+        vm_type = (vm.vm_type.value if vm else "qemu")
 
         from ...backend import VmDiskResizeWorker
         worker = VmDiskResizeWorker(cfg, node, vmid, disk, size, vm_type)
@@ -673,8 +676,8 @@ class VMTabs:
             return
         vmid = int(vmid_str)
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
-        node = vm.get("node") if vm else host_name
-        vm_type = (vm.get("type") if vm else "qemu") or "qemu"
+        node = vm.node if vm else host_name
+        vm_type = (vm.vm_type.value if vm else "qemu")
 
         from ...backend import VmDiskMoveWorker
         worker = VmDiskMoveWorker(cfg, node, vmid, disk, storage, delete, vm_type)
@@ -704,7 +707,7 @@ class VMTabs:
             return
         detail_key = (host_name, vmid)
         panel.config_cache[detail_key] = config
-        if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
+        if panel._last_vm_data and panel._last_vm_data.vmid == vmid and panel._last_vm_data.host_name == host_name:
             detail = panel.details_cache.get(detail_key)
             panel.hardware_widget.set_hardware_data(config, detail)
             panel.options_widget.set_options_data(config)
@@ -715,7 +718,7 @@ class VMTabs:
             return
         detail_key = (host_name, vmid)
         panel.task_history_cache[detail_key] = tasks
-        if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
+        if panel._last_vm_data and panel._last_vm_data.vmid == vmid and panel._last_vm_data.host_name == host_name:
             panel.task_history_widget.set_tasks(tasks)
 
     def on_snapshots_loaded(self, vmid, snapshots, gen, host_name):
@@ -724,14 +727,14 @@ class VMTabs:
             return
         detail_key = (host_name, vmid)
         panel.vm_snapshots_cache[detail_key] = snapshots
-        if panel._last_vm_data and panel._last_vm_data.get("vmid") == vmid and panel._last_vm_data.get("host_name") == host_name:
+        if panel._last_vm_data and panel._last_vm_data.vmid == vmid and panel._last_vm_data.host_name == host_name:
             self.populate_vm_snapshots_tree(snapshots)
 
     def on_snapshots_error(self, vmid, err, gen, host_name):
         panel = self.panel
         if gen != panel._generation:
             return
-        if not panel._last_vm_data or panel._last_vm_data.get("vmid") != vmid or panel._last_vm_data.get("host_name") != host_name:
+        if not panel._last_vm_data or panel._last_vm_data.vmid != vmid or panel._last_vm_data.host_name != host_name:
             return
         detail_key = (host_name, vmid)
         panel.vm_snapshots_cache.pop(detail_key, None)
@@ -747,8 +750,8 @@ class VMTabs:
         panel.vm_snapshots_stack.setCurrentIndex(0)
         cfg = panel._cfg_by_name.get(host_name)
         if cfg and panel._last_vm_data:
-            node_name = panel._last_vm_data.get("node") or host_name
-            vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+            node_name = panel._last_vm_data.node or host_name
+            vm_type = panel._last_vm_data.vm_type.value
             gen = panel._generation
             from ...backend import VmSnapshotsWorker
             worker = VmSnapshotsWorker(cfg, node_name, vmid, vm_type)
@@ -770,10 +773,10 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        node_name = panel._last_vm_data.get("node") or host_name
-        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        node_name = panel._last_vm_data.node or host_name
+        vm_type = panel._last_vm_data.vm_type.value
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -867,10 +870,10 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        node_name = panel._last_vm_data.get("node") or host_name
-        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        node_name = panel._last_vm_data.node or host_name
+        vm_type = panel._last_vm_data.vm_type.value
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -910,10 +913,10 @@ class VMTabs:
             return
         if not panel._last_vm_data:
             return
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        node_name = panel._last_vm_data.get("node") or host_name
-        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        node_name = panel._last_vm_data.node or host_name
+        vm_type = panel._last_vm_data.vm_type.value
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -997,8 +1000,8 @@ class VMTabs:
         panel.config_cache.pop(detail_key, None)
         cfg = panel._cfg_by_name.get(host_name)
         if cfg and panel._last_vm_data:
-            node_name = panel._last_vm_data.get("node") or host_name
-            vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+            node_name = panel._last_vm_data.node or host_name
+            vm_type = panel._last_vm_data.vm_type.value
             gen = panel._generation
             from ...backend import VmConfigWorker
             worker = VmConfigWorker(cfg, node_name, vmid, vm_type)
@@ -1014,24 +1017,24 @@ class VMTabs:
     def display_full_vm_info(self, basic, detail):
         panel = self.panel
         try:
-            vmid = basic.get("vmid") or detail.get("vmid", "?")
-            name = basic.get("name") or detail.get("name", "")
-            status = basic.get("status") or detail.get("status", "")
+            vmid = basic.vmid or detail.get("vmid", "?")
+            name = basic.name or detail.get("name", "")
+            status = basic.status_value or detail.get("status", "")
 
-            maxmem_bytes = _safe_int(detail.get("maxmem") or basic.get("maxmem"))
+            maxmem_bytes = _safe_int(detail.get("maxmem") or basic.maxmem_bytes)
             mem_used_bytes = _safe_int(detail.get("mem"))
             maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
             mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
             mem_pct = safe_pct(mem_used_bytes, maxmem_bytes)
 
-            cpus = detail.get("cpus") or basic.get("cpus") or 0
-            cpu_usage = basic.get("cpu_pct") or detail.get("cpu_pct",
+            cpus = detail.get("cpus") or 0
+            cpu_usage = basic.cpu_pct or detail.get("cpu_pct",
                 round(detail.get("cpu", 0) * 100, 1) if isinstance(detail.get("cpu"), float) else 0)
 
-            maxdisk_bytes = _safe_int(detail.get("maxdisk") or basic.get("maxdisk"))
+            maxdisk_bytes = _safe_int(detail.get("maxdisk") or basic.maxdisk_bytes)
             disk_used_bytes = _safe_int(detail.get("disk"))
             maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
-            vm_type = (detail.get("type") or basic.get("type", "qemu"))
+            vm_type = detail.get("type") or basic.vm_type.value
             if vm_type == "lxc" and disk_used_bytes:
                 disk_used_gb = round(disk_used_bytes / (1024**3), 2)
                 disk_pct = safe_pct(disk_used_bytes, maxdisk_bytes)
@@ -1047,9 +1050,9 @@ class VMTabs:
             netin_mb = round(netin / (1024*1024), 2) if netin else 0
             netout_mb = round(netout / (1024*1024), 2) if netout else 0
 
-            uptime = detail.get("uptime") or basic.get("uptime", "")
-            tags = basic.get("tags") or detail.get("tags") or ""
-            ha = basic.get("hastate") or detail.get("hastate", "")
+            uptime = detail.get("uptime") or basic.uptime_seconds
+            tags = basic.tags or detail.get("tags") or ""
+            ha = basic.hastate or detail.get("hastate", "")
 
             panel.detail_label.setText(f"{name or vmid}")
 
@@ -1104,32 +1107,32 @@ class VMTabs:
         panel = self.panel
         if not vm_data:
             return
-        detail_key = (vm_data.get("host_name") or vm_data.get("node"), vm_data.get("vmid"))
+        detail_key = (vm_data.host_name or vm_data.node, vm_data.vmid)
         detail = panel.details_cache.get(detail_key)
         if not detail:
             return
 
-        status = vm_data.get("status") or detail.get("status", "")
+        status = vm_data.status_value or detail.get("status", "")
         status_color = Color.STATUS_OK if status == "running" else Color.STATUS_ERR if status == "stopped" else Color.STATUS_WARN
         panel.card_status.set_value(status_text(status))
         panel.card_status.set_value_color(status_color)
 
-        cpu_usage = vm_data.get("cpu_pct") or detail.get("cpu_pct",
+        cpu_usage = vm_data.cpu_pct or detail.get("cpu_pct",
             round(detail.get("cpu", 0) * 100, 1) if isinstance(detail.get("cpu"), float) else 0)
         panel.card_cpu.set_value(f"{cpu_usage}%")
         panel.card_cpu.set_progress(cpu_usage)
 
-        maxmem_bytes = _safe_int(detail.get("maxmem") or vm_data.get("maxmem"))
+        maxmem_bytes = _safe_int(detail.get("maxmem") or vm_data.maxmem_bytes)
         mem_used_bytes = _safe_int(detail.get("mem"))
         maxmem_gb = round(maxmem_bytes / (1024**3), 2) if maxmem_bytes else 0
         mem_used_gb = round(mem_used_bytes / (1024**3), 2) if mem_used_bytes else 0
         panel.card_ram.set_value(f"{mem_used_gb} / {maxmem_gb} {tr('GiB')}")
         panel.card_ram.set_progress(safe_pct(mem_used_bytes, maxmem_bytes))
 
-        maxdisk_bytes = _safe_int(detail.get("maxdisk") or vm_data.get("maxdisk"))
+        maxdisk_bytes = _safe_int(detail.get("maxdisk") or vm_data.maxdisk_bytes)
         disk_used_bytes = _safe_int(detail.get("disk"))
         maxdisk_gb = round(maxdisk_bytes / (1024**3), 2) if maxdisk_bytes else 0
-        vm_type = detail.get("type") or vm_data.get("type", "qemu")
+        vm_type = detail.get("type") or vm_data.vm_type.value
         if vm_type == "lxc" and disk_used_bytes:
             disk_used_gb = round(disk_used_bytes / (1024**3), 2)
             panel.card_disk.set_value(f"{disk_used_gb} / {maxdisk_gb} {tr('GiB')}")
@@ -1146,13 +1149,13 @@ class VMTabs:
         panel.card_net.set_value(f"↓ {netin_mb} MB")
         panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
 
-        uptime = detail.get("uptime") or vm_data.get("uptime", "")
+        uptime = detail.get("uptime") or vm_data.uptime_seconds
         panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
 
     def update_pool_cells(self):
         panel = self.panel
         pool_name = panel.current_obj_name
-        vms = [vm for vm in panel.all_vms if vm.get("pool") == pool_name]
+        vms = [vm for vm in panel.all_vms if vm.pool == pool_name]
         panel.pool_widget.set_pool_vms(vms)
 
     def show_pool_info(self, pool_name):
@@ -1170,7 +1173,7 @@ class VMTabs:
         panel.tabs.setTabVisible(TabIndex.POOL_VMS, True)
         panel.tabs.setCurrentIndex(TabIndex.POOL_VMS)
 
-        vms_in_pool = [vm for vm in panel.all_vms if vm.get("pool") == pool_name]
+        vms_in_pool = [vm for vm in panel.all_vms if vm.pool == pool_name]
         panel.pool_widget.set_pool_vms(vms_in_pool)
 
     def load_iso_for_node(self, host_name, node_name):
@@ -1180,12 +1183,12 @@ class VMTabs:
         if not cfg:
             return
         storages = [s for s in panel.all_storages
-                    if s.get("node") == node_name
-                    and s.get("host_name") == host_name
-                    and "iso" in (s.get("content") or "").split(",")]
+                    if s.node == node_name
+                    and s.host_name == host_name
+                    and "iso" in s.content_list]
         from ..api.metrics import StorageContentListWorker
         for storage_info in storages:
-            storage = storage_info.get("storage")
+            storage = storage_info.storage
             if not storage:
                 continue
             worker = StorageContentListWorker(cfg, node_name, storage, "iso")
@@ -1215,9 +1218,9 @@ class VMTabs:
         panel.vm_backup_table.setRowCount(0)
         backup_storages = [
             s for s in panel.all_storages
-            if s.get("node") == node_name
-            and s.get("host_name") == host_name
-            and "backup" in (s.get("content", "") or "").split(",")
+            if s.node == node_name
+            and s.host_name == host_name
+            and "backup" in s.content_list
         ]
         if not backup_storages:
             panel.vm_backup_loading.setText(tr("No backup storage available"))
@@ -1227,7 +1230,7 @@ class VMTabs:
         panel._vm_backup_gen = getattr(panel, "_generation", 0)
         from ..api.metrics import StorageContentListWorker
         for storage_info in backup_storages:
-            storage = storage_info.get("storage")
+            storage = storage_info.storage
             if not storage:
                 continue
             worker = StorageContentListWorker(cfg, node_name, storage, "backup")
@@ -1292,16 +1295,16 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        vmid = panel._last_vm_data.get("vmid")
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        node_name = panel._last_vm_data.get("node") or host_name
+        vmid = panel._last_vm_data.vmid
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        node_name = panel._last_vm_data.node or host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
         from ..vzdump_dialog import VzdumpDialog
         storages = [s for s in panel.all_storages
-                    if s.get("node") == node_name
-                    and s.get("host_name") == host_name]
+                    if s.node == node_name
+                    and s.host_name == host_name]
         dlg = VzdumpDialog(panel, vmid=vmid, storages=storages)
         if dlg.exec() != VzdumpDialog.Accepted:
             return
@@ -1341,9 +1344,9 @@ class VMTabs:
         panel = self.panel
         if not panel._last_vm_data:
             return
-        host_name = panel._last_vm_data.get("host_name") or panel._last_vm_data.get("node")
-        node_name = panel._last_vm_data.get("node") or host_name
-        vm_type = panel._last_vm_data.get("type", "qemu") or "qemu"
+        host_name = panel._last_vm_data.host_name or panel._last_vm_data.node
+        node_name = panel._last_vm_data.node or host_name
+        vm_type = panel._last_vm_data.vm_type.value
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -1359,12 +1362,12 @@ class VMTabs:
         volid = archive_item.data(Qt.UserRole) or archive_item.text()
         if not volid:
             return
-        used_vmids = {v.get("vmid") for v in panel.all_vms if v.get("vmid")}
+        used_vmids = {v.vmid for v in panel.all_vms if v.vmid}
         next_vmid = self._next_free_vmid(used_vmids)
         from ..vm_restore_dialog import VmRestoreDialog
         storages = [s for s in panel.all_storages
-                    if s.get("node") == node_name
-                    and s.get("host_name") == host_name]
+                    if s.node == node_name
+                    and s.host_name == host_name]
         dlg = VmRestoreDialog(panel, volid=volid, vm_type=vm_type,
                               storages=storages, next_vmid=next_vmid)
         if dlg.exec() != VmRestoreDialog.Accepted:

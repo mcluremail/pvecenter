@@ -372,28 +372,21 @@ class StorageTabs:
     def populate_storage_table(self, storages):
         card_items = []
         for st in storages:
-            name = st.get("storage", st.get("id", ""))
-            content = st.get("content_text", "")
-            if not content:
-                raw_content = st.get("content", "")
-                if isinstance(raw_content, list):
-                    content = ", ".join(raw_content)
-                else:
-                    content = raw_content
-            cluster = st.get("cluster")
-            location = cluster if cluster else st.get("node", st.get("host_name", ""))
+            name = st.storage
+            cluster = st.cluster
+            location = cluster if cluster else (st.node or st.host_name)
             if cluster:
                 nav_key = ("storage", name, "cluster", cluster)
             else:
-                nav_key = ("storage", name, "host", st.get("host_name", ""))
+                nav_key = ("storage", name, "host", st.host_name)
             card_items.append({
                 "name": name,
-                "type_text": st.get("type_text", st.get("type", "")),
-                "content_text": content,
+                "type_text": st.type_text or st.storage_type,
+                "content_text": st.content_text,
                 "location_text": location,
-                "used_text": st.get("used_text", "0 GiB"),
-                "total_text": st.get("total_text", "0 GiB"),
-                "usage_text": st.get("usage_text", "0%"),
+                "used_text": st.used_text,
+                "total_text": st.total_text,
+                "usage_text": st.usage_text,
                 "nav_key": nav_key,
             })
         self.panel.storage_list.set_items(card_items)
@@ -426,11 +419,11 @@ class StorageTabs:
         seen = set()
         deduped = []
         for st in panel.all_storages:
-            cluster = st.get("cluster")
+            cluster = st.cluster
             if cluster:
-                key = (st.get("storage"), cluster)
+                key = (st.storage, cluster)
             else:
-                key = (st.get("storage"), st.get("host_name"))
+                key = (st.storage, st.host_name)
             if key not in seen:
                 seen.add(key)
                 deduped.append(st)
@@ -467,12 +460,12 @@ class StorageTabs:
         panel.storage_detail_name.setText(title)
         if cluster:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("cluster") == cluster]
+                        if s.storage == storage_name and s.cluster == cluster]
         elif host_name_filter:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
+                        if s.storage == storage_name and s.host_name == host_name_filter]
         else:
-            filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
+            filtered = [s for s in panel.all_storages if s.storage == storage_name]
         if not filtered:
             panel.storage_detail_params.setRowCount(0)
             panel.storage_detail_bar.setValue(0)
@@ -480,12 +473,10 @@ class StorageTabs:
             panel.storage_detail_nodes_table.setRowCount(0)
             return
         rep = filtered[0]
-        st_type = rep.get("type", "")
-        content = rep.get("content", "")
-        if isinstance(content, list):
-            content = ", ".join(content)
-        total_used = sum(s.get("used", 0) or 0 for s in filtered)
-        total_total = sum(s.get("total", 0) or 0 for s in filtered)
+        st_type = rep.storage_type
+        content = rep.content_text
+        total_used = sum(s.used_bytes for s in filtered)
+        total_total = sum(s.total_bytes for s in filtered)
         total_pct = safe_pct(total_used, total_total)
         used_gb = round(total_used / (1024**3), 1) if total_used else 0
         total_gb = round(total_total / (1024**3), 1) if total_total else 0
@@ -511,15 +502,13 @@ class StorageTabs:
         panel.storage_detail_nodes_label.setText(tr("Per node:") if cluster else tr("Node:"))
         panel.storage_detail_nodes_table.setRowCount(len(filtered))
         for i, st in enumerate(filtered):
-            node = st.get("node", "")
+            node = st.node
             panel.storage_detail_nodes_table.setItem(i, 0, QTableWidgetItem(node))
-            panel.storage_detail_nodes_table.setItem(i, 1, QTableWidgetItem(st.get("type", "")))
-            sc = st.get("content", "")
-            if isinstance(sc, list):
-                sc = ", ".join(sc)
+            panel.storage_detail_nodes_table.setItem(i, 1, QTableWidgetItem(st.storage_type))
+            sc = st.content_text
             panel.storage_detail_nodes_table.setItem(i, 2, QTableWidgetItem(sc))
-            used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 0
+            used = st.used_bytes
+            total = st.total_bytes
             u_gb = round(used / (1024**3), 1) if used else 0
             t_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
@@ -545,9 +534,7 @@ class StorageTabs:
 
     def load_storage_content(self, storage_name, filtered, rep):
         panel = self.panel
-        allowed = rep.get("content", [])
-        if isinstance(allowed, str):
-            allowed = [c.strip() for c in allowed.split(",") if c.strip()]
+        allowed = rep.content_list
         tab_map = {
             "backup": (10, tr("Backups"), [tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")]),
             "images": (11, tr("VM Disks"), [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")]),
@@ -590,8 +577,8 @@ class StorageTabs:
                 stack.setCurrentIndex(0)
                 stack.widget(0).setText(tr("Loading..."))
         node_entry = filtered[0]
-        node_name = node_entry.get("node", "")
-        host_name = node_entry.get("host_name", "")
+        node_name = node_entry.node
+        host_name = node_entry.host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -621,10 +608,10 @@ class StorageTabs:
         if workers_launched > 0:
             panel._storage_content_pending[storage_name] = {ct: None for ct in allowed if ct in tab_map and ct != "backup"}
         if "images" in allowed or "rootdir" in allowed:
-            host_names_with_sto = {s.get("host_name") for s in filtered}
+            host_names_with_sto = {s.host_name for s in filtered}
             node_vms = [vm for vm in panel.all_vms
-                        if vm.get("node") in {s.get("node") for s in filtered}
-                        and vm.get("host_name") in host_names_with_sto]
+                        if vm.node in {s.node for s in filtered}
+                        and vm.host_name in host_names_with_sto]
             self.fetch_storage_disks_simple(storage_name, node_name, host_name, cfg, node_vms)
 
         toolbar_map = {
@@ -737,20 +724,20 @@ class StorageTabs:
             cluster = data.get("cluster")
             if cluster:
                 filtered = [s for s in panel.all_storages
-                            if s.get("storage") == storage_name and s.get("cluster") == cluster]
+                            if s.storage == storage_name and s.cluster == cluster]
             elif host_name_filter:
                 filtered = [s for s in panel.all_storages
-                            if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
+                            if s.storage == storage_name and s.host_name == host_name_filter]
             else:
-                filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
+                filtered = [s for s in panel.all_storages if s.storage == storage_name]
             if filtered:
                 self.fetch_storage_metrics(storage_name, filtered)
 
     def fetch_storage_metrics(self, storage_name, filtered):
         panel = self.panel
         node_entry = filtered[0]
-        node_name = node_entry.get("node", "")
-        host_name = node_entry.get("host_name", "")
+        node_name = node_entry.node
+        host_name = node_entry.host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
@@ -903,16 +890,16 @@ class StorageTabs:
         cluster = data.get("cluster")
         if cluster:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("cluster") == cluster]
+                        if s.storage == storage_name and s.cluster == cluster]
         elif host_name_filter:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
+                        if s.storage == storage_name and s.host_name == host_name_filter]
         else:
-            filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
+            filtered = [s for s in panel.all_storages if s.storage == storage_name]
         if not filtered:
             return
-        total_used = sum(s.get("used", 0) or 0 for s in filtered)
-        total_total = sum(s.get("total", 0) or 0 for s in filtered)
+        total_used = sum(s.used_bytes for s in filtered)
+        total_total = sum(s.total_bytes for s in filtered)
         total_pct = safe_pct(total_used, total_total)
         used_gb = round(total_used / (1024**3), 1) if total_used else 0
         total_gb = round(total_total / (1024**3), 1) if total_total else 0
@@ -927,7 +914,7 @@ class StorageTabs:
         node_table = panel.storage_detail_nodes_table
         node_by_storage = {}
         for st in filtered:
-            node_by_storage[st.get("node", "")] = st
+            node_by_storage[st.node] = st
         for r in range(node_table.rowCount()):
             name_item = node_table.item(r, 0)
             if name_item is None:
@@ -935,8 +922,8 @@ class StorageTabs:
             st = node_by_storage.get(name_item.text())
             if st is None:
                 continue
-            used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 0
+            used = st.used_bytes
+            total = st.total_bytes
             u_gb = round(used / (1024**3), 1) if used else 0
             t_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
@@ -1112,9 +1099,9 @@ class StorageTabs:
         is_disk = table is panel.storage_disks_table
         target_storages = [
             s for s in panel.all_storages
-            if s.get("node") == node_name
-            and s.get("host_name") == host_name
-            and s.get("storage") != storage_name
+            if s.node == node_name
+            and s.host_name == host_name
+            and s.storage != storage_name
         ]
         dlg = StorageMoveDialog(volid_full, target_storages, is_disk, self.panel)
         if dlg.exec() != QDialog.Accepted:
@@ -1188,12 +1175,12 @@ class StorageTabs:
         cluster = data.get("cluster")
         if cluster:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("cluster") == cluster]
+                        if s.storage == storage_name and s.cluster == cluster]
         elif host_name_filter:
             filtered = [s for s in panel.all_storages
-                        if s.get("storage") == storage_name and s.get("host_name") == host_name_filter]
+                        if s.storage == storage_name and s.host_name == host_name_filter]
         else:
-            filtered = [s for s in panel.all_storages if s.get("storage") == storage_name]
+            filtered = [s for s in panel.all_storages if s.storage == storage_name]
         if filtered:
             rep = filtered[0]
             self.load_storage_content(storage_name, filtered, rep)

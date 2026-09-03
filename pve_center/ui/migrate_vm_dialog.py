@@ -51,8 +51,8 @@ class MigrateVMDialog(QDialog):
         target_grid.addWidget(QLabel(tr("Target node:")), 0, 0)
         self.target_combo = QComboBox()
         for n in self._cluster_nodes:
-            n_name = n.get("node", "") if isinstance(n, dict) else str(n)
-            n_status = n.get("status", "") if isinstance(n, dict) else ""
+            n_name = n.node or ""
+            n_status = n.status_value or ""
             if n_name and n_name != self._current_node:
                 label = n_name
                 if n_status == "online":

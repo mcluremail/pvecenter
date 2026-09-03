@@ -538,9 +538,9 @@ class MainWindow(QMainWindow):
     def _on_vm_delete_requested(self, host_name, node, vmid):
         # Найти ВМ по vmid + host_name
         vm = self._vm_repo.get(host_name, vmid)
-        vm_name = vm.get("name") if vm else f"VM {vmid}"
-        vm_status = vm.get("status", "") if vm else ""
-        vm_type = vm.get("type", "qemu") if vm else "qemu"
+        vm_name = vm.name if vm else f"VM {vmid}"
+        vm_status = vm.status_value if vm else ""
+        vm_type = vm.vm_type.value if vm else "qemu"
         is_running = vm_status == "running"
 
         # Найти конфиг хоста
@@ -662,10 +662,10 @@ class MainWindow(QMainWindow):
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
         vm = self._vm_repo.get(host_name, vmid)
-        if vm and vm.get("template"):
+        if vm and vm.template:
             self._notifications.show(tr("Lifecycle actions are not available for templates"), error=True)
             return
-        vm_type = (vm.get("type", "qemu") if vm else "qemu")
+        vm_type = (vm.vm_type.value if vm else "qemu")
         if not confirm_vm_action(action, vmid, parent=self):
             return
         from ..backend import VmActionWorker
@@ -784,7 +784,7 @@ class MainWindow(QMainWindow):
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
         vm = self._vm_repo.get(host_name, vmid)
-        vm_type = (vm.get("type", "qemu") if vm else "qemu")
+        vm_type = (vm.vm_type.value if vm else "qemu")
         from ..backend import VmConsoleWorker
         worker = VmConsoleWorker(cfg, node, vmid, vm_type)
         worker.signals.console_ready.connect(lambda msg: self._notifications.show(msg))
@@ -801,13 +801,13 @@ class MainWindow(QMainWindow):
             self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
             return
         vm = self._vm_repo.get(host_name, vmid)
-        if vm and vm.get("template"):
+        if vm and vm.template:
             self._notifications.show(tr("Migration is not available for templates"), error=True)
             return
         vm_info = {
-            "name": vm.get("name", "") if vm else "",
+            "name": vm.name if vm else "",
             "vmid": vmid,
-            "type": vm.get("type", "qemu") if vm else "qemu",
+            "type": vm.vm_type.value if vm else "qemu",
             "node": node,
         }
         cluster_nodes = self._get_cluster_nodes(host_name, node)
@@ -844,9 +844,9 @@ class MainWindow(QMainWindow):
             return
         vm = self._vm_repo.get(host_name, vmid)
         vm_info = {
-            "name": vm.get("name", "") if vm else "",
+            "name": vm.name if vm else "",
             "vmid": vmid,
-            "type": vm.get("type", "qemu") if vm else "qemu",
+            "type": vm.vm_type.value if vm else "qemu",
             "node": node,
         }
         cluster_nodes = self._get_cluster_nodes(host_name, node)
@@ -897,10 +897,10 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dlg)
         form = QFormLayout()
         tmpl_combo = QComboBox()
-        for vm in sorted(templates, key=lambda v: v.get("vmid", 0)):
-            name = vm.get("name") or f"VM {vm.get('vmid', '?')}"
-            vmid = vm.get("vmid")
-            node_name = vm.get("node", node)
+        for vm in sorted(templates, key=lambda v: v.vmid):
+            name = vm.name or f"VM {vm.vmid or '?'}"
+            vmid = vm.vmid
+            node_name = vm.node or node
             label = f"{name} ({vmid}) [{node_name}]"
             tmpl_combo.addItem(label, vmid)
         form.addRow(QLabel(tr("Template:")), tmpl_combo)
@@ -923,7 +923,7 @@ class MainWindow(QMainWindow):
             return
         vm = self._vm_repo.get(host_name, vmid)
         if direction == "to_template":
-            if vm and vm.get("status") == "running":
+            if vm and vm.status_value == "running":
                 self._notifications.show(
                     tr("VM must be stopped before converting to template"), error=True)
                 return
@@ -1333,21 +1333,21 @@ class MainWindow(QMainWindow):
         if vms is None:
             vms = self._vm_repo.all()
         for node in nodes:
-            name = node.get("node", "")
-            status = node.get("status", "unknown")
+            name = node.node
+            status = node.status_value
             old = self._last_host_statuses.get(name)
             if old is not None and old != status:
-                display = node.get("_display_name") or name
+                display = node.display_name or name
                 self._notifications.host_status_changed(display, old, status)
             self._last_host_statuses[name] = status
 
         for vm in vms:
-            key = (vm.get("host_name", ""), vm.get("vmid", 0))
-            status = vm.get("status", "unknown")
+            key = (vm.host_name, vm.vmid)
+            status = vm.status_value
             old = self._last_vm_statuses.get(key)
             if old is not None and old != status:
-                vm_name = vm.get("name") or f"VM {vm.get('vmid', '?')}"
-                self._notifications.vm_status_changed(vm_name, vm.get("host_name", ""), status)
+                vm_name = vm.name or f"VM {vm.vmid}"
+                self._notifications.vm_status_changed(vm_name, vm.host_name, status)
             self._last_vm_statuses[key] = status
 
     # ------------------------------------------------------------
@@ -1499,11 +1499,11 @@ class MainWindow(QMainWindow):
 
         rep_cfg = next((c for c in self.nodes_cfg if c.get("cluster_rep")), None)
         for n in self._node_repo.all():
-            pve_node = n.get("node", "")
-            host_name = n.get("host_name", "")
+            pve_node = n.node or ""
+            host_name = n.host_name
             if not pve_node or pve_node in seen_nodes:
                 continue
-            display = n.get("_display_name", "")
+            display = n.display_name or ""
 
             if rep_cfg and display.endswith(f"@{rep_cfg.get('cluster', '')}"):
                 cfg = rep_cfg

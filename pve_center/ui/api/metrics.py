@@ -377,9 +377,9 @@ class HostSnapshotsWorker(QRunnable):
             lock = threading.Lock()
 
             def fetch_vm_snapshots(vm):
-                vmid = vm.get("vmid")
-                vm_type = vm.get("type", "qemu")
-                vm_name = vm.get("name", "")
+                vmid = vm.vmid
+                vm_type = vm.vm_type.value
+                vm_name = vm.name or ""
                 if not vmid:
                     return
                 s = requests.Session()
@@ -396,8 +396,8 @@ class HostSnapshotsWorker(QRunnable):
                             continue
                         snap["vmid"] = vmid
                         snap["vm_name"] = vm_name
-                        snap["host_name"] = vm.get("host_name", "")
-                        snap["node"] = vm.get("node", self.node_name)
+                        snap["host_name"] = vm.host_name
+                        snap["node"] = vm.node or self.node_name
                         snap["size"] = 0
                         vm_snaps.append(dict(snap))
                     for snap in vm_snaps:
@@ -473,22 +473,22 @@ class StorageDisksWorker(QRunnable):
             lock = threading.Lock()
 
             def fetch_vm_config(vm):
-                vmid = vm.get("vmid")
-                vm_node = vm.get("node")
+                vmid = vm.vmid
+                vm_node = vm.node
                 if not vmid or not vm_node:
                     return
                 s = requests.Session()
                 try:
                     s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(vm_node, safe="")
-                    vm_type = vm.get("type", "qemu")
+                    vm_type = vm.vm_type.value
                     r = s.get(
                         f"{base}/nodes/{enc_node}/{vm_type}/{vmid}/config",
                         headers=headers, verify=_verify_ssl(self.host_cfg), timeout=10
                     )
                     _check_response(r)
                     config = r.json().get("data", {})
-                    vm_name = vm.get("name", "")
+                    vm_name = vm.name or ""
 
                     for key, val in config.items():
                         val_str = str(val)
@@ -514,7 +514,7 @@ class StorageDisksWorker(QRunnable):
                                         "volid": f"{self.storage_name}:{volid}",
                                         "bus": key,
                                         "size": size_bytes,
-                                        "host_name": vm.get("host_name", ""),
+                                        "host_name": vm.host_name,
                                         "node": vm_node,
                                     })
                 except Exception:

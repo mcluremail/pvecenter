@@ -49,13 +49,13 @@ class HostTabs:
         parts = []
         if not host_data:
             return parts
-        status = host_data.get("status", "")
+        status = host_data.status_value
         parts.append(status_text(status))
-        pve_ver = host_data.get("pveversion", "")
+        pve_ver = host_data.pve_version_raw or ""
         if pve_ver:
             ver = pve_ver.split("/")[1] if "/" in pve_ver else pve_ver
             parts.append("pve " + ver.split("-")[0] if "-" in ver else "pve " + ver)
-        uptime = host_data.get("uptime", 0)
+        uptime = host_data.uptime_seconds or 0
         if uptime:
             parts.append(_format_uptime(uptime) + " " + tr("uptime"))
         return parts
@@ -426,24 +426,23 @@ class HostTabs:
         panel.summary_stack.setCurrentIndex(0)
         card_items = []
         for node in hosts:
-            node_name = (node.display_name if hasattr(node, "display_name")
-                         else node.get("_display_name", "")) or node.get("node", "?")
-            host_name = node.get("host_name", "")
+            node_name = node.display_name or node.node or "?"
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster_rep"):
                 node_name = "★ " + node_name
-            status = node.get("status", "unknown")
+            status = node.status_value
             vms_count = sum(
                 1 for v in panel.all_vms
-                if v.get("node") == node.get("node")
-                and v.get("host_name") == host_name
+                if v.node == node.node
+                and v.host_name == host_name
             )
-            cpu_text = node.cpu_text if hasattr(node, "cpu_text") else f"{node.get('cpu_pct', 0)}%"
-            ram_text = node.ram_text if hasattr(node, "ram_text") else f"{node.get('mem_gib', 0)}/{node.get('maxmem_gib', 0)} GiB"
-            uptime_text = node.uptime_str if hasattr(node, "uptime_str") else node.get("uptime_str", "—")
+            cpu_text = node.cpu_text
+            ram_text = node.ram_text
+            uptime_text = node.uptime_str
             card_items.append({
-                "_key": f"{node.get('node', '')}@{host_name}",
-                "node": node.get("node", ""),
+                "_key": f"{node.node}@{host_name}",
+                "node": node.node,
                 "name": node_name,
                 "status": status,
                 "status_text": status_text(status),
@@ -458,11 +457,11 @@ class HostTabs:
     def _populate_vm_stats(self, vms):
         panel = self.panel
         total = len(vms)
-        running = sum(1 for v in vms if v.get("status") == "running")
+        running = sum(1 for v in vms if v.status_value == "running")
         stopped = total - running
         panel.card_vm_total.set_value(str(total))
         panel.card_vm_total.set_subtitle(f"{running} {tr('running')} · {stopped} {tr('stopped')}")
-        running_vms = [v for v in vms if v.get("status") == "running"]
+        running_vms = [v for v in vms if v.status_value == "running"]
         cpu_sum = sum(v.cpu_fraction for v in running_vms if hasattr(v, "cpu_fraction"))
         cpu_pct = round(cpu_sum * 100, 1) if cpu_sum else 0
         panel.card_vm_cpu.set_value(f"{cpu_pct}%")
@@ -484,15 +483,15 @@ class HostTabs:
         if first_cfg:
             cluster_name = first_cfg.get("cluster", "")
         vms = [vm for vm in panel.all_vms
-               if vm.get("node") in node_names and vm.get("host_name") in host_names]
+               if vm.node in node_names and vm.host_name in host_names]
         vms_running = sum(1 for v in vms if v.status.value == "running")
         vms_stopped = len(vms) - vms_running
         panel.card_cluster_hosts.set_value(f"{len(hosts)}")
-        running_hosts = sum(1 for h in hosts if h.get("status") == "online")
+        running_hosts = sum(1 for h in hosts if h.status_value == "online")
         panel.card_cluster_hosts.set_subtitle(f"{running_hosts} {tr('online')}")
         panel.card_cluster_vms.set_value(f"{vms_running}/{len(vms)}")
         panel.card_cluster_vms.set_subtitle(f"{vms_stopped} {tr('stopped')}")
-        online_hosts = [h for h in hosts if h.get("status") == "online"]
+        online_hosts = [h for h in hosts if h.status_value == "online"]
         n_online = len(online_hosts) or 1
         avg_cpu_pct = round(sum(h.cpu_pct for h in online_hosts) / n_online, 1)
         panel.card_cluster_cpu.set_value(f"{avg_cpu_pct}%")
@@ -505,12 +504,12 @@ class HostTabs:
         ram_pct = safe_pct(total_mem, total_maxmem)
         panel.card_cluster_ram.set_progress(ram_pct)
         if cluster_name:
-            cluster_storages = [s for s in panel.all_storages if s.get("cluster") == cluster_name]
+            cluster_storages = [s for s in panel.all_storages if s.cluster == cluster_name]
         else:
             cluster_storages = [s for s in panel.all_storages
-                                if s.get("node") in node_names]
-        total_used = sum(s.get("used", 0) or 0 for s in cluster_storages)
-        total_total = sum(s.get("total", 0) or 0 for s in cluster_storages)
+                                if s.node in node_names]
+        total_used = sum(s.used_bytes or 0 for s in cluster_storages)
+        total_total = sum(s.total_bytes or 0 for s in cluster_storages)
         used_gb = round(total_used / (1024**3), 1) if total_used else 0
         total_gb = round(total_total / (1024**3), 1) if total_total else 0
         panel.card_cluster_disk.set_value(f"{used_gb} / {total_gb} {tr('GiB')}")
@@ -549,24 +548,24 @@ class HostTabs:
         panel = self.panel
         clusters = {}
         for node in panel.all_nodes:
-            host_name = node.get("host_name", "")
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if cl and cl not in (False, None, "Standalone"):
                 clusters.setdefault(cl, {"hosts": [], "host_names": set(), "nodes": set()})
                 clusters[cl]["hosts"].append(node)
                 clusters[cl]["host_names"].add(host_name)
-                clusters[cl]["nodes"].add(node.get("node"))
+                clusters[cl]["nodes"].add(node.node)
         for cl in clusters.values():
             cl["vms"] = [vm for vm in panel.all_vms
-                         if vm.get("host_name") in cl["host_names"]]
+                         if vm.host_name in cl["host_names"]]
         cluster_items = []
         for cl_name, cl_data in sorted(clusters.items(), key=lambda x: x[0].lower()):
             hosts = cl_data["hosts"]
             vms = cl_data["vms"]
-            hosts_ok = sum(1 for h in hosts if h.get("status") == "online")
-            vms_ok = sum(1 for v in vms if v.get("status") == "running")
-            online_hosts = [h for h in hosts if h.get("status") == "online"]
+            hosts_ok = sum(1 for h in hosts if h.status_value == "online")
+            vms_ok = sum(1 for v in vms if v.status_value == "running")
+            online_hosts = [h for h in hosts if h.status_value == "online"]
             if online_hosts:
                 avg_cpu = round(sum(h.cpu_pct for h in online_hosts) / len(online_hosts), 1)
             else:
@@ -588,44 +587,43 @@ class HostTabs:
         panel = self.panel
         card_items = []
         def _sort_key(n):
-            host_name = n.get("host_name", "")
+            host_name = n.host_name
             cfg = panel._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             is_standalone = not cl or cl in (False, None, "Standalone")
-            return (1 if is_standalone else 0, cl or "", n.get("node", ""))
+            return (1 if is_standalone else 0, cl or "", n.node)
         # Only cluster nodes — standalone has its own folder
         cluster_nodes = []
         for node in panel.all_nodes:
-            host_name = node.get("host_name", "")
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if cl and cl not in (False, None, "Standalone"):
                 cluster_nodes.append(node)
         for node in sorted(cluster_nodes, key=_sort_key):
-            node_name = (node.display_name if hasattr(node, "display_name")
-                         else node.get("_display_name", "")) or node.get("node", "?")
-            host_name = node.get("host_name", "")
+            node_name = node.display_name or node.node or "?"
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             cluster_name = cfg.get("cluster", "") if cfg else ""
             if cluster_name in (None, "Standalone"):
                 cluster_name = tr("Standalone")
-            status = node.get("status", "unknown")
-            cpu_pct = node.cpu_pct if hasattr(node, "cpu_pct") else 0
+            status = node.status_value
+            cpu_pct = node.cpu_pct
             vms_count = sum(
                 1 for v in panel.all_vms
-                if v.get("node") == node.get("node")
-                and v.get("host_name") == host_name
+                if v.node == node.node
+                and v.host_name == host_name
             )
-            mem_gib = node.mem_gib if hasattr(node, "mem_gib") else 0
-            maxmem_gib = node.maxmem_gib if hasattr(node, "maxmem_gib") else 0
-            mem_pct = node.mem_pct if hasattr(node, "mem_pct") else 0
-            disk_gib = node.disk_gib if hasattr(node, "disk_gib") else 0
-            maxdisk_gib = node.maxdisk_gib if hasattr(node, "maxdisk_gib") else 0
-            uptime_str = node.uptime_str if hasattr(node, "uptime_str") else "—"
-            pve_text = node.pve_text if hasattr(node, "pve_text") else "—"
+            mem_gib = node.mem_gib
+            maxmem_gib = node.maxmem_gib
+            mem_pct = node.mem_pct
+            disk_gib = node.disk_gib
+            maxdisk_gib = node.maxdisk_gib
+            uptime_str = node.uptime_str
+            pve_text = node.pve_text
             card_items.append({
-                "_key": f"{node.get('node', '')}@{host_name}",
-                "node": node.get("node", ""),
+                "_key": f"{node.node}@{host_name}",
+                "node": node.node,
                 "name": node_name,
                 "status": status,
                 "cluster_text": cluster_name,
@@ -652,7 +650,7 @@ class HostTabs:
         panel.tabs.setCurrentIndex(TabIndex.SUMMARY)
         standalone = []
         for node in panel.all_nodes:
-            host_name = node.get("host_name", "")
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             cl = cfg.get("cluster") if cfg else None
             if not cl or cl in (False, None, "Standalone"):
@@ -664,7 +662,7 @@ class HostTabs:
         hosts = []
         cluster_cfg = None
         for node in panel.all_nodes:
-            host_name = node.get("host_name", "")
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster") == cluster_name:
                 hosts.append(node)
@@ -672,7 +670,7 @@ class HostTabs:
                     cluster_cfg = cfg
         panel.detail_label.setText(cluster_name)
         hosts_count = len(hosts)
-        running = sum(1 for h in hosts if h.get("status") == "online")
+        running = sum(1 for h in hosts if h.status_value == "online")
         panel.detail_sublabel.setText(f"{hosts_count} {tr('hosts')} · {running} {tr('online')}")
         panel.detail_sublabel.setVisible(True)
         panel._cluster_view_toggle.setVisible(False)
@@ -706,12 +704,12 @@ class HostTabs:
         panel = self.panel
         hosts = []
         for node in panel.all_nodes:
-            cfg = panel._cfg_by_name.get(node.get("host_name", ""))
+            cfg = panel._cfg_by_name.get(node.host_name)
             if cfg and (cfg.get("group") or "").strip() == group_name:
                 hosts.append(node)
         panel.detail_label.setText(group_name)
         hosts_count = len(hosts)
-        running = sum(1 for h in hosts if h.get("status") == "online")
+        running = sum(1 for h in hosts if h.status_value == "online")
         panel.detail_sublabel.setText(f"{hosts_count} {tr('hosts')} · {running} {tr('online')}")
         panel.detail_sublabel.setVisible(True)
         panel._cluster_view_toggle.setVisible(False)
@@ -735,20 +733,20 @@ class HostTabs:
     def show_host_info(self, host_name, host_data):
         panel = self.panel
         panel.cluster_quorum_widget.setVisible(False)
-        host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
+        host_cfg_name = (host_data.host_name if host_data else "") or host_name
         node = panel._node_repo.get(host_cfg_name, host_name) if panel._node_repo else None
         if node is None:
             node = host_data if host_data else None
-        display_name = node.get("_display_name") if node else host_name
+        display_name = node.display_name if node else host_name
         panel.detail_label.setText(display_name)
         panel.detail_sublabel.setText(" · ".join(self._host_subtitle(host_data, host_name)))
         panel.detail_sublabel.setVisible(True)
         panel._cluster_view_toggle.setVisible(False)
         panel.cluster_summary_cards.setVisible(False)
 
-        if host_data and host_data.get("status") == "error":
+        if host_data and host_data.status_value == "error":
             from ..utils import parse_pve_error
-            err = host_data.get("error", "")
+            err = host_data.error or ""
             reason = parse_pve_error(err)
             panel.info_label.setStyleSheet(f"font-size: 13px; color: {Color.STATUS_ERR}; padding: 40px 16px;")
             panel.info_label.setText(
@@ -797,24 +795,24 @@ class HostTabs:
         panel.host_health_loading.setText(tr("Loading..."))
         panel.host_health_list.set_items([])
 
-        if host_data and host_data.get("status") != "error":
+        if host_data and host_data.status_value != "error":
             from ._constants import _fmt_pveversion
-            host_cfg = panel._cfg_by_name.get(host_data.get("host_name", ""))
-            cpu_pct = host_data.get("cpu_pct", 0)
-            mem_gb = host_data.get("mem_gib", 0)
-            maxmem_gb = host_data.get("maxmem_gib", 0)
-            status = host_data.get("status", "")
+            host_cfg = panel._cfg_by_name.get(host_data.host_name)
+            cpu_pct = host_data.cpu_pct
+            mem_gb = host_data.mem_gib
+            maxmem_gb = host_data.maxmem_gib
+            status = host_data.status_value
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
             panel.card_status.set_title(tr("Status"))
             panel.card_status.set_value(status_text(status))
             panel.card_status.set_value_color(status_color)
             panel.card_status.set_subtitle(
-                tr("PVE") + " " + _fmt_pveversion(host_data.get("pveversion", "?"))
+                tr("PVE") + " " + _fmt_pveversion(host_data.pve_version_raw or "?")
             )
 
             panel.card_cpu.set_value(f"{cpu_pct}%")
-            cpu_sockets = host_data.get("sockets", "")
+            cpu_sockets = host_data.cpu_sockets or ""
             if cpu_sockets:
                 panel.card_cpu.set_subtitle(f"{cpu_sockets} {tr('sockets')}")
             else:
@@ -822,23 +820,23 @@ class HostTabs:
             panel.card_cpu.set_progress(cpu_pct)
 
             panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
-            panel.card_ram.set_progress(host_data.get("mem_pct", 0))
+            panel.card_ram.set_progress(host_data.mem_pct)
 
-            host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
+            host_cfg_name = (host_data.host_name if host_data else "") or host_name
             vms_count = sum(1 for v in panel.all_vms
-                           if v.get("node") == host_name
-                           and v.get("host_name") == host_cfg_name)
+                           if v.node == host_name
+                           and v.host_name == host_cfg_name)
             vms_running = sum(1 for v in panel.all_vms
-                              if v.get("node") == host_name
-                              and v.get("host_name") == host_cfg_name
-                              and v.get("status") == "running")
+                              if v.node == host_name
+                              and v.host_name == host_cfg_name
+                              and v.status_value == "running")
             panel.card_disk.set_title(tr("VMs"))
             panel.card_disk.set_value(f"{vms_running}/{vms_count}")
             panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
             panel.card_disk.set_progress(0)
 
             panel.card_net.set_title(tr("Uptime"))
-            panel.card_net.set_value(host_data.get("uptime_str", "—"))
+            panel.card_net.set_value(host_data.uptime_str)
             panel.card_net.set_subtitle("")
 
             panel.card_uptime.set_title(tr("Address"))
@@ -853,53 +851,53 @@ class HostTabs:
             panel.info_stack.setCurrentIndex(0)
             return
 
-        host_cfg_name = (host_data.get("host_name") if host_data else "") or host_name
+        host_cfg_name = (host_data.host_name if host_data else "") or host_name
         vms_of_host = [vm for vm in panel.all_vms
-                       if vm.get("node") == host_name
-                       and vm.get("host_name") == host_cfg_name]
+                       if vm.node == host_name
+                       and vm.host_name == host_cfg_name]
         card_items = []
         for vm in vms_of_host:
-            vm_status = str(vm.get("status", ""))
-            cpu_str = str(vm.get("cpu_pct", 0))
-            mem = vm.get("mem", 0) or 0
-            maxmem = vm.get("maxmem", 0) or 0
+            vm_status = vm.status_value
+            cpu_str = str(vm.cpu_pct)
+            mem = vm.mem_bytes or 0
+            maxmem = vm.maxmem_bytes or 0
             if maxmem:
                 mem_pct = round(mem / maxmem * 100, 1)
-                mem_gb = vm.get("mem_gib", round(mem / (1024**3), 2) if mem else 0)
-                maxmem_gb = vm.get("maxmem_gib", round(maxmem / (1024**3), 2) if maxmem else 0)
+                mem_gb = vm.mem_gib
+                maxmem_gb = vm.maxmem_gib
                 ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
             else:
                 ram_str = "—"
-            disk = vm.get("disk", 0) or 0
-            maxdisk = vm.get("maxdisk", 0) or 0
-            vm_type = vm.get("type", "qemu")
+            disk = vm.disk_bytes or 0
+            maxdisk = vm.maxdisk_bytes or 0
+            vm_type = vm.vm_type.value
             if maxdisk:
-                maxdisk_gb = vm.get("maxdisk_gib", round(maxdisk / (1024**3), 2))
+                maxdisk_gb = vm.maxdisk_gib
                 if vm_type == "lxc" and disk:
-                    disk_gb = vm.get("disk_gib", round(disk / (1024**3), 2) if disk else 0)
+                    disk_gb = vm.disk_gib
                     disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
                 else:
                     disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
             card_items.append({
-                "vmid": vm.get("vmid"),
-                "name": str(vm.get("name", "")),
+                "vmid": vm.vmid,
+                "name": str(vm.name or ""),
                 "status": vm_status,
                 "status_text": status_text(vm_status),
                 "cpu_text": cpu_str,
                 "ram_text": ram_str,
                 "disk_text": disk_str,
-                "uptime_text": vm.get("uptime_str", "—"),
+                "uptime_text": vm.uptime_str,
                 "host_name": host_cfg_name,
-                "node": vm.get("node", host_name),
+                "node": vm.node or host_name,
             })
         panel.host_vm_list.set_items(card_items)
         self._populate_vm_stats(vms_of_host)
 
         host_storages = [s for s in panel.all_storages
-                         if s.get("node") == host_name
-                         and s.get("host_name") == (host_data.get("host_name") if host_data else host_name)]
+                         if s.node == host_name
+                         and s.host_name == (host_data.host_name if host_data else host_name)]
         self.populate_host_storage_table(host_storages)
 
         self.fetch_host_network(host_name, host_data)
@@ -908,17 +906,17 @@ class HostTabs:
         self.fetch_host_snapshots(host_name, host_data)
         self.fetch_host_metrics(host_data)
         self.fetch_host_health(host_name, host_data)
-        host_cfg = panel._cfg_by_name.get(host_data.get("host_name", "")) if host_data else None
+        host_cfg = panel._cfg_by_name.get(host_data.host_name) if host_data else None
         if host_cfg:
             is_cluster_host = bool(host_cfg.get("cluster"))
             if not is_cluster_host:
-                panel._backup_jobs_host_cfg = host_data.get("host_name", "") if host_data else host_name
+                panel._backup_jobs_host_cfg = host_data.host_name if host_data else host_name
                 self._fetch_backup_jobs(host_cfg, host_name)
             else:
                 cluster_name = host_cfg.get("cluster", "")
                 cluster_cfg = None
                 for n in panel.all_nodes:
-                    cn = panel._cfg_by_name.get(n.get("host_name", ""))
+                    cn = panel._cfg_by_name.get(n.host_name)
                     if cn and cn.get("cluster") == cluster_name:
                         cluster_cfg = cn
                         break
@@ -928,7 +926,7 @@ class HostTabs:
             if is_cluster_host:
                 cluster_name = host_cfg.get("cluster", "")
                 for n in panel.all_nodes:
-                    cn = panel._cfg_by_name.get(n.get("host_name", ""))
+                    cn = panel._cfg_by_name.get(n.host_name)
                     if cn and cn.get("cluster") == cluster_name:
                         access_cfg = cn
                         break
@@ -940,16 +938,16 @@ class HostTabs:
         table = panel.host_storage_table
         table.setRowCount(len(storages))
         for i, st in enumerate(storages):
-            name_item = QTableWidgetItem(st.get("storage", st.get("id", "")))
+            name_item = QTableWidgetItem(st.storage or "")
             name_item.setIcon(get_icon("storage"))
             table.setItem(i, 0, name_item)
-            table.setItem(i, 1, QTableWidgetItem(st.get("type", "")))
-            content = st.get("content", "")
+            table.setItem(i, 1, QTableWidgetItem(st.storage_type))
+            content = st.content
             if isinstance(content, list):
                 content = ", ".join(content)
             table.setItem(i, 2, QTableWidgetItem(content))
-            used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 0
+            used = st.used_bytes or 0
+            total = st.total_bytes or 0
             used_gb = round(used / (1024**3), 1) if used else 0
             total_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
@@ -973,42 +971,42 @@ class HostTabs:
         panel = self.panel
         if not host_data:
             return
-        host_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
-        is_online = host_data.get("status") != "error"
+        host_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
+        is_online = host_data.status_value != "error"
 
         if is_online:
             from ._constants import _fmt_pveversion
             host_cfg = panel._cfg_by_name.get(host_cfg_name)
-            cpu_pct = host_data.get("cpu_pct", 0)
-            mem_gb = host_data.get("mem_gib", 0)
-            maxmem_gb = host_data.get("maxmem_gib", 0)
-            status = host_data.get("status", "")
+            cpu_pct = host_data.cpu_pct
+            mem_gb = host_data.mem_gib
+            maxmem_gb = host_data.maxmem_gib
+            status = host_data.status_value
             status_color = Color.STATUS_OK if status == "online" else Color.STATUS_ERR if status == "offline" else Color.STATUS_WARN
 
             panel.card_status.set_value(status_text(status))
             panel.card_status.set_value_color(status_color)
             panel.card_status.set_subtitle(
-                tr("PVE") + " " + _fmt_pveversion(host_data.get("pveversion", "?"))
+                tr("PVE") + " " + _fmt_pveversion(host_data.pve_version_raw or "?")
             )
 
             panel.card_cpu.set_value(f"{cpu_pct}%")
             panel.card_cpu.set_progress(cpu_pct)
 
             panel.card_ram.set_value(f"{mem_gb} / {maxmem_gb} {tr('GiB')}")
-            panel.card_ram.set_progress(host_data.get("mem_pct", 0))
+            panel.card_ram.set_progress(host_data.mem_pct)
 
             vms_count = sum(1 for v in panel.all_vms
-                           if v.get("node") == host_name
-                           and v.get("host_name") == host_cfg_name)
+                           if v.node == host_name
+                           and v.host_name == host_cfg_name)
             vms_running = sum(1 for v in panel.all_vms
-                              if v.get("node") == host_name
-                              and v.get("host_name") == host_cfg_name
-                              and v.get("status") == "running")
+                              if v.node == host_name
+                              and v.host_name == host_cfg_name
+                              and v.status_value == "running")
             panel.card_disk.set_value(f"{vms_running}/{vms_count}")
             panel.card_disk.set_subtitle(f"{vms_count - vms_running} {tr('stopped')}" if vms_count != vms_running else "")
 
-            panel.card_net.set_value(host_data.get("uptime_str", "—"))
+            panel.card_net.set_value(host_data.uptime_str)
 
             address = host_cfg.get("host", "") if host_cfg else ""
             panel.card_uptime.set_value(address)
@@ -1018,42 +1016,42 @@ class HostTabs:
             panel.info_stack.setCurrentIndex(1)
 
         vms_of_host = [vm for vm in panel.all_vms
-                       if vm.get("node") == host_name
-                       and vm.get("host_name") == host_cfg_name]
+                       if vm.node == host_name
+                       and vm.host_name == host_cfg_name]
         card_updates = []
         for vm in vms_of_host:
-            vm_status = str(vm.get("status", ""))
-            cpu_str = str(vm.get("cpu_pct", 0))
-            mem = vm.get("mem", 0) or 0
-            maxmem = vm.get("maxmem", 0) or 0
+            vm_status = vm.status_value
+            cpu_str = str(vm.cpu_pct)
+            mem = vm.mem_bytes or 0
+            maxmem = vm.maxmem_bytes or 0
             if maxmem:
                 mem_pct = round(mem / maxmem * 100, 1)
-                mem_gb = vm.get("mem_gib", round(mem / (1024**3), 2) if mem else 0)
-                maxmem_gb = vm.get("maxmem_gib", round(maxmem / (1024**3), 2) if maxmem else 0)
+                mem_gb = vm.mem_gib
+                maxmem_gb = vm.maxmem_gib
                 ram_str = f"{mem_gb}/{maxmem_gb} ({mem_pct}%)"
             else:
                 ram_str = "—"
-            disk = vm.get("disk", 0) or 0
-            maxdisk = vm.get("maxdisk", 0) or 0
-            vm_type = vm.get("type", "qemu")
+            disk = vm.disk_bytes or 0
+            maxdisk = vm.maxdisk_bytes or 0
+            vm_type = vm.vm_type.value
             if maxdisk:
-                maxdisk_gb = vm.get("maxdisk_gib", round(maxdisk / (1024**3), 2))
+                maxdisk_gb = vm.maxdisk_gib
                 if vm_type == "lxc" and disk:
-                    disk_gb = vm.get("disk_gib", round(disk / (1024**3), 2) if disk else 0)
+                    disk_gb = vm.disk_gib
                     disk_str = f"{disk_gb}/{maxdisk_gb} GiB"
                 else:
                     disk_str = f"{maxdisk_gb} GiB"
             else:
                 disk_str = "—"
             card_updates.append({
-                "vmid": vm.get("vmid"),
-                "name": str(vm.get("name", "")),
+                "vmid": vm.vmid,
+                "name": str(vm.name or ""),
                 "status": vm_status,
                 "status_text": status_text(vm_status),
                 "cpu_text": cpu_str,
                 "ram_text": ram_str,
                 "disk_text": disk_str,
-                "uptime_text": vm.get("uptime_str", "—"),
+                "uptime_text": vm.uptime_str,
             })
         panel.host_vm_list.update_all(card_updates)
 
@@ -1063,25 +1061,24 @@ class HostTabs:
             return
         card_updates = []
         for node in hosts:
-            node_name = (node.display_name if hasattr(node, "display_name")
-                         else node.get("_display_name", "")) or node.get("node", "?")
-            host_name = node.get("host_name", "")
+            node_name = node.display_name or node.node or "?"
+            host_name = node.host_name
             cfg = panel._cfg_by_name.get(host_name)
             if cfg and cfg.get("cluster_rep"):
                 node_name = "★ " + node_name
-            status = node.get("status", "unknown")
-            cpu_pct = node.cpu_pct if hasattr(node, "cpu_pct") else 0
+            status = node.status_value
+            cpu_pct = node.cpu_pct
             mem_gb = node.mem_gib if hasattr(node, "mem_gib") else 0
             maxmem_gb = node.maxmem_gib if hasattr(node, "maxmem_gib") else 0
-            uptime_str = node.uptime_str if hasattr(node, "uptime_str") else "—"
+            uptime_str = node.uptime_str
             vms_count = sum(
                 1 for v in panel.all_vms
-                if v.get("node") == node.get("node")
-                and v.get("host_name") == host_name
+                if v.node == node.node
+                and v.host_name == host_name
             )
             card_updates.append({
-                "_key": f"{node.get('node', '')}@{host_name}",
-                "node": node.get("node", ""),
+                "_key": f"{node.node}@{host_name}",
+                "node": node.node,
                 "name": node_name,
                 "status": status,
                 "status_text": status_text(status),
@@ -1095,8 +1092,8 @@ class HostTabs:
 
     def fetch_host_network(self, host_name, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_network_stack.widget(0).setText(tr("No data"))
@@ -1173,8 +1170,8 @@ class HostTabs:
 
     def fetch_host_services(self, host_name, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_services_stack.widget(0).setText(tr("No data"))
@@ -1225,8 +1222,8 @@ class HostTabs:
 
     def fetch_host_health(self, host_name, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_health_stack.widget(0).setText(tr("No data"))
@@ -1281,8 +1278,8 @@ class HostTabs:
 
     def fetch_host_disks(self, host_name, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_disks_stack.widget(0).setText(tr("No data"))
@@ -1346,15 +1343,15 @@ class HostTabs:
 
     def fetch_host_snapshots(self, host_name, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         panel._snap_nav_ctx = (host_cfg_name, node_name)
         cfg = panel._cfg_by_name.get(host_cfg_name)
         if not cfg:
             panel.host_snapshots_stack.widget(0).setText(tr("No data"))
             panel.host_snapshots_stack.setCurrentIndex(0)
             return
-        vms = [vm for vm in panel.all_vms if vm.get("node") == host_name and vm.get("host_name") == host_cfg_name]
+        vms = [vm for vm in panel.all_vms if vm.node == host_name and vm.host_name == host_cfg_name]
         from ..api.metrics import HostSnapshotsWorker
         worker = HostSnapshotsWorker(cfg, node_name, vms)
         worker.signals.snapshots_ready.connect(
@@ -1460,8 +1457,8 @@ class HostTabs:
 
     def fetch_host_metrics(self, host_data):
         panel = self.panel
-        node_name = host_data.get("node", "")
-        host_cfg_name = host_data.get("host_name", "")
+        node_name = host_data.node or ""
+        host_cfg_name = host_data.host_name or ""
         cfg = panel._cfg_by_name.get(host_cfg_name)
         panel.metrics_widget.show_disk_io(False)
         if not cfg:
@@ -1546,21 +1543,21 @@ class HostTabs:
 
     def _populate_cluster_vms(self, cluster_name, hosts):
         panel = self.panel
-        host_names = {h.get("host_name", "") for h in hosts}
-        node_names = {h.get("node", "") for h in hosts}
+        host_names = {h.host_name for h in hosts}
+        node_names = {h.node for h in hosts}
         vms = [vm for vm in panel.all_vms
-               if vm.get("node") in node_names
-               and vm.get("host_name") in host_names]
+               if vm.node in node_names
+               and vm.host_name in host_names]
         card_items = []
         for vm in vms:
-            vmid = vm.get("vmid", "")
-            name = vm.get("name", "") or f"VM {vmid}"
-            status = vm.get("status", "")
-            cpu_pct = vm.cpu_pct if hasattr(vm, "cpu_pct") else 0
-            mem_gib = vm.mem_gib if hasattr(vm, "mem_gib") else 0
-            maxmem_gib = vm.maxmem_gib if hasattr(vm, "maxmem_gib") else 0
-            disk_gib = vm.disk_gib if hasattr(vm, "disk_gib") else 0
-            uptime_str = vm.uptime_str if hasattr(vm, "uptime_str") else "—"
+            vmid = vm.vmid
+            name = vm.name or f"VM {vmid}"
+            status = vm.status_value
+            cpu_pct = vm.cpu_pct
+            mem_gib = vm.mem_gib
+            maxmem_gib = vm.maxmem_gib
+            disk_gib = vm.disk_gib
+            uptime_str = vm.uptime_str
             card_items.append({
                 "vmid": vmid,
                 "name": name,
@@ -1570,41 +1567,41 @@ class HostTabs:
                 "ram_text": f"{mem_gib}/{maxmem_gib} GiB",
                 "disk_text": f"{disk_gib} GiB",
                 "uptime_text": uptime_str,
-                "host_name": vm.get("host_name", ""),
-                "node": vm.get("node", ""),
+                "host_name": vm.host_name or "",
+                "node": vm.node or "",
             })
         panel.host_vm_list.set_items(card_items)
         self._populate_vm_stats(vms)
 
     def _populate_cluster_storages(self, cluster_name):
         panel = self.panel
-        storages = [s for s in panel.all_storages if s.get("cluster") == cluster_name]
+        storages = [s for s in panel.all_storages if s.cluster == cluster_name]
         if not storages:
-            cluster_host_names = {h.get("host_name") for h in panel.all_nodes
-                                  if panel._cfg_by_name.get(h.get("host_name", ""), {}).get("cluster") == cluster_name}
+            cluster_host_names = {h.host_name for h in panel.all_nodes
+                                  if (panel._cfg_by_name.get(h.host_name) or {}).get("cluster") == cluster_name}
             storages = [s for s in panel.all_storages
-                        if not s.get("cluster")
-                        and s.get("node") in {h.get("node") for h in panel.all_nodes
-                                              if h.get("host_name") in cluster_host_names}
-                        and s.get("host_name") in cluster_host_names]
+                        if not s.cluster
+                        and s.node in {h.node for h in panel.all_nodes
+                                              if h.host_name in cluster_host_names}
+                        and s.host_name in cluster_host_names]
         card_items = []
         seen = set()
         for st in storages:
-            name = st.get("storage", st.get("id", ""))
+            name = st.storage or ""
             if not name or name in seen:
                 continue
             seen.add(name)
-            content = st.get("content", "")
+            content = st.content
             if isinstance(content, list):
                 content = ", ".join(content)
-            used = st.get("used", 0) or 0
-            total = st.get("total", 0) or 0
+            used = st.used_bytes or 0
+            total = st.total_bytes or 0
             used_gb = round(used / (1024**3), 1) if used else 0
             total_gb = round(total / (1024**3), 1) if total else 0
             pct = safe_pct(used, total)
             card_items.append({
                 "name": name,
-                "type_text": st.get("type", ""),
+                "type_text": st.storage_type,
                 "content_text": content,
                 "location_text": cluster_name,
                 "used_text": f"{used_gb} GiB",
@@ -1647,13 +1644,13 @@ class HostTabs:
         panel.host_snapshots_loading.setText(tr("Loading..."))
         panel.host_snapshots_tree.clear()
         for host in hosts:
-            node_name = host.get("node", "")
-            host_cfg_name = host.get("host_name", "")
+            node_name = host.node or ""
+            host_cfg_name = host.host_name or ""
             cfg = panel._cfg_by_name.get(host_cfg_name)
             if not cfg:
                 continue
             vms = [vm for vm in panel.all_vms
-                   if vm.get("node") == node_name and vm.get("host_name") == host_cfg_name]
+                   if vm.node == node_name and vm.host_name == host_cfg_name]
             from ..api.metrics import HostSnapshotsWorker
             worker = HostSnapshotsWorker(cfg, node_name, vms)
             worker.signals.snapshots_ready.connect(
@@ -1717,14 +1714,14 @@ class HostTabs:
         panel._cluster_health_collected = []
         panel._cluster_health_total = 0
         panel._cluster_health_done = 0
-        pending = [h for h in hosts if h.get("status") != "error"]
+        pending = [h for h in hosts if h.status_value != "error"]
         if not pending:
             panel.host_health_loading.setText(tr("No data"))
             return
         panel._cluster_health_total = len(pending)
         for host in pending:
-            node_name = host.get("node", "")
-            host_cfg_name = host.get("host_name", "")
+            node_name = host.node or ""
+            host_cfg_name = host.host_name or ""
             cfg = panel._cfg_by_name.get(host_cfg_name)
             if not cfg:
                 panel._cluster_health_done += 1
@@ -1790,8 +1787,8 @@ class HostTabs:
     def _detect_pve_major(self, cfg_or_host):
         if isinstance(cfg_or_host, dict):
             for node in self.panel.all_nodes:
-                if node.get("host_name") == cfg_or_host.get("name", ""):
-                    pvever = node.get("pveversion", "")
+                if node.host_name == cfg_or_host.get("name", ""):
+                    pvever = node.pve_version_raw or ""
                     if pvever:
                         v = pvever.split("/")[1] if "/" in pvever else pvever
                         major = v.split(".")[0]
@@ -1868,12 +1865,12 @@ class HostTabs:
         panel = self.panel
         ctx = getattr(panel, "_backup_jobs_context", "")
         if panel.current_obj_type == "cluster":
-            return [s for s in panel.all_storages if s.get("cluster") == ctx]
+            return [s for s in panel.all_storages if s.cluster == ctx]
         elif panel.current_obj_type == "host":
             host_cfg = getattr(panel, "_backup_jobs_host_cfg", "") or ctx
             return [s for s in panel.all_storages
-                    if s.get("node") == ctx
-                    and s.get("host_name") == host_cfg]
+                    if s.node == ctx
+                    and s.host_name == host_cfg]
         return panel.all_storages
 
     def _on_add_backup_job(self):
@@ -1993,9 +1990,9 @@ class HostTabs:
         host_data = panel.current_obj_data
         if not host_data:
             return None, None
-        host_name = host_data.get("host_name", "") or host_data.get("node", "")
+        host_name = host_data.host_name or host_data.node
         cfg = panel._cfg_by_name.get(host_name)
-        node_name = host_data.get("node", "") or host_name
+        node_name = host_data.node or host_name
         return cfg, node_name
 
     def _on_network_add(self):
@@ -2010,7 +2007,7 @@ class HostTabs:
         worker = NetworkCreateWorker(cfg, node_name, params)
         worker.signals.result.connect(lambda msg, w=worker: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2044,7 +2041,7 @@ class HostTabs:
         worker = NetworkUpdateWorker(cfg, node_name, iface_name, params)
         worker.signals.result.connect(lambda msg, w=worker: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2076,7 +2073,7 @@ class HostTabs:
         worker = NetworkDeleteWorker(cfg, node_name, iface_name)
         worker.signals.result.connect(lambda msg, w=worker: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2101,7 +2098,7 @@ class HostTabs:
         worker = NetworkApplyWorker(cfg, node_name)
         worker.signals.result.connect(lambda msg, w=worker: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -2126,7 +2123,7 @@ class HostTabs:
         worker = NetworkRevertWorker(cfg, node_name)
         worker.signals.result.connect(lambda msg, w=worker: (
             panel.config_update_result.emit(msg),
-            self.fetch_host_network(panel.current_obj_data.get("host_name", ""), panel.current_obj_data),
+            self.fetch_host_network(panel.current_obj_data.host_name, panel.current_obj_data),
             panel._workers_mgr.discard_worker(w),
         ))
         worker.signals.error.connect(lambda err, w=worker: (
@@ -3591,7 +3588,7 @@ class HostTabs:
 
         vms = []
         for vm in panel.all_vms:
-            host_name = vm.get("host_name", "")
+            host_name = vm.host_name or ""
             if host_name:
                 cfg = panel._cfg_by_name.get(host_name)
                 if cfg and cfg.get("cluster"):
@@ -3606,9 +3603,9 @@ class HostTabs:
         layout = QFormLayout(dlg)
 
         vm_combo = QComboBox()
-        for vm in sorted(vms, key=lambda v: v.get("vmid", 0)):
-            vmid = vm.get("vmid", "?")
-            name = vm.get("name", "")
+        for vm in sorted(vms, key=lambda v: v.vmid):
+            vmid = vm.vmid or "?"
+            name = vm.name or ""
             label = f"vm:{vmid}" if not name else f"{name} (vm:{vmid})"
             vm_combo.addItem(label, f"vm:{vmid}")
         layout.addRow(tr("VM:"), vm_combo)

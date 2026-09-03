@@ -112,8 +112,8 @@ class CreateVmDialog(QDialog):
         self.setWindowTitle(tr("Create Virtual Machine"))
         self.setMinimumSize(700, 400)
         self.setMaximumWidth(780)
-        self._nodes = sorted(nodes or [], key=lambda n: (not n.get("_is_cluster", False),
-                                        (n.get("_display_name") or n.get("node", "")).lower()))
+        self._nodes = sorted(nodes or [], key=lambda n: (not n.is_cluster,
+                                        (n.display_name or n.node).lower()))
         self._storages = storages or []
         self._pools = pools or []
         self._iso_images = iso_images or {}
@@ -227,8 +227,8 @@ class CreateVmDialog(QDialog):
         g1.addWidget(QLabel(tr("Node:")), 0, 0, Qt.AlignRight | Qt.AlignVCenter)
         self.node_combo = QComboBox()
         for n in self._nodes:
-            label = n.get("_display_name") or n.get("node", "?")
-            self.node_combo.addItem(label, (n.get("node", ""), n.get("host_name", "")))
+            label = n.display_name or n.node or "?"
+            self.node_combo.addItem(label, (n.node, n.host_name))
         self.node_combo.currentIndexChanged.connect(self._on_node_changed)
         g1.addWidget(self.node_combo, 0, 1)
         g1.addWidget(QLabel(tr("VM ID:")), 0, 2, Qt.AlignRight | Qt.AlignVCenter)
@@ -454,8 +454,8 @@ class CreateVmDialog(QDialog):
             return
         node, host_name = data if isinstance(data, tuple) else (data, "")
         node_storages = [s for s in self._storages
-                         if s.get("node") == node
-                         and s.get("host_name") == host_name]
+                         if s.node == node
+                         and s.host_name == host_name]
         if not node_storages:
             node_storages = self._storages
 
@@ -463,7 +463,7 @@ class CreateVmDialog(QDialog):
             combo.clear()
             seen = set()
             for s in node_storages:
-                name = s.get("storage", "")
+                name = s.storage
                 if name not in seen:
                     seen.add(name)
                     combo.addItem(name, name)
@@ -474,8 +474,8 @@ class CreateVmDialog(QDialog):
         for i in range(self.storage_combo.count()):
             name = self.storage_combo.itemText(i)
             if any(
-                "images" in (s.get("content", "") or "").split(",")
-                for s in node_storages if s.get("storage") == name
+                "images" in s.content_list
+                for s in node_storages if s.storage == name
             ):
                 self.storage_combo.setCurrentIndex(i)
                 break

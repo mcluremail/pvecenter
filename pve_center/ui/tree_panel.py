@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import load_ui_state, save_ui_state
+from ..domain import Node, NodeStatus, VmStatus, VmType
 from .i18n import tr
 from .icons import get_icon, init_icons, make_loading_icon
 from .theme import Color
@@ -32,19 +33,14 @@ ITEM_KEY_ROLE = Qt.UserRole + 2
 
 def _vm_count_str(vms):
     total = len(vms)
-    running = sum(1 for v in vms if v.get("status") == "running")
+    running = sum(1 for v in vms if v.status is VmStatus.RUNNING)
     return f"[{running}/{total}]"
 
 
 def _node_tooltip(node):
-    cpu = node.get("cpu", 0)
-    if isinstance(cpu, float):
-        cpu = round(cpu * 100, 1)
-    mem = node.get("mem", 0) or 0
-    maxmem = node.get("maxmem", 0) or 0
-    mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem else 0
-    uptime = node.get("uptime", 0)
-    uptime_str = str(timedelta(seconds=int(uptime))) if uptime else "?"
+    cpu = node.cpu_pct
+    mem_pct = node.mem_pct
+    uptime_str = str(timedelta(seconds=int(node.uptime_seconds))) if node.uptime_seconds else "?"
     return tr("CPU") + f": {cpu}%\n" + tr("RAM") + f": {mem_pct}%\n" + tr("Uptime") + f": {uptime_str}"
 
 
@@ -275,9 +271,9 @@ class TreePanel(QWidget):
                 "QMenu::item { padding: 4px 12px; }"
                 f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
             )
-            vm_status = vm.get("status", "") if vm else ""
-            is_template = bool(vm and vm.get("template"))
-            is_qemu = vm and vm.get("type", "qemu") == "qemu"
+            vm_status = vm.status_value if vm else ""
+            is_template = bool(vm and vm.template)
+            is_qemu = vm is not None and vm.vm_type is VmType.QEMU
             selected_vm_keys = self.selected_vm_keys()
             if len(selected_vm_keys) > 1:
                 for act_key, act_label in [("start", tr("Start all")),
@@ -392,8 +388,8 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name = key[2] if len(key) > 2 else ""
             if not host_name:
-                host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
-                host_name = host.get("host_name", "") if host else ""
+                host = next((n for n in self.all_nodes if n.node == item_name), None)
+                host_name = host.host_name if host else ""
             if host_name:
                 create_vm_action = QAction(tr("Create VM"), self.tree)
                 create_vm_action.setIcon(get_icon("vm"))
@@ -402,7 +398,7 @@ class TreePanel(QWidget):
                 )
                 menu.addAction(create_vm_action)
                 templates = [vm for vm in self.all_vms
-                             if vm.get("template") and vm.get("host_name") == host_name]
+                             if vm.template and vm.host_name == host_name]
                 if templates:
                     clone_from_tmpl = QAction(tr("Clone from Template"), self.tree)
                     clone_from_tmpl.setIcon(get_icon("template"))
@@ -616,22 +612,16 @@ class TreePanel(QWidget):
 
     def _add_vm_item(self, parent, vm):
         vm_item = QTreeWidgetItem(parent)
-        vm_name = vm.get("name") or f"VM {vm.get('vmid')}"
+        vm_name = vm.name or f"VM {vm.vmid}"
         vm_item.setText(0, vm_name)
-        if vm.get("template"):
+        if vm.template:
             vm_item.setIcon(0, get_icon("template"))
         else:
-            vm_item.setIcon(0, get_icon("vm", vm.get("status")))
-        vm_item.setData(0, VM_KEY_ROLE, (vm.get("host_name", ""), vm.get("vmid", 0), vm.get("node", "")))
-        cpu = vm.get("cpu", 0)
-        if isinstance(cpu, float):
-            cpu_pct = round(cpu * 100, 1)
-        else:
-            cpu_pct = cpu
-        mem = vm.get("mem", 0) or 0
-        maxmem = vm.get("maxmem", 0) or 0
-        mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem else 0
-        status = vm.get("status", "")
+            vm_item.setIcon(0, get_icon("vm", vm.status_value))
+        vm_item.setData(0, VM_KEY_ROLE, (vm.host_name, vm.vmid, vm.node))
+        cpu_pct = vm.cpu_pct
+        mem_pct = vm.mem_pct
+        status = vm.status_value
         vm_item.setToolTip(0, tr("Status") + f": {status_text(status)}\n" + tr("CPU") + f": {cpu_pct}%\n" + tr("RAM") + f": {mem_pct}%")
         return vm_item
 
@@ -689,28 +679,28 @@ class TreePanel(QWidget):
             cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
             cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
             return cl_item
-        cluster_host_names = {n.get("host_name") for n in nodes_in_cl}
+        cluster_host_names = {n.host_name for n in nodes_in_cl}
         vms_in_cl = [vm for vm in self.all_vms
-                     if vm.get("node") in {n.get("node") for n in nodes_in_cl}
-                     and vm.get("host_name") in cluster_host_names]
+                     if vm.node in {n.node for n in nodes_in_cl}
+                     and vm.host_name in cluster_host_names]
         cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
         cl_item.setIcon(0, get_icon("cluster"))
         cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
 
-        for node in sorted(nodes_in_cl, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
-            node_name = node.get("node", "?")
-            display_name = node.get("_display_name") or node_name
-            vms_on_node = [vm for vm in vms_in_cl if vm.get("node") == node_name and vm.get("host_name") == node.get("host_name")]
+        for node in sorted(nodes_in_cl, key=lambda n: (n.display_name or n.node).lower()):
+            node_name = node.node
+            display_name = node.display_name or node_name
+            vms_on_node = [vm for vm in vms_in_cl if vm.node == node_name and vm.host_name == node.host_name]
             host_item = QTreeWidgetItem(cl_item)
             host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_node)}")
-            host_item.setIcon(0, get_icon("host", node.get("status")))
-            host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.get("host_name", "")))
+            host_item.setIcon(0, get_icon("host", node.status_value))
+            host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.host_name))
             host_item.setToolTip(0, _node_tooltip(node))
 
         pool_groups = defaultdict(list)
         no_pool_vms = []
         for vm in vms_in_cl:
-            pool = vm.get("pool")
+            pool = vm.pool
             if pool and pool not in ("", "No pool"):
                 pool_groups[pool].append(vm)
             else:
@@ -723,36 +713,36 @@ class TreePanel(QWidget):
             pool_item.setIcon(0, get_icon("pool"))
             pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
 
-            for vm in sorted(vms_list, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+            for vm in sorted(vms_list, key=lambda v: (v.name or f"VM {v.vmid}").lower()):
                 self._add_vm_item(pool_item, vm)
 
-        for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+        for vm in sorted(no_pool_vms, key=lambda v: (v.name or f"VM {v.vmid}").lower()):
             self._add_vm_item(cl_item, vm)
         return cl_item
 
     def _make_host_item(self, parent, node):
         """Create a standalone host item (with pools and VMs) under parent."""
-        node_name = node.get("node", "?")
-        display_name = node.get("_display_name") or node_name
-        host_name = node.get("host_name", "")
+        node_name = node.node
+        display_name = node.display_name or node_name
+        host_name = node.host_name
         vms_on_host = [vm for vm in self.all_vms
-                       if vm.get("node") == node_name
-                       and vm.get("host_name") == host_name]
+                       if vm.node == node_name
+                       and vm.host_name == host_name]
         host_item = QTreeWidgetItem(parent)
-        if node.get("status") == "loading":
+        if node.status is NodeStatus.LOADING:
             host_item.setText(0, display_name)
             host_item.setIcon(0, make_loading_icon(self._spinner_angle))
             host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
             return host_item
         host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
-        host_item.setIcon(0, get_icon("host", node.get("status")))
+        host_item.setIcon(0, get_icon("host", node.status_value))
         host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
         host_item.setToolTip(0, _node_tooltip(node))
 
         pool_groups = defaultdict(list)
         no_pool_vms = []
         for vm in vms_on_host:
-            pool = vm.get("pool")
+            pool = vm.pool
             if pool and pool not in ("", "No pool"):
                 pool_groups[pool].append(vm)
             else:
@@ -764,10 +754,10 @@ class TreePanel(QWidget):
             pool_item.setIcon(0, get_icon("pool"))
             pool_item.setData(0, ITEM_KEY_ROLE, ("pool", pool_name))
 
-            for vm in sorted(pool_groups[pool_name], key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+            for vm in sorted(pool_groups[pool_name], key=lambda v: (v.name or f"VM {v.vmid}").lower()):
                 self._add_vm_item(pool_item, vm)
 
-        for vm in sorted(no_pool_vms, key=lambda v: (v.get("name") or f"VM {v.get('vmid')}").lower()):
+        for vm in sorted(no_pool_vms, key=lambda v: (v.name or f"VM {v.vmid}").lower()):
             self._add_vm_item(host_item, vm)
         return host_item
 
@@ -795,7 +785,7 @@ class TreePanel(QWidget):
         group_standalone = defaultdict(list)   # group -> [nodes]
 
         for node in self.all_nodes:
-            host_name = node.get("host_name", "")
+            host_name = node.host_name
             cfg = self._cfg_by_name.get(host_name)
             cluster_name = cfg.get("cluster") if cfg else None
             if cluster_name and cluster_name not in (False, None, "Standalone"):
@@ -827,8 +817,8 @@ class TreePanel(QWidget):
                     if f"cluster:{cluster_name}" not in self._loading_hosts:
                         self._loading_hosts.add(f"cluster:{cluster_name}")
 
-        standalone_names = {n.get("host_name", "") for n in standalone_nodes}
-        grouped_standalone_names = {n.get("host_name", "") for nodes in group_standalone.values() for n in nodes}
+        standalone_names = {n.host_name for n in standalone_nodes}
+        grouped_standalone_names = {n.host_name for nodes in group_standalone.values() for n in nodes}
         for cfg in self.nodes_cfg:
             if cfg.get("skip"):
                 continue
@@ -839,28 +829,18 @@ class TreePanel(QWidget):
             g = host_group.get(host_name)
             if g:
                 if host_name not in grouped_standalone_names:
-                    group_standalone[g].append({
-                        "node": host_name,
-                        "host_name": host_name,
-                        "_display_name": host_name,
-                        "status": "loading",
-                    })
+                    group_standalone[g].append(Node.loading_stub(host_name))
                     self._loading_hosts.add(host_name)
                     grouped_standalone_names.add(host_name)
                 continue
             if host_name not in standalone_names:
-                standalone_nodes.append({
-                    "node": host_name,
-                    "host_name": host_name,
-                    "_display_name": host_name,
-                    "status": "loading",
-                })
+                standalone_nodes.append(Node.loading_stub(host_name))
                 self._loading_hosts.add(host_name)
 
         for node in self.all_nodes:
-            hn = node.get("host_name", "")
+            hn = node.host_name
             self._loading_hosts.discard(hn)
-            if node.get("_is_cluster"):
+            if node.is_cluster:
                 cfg = self._cfg_by_name.get(hn)
                 if cfg:
                     cl_name = cfg.get("cluster", "")
@@ -874,13 +854,13 @@ class TreePanel(QWidget):
             g_item.setData(0, ITEM_KEY_ROLE, ("group", g))
             g_nodes = group_standalone.get(g, [])
             g_cl_nodes = [n for nodes in group_clusters.get(g, {}).values() for n in nodes]
-            g_host_names = {n.get("host_name") for n in g_nodes + g_cl_nodes}
-            g_vms = [vm for vm in self.all_vms if vm.get("host_name") in g_host_names]
+            g_host_names = {n.host_name for n in g_nodes + g_cl_nodes}
+            g_vms = [vm for vm in self.all_vms if vm.host_name in g_host_names]
             g_item.setText(0, f"{g}  {_vm_count_str(g_vms)}")
             g_item.setIcon(0, get_icon("folder"))
             for cl_name in sorted(group_clusters.get(g, {}), key=str.lower):
                 self._make_cluster_item(g_item, cl_name, group_clusters[g][cl_name])
-            for node in sorted(g_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
+            for node in sorted(g_nodes, key=lambda n: (n.display_name or n.node).lower()):
                 self._make_host_item(g_item, node)
 
         cluster_folder = self._make_section_item(self.tree, tr("Clusters"))
@@ -891,7 +871,7 @@ class TreePanel(QWidget):
                 self._make_cluster_item(cluster_folder, cluster_name, cluster_nodes[cluster_name])
 
         if standalone_nodes:
-            for node in sorted(standalone_nodes, key=lambda n: (n.get("_display_name") or n.get("node", "")).lower()):
+            for node in sorted(standalone_nodes, key=lambda n: (n.display_name or n.node).lower()):
                 self._make_host_item(standalone_folder, node)
 
         if self.all_storages:
@@ -900,7 +880,7 @@ class TreePanel(QWidget):
             cluster_storages = defaultdict(list)
             standalone_storages = []
             for st in self.all_storages:
-                cluster = st.get("cluster")
+                cluster = st.cluster
                 if cluster:
                     cluster_storages[cluster].append(st)
                 else:
@@ -915,7 +895,7 @@ class TreePanel(QWidget):
 
                 seen_names = set()
                 for st in cluster_storages[cluster_name]:
-                    sname = st.get("storage", "")
+                    sname = st.storage
                     if sname not in seen_names:
                         seen_names.add(sname)
                         si = QTreeWidgetItem(cl_item)
@@ -932,8 +912,8 @@ class TreePanel(QWidget):
 
                 seen_keys = set()
                 for st in standalone_storages:
-                    sname = st.get("storage", "")
-                    shost = st.get("host_name", "")
+                    sname = st.storage
+                    shost = st.host_name
                     key = (sname, shost)
                     if key not in seen_keys:
                         seen_keys.add(key)
@@ -958,9 +938,9 @@ class TreePanel(QWidget):
         self.all_nodes = all_nodes
         self._node_repo = node_repo or self._node_repo
         for node in list(all_nodes):
-            hn = node.get("host_name", "")
+            hn = node.host_name
             self._loading_hosts.discard(hn)
-            if node.get("_is_cluster"):
+            if node.is_cluster:
                 cfg = self._cfg_by_name.get(hn)
                 if cfg:
                     cluster_name = cfg.get("cluster", "")
@@ -977,10 +957,10 @@ class TreePanel(QWidget):
                 host_name, vmid, _node = vm_key
                 vm = self._vm_repo.get(host_name, vmid) if self._vm_repo else None
                 if vm:
-                    if vm.get("template"):
+                    if vm.template:
                         item.setIcon(0, get_icon("template"))
                     else:
-                        item.setIcon(0, get_icon("vm", vm.get("status")))
+                        item.setIcon(0, get_icon("vm", vm.status_value))
             else:
                 key = item.data(0, ITEM_KEY_ROLE)
                 if key and isinstance(key, tuple) and key[0] == "host":
@@ -989,9 +969,9 @@ class TreePanel(QWidget):
                     if hn:
                         host = self._node_repo.get(hn, node_name) if self._node_repo else None
                     else:
-                        host = next((n for n in self.all_nodes if n.get("node") == node_name), None)
+                        host = next((n for n in self.all_nodes if n.node == node_name), None)
                     if host:
-                        item.setIcon(0, get_icon("host", host.get("status")))
+                        item.setIcon(0, get_icon("host", host.status_value))
             it += 1
 
     @staticmethod
@@ -1119,8 +1099,8 @@ class TreePanel(QWidget):
         if item_type == "host":
             host_name = key[2] if len(key) > 2 else ""
             if not host_name:
-                host = next((n for n in self.all_nodes if n.get("node") == item_name), None)
-                host_name = host.get("host_name", "") if host else ""
+                host = next((n for n in self.all_nodes if n.node == item_name), None)
+                host_name = host.host_name if host else ""
             if host_name:
                 self.host_remove_requested.emit("host", host_name)
         elif item_type in ("cluster", "section"):
@@ -1134,7 +1114,7 @@ class TreePanel(QWidget):
             host_name, vmid, _node = vm_key
             vm = self._vm_repo.get(host_name, vmid) if self._vm_repo else None
             if vm is not None:
-                self.item_selected.emit("vm", vm.get("name") or f"VM {vmid}", vm)
+                self.item_selected.emit("vm", vm.name or f"VM {vmid}", vm)
                 return
             self.item_selected.emit("unknown", str(vmid), {})
             return
@@ -1170,9 +1150,9 @@ class TreePanel(QWidget):
                 host_data = self._node_repo.get(host_name_key, item_name) if self._node_repo else None
                 if host_data is None:
                     host_data = next((n for n in self.all_nodes
-                                      if n.get("host_name") == host_name_key), None)
+                                      if n.host_name == host_name_key), None)
             else:
-                host_data = next((n for n in self.all_nodes if n.get("node") == item_name), None)
+                host_data = next((n for n in self.all_nodes if n.node == item_name), None)
             self.item_selected.emit("host", item_name, host_data or {})
             return
 

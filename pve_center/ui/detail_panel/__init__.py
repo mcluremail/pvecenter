@@ -3,6 +3,7 @@ import logging
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
+from ...domain import VmStatus, VmType
 from ..i18n import tr
 from ..icons import get_icon
 from ..object_id import HostId, StorageId, VmId
@@ -323,11 +324,11 @@ class DetailPanel(QWidget):
     def _build_obj_id(self, obj_type, obj_name, data):
         """Build a typed ID for the current object based on type."""
         if obj_type == "host":
-            host_name = (data.get("host_name") if data else "") or obj_name
+            host_name = (data.host_name if data else "") or obj_name
             return HostId(host_name, obj_name)
         elif obj_type == "vm":
-            host_name = (data.get("host_name") if data else "") or (data.get("node", "") if data else "")
-            vmid = data.get("vmid", 0) if data else 0
+            host_name = (data.host_name if data else "") or (data.node if data else "")
+            vmid = data.vmid if data else 0
             return VmId(host_name, vmid)
         elif obj_type == "storage":
             host_name = (data.get("host_name") if data else "") or ""
@@ -335,14 +336,14 @@ class DetailPanel(QWidget):
             node = data.get("node", "") if data else ""
             if not node:
                 for s in self.all_storages:
-                    if s.get("storage") != obj_name:
+                    if s.storage != obj_name:
                         continue
-                    if host_name and s.get("host_name") == host_name:
-                        node = s.get("node", "")
+                    if host_name and s.host_name == host_name:
+                        node = s.node
                         break
-                    if cluster and s.get("cluster") == cluster:
-                        node = s.get("node", "")
-                        host_name = s.get("host_name", "") or host_name
+                    if cluster and s.cluster == cluster:
+                        node = s.node
+                        host_name = s.host_name or host_name
                         break
             return StorageId(host_name, node, obj_name)
         return obj_name
@@ -362,7 +363,7 @@ class DetailPanel(QWidget):
         elif self.current_obj_type == "cluster":
             hosts = []
             for node in self.all_nodes:
-                host_name = node.get("host_name", "")
+                host_name = node.host_name
                 cfg = self._cfg_by_name.get(host_name)
                 if cfg and cfg.get("cluster") == self.current_obj_name:
                     hosts.append(node)
@@ -376,7 +377,7 @@ class DetailPanel(QWidget):
                 host_data = self.current_obj_data
             if host_data:
                 node_name = self.current_obj_id.node if isinstance(self.current_obj_id, HostId) else self.current_obj_name
-                if host_data.get("status") == "error":
+                if host_data.status_value == "error":
                     self._host_tabs.show_host_info(node_name, host_data)
                 else:
                     self._host_tabs.update_host_cells(host_data)
@@ -389,11 +390,11 @@ class DetailPanel(QWidget):
                 if isinstance(self.current_obj_id, VmId):
                     fresh = self._vm_repo.get(self.current_obj_id.host_name, self.current_obj_id.vmid) if self._vm_repo else None
                 else:
-                    lookup_host = vm_data.get("host_name") or vm_data.get("node")
-                    fresh = self._vm_repo.get(lookup_host, vm_data.get("vmid")) if self._vm_repo else None
+                    lookup_host = vm_data.host_name or vm_data.node
+                    fresh = self._vm_repo.get(lookup_host, vm_data.vmid) if self._vm_repo else None
                 if fresh:
                     self.current_obj_data = fresh
-                    self.hardware_widget.set_vm_status(fresh.get("status", ""))
+                    self.hardware_widget.set_vm_status(fresh.status_value)
                 self._vm_tabs.update_vm_cells(fresh or vm_data)
                 self._vm_tabs.show_vm_metrics(fresh or vm_data)
         elif self.current_obj_type == "storage":
@@ -411,9 +412,9 @@ class DetailPanel(QWidget):
         vm_data = self._last_vm_data
         if not vm_data:
             return
-        host_name = vm_data.get("host_name") or vm_data.get("node")
-        node = vm_data.get("node") or host_name
-        vmid = vm_data.get("vmid")
+        host_name = vm_data.host_name or vm_data.node
+        node = vm_data.node or host_name
+        vmid = vm_data.vmid
         if action == "clone":
             self.vm_clone_requested.emit(host_name, node, vmid)
         elif action == "convert_template":
@@ -423,9 +424,9 @@ class DetailPanel(QWidget):
 
     def _update_action_buttons(self, vm_data=None):
         self._vm_tabs.update_action_buttons(vm_data)
-        is_template = bool(vm_data and vm_data.get("template"))
-        is_qemu = vm_data and vm_data.get("type", "qemu") == "qemu"
-        is_running = vm_data and vm_data.get("status") == "running"
+        is_template = bool(vm_data and vm_data.template)
+        is_qemu = vm_data is not None and vm_data.vm_type is VmType.QEMU
+        is_running = vm_data is not None and vm_data.status is VmStatus.RUNNING
         clone_btn = self._extra_action_buttons.get("clone")
         if clone_btn:
             clone_btn.setVisible(bool(vm_data))

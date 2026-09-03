@@ -71,22 +71,22 @@ class VmPoolWidget(QWidget):
             return
         self.table.setRowCount(len(vms))
         for i, vm in enumerate(vms):
-            name_item = QTableWidgetItem(str(vm.get("name", "")))
-            name_item.setIcon(get_icon("vm", vm.get("status")))
-            host_name = vm.get("host_name", "")
-            node = vm.get("node", "")
-            vmid = vm.get("vmid")
+            name_item = QTableWidgetItem(str(vm.name or ""))
+            name_item.setIcon(get_icon("vm", vm.status_value))
+            host_name = vm.host_name or ""
+            node = vm.node or ""
+            vmid = vm.vmid
             if host_name and vmid is not None:
                 try:
                     name_item.setData(Qt.UserRole, (host_name, int(vmid), node))
                 except (ValueError, TypeError):
                     pass
             self.table.setItem(i, 0, name_item)
-            self.table.setItem(i, 1, QTableWidgetItem(str(vm.get("type", ""))))
+            self.table.setItem(i, 1, QTableWidgetItem(vm.vm_type.value))
 
-            maxdisk = vm.get("maxdisk", 0)
-            disk = vm.get("disk", 0)
-            vm_type = vm.get("type", "qemu")
+            maxdisk = vm.maxdisk_bytes or 0
+            disk = vm.disk_bytes or 0
+            vm_type = vm.vm_type.value
             if vm_type == "lxc" and disk and maxdisk:
                 disk_pct = int(max(0, min(100, (disk / maxdisk) * 100)))
                 self._set_progress(i, 2, disk_pct)
@@ -96,16 +96,16 @@ class VmPoolWidget(QWidget):
                 disk_item.setFlags(Qt.ItemIsEnabled)
                 self.table.setItem(i, 2, disk_item)
 
-            maxmem = vm.get("maxmem", 0)
-            mem = vm.get("mem", 0)
+            maxmem = vm.maxmem_bytes or 0
+            mem = vm.mem_bytes or 0
             mem_pct = int(max(0, min(100, (mem / maxmem) * 100))) if maxmem > 0 else 0
             self._set_progress(i, 3, mem_pct)
 
-            cpu_fraction = vm.get("cpu", 0)
+            cpu_fraction = vm.cpu_fraction or 0
             cpu_pct = int(round(cpu_fraction * 100)) if isinstance(cpu_fraction, (int, float)) else 0
             self._set_progress(i, 4, cpu_pct)
 
-            uptime_sec = vm.get("uptime", 0)
+            uptime_sec = vm.uptime_seconds or 0
             uptime_str = self._fmt_uptime(uptime_sec) if uptime_sec else ''
             self.table.setItem(i, 5, QTableWidgetItem(uptime_str))
 
@@ -118,29 +118,28 @@ class VmPoolWidget(QWidget):
 
     def _update_summary(self, vms):
         total = len(vms)
-        running = sum(1 for v in vms if v.get("status") == "running")
+        running = sum(1 for v in vms if v.status_value == "running")
         self._summary_cards["vms"].set_value(f"{running}/{total}")
         self._summary_cards["vms"].set_subtitle(
             f"{total - running} {tr('stopped')}" if total != running else "")
         self._summary_cards["vms"].set_progress(
             int(running / total * 100) if total else 0)
 
-        cpu_sum = sum(v.get("cpu", 0) or 0 for v in vms
-                      if isinstance(v.get("cpu"), (int, float)))
+        cpu_sum = sum(v.cpu_fraction or 0 for v in vms)
         cpu_pct = round(cpu_sum / total * 100, 1) if total else 0
         self._summary_cards["cpu"].set_value(f"{cpu_pct}%")
         self._summary_cards["cpu"].set_progress(cpu_pct)
 
-        mem_total = sum(v.get("maxmem", 0) or 0 for v in vms)
-        mem_used = sum(v.get("mem", 0) or 0 for v in vms)
+        mem_total = sum(v.maxmem_bytes or 0 for v in vms)
+        mem_used = sum(v.mem_bytes or 0 for v in vms)
         mem_pct = round(mem_used / mem_total * 100, 1) if mem_total else 0
         mem_gb = round(mem_used / (1024**3), 1) if mem_used else 0
         maxmem_gb = round(mem_total / (1024**3), 1) if mem_total else 0
         self._summary_cards["ram"].set_value(f"{mem_gb}/{maxmem_gb} GiB")
         self._summary_cards["ram"].set_progress(mem_pct)
 
-        disk_total = sum(v.get("maxdisk", 0) or 0 for v in vms)
-        disk_used = sum(v.get("disk", 0) or 0 for v in vms)
+        disk_total = sum(v.maxdisk_bytes or 0 for v in vms)
+        disk_used = sum(v.disk_bytes or 0 for v in vms)
         disk_pct = round(disk_used / disk_total * 100, 1) if disk_total else 0
         disk_gb = round(disk_used / (1024**3), 1) if disk_used else 0
         maxdisk_gb = round(disk_total / (1024**3), 1) if disk_total else 0

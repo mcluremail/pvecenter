@@ -66,7 +66,7 @@ class CloneVMDialog(QDialog):
         self.target_combo = QComboBox()
         self.target_combo.addItem(self._current_node, self._current_node)
         for n in self._cluster_nodes:
-            n_name = n.get("node", "") if isinstance(n, dict) else str(n)
+            n_name = n.node or ""
             if n_name and n_name != self._current_node:
                 self.target_combo.addItem(n_name, n_name)
         clone_grid.addWidget(self.target_combo, 2, 1)
@@ -98,8 +98,8 @@ class CloneVMDialog(QDialog):
         self.storage_combo.addItem(tr("Same as source"), "")
         seen = set()
         for s in self._storages:
-            s_node = s.get("node", "")
-            s_name = s.get("storage", "")
+            s_node = s.node or ""
+            s_name = s.storage
             if s_name and s_name not in seen and (not s_node or s_node == node):
                 self.storage_combo.addItem(s_name, s_name)
                 seen.add(s_name)

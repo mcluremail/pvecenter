@@ -222,3 +222,30 @@ class Node(DictCompat):
             lxc_version=d.get("lxctype", ""),
             is_cluster=is_cluster,
         )
+
+    @staticmethod
+    def loading_stub(host_name: str) -> Node:
+        """Placeholder node shown in the tree while data is being fetched.
+
+        The node name equals the config name; status is LOADING so the UI
+        renders a spinner instead of an icon.
+        """
+        return Node(
+            host_name=host_name,
+            node=host_name,
+            cluster="",
+            status=NodeStatus.LOADING,
+            error="",
+            cpu_fraction=0.0,
+            cpu_sockets=0,
+            mem_bytes=0,
+            maxmem_bytes=0,
+            disk_bytes=0,
+            maxdisk_bytes=0,
+            uptime_seconds=0,
+            pve_version_raw="",
+            kernel_version="",
+            qemu_version="",
+            lxc_version="",
+            is_cluster=False,
+        )

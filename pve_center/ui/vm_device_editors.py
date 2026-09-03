@@ -484,7 +484,7 @@ class VmDiskMoveDialog(QDialog):
 
         self._storage_combo = QComboBox()
         for s in self._storages:
-            name = s.get("storage", "") if isinstance(s, dict) else str(s)
+            name = s.storage or ""
             if name and name != self._parsed["storage"]:
                 self._storage_combo.addItem(name, name)
         form.addRow(tr("Target storage:"), self._storage_combo)
@@ -864,7 +864,7 @@ class VmAddDiskDialog(QDialog):
         self._storage_combo = QComboBox()
         self._storage_combo.setEditable(True)
         for s in self._storages:
-            name = s.get("storage", "")
+            name = s.storage or ""
             if name:
                 self._storage_combo.addItem(name, name)
         if self._storage_combo.count() == 0:
@@ -1135,7 +1135,7 @@ class VmAddEfiDialog(QDialog):
         self._storage_combo = QComboBox()
         self._storage_combo.setEditable(True)
         for s in self._storages:
-            name = s.get("storage", "")
+            name = s.storage or ""
             if name:
                 self._storage_combo.addItem(name, name)
         if self._storage_combo.count() == 0:
@@ -1199,7 +1199,7 @@ class VmAddTpmDialog(QDialog):
         self._storage_combo = QComboBox()
         self._storage_combo.setEditable(True)
         for s in self._storages:
-            name = s.get("storage", "")
+            name = s.storage or ""
             if name:
                 self._storage_combo.addItem(name, name)
         if self._storage_combo.count() == 0:

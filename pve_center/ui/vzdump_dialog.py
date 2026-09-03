@@ -40,7 +40,7 @@ class VzdumpDialog(QDialog):
         self._storage_combo = QComboBox()
         backup_storages = [
             s for s in self._storages
-            if "backup" in (s.get("content", "") or "").split(",")
+            if "backup" in s.content_list
         ]
         if not backup_storages:
             hint = QLabel(tr("No backup storage available"))
@@ -49,7 +49,7 @@ class VzdumpDialog(QDialog):
             self._storage_combo = None
         else:
             for s in backup_storages:
-                name = s.get("storage", "")
+                name = s.storage or ""
                 if name:
                     self._storage_combo.addItem(name, name)
             form.addRow(tr("Backup storage:"), self._storage_combo)

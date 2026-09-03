@@ -43,7 +43,7 @@ class StorageMoveDialog(QDialog):
         self._target_combo = QComboBox()
         self._target_combo.setEditable(True)
         for s in storages:
-            name = s.get("storage", "")
+            name = s.storage or ""
             if name:
                 self._target_combo.addItem(name, name)
         form.addRow(tr("Target storage:"), self._target_combo)
