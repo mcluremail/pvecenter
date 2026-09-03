@@ -193,6 +193,14 @@ class BackupJobDialog(QDialog):
             self._mode_combo.setCurrentIndex(idx)
         storage = job.get("storage", "")
         idx = self._storage_combo.findData(storage)
+        if idx < 0 and storage:
+            # Job references a storage that's not in the backup list
+            # (removed/unavailable). Show it explicitly instead of silently
+            # substituting the first entry and corrupting the job on save.
+            self._storage_combo.addItem(
+                tr("{name} (unavailable)").format(name=storage), storage
+            )
+            idx = self._storage_combo.count() - 1
         if idx >= 0:
             self._storage_combo.setCurrentIndex(idx)
         compress = job.get("compress", "0")

@@ -121,13 +121,21 @@ class UserDialog(QDialog):
         self._firstname_edit.setText(u.get("firstname", "") or "")
         self._lastname_edit.setText(u.get("lastname", "") or "")
         self._email_edit.setText(u.get("email", "") or "")
-        groups_str = u.get("groups", "")
+        groups_str = u.get("groups", "") or ""
         if isinstance(groups_str, list):
-            groups_str = ",".join(groups_str)
-        if groups_str:
-            idx = self._groups_combo.findData(groups_str.split(",")[0].strip())
+            orig_groups = [str(g).strip() for g in groups_str if str(g).strip()]
+        else:
+            orig_groups = [g.strip() for g in str(groups_str).split(",") if g.strip()]
+        # The dialog edits a single group; remember the preselected one so
+        # get_params can tell "untouched" from "user changed it" and omit
+        # the groups param on unchanged saves (otherwise saving a plain
+        # edit would strip every group but the first).
+        self._groups_initial = ""
+        if orig_groups:
+            idx = self._groups_combo.findData(orig_groups[0])
             if idx >= 0:
                 self._groups_combo.setCurrentIndex(idx)
+                self._groups_initial = orig_groups[0]
         enable_val = u.get("enable", 1)
         try:
             enable_val = int(enable_val)
@@ -173,8 +181,14 @@ class UserDialog(QDialog):
         if email:
             params["email"] = email
 
-        group = self._groups_combo.currentData()
-        if group:
+        group = self._groups_combo.currentData() or ""
+        if self._is_edit:
+            # Send groups only when the user actually changed the combo;
+            # otherwise PVE would replace the full membership list with the
+            # single visible group (multi-group users would lose groups).
+            if group and group != getattr(self, "_groups_initial", ""):
+                params["groups"] = group
+        elif group:
             params["groups"] = group
 
         params["enable"] = 1 if self._enabled_check.isChecked() else 0

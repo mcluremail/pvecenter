@@ -1,3 +1,5 @@
+import re
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -31,10 +33,10 @@ DISK_CACHE = [
 def _parse_net(val):
     """Parse netX string -> dict of components."""
     if not val or str(val).strip() in ("", "None"):
-        return {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": ""}
+        return {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": "", "extra": []}
     val = str(val)
     parts = val.split(",")
-    result = {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": ""}
+    result = {"model": "virtio", "mac": "", "bridge": "vmbr0", "tag": "", "queues": "", "extra": []}
     first = parts[0]
     if "=" in first:
         result["model"], result["mac"] = first.split("=", 1)
@@ -47,10 +49,15 @@ def _parse_net(val):
             result["tag"] = p.split("=", 1)[1]
         elif p.startswith("queues="):
             result["queues"] = p.split("=", 1)[1]
+        else:
+            # Preserve options the editor has no field for (firewall=1,
+            # link_down=1, rate=..., mtu=..., trunks=...) so saving the
+            # dialog doesn't silently strip them.
+            result["extra"].append(p)
     return result
 
 
-def _build_net(model, mac, bridge, tag, queues):
+def _build_net(model, mac, bridge, tag, queues, extra=()):
     parts = [f"{model}={mac}" if mac else model]
     if bridge:
         parts.append(f"bridge={bridge}")
@@ -58,23 +65,26 @@ def _build_net(model, mac, bridge, tag, queues):
         parts.append(f"tag={tag}")
     if queues:
         parts.append(f"queues={queues}")
+    parts.extend(extra)
     return ",".join(parts)
 
 
 def _parse_disk(val):
     if not val or str(val).strip() in ("", "None"):
-        return {"storage": "", "size": "", "format": "", "cache": "none", "extra": []}
+        return {"storage": "", "volume": "", "size": "", "format": "", "cache": "none", "extra": []}
     parts = str(val).split(",")
-    result = {"storage": "", "size": "", "format": "", "cache": "none", "extra": []}
+    result = {"storage": "", "volume": "", "size": "", "format": "", "cache": "none", "extra": []}
     first = parts[0]
     if ":" in first:
         result["storage"] = first.split(":")[0]
-        result["size"] = first.split(":", 1)[1]
+        result["volume"] = first.split(":", 1)[1]
     for p in parts[1:]:
         if p.startswith("cache="):
             result["cache"] = p.split("=", 1)[1]
         elif p.startswith("format="):
             result["format"] = p.split("=", 1)[1]
+        elif p.startswith("size="):
+            result["size"] = p.split("=", 1)[1]
         else:
             result["extra"].append(p)
     return result
@@ -191,7 +201,8 @@ class VmNetworkEditorDialog(QDialog):
         queues = self._queues_spin.value()
         net_val = _build_net(model, mac, bridge,
                              str(tag) if tag > 0 else "",
-                             str(queues) if queues > 0 else "")
+                             str(queues) if queues > 0 else "",
+                             extra=self._parsed.get("extra", []))
         return (self._key, net_val)
 
 
@@ -310,6 +321,11 @@ class VmDiskEditorDialog(QDialog):
         storage_edit.setReadOnly(True)
         form.addRow(tr("Storage:"), storage_edit)
 
+        if self._parsed["volume"]:
+            volume_edit = QLineEdit(self._parsed["volume"])
+            volume_edit.setReadOnly(True)
+            form.addRow(tr("Volume:"), volume_edit)
+
         size_edit = QLineEdit(self._parsed["size"])
         size_edit.setReadOnly(True)
         form.addRow(tr("Size:"), size_edit)
@@ -360,13 +376,16 @@ class VmDiskEditorDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _on_resize(self):
-        dlg = VmDiskResizeDialog(self._key, self._key, self._parsed.get("storage", "") + ":" + self._parsed.get("size", ""), self)
+        raw_val = self._parsed.get("storage", "") + ":" + self._parsed.get("volume", "")
+        if self._parsed.get("size"):
+            raw_val += f",size={self._parsed['size']}"
+        dlg = VmDiskResizeDialog(self._key, self._key, raw_val, self)
         if dlg.exec() == VmDiskResizeDialog.Accepted:
             self._resize_params = dlg.get_resize_params()
             self.done(self.RESIZE_RESULT)
 
     def _on_move(self):
-        raw_val = self._parsed.get("storage", "") + ":" + self._parsed.get("size", "")
+        raw_val = self._parsed.get("storage", "") + ":" + self._parsed.get("volume", "")
         dlg = VmDiskMoveDialog(self._key, self._key, raw_val, self._storages, self)
         if dlg.exec() == VmDiskMoveDialog.Accepted:
             self._move_params = dlg.get_move_params()
@@ -531,7 +550,9 @@ class VmDiskMoveDialog(QDialog):
 
 
 class VmBootEditorDialog(QDialog):
-    _DEVICE_TYPES = ("ide", "sata", "scsi", "virtio", "net")
+    # Bootable device keys look like "ide2"/"scsi0"/"net0"; a plain
+    # startswith match would also catch config keys like "scsihw".
+    _DEVICE_RE = re.compile(r"(ide|sata|scsi|virtio|net)\d+$")
 
     def __init__(self, key, label, current_value, config_data, parent=None):
         super().__init__(parent)
@@ -609,9 +630,8 @@ class VmBootEditorDialog(QDialog):
     def _collect_devices(self):
         devices = set()
         for key in (self._config_data or {}):
-            for pfx in self._DEVICE_TYPES:
-                if key.startswith(pfx):
-                    devices.add(key)
+            if self._DEVICE_RE.fullmatch(key):
+                devices.add(key)
         return sorted(devices)
 
     def _fill(self, val):

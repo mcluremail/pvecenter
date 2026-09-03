@@ -580,25 +580,26 @@ def _fmt_cdrom(val):
 
 
 def _fmt_disk(val):
-    """Parse a disk string: storage:size,format=qcow2,cache=writeback,..."""
+    """Parse a disk string: storage:volume-name,size=32G,format=qcow2,cache=writeback,..."""
     val = str(val)
     parts = val.split(",")
     storage_part = parts[0]
 
     if ":" in storage_part:
-        storage = storage_part.split(":")[0]
-        size = storage_part.split(":", 1)[1]
+        storage, volume = storage_part.split(":", 1)
     else:
-        storage = storage_part
-        size = ""
+        storage, volume = storage_part, ""
 
     fmt = ""
     cache = ""
+    size = ""
     for p in parts[1:]:
         if p.startswith("cache="):
             cache = p.split("=", 1)[1]
         elif p.startswith("format="):
             fmt = p.split("=", 1)[1]
+        elif p.startswith("size="):
+            size = p.split("=", 1)[1]
 
     _cache_labels = {"none": tr("None"), "writeback": tr("Write back"),
                      "writethrough": tr("Write through"),
@@ -606,6 +607,8 @@ def _fmt_disk(val):
     cache = _cache_labels.get(cache, cache)
 
     out = storage
+    if volume:
+        out += f" | {volume}"
     if size:
         out += f" | {size}"
     if fmt:

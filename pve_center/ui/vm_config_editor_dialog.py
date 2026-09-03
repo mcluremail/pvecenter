@@ -45,7 +45,9 @@ class VmConfigEditorDialog(QDialog):
 
         elif field_type == "int":
             self._editor = QSpinBox()
-            self._editor.setRange(0, 999999)
+            # PVE int params (e.g. memory in MiB on large hosts) exceed the
+            # old 0..999999 range and would be silently clamped on save.
+            self._editor.setRange(0, 2147483647)
             try:
                 self._editor.setValue(int(current_value) if current_value is not None else 0)
             except (ValueError, TypeError):
