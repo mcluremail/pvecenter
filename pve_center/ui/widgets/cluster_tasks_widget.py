@@ -162,6 +162,8 @@ class ClusterTasksWidget(QWidget):
         filter_bar.setSpacing(4)
         filter_bar.addStretch()
 
+        self._progress_items = {}
+        self._progress_rows = {}
         self._filter_input = QLineEdit()
         self._filter_input.setPlaceholderText(tr("Filter..."))
         self._filter_input.setClearButtonEnabled(True)
@@ -190,7 +192,9 @@ class ClusterTasksWidget(QWidget):
 
     def set_tasks(self, tasks: list[Task]):
         self._all_tasks = tasks
-        self._populate_table(tasks)
+        # Re-apply the active filter instead of dumping everything into the
+        # table; also re-inserts any in-flight progress rows.
+        self._apply_filter()
 
     def _populate_table(self, tasks: list[Task]):
         sort_col = self.table.horizontalHeader().sortIndicatorSection()
@@ -277,6 +281,11 @@ class ClusterTasksWidget(QWidget):
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
 
+        # Re-insert in-flight progress rows on top: a timer-driven set_tasks
+        # must not wipe the progress indicator of a running backup/restore.
+        for key, description in self._progress_items.items():
+            self._insert_progress_row(key, description)
+
         # Set sort indicator visual only — do NOT enable sorting
         # (setSortingEnabled(True) triggers sortItems with Python __lt__
         # which freezes on 400+ rows; data is already sorted in Python)
@@ -343,6 +352,12 @@ class ClusterTasksWidget(QWidget):
         font.setBold(True)
         item4.setFont(font)
         self.table.setItem(0, 4, item4)
+        self._make_progress_bar(0)
+        self.table.setRowHeight(0, 22)
+        self._progress_items[key] = description
+        self._progress_rows[key] = 0
+
+    def _make_progress_bar(self, row):
         bar = QProgressBar()
         bar.setRange(0, 100)
         bar.setValue(0)
@@ -352,24 +367,27 @@ class ClusterTasksWidget(QWidget):
             f" text-align: center; font-size: 11px; }}"
             f"QProgressBar::chunk {{ background: {Color.STATUS_WARN}; border-radius: 2px; }}"
         )
-        self.table.setCellWidget(0, 5, bar)
-        self.table.setRowHeight(0, 22)
-        self._progress_rows = getattr(self, "_progress_rows", {})
-        self._reindex_progress_rows()
-        self._progress_rows[key] = 0
+        self.table.setCellWidget(row, 5, bar)
 
-    def _reindex_progress_rows(self):
-        """Rebuild _progress_rows by scanning the table for progress bar rows."""
-        rows = getattr(self, "_progress_rows", {})
-        new_rows = {}
-        for row in range(self.table.rowCount()):
-            bar = self.table.cellWidget(row, 5)
-            if isinstance(bar, QProgressBar):
-                for k, idx in list(rows.items()):
-                    if idx == row:
-                        new_rows[k] = row
-                        break
-        self._progress_rows = new_rows
+    def _insert_progress_row(self, key, description):
+        self.table.insertRow(0)
+        now_str = datetime.now().strftime(TIMESTAMP_FMT)
+        item0 = QTableWidgetItem(now_str)
+        item0.setForeground(QColor(Color.STATUS_WARN))
+        self.table.setItem(0, 0, item0)
+        item1 = QTableWidgetItem(tr("running..."))
+        item1.setForeground(QColor(Color.STATUS_WARN))
+        self.table.setItem(0, 1, item1)
+        self.table.setItem(0, 2, QTableWidgetItem(""))
+        self.table.setItem(0, 3, QTableWidgetItem(""))
+        item4 = QTableWidgetItem(description)
+        font = item4.font()
+        font.setBold(True)
+        item4.setFont(font)
+        self.table.setItem(0, 4, item4)
+        self._make_progress_bar(0)
+        self.table.setRowHeight(0, 22)
+        self._progress_rows[key] = 0
 
     def update_progress_row(self, key, percent):
         rows = getattr(self, "_progress_rows", {})
@@ -385,6 +403,7 @@ class ClusterTasksWidget(QWidget):
         if key not in rows:
             return
         row = rows[key]
+        self._progress_items.pop(key, None)
         bar = self.table.cellWidget(row, 5)
         if isinstance(bar, QProgressBar):
             self.table.removeCellWidget(row, 5)

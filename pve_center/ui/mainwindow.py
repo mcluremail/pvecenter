@@ -476,6 +476,8 @@ class MainWindow(QMainWindow):
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.tree_panel.set_servers(merged)
         self.detail_panel.update_nodes_cfg(merged)
+        save_config(self.nodes_cfg)
+        self.refresh_data()
         QMessageBox.information(self, tr("Import"),
                                 tr("Configuration imported ({count} hosts).").format(
                                     count=len(merged)))

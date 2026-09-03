@@ -953,15 +953,17 @@ class HostTabs:
             pct = safe_pct(used, total)
             table.setItem(i, 3, QTableWidgetItem(f"{used_gb} GiB"))
             table.setItem(i, 4, QTableWidgetItem(f"{total_gb} GiB"))
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(pct)
-            bar.setStyleSheet(_progress_style(pct))
-            bar.setFormat(f"{pct}%")
-            table.setCellWidget(i, 5, bar)
-            bi = QTableWidgetItem("")
-            bi.setFlags(Qt.ItemIsEnabled)
-            table.setItem(i, 5, bi)
+            if total:
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setValue(pct)
+                bar.setStyleSheet(_progress_style(pct))
+                bar.setFormat(f"{pct}%")
+                table.setCellWidget(i, 5, bar)
+            else:
+                bi = QTableWidgetItem("")
+                bi.setFlags(Qt.ItemIsEnabled)
+                table.setItem(i, 5, bi)
         table.resizeRowsToContents()
         for r in range(table.rowCount()):
             if table.rowHeight(r) > 24:
@@ -1858,7 +1860,9 @@ class HostTabs:
 
     def _on_backup_jobs_error(self, err):
         panel = self.panel
-        panel.backup_jobs_loading.setText(tr("Error loading jobs"))
+        from ..utils import parse_pve_error
+        panel.backup_jobs_loading.setText(
+            tr("Error loading jobs") + ": " + parse_pve_error(err))
         panel.backup_jobs_stack.setCurrentIndex(0)
 
     def _get_backup_jobs_storages(self):
@@ -3579,8 +3583,12 @@ class HostTabs:
         if not cluster_cfg:
             return
 
+        current_cluster = cluster_cfg.get("cluster", "")
         ha_groups_raw = []
-        for _h, groups in panel.all_ha_groups.items():
+        for h, groups in panel.all_ha_groups.items():
+            h_cfg = panel._cfg_by_name.get(h, {})
+            if h_cfg.get("cluster", "") != current_cluster:
+                continue
             for g in groups:
                 if g.group:
                     ha_groups_raw.append(g.group)
@@ -3593,7 +3601,7 @@ class HostTabs:
             host_name = vm.host_name or ""
             if host_name:
                 cfg = panel._cfg_by_name.get(host_name)
-                if cfg and cfg.get("cluster"):
+                if cfg and cfg.get("cluster") == current_cluster:
                     vms.append(vm)
         if not vms:
             QMessageBox.information(panel, tr("HA"), tr("No VMs available"))

@@ -223,6 +223,10 @@ class TokenValueDialog(QDialog):
         self._copy_btn.setText(tr("Copy auth string"))
 
     def _cleanup_and_accept(self):
+        self._clear_sensitive()
+        self.accept()
+
+    def _clear_sensitive(self):
         try:
             current = QGuiApplication.clipboard().text()
             expected = f"{self._full}={self._value}"
@@ -232,8 +236,9 @@ class TokenValueDialog(QDialog):
             pass
         self._value = ""
         self._full = ""
-        self.accept()
 
-    def closeEvent(self, event):
-        self._cleanup_and_accept()
-        super().closeEvent(event)
+    def done(self, r):
+        # Covers Esc (reject), the Close button and window close: the token
+        # must never outlive the dialog in the clipboard or memory.
+        self._clear_sensitive()
+        super().done(r)

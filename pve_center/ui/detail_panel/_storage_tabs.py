@@ -514,15 +514,17 @@ class StorageTabs:
             pct = safe_pct(used, total)
             panel.storage_detail_nodes_table.setItem(i, 3, QTableWidgetItem(f"{u_gb} GiB"))
             panel.storage_detail_nodes_table.setItem(i, 4, QTableWidgetItem(f"{t_gb} GiB"))
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(pct)
-            bar.setStyleSheet(_progress_style(pct))
-            bar.setFormat(f"{pct}%")
-            panel.storage_detail_nodes_table.setCellWidget(i, 5, bar)
-            bi = QTableWidgetItem("")
-            bi.setFlags(Qt.ItemIsEnabled)
-            panel.storage_detail_nodes_table.setItem(i, 5, bi)
+            if total:
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setValue(pct)
+                bar.setStyleSheet(_progress_style(pct))
+                bar.setFormat(f"{pct}%")
+                panel.storage_detail_nodes_table.setCellWidget(i, 5, bar)
+            else:
+                bi = QTableWidgetItem("")
+                bi.setFlags(Qt.ItemIsEnabled)
+                panel.storage_detail_nodes_table.setItem(i, 5, bi)
         panel.storage_detail_nodes_table.resizeRowsToContents()
         for r in range(panel.storage_detail_nodes_table.rowCount()):
             if panel.storage_detail_nodes_table.rowHeight(r) > 24:
@@ -581,6 +583,13 @@ class StorageTabs:
         host_name = node_entry.host_name
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
+            # Without a config no worker can be launched — replace the
+            # "Loading..." placeholders instead of leaving them forever.
+            for idx in seen_tabs:
+                stack = loading_map.get(idx)
+                if stack:
+                    stack.setCurrentIndex(0)
+                    stack.widget(0).setText(tr("No data"))
             return
         panel._storage_content_pending = {}
         workers_launched = 0

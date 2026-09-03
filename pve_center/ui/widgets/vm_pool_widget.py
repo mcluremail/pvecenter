@@ -66,7 +66,7 @@ class VmPoolWidget(QWidget):
 
     def set_pool_vms(self, vms):
         if not vms:
-            set_empty_placeholder(self.table, 5)
+            set_empty_placeholder(self.table, 6)
             self._update_summary([])
             return
         self.table.setRowCount(len(vms))

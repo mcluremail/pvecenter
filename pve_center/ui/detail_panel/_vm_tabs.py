@@ -256,7 +256,7 @@ class VMTabs:
         worker = VmActionWorker(cfg, node_name, vmid, vm_type, action)
         for btn in panel._action_buttons.values():
             btn.setEnabled(False)
-        panel.detail_label.setText(tr("VM/CT: {name}").format(name=vmid) + " — " + VM_ACTION_MESSAGE_LABELS.get(action, action) + "...")
+        panel.detail_label.setText(tr("VM/CT: {name}").format(name=(panel._last_vm_data.name or vmid)) + " — " + VM_ACTION_MESSAGE_LABELS.get(action, action) + "...")
         worker.signals.action_result.connect(lambda msg: (
             self.on_action_finished(msg),
             self.refresh_after_action(),
@@ -551,7 +551,10 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        vmid = int(vmid_str)
+        try:
+            vmid = int(vmid_str)
+        except (ValueError, TypeError):
+            return
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.node if vm else host_name
         vm_type = (vm.vm_type.value if vm else "qemu")
@@ -578,7 +581,10 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        vmid = int(vmid_str)
+        try:
+            vmid = int(vmid_str)
+        except (ValueError, TypeError):
+            return
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.node if vm else host_name
         vm_type = (vm.vm_type.value if vm else "qemu")
@@ -642,7 +648,10 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        vmid = int(vmid_str)
+        try:
+            vmid = int(vmid_str)
+        except (ValueError, TypeError):
+            return
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.node if vm else host_name
         vm_type = (vm.vm_type.value if vm else "qemu")
@@ -674,7 +683,10 @@ class VMTabs:
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
             return
-        vmid = int(vmid_str)
+        try:
+            vmid = int(vmid_str)
+        except (ValueError, TypeError):
+            return
         vm = panel._vm_repo.get(host_name, vmid) if panel._vm_repo else None
         node = vm.node if vm else host_name
         vm_type = (vm.vm_type.value if vm else "qemu")
@@ -842,6 +854,10 @@ class VMTabs:
             return
         snap_name = item.text(0)
         if not snap_name:
+            return
+        if snap_name == "current":
+            # "current" is a PVE pseudo-snapshot: it can't be deleted or
+            # rolled back, so there is nothing to offer.
             return
         from PySide6.QtGui import QAction
         from PySide6.QtWidgets import QMenu
@@ -1087,8 +1103,8 @@ class VMTabs:
 
             panel.card_disk.set_title(tr("Disk"))
             panel.card_net.set_title(tr("Network"))
-            panel.card_net.set_value(f"↓ {netin_mb} MB")
-            panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
+            panel.card_net.set_value(f"↓ {netin_mb} MiB")
+            panel.card_net.set_subtitle(f"↑ {netout_mb} MiB")
 
             panel.card_uptime.set_title(tr("Uptime"))
             panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
@@ -1146,8 +1162,8 @@ class VMTabs:
         netout = detail.get("netout", 0)
         netin_mb = round(netin / (1024*1024), 2) if netin else 0
         netout_mb = round(netout / (1024*1024), 2) if netout else 0
-        panel.card_net.set_value(f"↓ {netin_mb} MB")
-        panel.card_net.set_subtitle(f"↑ {netout_mb} MB")
+        panel.card_net.set_value(f"↓ {netin_mb} MiB")
+        panel.card_net.set_subtitle(f"↑ {netout_mb} MiB")
 
         uptime = detail.get("uptime") or vm_data.uptime_seconds
         panel.card_uptime.set_value(_format_uptime(uptime) if uptime else "—")
@@ -1321,7 +1337,7 @@ class VMTabs:
             remove=params["remove"],
             bwlimit=params["bwlimit"],
         )
-        key = f"vzdump:{vmid}"
+        key = f"vzdump:{host_name}:{vmid}"
         panel.transfer_started.emit(key, tr("Backup VM {vmid}").format(vmid=vmid))
         panel.vm_backup_btn.setEnabled(False)
         worker.signals.result.connect(lambda msg, k=key, w=worker: (
@@ -1381,7 +1397,7 @@ class VMTabs:
             force=params["force"],
             unique=params["unique"],
         )
-        key = f"restore:{params['vmid']}"
+        key = f"restore:{host_name}:{params['vmid']}"
         panel.transfer_started.emit(key, tr("Restore VM {vmid}").format(vmid=params["vmid"]))
         panel.vm_restore_btn.setEnabled(False)
         worker.signals.result.connect(lambda msg, k=key, w=worker: (
