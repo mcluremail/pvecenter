@@ -515,12 +515,8 @@ class CreateVmDialog(QDialog):
         groups_raw = self._ha_groups.get(host_name, []) if host_name else []
         groups = []
         for g in groups_raw:
-            if isinstance(g, dict):
-                gn = g.get("group", "")
-                if gn:
-                    groups.append(gn)
-            elif isinstance(g, str) and g:
-                groups.append(g)
+            if g.group:
+                groups.append(g.group)
         visible = bool(groups)
         self.ha_label.setVisible(visible)
         self.ha_combo.setVisible(visible)

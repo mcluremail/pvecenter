@@ -44,15 +44,16 @@ from ..config import (
     save_ui_state,
 )
 from ..domain import (
-    Node as DomainNode,
-)
-from ..domain import (
+    HaGroup,
     NodeRepository,
     NodeStatus,
     PoolRepository,
     StorageRepository,
     VmRepository,
     VmStatus,
+)
+from ..domain import (
+    Node as DomainNode,
 )
 from ..domain import (
     Pool as DomainPool,
@@ -978,10 +979,8 @@ class MainWindow(QMainWindow):
         ha_groups_raw = self.all_ha_groups.get(host_name, [])
         ha_group_names = []
         for g in ha_groups_raw:
-            if isinstance(g, dict) and g.get("group"):
-                ha_group_names.append(g["group"])
-            elif isinstance(g, str) and g:
-                ha_group_names.append(g)
+            if g.group:
+                ha_group_names.append(g.group)
         if not ha_group_names:
             self._notifications.show(tr("No HA groups available"), error=True)
             return
@@ -1253,7 +1252,7 @@ class MainWindow(QMainWindow):
                 if isos:
                     self.all_iso_images[iso_host] = isos
             # Собираем HA группы (host_name -> [group, ...])
-            ha_list = data.get("ha_groups", [])
+            ha_list = [HaGroup.from_pve(g) for g in data.get("ha_groups", [])]
             if ha_list:
                 self.all_ha_groups[host] = ha_list
         else:

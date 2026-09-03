@@ -543,3 +543,48 @@ class TestVmSnapshotsWorker:
         _, snapshots = recorded["ready"][0]
         assert snapshots[0].size_bytes == 0
         assert snapshots[0].size_str == "—"
+
+
+class TestHaResourcesWorker:
+    """HA resources flow emits domain HaResource objects."""
+
+    def test_emits_domain_ha_resources(self, monkeypatch):
+        class FakeSession:
+            def __init__(self, cfg, timeout=10):
+                pass
+
+            def close(self):
+                pass
+
+        class FakeClusterAPI:
+            def __init__(self, session):
+                pass
+
+            def list_ha_resources(self):
+                return [
+                    {"sid": "vm:100", "group": "g1", "state": "started",
+                     "max_restart": 2, "max_relocate": 1, "comment": "db"},
+                    {"sid": "vm:200", "group": "g2", "state": "stopped"},
+                ]
+
+        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
+        monkeypatch.setattr(backend, "ClusterAPI", FakeClusterAPI)
+
+        worker = backend.HaResourcesWorker({"name": "h1"})
+        recorded = {"ready": [], "error": [], "finished": []}
+        worker.signals.ha_resources_ready.connect(
+            lambda r: recorded["ready"].append(r))
+        worker.signals.ha_resources_error.connect(
+            lambda e: recorded["error"].append(e))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
+        worker.run()
+
+        assert recorded["error"] == []
+        resources = recorded["ready"][0]
+        assert all(isinstance(r, backend.HaResource) for r in resources)
+        assert resources[0].sid == "vm:100"
+        assert resources[0].vmid == 100
+        assert resources[0].max_restart == 2
+        assert resources[0].comment == "db"
+        assert resources[1].max_restart == 1  # PVE omits defaults
+        assert recorded["finished"] == [True]

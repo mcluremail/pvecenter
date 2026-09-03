@@ -3565,32 +3565,30 @@ class HostTabs:
         panel.ha_stack.setCurrentIndex(1)
 
         ha_groups = []
-        for _h, groups in panel.all_ha_groups.items():
-            for g in groups:
-                if isinstance(g, dict):
-                    ha_groups.append(g)
-        ha_groups.sort(key=lambda x: x.get("group", ""))
+        for groups in panel.all_ha_groups.values():
+            ha_groups.extend(groups)
+        ha_groups.sort(key=lambda g: g.group)
         groups_table = panel.ha_groups_table
         groups_table.setRowCount(len(ha_groups))
         for i, g in enumerate(ha_groups):
-            groups_table.setItem(i, 0, QTableWidgetItem(g.get("group", "")))
-            groups_table.setItem(i, 1, QTableWidgetItem(g.get("nodes", "")))
-            restricted = tr("Yes") if g.get("restricted") else tr("No")
+            groups_table.setItem(i, 0, QTableWidgetItem(g.group))
+            groups_table.setItem(i, 1, QTableWidgetItem(g.nodes))
+            restricted = tr("Yes") if g.restricted else tr("No")
             groups_table.setItem(i, 2, QTableWidgetItem(restricted))
-            nofailback = tr("Yes") if g.get("nofailback") else tr("No")
+            nofailback = tr("Yes") if g.nofailback else tr("No")
             groups_table.setItem(i, 3, QTableWidgetItem(nofailback))
-            groups_table.setItem(i, 4, QTableWidgetItem(g.get("comment", "")))
+            groups_table.setItem(i, 4, QTableWidgetItem(g.comment))
         groups_table.resizeRowsToContents()
 
         resources_table = panel.ha_resources_table
         resources_table.setRowCount(len(data))
         for i, r in enumerate(data):
-            resources_table.setItem(i, 0, QTableWidgetItem(r.get("sid", "")))
-            resources_table.setItem(i, 1, QTableWidgetItem(r.get("group", "")))
-            resources_table.setItem(i, 2, QTableWidgetItem(r.get("state", "")))
-            resources_table.setItem(i, 3, QTableWidgetItem(str(r.get("max_restart", ""))))
-            resources_table.setItem(i, 4, QTableWidgetItem(str(r.get("max_relocate", ""))))
-            resources_table.setItem(i, 5, QTableWidgetItem(r.get("comment", "")))
+            resources_table.setItem(i, 0, QTableWidgetItem(r.sid))
+            resources_table.setItem(i, 1, QTableWidgetItem(r.group))
+            resources_table.setItem(i, 2, QTableWidgetItem(r.state))
+            resources_table.setItem(i, 3, QTableWidgetItem(str(r.max_restart)))
+            resources_table.setItem(i, 4, QTableWidgetItem(str(r.max_relocate)))
+            resources_table.setItem(i, 5, QTableWidgetItem(r.comment))
         resources_table.resizeRowsToContents()
 
         panel.ha_remove_btn.setEnabled(len(data) > 0)
@@ -3616,10 +3614,8 @@ class HostTabs:
         ha_groups_raw = []
         for _h, groups in panel.all_ha_groups.items():
             for g in groups:
-                if isinstance(g, dict) and g.get("group"):
-                    ha_groups_raw.append(g["group"])
-                elif isinstance(g, str) and g:
-                    ha_groups_raw.append(g)
+                if g.group:
+                    ha_groups_raw.append(g.group)
         if not ha_groups_raw:
             QMessageBox.information(panel, tr("HA"), tr("No HA groups available"))
             return

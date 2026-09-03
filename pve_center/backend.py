@@ -7,6 +7,7 @@ import urllib3
 from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from .domain.ha_resource import HaResource
 from .domain.snapshot import Snapshot
 from .domain.task import Task
 from .provider import (
@@ -1776,7 +1777,8 @@ class HaResourcesWorker(QRunnable):
             session = ProxmoxSession(self.host_cfg, timeout=15)
             cluster_api = ClusterAPI(session)
             data = cluster_api.list_ha_resources()
-            _safe_emit(self.signals.ha_resources_ready, data)
+            resources = [HaResource.from_pve(r) for r in data]
+            _safe_emit(self.signals.ha_resources_ready, resources)
         except Exception as e:
             logger.debug("HA resources error: %s", e)
             _safe_emit(self.signals.ha_resources_error, _sanitize_error(e))
