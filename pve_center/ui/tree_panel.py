@@ -4,10 +4,11 @@ from collections import defaultdict
 from datetime import timedelta
 
 from PySide6.QtCore import QMimeData, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QDrag
+from PySide6.QtGui import QAction, QBrush, QColor, QDrag
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QMenu,
@@ -20,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import load_ui_state, save_ui_state
+from ..config import load_tree_notes, load_ui_state, save_tree_note, save_ui_state
 from ..domain import Node, NodeStatus, VmStatus, VmType
 from .i18n import tr
 from .icons import get_icon, init_icons, make_loading_icon
@@ -174,6 +175,7 @@ class TreePanel(QWidget):
         super().__init__()
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
+        self._tree_notes = load_tree_notes()
         self.all_nodes = []
         self._node_repo = None
         self.all_vms = []
@@ -218,8 +220,12 @@ class TreePanel(QWidget):
         layout.addWidget(self._empty_label)
 
         self.tree = GroupTreeWidget(self)
-        self.tree.setColumnCount(1)
+        self.tree.setColumnCount(2)
         self.tree.setHeaderHidden(True)
+        header = self.tree.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tree.setAlternatingRowColors(True)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setIndentation(20)
@@ -365,6 +371,12 @@ class TreePanel(QWidget):
             )
             menu.addAction(ha_remove_act)
             menu.addSeparator()
+            vm_note_act = QAction(tr("Edit note…"), self.tree)
+            vm_note_act.triggered.connect(
+                lambda checked, it=item, ks=f"vm:{host_name}:{vmid}":
+                    self._edit_note_dialog(it, ks)
+            )
+            menu.addAction(vm_note_act)
             delete_action = QAction(tr("Delete VM"), self.tree)
             delete_action.triggered.connect(
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_delete_requested.emit(hn, nd, vid)
@@ -430,6 +442,13 @@ class TreePanel(QWidget):
                 )
                 menu.addAction(trust_action)
                 self._add_group_menu(menu, "host", host_name)
+                note_act = QAction(tr("Edit note…"), self.tree)
+                note_default = self._host_default_note(host_name)
+                note_act.triggered.connect(
+                    lambda checked, it=item, ks=f"host:{host_name}", df=note_default:
+                        self._edit_note_dialog(it, ks, df)
+                )
+                menu.addAction(note_act)
 
         elif item_type == "cluster":
             cl_hosts = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
@@ -449,6 +468,12 @@ class TreePanel(QWidget):
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
             menu.addAction(delete_action)
             self._add_group_menu(menu, "cluster", item_name)
+            note_act = QAction(tr("Edit note…"), self.tree)
+            note_act.triggered.connect(
+                lambda checked, it=item, ks=f"cluster:{item_name}":
+                    self._edit_note_dialog(it, ks)
+            )
+            menu.addAction(note_act)
 
         elif item_type == "group":
             rename_action = QAction(tr("Rename group…"), self.tree)
@@ -459,6 +484,21 @@ class TreePanel(QWidget):
             delete_action.triggered.connect(
                 lambda checked=False, g=item_name: self.group_delete_requested.emit(g))
             menu.addAction(delete_action)
+            note_act = QAction(tr("Edit note…"), self.tree)
+            note_act.triggered.connect(
+                lambda checked, it=item, ks=f"group:{item_name}":
+                    self._edit_note_dialog(it, ks)
+            )
+            menu.addAction(note_act)
+
+        elif item_type == "storage":
+            scope = key[3] if len(key) > 3 else ""
+            note_act = QAction(tr("Edit note…"), self.tree)
+            note_act.triggered.connect(
+                lambda checked, it=item, ks=f"storage:{item_name}:{scope}":
+                    self._edit_note_dialog(it, ks)
+            )
+            menu.addAction(note_act)
 
         elif item_type == "section" and item_name in (tr("Clusters"), tr("Standalone hosts")):
             delete_action = QAction(tr("Remove all hosts from") + f' "{item_name}"', self.tree)
@@ -611,6 +651,37 @@ class TreePanel(QWidget):
         if item:
             self._on_item_clicked(item, 0)
 
+    # ── B19: per-item notes ─────────────────────────────────────────
+
+    def _host_default_note(self, host_name):
+        """Default note for a host item: the FQDN/address from its config."""
+        cfg = self._cfg_by_name.get(host_name)
+        return (cfg.get("host") or "") if cfg else ""
+
+    def _refresh_note(self, item, key_str, default=""):
+        """Show the note in column 1 (muted); fall back to default when unset."""
+        note = self._tree_notes.get(key_str, "") or default
+        if note:
+            item.setText(1, note if len(note) <= 60 else note[:59] + "…")
+            item.setForeground(1, QBrush(QColor(Color.GRAY_400)))
+            item.setToolTip(1, note)
+        else:
+            item.setText(1, "")
+            item.setToolTip(1, "")
+
+    def _edit_note_dialog(self, item, key_str, default=""):
+        current = self._tree_notes.get(key_str, "")
+        text, ok = QInputDialog.getMultiLineText(self, tr("Edit note"), tr("Note"), current)
+        if not ok:
+            return
+        note = text.strip()
+        if note:
+            self._tree_notes[key_str] = note
+        else:
+            self._tree_notes.pop(key_str, None)
+        save_tree_note(key_str, note)
+        self._refresh_note(item, key_str, default)
+
     def _add_vm_item(self, parent, vm):
         vm_item = QTreeWidgetItem(parent)
         vm_name = vm.name or f"VM {vm.vmid}"
@@ -620,6 +691,7 @@ class TreePanel(QWidget):
         else:
             vm_item.setIcon(0, get_icon("vm", vm.status_value))
         vm_item.setData(0, VM_KEY_ROLE, (vm.host_name, vm.vmid, vm.node))
+        self._refresh_note(vm_item, f"vm:{vm.host_name}:{vm.vmid}")
         cpu_pct = vm.cpu_pct
         mem_pct = vm.mem_pct
         status = vm.status_value
@@ -679,6 +751,7 @@ class TreePanel(QWidget):
             cl_item.setText(0, cluster_name)
             cl_item.setIcon(0, make_loading_icon(self._spinner_angle))
             cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+            self._refresh_note(cl_item, f"cluster:{cluster_name}")
             return cl_item
         cluster_host_names = {n.host_name for n in nodes_in_cl}
         vms_in_cl = [vm for vm in self.all_vms
@@ -687,6 +760,7 @@ class TreePanel(QWidget):
         cl_item.setText(0, f"{cluster_name}  {_vm_count_str(vms_in_cl)}")
         cl_item.setIcon(0, get_icon("cluster"))
         cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+        self._refresh_note(cl_item, f"cluster:{cluster_name}")
 
         for node in sorted(nodes_in_cl, key=lambda n: (n.display_name or n.node).lower()):
             node_name = node.node
@@ -697,6 +771,8 @@ class TreePanel(QWidget):
             host_item.setIcon(0, get_icon("host", node.status_value))
             host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, node.host_name))
             host_item.setToolTip(0, _node_tooltip(node))
+            self._refresh_note(host_item, f"host:{node.host_name}",
+                               self._host_default_note(node.host_name))
 
         pool_groups = defaultdict(list)
         no_pool_vms = []
@@ -734,11 +810,15 @@ class TreePanel(QWidget):
             host_item.setText(0, display_name)
             host_item.setIcon(0, make_loading_icon(self._spinner_angle))
             host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
+            self._refresh_note(host_item, f"host:{host_name}",
+                               self._host_default_note(host_name))
             return host_item
         host_item.setText(0, f"{display_name}  {_vm_count_str(vms_on_host)}")
         host_item.setIcon(0, get_icon("host", node.status_value))
         host_item.setData(0, ITEM_KEY_ROLE, ("host", node_name, host_name))
         host_item.setToolTip(0, _node_tooltip(node))
+        self._refresh_note(host_item, f"host:{host_name}",
+                           self._host_default_note(host_name))
 
         pool_groups = defaultdict(list)
         no_pool_vms = []
@@ -859,6 +939,7 @@ class TreePanel(QWidget):
             g_vms = [vm for vm in self.all_vms if vm.host_name in g_host_names]
             g_item.setText(0, f"{g}  {_vm_count_str(g_vms)}")
             g_item.setIcon(0, get_icon("folder"))
+            self._refresh_note(g_item, f"group:{g}")
             for cl_name in sorted(group_clusters.get(g, {}), key=str.lower):
                 self._make_cluster_item(g_item, cl_name, group_clusters[g][cl_name])
             for node in sorted(g_nodes, key=lambda n: (n.display_name or n.node).lower()):
@@ -903,6 +984,7 @@ class TreePanel(QWidget):
                         si.setText(0, f"{sname} (@{cluster_name})")
                         si.setIcon(0, get_icon("storage"))
                         si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "cluster", cluster_name))
+                        self._refresh_note(si, f"storage:{sname}:{cluster_name}")
 
             if standalone_storages:
                 so_item = QTreeWidgetItem(st_folder)
@@ -922,6 +1004,7 @@ class TreePanel(QWidget):
                         si.setText(0, f"{sname} ({shost})")
                         si.setIcon(0, get_icon("storage"))
                         si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "host", shost))
+                        self._refresh_note(si, f"storage:{sname}:{shost}")
 
         raw = load_ui_state("expandedTreePaths")
         if raw:

@@ -329,3 +329,32 @@ class TestBundle:
     def test_export_empty_config(self, cfg_dir, fake_keyring):
         config.save_config([])
         assert config.export_config(str(cfg_dir / "b.enc")) is False
+
+
+# --- tree notes (B19) ---
+
+
+class TestTreeNotes:
+    def test_empty_and_roundtrip(self, cfg_dir):
+        assert config.load_tree_notes() == {}
+        config.save_tree_note("host:h1", "Main host")
+        config.save_tree_note("cluster:c1", "Prod")
+        config.save_tree_note("vm:h1:100", "web")
+        assert config.load_tree_notes() == {
+            "host:h1": "Main host",
+            "cluster:c1": "Prod",
+            "vm:h1:100": "web",
+        }
+
+    def test_overwrite(self, cfg_dir):
+        config.save_tree_note("host:h1", "a")
+        config.save_tree_note("host:h1", "b")
+        assert config.load_tree_notes() == {"host:h1": "b"}
+
+    def test_empty_note_removes_entry(self, cfg_dir):
+        config.save_tree_note("host:h1", "a")
+        config.save_tree_note("host:h1", "")
+        assert config.load_tree_notes() == {}
+        config.save_tree_note("host:h2", "keep")
+        config.save_tree_note("host:h2", "   ")
+        assert config.load_tree_notes() == {}

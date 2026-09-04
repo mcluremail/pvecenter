@@ -128,6 +128,7 @@ def _init_db():
     """)
     conn.execute("CREATE TABLE IF NOT EXISTS tasks_cache (id INTEGER PRIMARY KEY, data TEXT)")
     conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS tree_notes (key TEXT PRIMARY KEY, note TEXT NOT NULL)")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS resources_cache (
             id INTEGER PRIMARY KEY,
@@ -531,6 +532,38 @@ def load_ui_state(key: str) -> str | None:
     except Exception as e:
         logger.warning("load_ui_state(%s): %s", key, e)
         return None
+
+
+def load_tree_notes() -> dict[str, str]:
+    """Load all user tree notes, keyed by item key strings ("kind:name")."""
+    try:
+        with _DB_LOCK:
+            conn = _init_db()
+            cur = conn.execute("SELECT key, note FROM tree_notes")
+            rows = cur.fetchall()
+            conn.close()
+            return {k: n for k, n in rows}
+    except Exception as e:
+        logger.warning("load_tree_notes: %s", e)
+        return {}
+
+
+def save_tree_note(key: str, note: str):
+    """Store a tree item note; an empty note removes the entry."""
+    try:
+        with _DB_LOCK:
+            conn = _init_db()
+            if note.strip():
+                conn.execute(
+                    "INSERT OR REPLACE INTO tree_notes (key, note) VALUES (?, ?)",
+                    (key, note.strip()),
+                )
+            else:
+                conn.execute("DELETE FROM tree_notes WHERE key = ?", (key,))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        logger.warning("save_tree_note(%s): %s", key, e)
 
 
 # ── translations ────────────────────────────────────────────────

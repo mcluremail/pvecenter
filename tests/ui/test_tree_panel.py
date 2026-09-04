@@ -516,3 +516,86 @@ class TestGroupDragDrop:
 
         assert event.ignored and not event.accepted
         assert emitted == []
+
+
+def _find_item(tp, text_part):
+    """Depth-first search for an item whose column-0 text contains text_part."""
+    def walk(item):
+        if text_part in item.text(0):
+            return item
+        for i in range(item.childCount()):
+            found = walk(item.child(i))
+            if found:
+                return found
+        return None
+    for i in range(tp.tree.topLevelItemCount()):
+        found = walk(tp.tree.topLevelItem(i))
+        if found:
+            return found
+    return None
+
+
+class TestTreePanelNotes:
+    """B19: per-item notes in tree column 1."""
+
+    def test_host_default_note_is_fqdn(self, qtbot, make_node):
+        cfg = [{"name": "h1", "host": "pve01.example.com", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node = make_node(host_name="h1", node="pve01")
+        tp.update_data([node], [], final=True)
+
+        host_item = _find_item(tp, "pve01")
+        assert host_item is not None
+        assert host_item.text(1) == "pve01.example.com"
+
+    def test_host_user_note_overrides_fqdn(self, qtbot, make_node):
+        cfg = [{"name": "h1", "host": "pve01.example.com", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        tp._tree_notes["host:h1"] = "Main node"
+        node = make_node(host_name="h1", node="pve01")
+        tp.update_data([node], [], final=True)
+
+        host_item = _find_item(tp, "pve01")
+        assert host_item.text(1) == "Main node"
+
+    def test_cluster_and_vm_notes(self, qtbot, make_node, make_vm):
+        cfg = [{"name": "h1", "cluster": "c1", "cluster_rep": True, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        tp._tree_notes["cluster:c1"] = "Prod cluster"
+        tp._tree_notes["vm:h1:100"] = "web server"
+        node = make_node(host_name="h1", node="pve01", cluster="c1")
+        vm = make_vm(host_name="h1", node="pve01", vmid=100)
+        tp.update_data([node], [vm], final=True)
+
+        cl_item = _find_item(tp, "c1")
+        assert cl_item is not None
+        assert cl_item.text(1) == "Prod cluster"
+        vm_item = _find_item(tp, "test-vm")
+        assert vm_item is not None
+        assert vm_item.text(1) == "web server"
+
+    def test_no_note_without_cfg_host(self, qtbot, make_node):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node = make_node(host_name="h1", node="pve01")
+        tp.update_data([node], [], final=True)
+
+        host_item = _find_item(tp, "pve01")
+        assert host_item is not None
+        assert host_item.text(1) == ""
+
+    def test_long_note_truncated_with_tooltip(self, qtbot, make_node):
+        cfg = [{"name": "h1", "host": "pve01.example.com", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        tp._tree_notes["host:h1"] = "x" * 80
+        node = make_node(host_name="h1", node="pve01")
+        tp.update_data([node], [], final=True)
+
+        host_item = _find_item(tp, "pve01")
+        assert host_item.text(1) == "x" * 59 + "…"
+        assert host_item.toolTip(1) == "x" * 80
