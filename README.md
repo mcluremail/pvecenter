@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.9.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.9.0)
+Latest release: [v2.10.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.10.0)
 
 ## Changelog
 
@@ -25,7 +25,6 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 ## Features
 
 **Monitoring**
-- Object tree: Clusters → Hosts (nodes) → VMs/Containers with color status indicators
 - CPU, RAM, network, and disk usage charts (RRD data from PVE)
 - VM pool summary with resource progress bars
 - Storage: aggregated overview, per-node detail, fill-level chart
@@ -40,9 +39,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 **Management**
 - Power actions for QEMU and LXC: Start, Shutdown, Reboot, Reset, Stop, Resume
+- Bulk actions: multi-select VMs in the tree (Ctrl/Shift+click) and mass Start / Shutdown / Reboot / Stop with progress dialog and per-VM results
+- Snapshot rollback: revert a VM/container to a snapshot from the Snapshots tab (guarded for the pseudo-snapshot "current")
 - Create Virtual Machines: dialog with CPU, RAM, disk, network settings — right from the node context menu
 - Migrate QEMU VMs between cluster nodes (with local disks option)
-- Clone QEMU VMs and LXC containers (full or linked, target node, storage selection)
+- Clone QEMU VMs and LXC containers (full or linked, target node, storage selection), clone from templates, convert VM ↔ template
 - SPICE console (requires virt-viewer)
 - Delete host with API token removal on the server
 - Token recreation via context menu
@@ -56,6 +57,10 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Audit log filters: text search + status filter (All/OK/Errors/Running)
 
 **Interface**
+- Object tree: user-defined groups, Clusters → Hosts → VMs/Containers with color status indicators; templates get a distinct icon
+- User-defined host groups: named groups above the tree sections, assign hosts/clusters via context menu or drag&drop; clicking a group shows an aggregated summary
+- Tree notes: short per-item note (host, cluster, group, VM, storage) in a muted second column; host notes default to the host FQDN
+- Global search (Ctrl+F): find VMs, hosts, pools and storages across all clusters and jump to the object in the tree
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
 - CardList widget — list views as card rows (Host VMs, Cluster Summary, Storage Overview) with status dots, filter, double-click editing
 - Node comparison view: side-by-side cluster node metrics (CPU, RAM, disk, VMs, uptime, PVE version)

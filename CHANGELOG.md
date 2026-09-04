@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (v2.10.0)
+## v2.10.0 — tree notes, global search, snapshot rollback, bulk actions, host groups
 
 **New features**
 - Tree notes: short user note per tree item (host, cluster, group, VM, storage) shown in a second muted column; host items default to the host FQDN until a custom note is set; edited via "Edit note…" context menu; stored in config.sqlite (`tree_notes` table)
