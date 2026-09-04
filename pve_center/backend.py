@@ -4,7 +4,6 @@ import threading
 
 import requests
 import urllib3
-from proxmoxer import ProxmoxAPI
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from .domain.cluster import ClusterStatus
@@ -48,39 +47,12 @@ def _verify_ssl(cfg):
     return not bool(trust)
 
 
-def _close_proxmox(proxmox):
-    """Close underlying requests.Session to prevent connection pool leaks."""
-    try:
-        sess = proxmox._store.get("session")
-        if sess is not None:
-            sess.close()
-    except Exception:
-        pass
-
-
 def _cleanup_vv(vv_path):
     if vv_path and os.path.exists(vv_path):
         try:
             os.unlink(vv_path)
         except OSError:
             pass
-
-
-def _make_proxmox(cfg, timeout=15):
-    """Create ProxmoxAPI with SSL verification and redirects disabled."""
-    proxmox = ProxmoxAPI(
-        cfg["host"],
-        user=cfg["user"],
-        token_name=cfg["token_name"],
-        token_value=cfg["token_value"],
-        verify_ssl=_verify_ssl(cfg),
-        timeout=timeout,
-    )
-    sess = proxmox._store.get("session")
-    if sess is not None:
-        sess.max_redirects = 0
-        sess.allow_redirects = False
-    return proxmox
 
 
 def _q(value):

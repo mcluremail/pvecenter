@@ -32,10 +32,6 @@ class NodeAPI:
         """GET /nodes/{node}/storage."""
         return self._s.call(self._s.proxmox.nodes(_q(node)).storage.get)
 
-    def list_networks(self, node: str) -> list[dict]:
-        """GET /nodes/{node}/network."""
-        return self._s.call(self._s.proxmox.nodes(_q(node)).network.get)
-
     def create_network(self, node: str, **params) -> object:
         """POST /nodes/{node}/network."""
         return self._s.call(self._s.proxmox.nodes(_q(node)).network.post, **params)
@@ -59,16 +55,6 @@ class NodeAPI:
     def revert_network(self, node: str) -> object:
         """DELETE /nodes/{node}/network — revert pending changes."""
         return self._s.call(self._s.proxmox.nodes(_q(node)).network.delete)
-
-    def list_tasks(self, node: str, limit: int = 100, **params) -> list[dict]:
-        """GET /nodes/{node}/tasks."""
-        return self._s.call(
-            self._s.proxmox.nodes(_q(node)).tasks.get, limit=limit, **params
-        )
-
-    def get_task_status(self, node: str, upid: str) -> dict:
-        """GET /nodes/{node}/tasks/{upid}/status."""
-        return self._s.call(self._s.proxmox.nodes(_q(node)).tasks(_q(upid)).status.get)
 
     def backup_vzdump(self, node: str, **params) -> object:
         """POST /nodes/{node}/vzdump — on-demand backup."""

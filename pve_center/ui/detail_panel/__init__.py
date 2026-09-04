@@ -53,7 +53,6 @@ class DetailPanel(QWidget):
         self.vm_snapshots_cache = {}
         self._storage_content_pending = {}
         self._iso_by_host = {}
-        self._all_iso_catalog = {}
         self._last_vm_data = None
         self.current_obj_type = None
         self.current_obj_name = None
@@ -248,9 +247,6 @@ class DetailPanel(QWidget):
     def update_nodes_cfg(self, nodes_cfg):
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
-
-    def set_iso_catalog(self, iso_images):
-        self._all_iso_catalog = iso_images or {}
 
     def show_details(self, obj_type, obj_name, data):
         self.tabs.show()

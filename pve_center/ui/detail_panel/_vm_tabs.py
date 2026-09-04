@@ -440,10 +440,6 @@ class VMTabs:
             detail = panel.details_cache.get(detail_key)
             panel.hardware_widget.set_hardware_data(panel.config_cache[detail_key], detail)
             panel.options_widget.set_options_data(panel.config_cache[detail_key])
-        if host_name not in panel._iso_by_host and panel._all_iso_catalog:
-            panel._iso_by_host[host_name] = {
-                iso["volid"] for iso in panel._all_iso_catalog.get(host_name, [])
-            }
         iso_set = panel._iso_by_host.setdefault(host_name, set())
         panel.hardware_widget.set_iso_list(iso_set)
         node_storages = [s for s in panel.all_storages

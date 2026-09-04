@@ -137,6 +137,21 @@ class Vm(DictCompat):
         return safe_pct(self.disk_bytes, self.maxdisk_bytes)
 
     @property
+    def cpu_text(self) -> str:
+        """CPU usage formatted: '35.0%'."""
+        return f"{self.cpu_pct}%"
+
+    @property
+    def ram_text(self) -> str:
+        """Memory usage formatted: '2.0/4.0 GiB'."""
+        return f"{self.mem_gib}/{self.maxmem_gib} GiB"
+
+    @property
+    def disk_text(self) -> str:
+        """Disk usage formatted: '1.0/16.0 GiB' (meaningful for LXC only)."""
+        return f"{self.disk_gib}/{self.maxdisk_gib} GiB"
+
+    @property
     def netin_mib(self) -> float:
         """Cumulative network-in in MiB, rounded to 2 decimals."""
         return round(self.netin_bytes / (1024**2), 2) if self.netin_bytes else 0.0
@@ -194,31 +209,6 @@ class Vm(DictCompat):
     def _type_value(self) -> str:
         """Raw type string ('qemu', 'lxc') — used by _FIELD_MAP for dict-compat."""
         return self.vm_type.value
-
-    @property
-    def cpu_text(self) -> str:
-        """CPU usage formatted: '35.0%'."""
-        return f"{self.cpu_pct}%"
-
-    @property
-    def ram_text(self) -> str:
-        """Memory usage formatted: '2.0/4.0 GiB'."""
-        return f"{self.mem_gib}/{self.maxmem_gib} GiB"
-
-    @property
-    def disk_text(self) -> str:
-        """Disk usage formatted: '1.0/16.0 GiB' (meaningful for LXC only)."""
-        return f"{self.disk_gib}/{self.maxdisk_gib} GiB"
-
-    @property
-    def netin_text(self) -> str:
-        """Network-in formatted: '100.0 MiB'."""
-        return f"{self.netin_mib} MiB"
-
-    @property
-    def netout_text(self) -> str:
-        """Network-out formatted: '50.0 MiB'."""
-        return f"{self.netout_mib} MiB"
 
     @property
     def _key(self) -> str:

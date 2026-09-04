@@ -27,7 +27,6 @@ from pve_center.provider import (
     TaskAPI,
     VmAPI,
     from_exception,
-    sanitize,
 )
 
 # -- _errors tests --
@@ -92,27 +91,6 @@ class TestErrors:
         result = from_exception(exc)
         assert isinstance(result, ProxmoxApiError)
         assert result.code == "api"
-
-    def test_sanitize_strips_url(self):
-        msg = sanitize(Exception("GET https://10.0.0.1:8006/api2/json/nodes failed"))
-        assert "https://" not in msg
-        assert "[url]" in msg
-
-    def test_sanitize_strips_host_port(self):
-        msg = sanitize(Exception("connect to 10.0.0.1:8006 failed"))
-        assert "10.0.0.1:8006" not in msg
-        assert "[host]" in msg
-
-    def test_sanitize_truncates(self):
-        long_msg = "x" * 300
-        msg = sanitize(Exception(long_msg))
-        assert len(msg) <= 153
-        assert msg.endswith("...")
-
-    def test_sanitize_preserves_short(self):
-        msg = sanitize(Exception("short error"))
-        assert "short error" in msg
-
 
 # -- _session tests --
 
@@ -316,14 +294,6 @@ class TestNodeAPI:
         chain.return_value.storage.get = MagicMock(return_value=[{"storage": "local"}])
         api = NodeAPI(mock_session)
         assert api.list_storage("n1") == [{"storage": "local"}]
-
-    def test_list_tasks(self, mock_session):
-        chain = mock_session.proxmox.nodes
-        chain.return_value.tasks.get = MagicMock(return_value=[{"upid": "UPID:1"}])
-        api = NodeAPI(mock_session)
-        result = api.list_tasks("n1", limit=50)
-        assert len(result) == 1
-        chain.return_value.tasks.get.assert_called_once_with(limit=50)
 
     def test_apply_network(self, mock_session):
         chain = mock_session.proxmox.nodes

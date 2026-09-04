@@ -162,11 +162,6 @@ class Node(DictCompat):
         return f"{self.mem_gib}/{self.maxmem_gib} GiB"
 
     @property
-    def ram_pct_text(self) -> str:
-        """Memory usage with percentage: '8.0/16.0 (50%)'."""
-        return f"{self.mem_gib}/{self.maxmem_gib} ({self.mem_pct}%)"
-
-    @property
     def disk_text(self) -> str:
         """Disk usage formatted: '1.0/50.0 GiB'."""
         return f"{self.disk_gib}/{self.maxdisk_gib} GiB"

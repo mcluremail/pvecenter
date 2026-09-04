@@ -43,22 +43,6 @@ class ClusterAPI:
         """GET /cluster/ha/groups."""
         return self._s.call(self._s.proxmox.cluster.ha.groups.get)
 
-    def create_ha_group(self, **params) -> object:
-        """POST /cluster/ha/groups."""
-        return self._s.call(self._s.proxmox.cluster.ha.groups.post, **params)
-
-    def update_ha_group(self, group_id: str, **params) -> object:
-        """PUT /cluster/ha/groups/{group_id}."""
-        return self._s.call(
-            self._s.proxmox.cluster.ha.groups(_q(group_id)).put, **params
-        )
-
-    def delete_ha_group(self, group_id: str) -> object:
-        """DELETE /cluster/ha/groups/{group_id}."""
-        return self._s.call(self._s.proxmox.cluster.ha.groups(_q(group_id)).delete)
-
-    # -- HA resources --
-
     def list_ha_resources(self) -> list[dict]:
         """GET /cluster/ha/resources."""
         return self._s.call(self._s.proxmox.cluster.ha.resources.get)

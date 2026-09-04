@@ -1220,7 +1220,6 @@ class MainWindow(QMainWindow):
                 self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
                 node_repo=self._node_repo, vm_repo=self._vm_repo
             )
-            self.detail_panel.set_iso_catalog(self.all_iso_images)
             self._update_status_bar()
 
     @Slot(dict)
@@ -1289,7 +1288,6 @@ class MainWindow(QMainWindow):
             self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
                 node_repo=self._node_repo, vm_repo=self._vm_repo
         )
-        self.detail_panel.set_iso_catalog(self.all_iso_images)
         self.detail_panel.all_pools = self.all_pools
         self.detail_panel.all_ha_groups = self.all_ha_groups
 
@@ -1462,7 +1460,6 @@ class MainWindow(QMainWindow):
                     # soft refresh не имеет ProxmoxAPI, пересобрать не может
                     self.detail_panel.all_pools = self.all_pools
                     self.detail_panel.all_ha_groups = self.all_ha_groups
-                    self.detail_panel.set_iso_catalog(self.all_iso_images)
                     self._detect_status_changes()
                     self._update_status_bar()
                     from ..config import save_resources_cache

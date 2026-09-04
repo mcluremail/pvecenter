@@ -88,12 +88,3 @@ def from_exception(exc: Exception) -> ProxmoxError:
         return ProxmoxNetworkError(msg)
     return ProxmoxApiError(msg)
 
-
-def sanitize(exc: Exception) -> str:
-    """Sanitize exception message for UI display — strip URLs, hostnames."""
-    msg = str(exc)
-    msg = re.sub(r"https?://[^\s'\"]+", "[url]", msg)
-    msg = re.sub(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\b", "[host]", msg)
-    if len(msg) > 150:
-        msg = msg[:150] + "..."
-    return msg

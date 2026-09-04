@@ -27,7 +27,6 @@ from ._errors import (
     ProxmoxPermissionError,
     ProxmoxTimeoutError,
     from_exception,
-    sanitize,
 )
 from ._nodes import NodeAPI
 from ._pools import PoolAPI
@@ -56,5 +55,4 @@ __all__ = [
     "TaskAPI",
     "VmAPI",
     "from_exception",
-    "sanitize",
 ]

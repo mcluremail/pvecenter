@@ -68,24 +68,10 @@ class TestSanitizeError:
         assert backend._sanitize_error(Exception("boom")) == "boom"
 
 
-# --- _close_proxmox / _cleanup_vv ---
+# --- _cleanup_vv ---
 
 
 class TestCloseAndCleanup:
-    def test_close_proxmox_closes_session(self):
-        sess = MagicMock()
-        proxmox = SimpleNamespace(_store={"session": sess})
-        backend._close_proxmox(proxmox)
-        sess.close.assert_called_once()
-
-    def test_close_proxmox_without_session(self):
-        backend._close_proxmox(SimpleNamespace(_store={}))
-
-    def test_close_proxmox_swallows_errors(self):
-        sess = MagicMock()
-        sess.close.side_effect = RuntimeError("closed twice")
-        backend._close_proxmox(SimpleNamespace(_store={"session": sess}))
-
     def test_cleanup_vv_removes_file(self, tmp_path):
         f = tmp_path / "spice.vv"
         f.write_text("[virt-viewer]")
