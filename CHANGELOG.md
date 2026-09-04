@@ -3,6 +3,7 @@
 ## Unreleased (v2.10.0)
 
 **New features**
+- Tree notes: short user note per tree item (host, cluster, group, VM, storage) shown in a second muted column; host items default to the host FQDN until a custom note is set; edited via "Edit note…" context menu; stored in config.sqlite (`tree_notes` table)
 - Global search: toolbar button + Ctrl+F dialog searches VMs (name, VMID, tags, pool, node), hosts, pools and storages across all clusters; selecting a result jumps to the object in the tree
 - Snapshot rollback: revert a VM/container to a snapshot from the Snapshots tab (toolbar button + context menu, with confirmation)
 - Rollback action is guarded for the pseudo-snapshot "current" and waits for the UPID task to finish
