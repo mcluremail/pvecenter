@@ -31,7 +31,7 @@ from ..widgets.vm_options_widget import VmOptionsWidget
 from ..widgets.vm_pool_widget import VmPoolWidget
 from ..widgets.vm_task_history_widget import VmTaskHistoryWidget
 from ._constants import TabIndex
-from ._table_utils import loading_label, safe_pct
+from ._table_utils import loading_label, make_loading_stack, safe_pct
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,10 @@ class VMTabs:
         panel.metrics_widget = VmMetricsWidget()
         panel.metrics_widget.setMinimumHeight(200)
         panel.metrics_widget.timeframe_changed.connect(panel._on_timeframe_changed)
-        monitor_layout.addWidget(panel.metrics_widget, 1)
+        # Spinner while MetricsWorker fetches rrddata (no cache hit).
+        panel.metrics_stack = make_loading_stack(panel.metrics_widget)
+        panel.metrics_stack.setCurrentIndex(1)
+        monitor_layout.addWidget(panel.metrics_stack, 1)
 
         tab.setWidget(monitor_widget)
         return tab
@@ -119,7 +122,10 @@ class VMTabs:
         tab = QScrollArea()
         tab.setWidgetResizable(True)
         panel.task_history_widget = VmTaskHistoryWidget()
-        tab.setWidget(panel.task_history_widget)
+        # Spinner while VmTaskHistoryWorker loads recent tasks.
+        panel.task_history_stack = make_loading_stack(panel.task_history_widget)
+        panel.task_history_stack.setCurrentIndex(1)
+        tab.setWidget(panel.task_history_stack)
         return tab
 
     def build_snapshots_tab(self):
@@ -451,15 +457,22 @@ class VMTabs:
 
         if detail_key not in panel.task_history_cache:
             panel.task_history_widget.set_tasks([])
+            panel.task_history_stack.setCurrentIndex(0)
             cfg = panel._cfg_by_name.get(host_name)
             if cfg:
                 node_name = vm_data.node or host_name
                 from ...backend import VmTaskHistoryWorker
                 panel._workers_mgr.current_hist_worker = VmTaskHistoryWorker(cfg, node_name, vmid, limit=50)
                 panel._workers_mgr.current_hist_worker.signals.tasks_ready.connect(lambda vid, t, g=gen, h=host_name, w=panel._workers_mgr.current_hist_worker: (self.on_tasks_loaded(vid, t, g, h), panel._workers_mgr.discard_worker(w)))
-                panel._workers_mgr.current_hist_worker.signals.tasks_error.connect(lambda vid, err, w=panel._workers_mgr.current_hist_worker: panel._workers_mgr.discard_worker(w))
+                panel._workers_mgr.current_hist_worker.signals.tasks_error.connect(lambda vid, err, w=panel._workers_mgr.current_hist_worker: (
+                    panel.task_history_stack.setCurrentIndex(1),
+                    panel._workers_mgr.discard_worker(w),
+                ))
                 panel._workers_mgr.run_worker(panel._workers_mgr.current_hist_worker)
+            else:
+                panel.task_history_stack.setCurrentIndex(1)
         else:
+            panel.task_history_stack.setCurrentIndex(1)
             panel.task_history_widget.set_tasks(panel.task_history_cache[detail_key])
 
     def show_vm_metrics(self, vm_data):
@@ -472,19 +485,25 @@ class VMTabs:
         timeframe = panel.metrics_widget.timeframe_combo.currentData()
         cache_key = (vmid, host_name, timeframe)
         if cache_key in panel.metrics_cache:
+            panel.metrics_stack.setCurrentIndex(1)
             panel.metrics_widget.update_curves(panel.metrics_cache[cache_key])
             return
 
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
+            panel.metrics_stack.setCurrentIndex(1)
             return
+        panel.metrics_stack.setCurrentIndex(0)
         node_name = vm_data.node or host_name
         vm_type = vm_data.vm_type.value
 
         from ..api.metrics import MetricsWorker
         worker = MetricsWorker(cfg, node_name, vmid, vm_type, timeframe)
         worker.signals.data_fetched.connect(lambda tf, v, md, g=panel._generation, h=host_name, w=worker: (self.on_metrics_fetched(tf, v, md, g, h), panel._workers_mgr.discard_worker(w)))
-        worker.signals.error_occurred.connect(lambda err, w=worker: panel._workers_mgr.discard_worker(w))
+        worker.signals.error_occurred.connect(lambda err, w=worker: (
+            panel.metrics_stack.setCurrentIndex(1),
+            panel._workers_mgr.discard_worker(w),
+        ))
         panel._workers_mgr.run_worker(worker)
 
     def on_metrics_fetched(self, timeframe, vmid, metrics_dict, gen, host_name):
@@ -497,6 +516,7 @@ class VMTabs:
         current_vmid = panel._last_vm_data.vmid
         if current_vmid != vmid or current_host != host_name:
             return
+        panel.metrics_stack.setCurrentIndex(1)
         cache_key = (vmid, host_name, timeframe)
         panel.metrics_cache[cache_key] = metrics_dict
         panel.metrics_widget.update_curves(metrics_dict)
@@ -725,6 +745,7 @@ class VMTabs:
         if gen != panel._generation:
             return
         detail_key = (host_name, vmid)
+        panel.task_history_stack.setCurrentIndex(1)
         panel.task_history_cache[detail_key] = tasks
         if panel._last_vm_data and panel._last_vm_data.vmid == vmid and panel._last_vm_data.host_name == host_name:
             panel.task_history_widget.set_tasks(tasks)

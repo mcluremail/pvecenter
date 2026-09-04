@@ -27,20 +27,21 @@ class TabIndex(IntEnum):
     STORAGES = 7
     HOST_STORAGE = 8
     STORAGE_DETAIL = 9
-    BACKUPS = 10
-    DISKS_VM = 11
-    ISO = 12
-    TEMPLATES = 13
-    NETWORK = 14
-    SERVICES = 15
-    HOST_DISKS = 16
-    SNAPSHOTS = 17
-    HEALTH = 18
-    VM_SNAPSHOTS = 19
-    VM_BACKUP = 20
-    BACKUP_JOBS = 21
-    ACCESS = 22
-    HA = 23
+    STORAGE_MONITORING = 10
+    BACKUPS = 11
+    DISKS_VM = 12
+    ISO = 13
+    TEMPLATES = 14
+    NETWORK = 15
+    SERVICES = 16
+    HOST_DISKS = 17
+    SNAPSHOTS = 18
+    HEALTH = 19
+    VM_SNAPSHOTS = 20
+    VM_BACKUP = 21
+    BACKUP_JOBS = 22
+    ACCESS = 23
+    HA = 24
 
 
 def _fmt_pveversion(val):

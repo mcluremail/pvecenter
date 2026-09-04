@@ -1465,22 +1465,29 @@ class HostTabs:
         panel.metrics_widget.show_disk_io(False)
         if not cfg:
             panel.metrics_widget.clear_curves()
+            panel.metrics_stack.setCurrentIndex(1)
             return
         timeframe = panel.metrics_widget.timeframe_combo.currentData()
         cache_key = ("host", node_name, timeframe)
         if cache_key in panel.metrics_cache:
+            panel.metrics_stack.setCurrentIndex(1)
             panel.metrics_widget.update_curves(panel.metrics_cache[cache_key])
             return
+        panel.metrics_stack.setCurrentIndex(0)
         from ..api.metrics import HostMetricsWorker
         worker = HostMetricsWorker(cfg, node_name, timeframe)
         worker.signals.data_fetched.connect(lambda tf, nn, md, g=panel._generation, w=worker: (self.on_host_metrics_fetched(tf, nn, md, g), panel._workers_mgr.discard_worker(w)))
-        worker.signals.error_occurred.connect(lambda err, w=worker: panel._workers_mgr.discard_worker(w))
+        worker.signals.error_occurred.connect(lambda err, w=worker: (
+            panel.metrics_stack.setCurrentIndex(1),
+            panel._workers_mgr.discard_worker(w),
+        ))
         panel._workers_mgr.run_host_worker(worker)
 
     def on_host_metrics_fetched(self, timeframe, node_name, metrics_dict, gen):
         panel = self.panel
         if gen != panel._generation:
             return
+        panel.metrics_stack.setCurrentIndex(1)
         cache_key = ("host", node_name, timeframe)
         panel.metrics_cache[cache_key] = metrics_dict
         panel.metrics_widget.update_curves(metrics_dict)
@@ -1907,6 +1914,8 @@ class HostTabs:
     # ------------------------------------------------------------------
 
     def _fetch_cluster_status(self, cluster_cfg):
+        panel = self.panel
+        panel.card_cluster_quorum.start_loading()
         from ...backend import ClusterStatusWorker
         worker = ClusterStatusWorker(cluster_cfg)
         worker.signals.cluster_status_ready.connect(
@@ -1972,6 +1981,7 @@ class HostTabs:
 
     def _on_cluster_status_error(self, err):
         panel = self.panel
+        panel.card_cluster_quorum.stop_loading()
         panel.cluster_quorum_label.setText(tr("Cluster status unavailable"))
         panel.cluster_quorum_label.setStyleSheet(
             f"font-size: 12px; padding: 4px 8px; color: {Color.STATUS_WARN};"

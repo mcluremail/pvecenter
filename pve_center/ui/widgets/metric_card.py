@@ -1,7 +1,9 @@
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QSizePolicy, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QSizePolicy, QVBoxLayout
 
 from ..theme import Color
+from .spinner import SpinnerWidget
 
 
 class MetricCard(QFrame):
@@ -31,7 +33,17 @@ class MetricCard(QFrame):
         f.setLetterSpacing(QFont.AbsoluteSpacing, -0.5)
         self._value_label.setFont(f)
         self._value_label.setStyleSheet(f"color: {Color.TEXT};")
-        layout.addWidget(self._value_label)
+
+        value_row = QHBoxLayout()
+        value_row.setContentsMargins(0, 0, 0, 0)
+        value_row.setSpacing(4)
+        value_row.addWidget(self._value_label)
+        value_row.addStretch()
+        # Shown instead of the value while async data is loading.
+        self._spinner = SpinnerWidget(18)
+        self._spinner.hide()
+        value_row.addWidget(self._spinner, 0, Qt.AlignVCenter)
+        layout.addLayout(value_row)
 
         self._subtitle_label = QLabel(subtitle)
         self._subtitle_label.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 12px;")
@@ -61,7 +73,17 @@ class MetricCard(QFrame):
     def set_title(self, title):
         self._title_label.setText(title)
 
+    def start_loading(self):
+        """Hide the value and spin until the next set_value/stop_loading."""
+        self._value_label.hide()
+        self._spinner.start()
+
+    def stop_loading(self):
+        self._spinner.stop()
+        self._value_label.show()
+
     def set_value(self, value, subtitle=None):
+        self.stop_loading()
         self._value_label.setText(str(value))
         if subtitle is not None:
             self.set_subtitle(subtitle)

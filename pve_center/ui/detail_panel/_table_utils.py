@@ -3,6 +3,7 @@ from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -16,6 +17,7 @@ from ...domain._format import (
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..theme import Color
+from ..widgets.spinner import SpinnerWidget
 from ._constants import _HEADER_STYLE
 
 _FILTER_TEXT_ROLE = Qt.UserRole + 42
@@ -24,10 +26,31 @@ _LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
 
 def loading_label():
+    """Animated loading page: spinner + caption.
+
+    Auto-replaces the former static "Loading..." label; the spinner only
+    runs while the page is visible.
+    """
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setAlignment(Qt.AlignCenter)
+    spinner = SpinnerWidget(28)
+    spinner.start()
+    layout.addWidget(spinner, 0, Qt.AlignCenter)
     lbl = QLabel(tr("Loading..."))
     lbl.setAlignment(Qt.AlignCenter)
     lbl.setStyleSheet(_LOADING_STYLE)
-    return lbl
+    layout.addWidget(lbl)
+    return container
+
+
+def make_loading_stack(content_widget, text=None):
+    """Stack with an animated spinner page (index 0) and content (index 1)."""
+    stack = QStackedWidget()
+    stack.addWidget(loading_label())
+    stack.addWidget(content_widget)
+    return stack
 
 
 def make_table(headers, col_specs, sortable=False):

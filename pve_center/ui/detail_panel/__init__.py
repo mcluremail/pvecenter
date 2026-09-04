@@ -186,7 +186,10 @@ class DetailPanel(QWidget):
         # 9: Storage detail
         tabs.addTab(self._storage_tabs.build_storage_detail_tab(), get_icon("storage"), tr("Storage Detail"))
         tabs.setTabVisible(TabIndex.STORAGE_DETAIL, False)
-        # 10: Backups
+        # 10: Storage monitoring (fill-level chart)
+        tabs.addTab(self._storage_tabs.build_storage_monitoring_tab(), get_icon("monitor"), tr("Monitoring"))
+        tabs.setTabVisible(TabIndex.STORAGE_MONITORING, False)
+        # 11: Backups
         tabs.addTab(self._storage_tabs.build_backups_tab(), get_icon("backup"), tr("Backups"))
         tabs.setTabVisible(TabIndex.BACKUPS, False)
         # 11: VM Disks
@@ -278,7 +281,8 @@ class DetailPanel(QWidget):
             for idx in (TabIndex.MONITOR, TabIndex.HARDWARE, TabIndex.OPTIONS,
                         TabIndex.HISTORY, TabIndex.HOST_VMS, TabIndex.POOL_VMS,
                         TabIndex.SUMMARY, TabIndex.STORAGES, TabIndex.HOST_STORAGE,
-                        TabIndex.STORAGE_DETAIL, TabIndex.BACKUPS,
+                        TabIndex.STORAGE_DETAIL, TabIndex.STORAGE_MONITORING,
+                        TabIndex.BACKUPS,
                         TabIndex.DISKS_VM, TabIndex.ISO, TabIndex.TEMPLATES,
                         TabIndex.NETWORK, TabIndex.SERVICES,
                         TabIndex.HOST_DISKS, TabIndex.SNAPSHOTS,

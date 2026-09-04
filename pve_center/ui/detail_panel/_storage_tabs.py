@@ -33,6 +33,7 @@ from ._table_utils import (
     format_volsize,
     loading_label,
     make_filterable_table,
+    make_loading_stack,
     make_table,
     safe_pct,
     set_cell_text,
@@ -183,6 +184,37 @@ class StorageTabs:
         panel.storage_detail_bar.setMinimumHeight(24)
         layout.addWidget(panel.storage_detail_bar)
 
+        panel.storage_detail_nodes_label = QLabel()
+        panel.storage_detail_nodes_label.setStyleSheet("font-weight: bold; margin-top: 8px;")
+        layout.addWidget(panel.storage_detail_nodes_label)
+
+        panel.storage_detail_nodes_table = make_table(
+            [tr("Node"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
+            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
+             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100),
+             (QHeaderView.Interactive, 100), (QHeaderView.Interactive, 95)],
+            sortable=True,
+        )
+        layout.addWidget(panel.storage_detail_nodes_table)
+
+        layout.addStretch()
+        # Content (params + fill bar + chart + per-node table) can exceed
+        # the tab height at FullHD — wrap in a scroll area so nothing is
+        # clipped.
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        tab.setWidget(widget)
+        return tab
+
+    def build_storage_monitoring_tab(self):
+        """Fill-level chart on its own tab with a spinner while rrddata
+        loads (moved out of Storage Detail in v2.11.2 — the combined
+        content did not fit at FullHD)."""
+        panel = self.panel
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 8, 8, 8)
+
         metrics_row = QHBoxLayout()
         metrics_row.addWidget(QLabel(tr("Fill level")))
         metrics_row.addStretch()
@@ -215,7 +247,7 @@ class StorageTabs:
             panel.storage_plot_widget.showGrid(x=False, y=True, alpha=0.3)
             panel.storage_plot_widget.enableAutoRange(axis='y')
             panel.storage_plot_widget.setMouseEnabled(x=False, y=False)
-            panel.storage_plot_widget.setMinimumHeight(220)
+            panel.storage_plot_widget.setMinimumHeight(260)
             panel.storage_plot_curve = panel.storage_plot_widget.plot(
                 [], [], pen=pg.mkPen(Color.STATUS_WARN, width=2),
                 fillLevel=0, fillBrush=pg.mkBrush(Color.STATUS_WARN + "33")
@@ -228,28 +260,12 @@ class StorageTabs:
             sd_plot_layout.setContentsMargins(0, 0, 0, 0)
             sd_plot_layout.addWidget(QLabel(tr("PyQtGraph not installed")))
         layout.addWidget(panel.storage_detail_plot)
-
-        panel.storage_detail_nodes_label = QLabel()
-        panel.storage_detail_nodes_label.setStyleSheet("font-weight: bold; margin-top: 8px;")
-        layout.addWidget(panel.storage_detail_nodes_label)
-
-        panel.storage_detail_nodes_table = make_table(
-            [tr("Node"), tr("Type"), tr("Content"), tr("Used"), tr("Total"), tr("Usage")],
-            [(QHeaderView.Stretch, None), (QHeaderView.Interactive, 65),
-             (QHeaderView.Stretch, None), (QHeaderView.Interactive, 100),
-             (QHeaderView.Interactive, 100), (QHeaderView.Interactive, 95)],
-            sortable=True,
-        )
-        layout.addWidget(panel.storage_detail_nodes_table)
-
         layout.addStretch()
-        # Content (params + fill bar + chart + per-node table) can exceed
-        # the tab height at FullHD — wrap in a scroll area so nothing is
-        # clipped.
-        tab = QScrollArea()
-        tab.setWidgetResizable(True)
-        tab.setWidget(widget)
-        return tab
+
+        # Spinner while StorageMetricsWorker fetches rrddata.
+        panel.storage_monitor_stack = make_loading_stack(widget)
+        panel.storage_monitor_stack.setCurrentIndex(1)
+        return panel.storage_monitor_stack
 
     def build_backups_tab(self):
         panel = self.panel
@@ -458,6 +474,7 @@ class StorageTabs:
         panel.tabs.setTabVisible(TabIndex.STORAGES, False)
         panel.tabs.setTabVisible(TabIndex.HOST_STORAGE, False)
         panel.tabs.setTabVisible(TabIndex.STORAGE_DETAIL, True)
+        panel.tabs.setTabVisible(TabIndex.STORAGE_MONITORING, True)
         panel.tabs.setTabVisible(TabIndex.BACKUPS, False)
         panel.tabs.setTabVisible(TabIndex.DISKS_VM, False)
         panel.tabs.setTabVisible(TabIndex.ISO, False)
@@ -759,6 +776,8 @@ class StorageTabs:
         timeframe = panel.storage_detail_tf_combo.currentData()
         if _HAS_PG:
             panel.storage_plot_curve.setData([], [])
+        # Spinner while the rrddata request runs.
+        panel.storage_monitor_stack.setCurrentIndex(0)
         from ..api.metrics import StorageMetricsWorker
         worker = StorageMetricsWorker(cfg, node_name, storage_name, timeframe)
         sid = StorageId(host_name, node_name, storage_name)
@@ -768,11 +787,17 @@ class StorageTabs:
                 panel._workers_mgr.discard_worker(w)
             )
         )
-        worker.signals.error_occurred.connect(lambda err, w=worker: panel._workers_mgr.discard_worker(w))
+        worker.signals.error_occurred.connect(
+            lambda err, w=worker: (
+                panel.storage_monitor_stack.setCurrentIndex(1),
+                panel._workers_mgr.discard_worker(w)
+            )
+        )
         panel._workers_mgr.run_worker(worker)
 
     def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict, sid=None):
         panel = self.panel
+        panel.storage_monitor_stack.setCurrentIndex(1)
         if sid is None or panel.current_obj_type != "storage" or panel.current_obj_id != sid:
             return
         if not _HAS_PG or not metrics_dict.get("usage"):
