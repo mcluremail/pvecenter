@@ -25,24 +25,44 @@ _FILTER_TEXT_ROLE = Qt.UserRole + 42
 _LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
 
 
-def loading_label():
-    """Animated loading page: spinner + caption.
+class LoadingPage(QWidget):
+    """Loading page: spinner + caption.
 
-    Auto-replaces the former static "Loading..." label; the spinner only
-    runs while the page is visible.
+    Drop-in replacement for the former static "Loading..." QLabel:
+    setText()/text() are proxied to the caption (error and empty-state
+    call sites keep working). Any text other than the initial
+    "Loading..." is treated as a final state and stops the spinner;
+    setting the loading text again re-arms it.
     """
-    container = QWidget()
-    layout = QVBoxLayout(container)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setAlignment(Qt.AlignCenter)
-    spinner = SpinnerWidget(28)
-    spinner.start()
-    layout.addWidget(spinner, 0, Qt.AlignCenter)
-    lbl = QLabel(tr("Loading..."))
-    lbl.setAlignment(Qt.AlignCenter)
-    lbl.setStyleSheet(_LOADING_STYLE)
-    layout.addWidget(lbl)
-    return container
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignCenter)
+        self._spinner = SpinnerWidget(28)
+        self._spinner.start()
+        layout.addWidget(self._spinner, 0, Qt.AlignCenter)
+        self._caption = QLabel(tr("Loading..."))
+        self._caption.setAlignment(Qt.AlignCenter)
+        self._caption.setStyleSheet(_LOADING_STYLE)
+        layout.addWidget(self._caption)
+        self._loading_text = self._caption.text()
+
+    def setText(self, text):
+        self._caption.setText(text)
+        if text == self._loading_text:
+            self._spinner.start()
+        else:
+            self._spinner.stop()
+
+    def text(self):
+        return self._caption.text()
+
+
+def loading_label():
+    """Animated loading page: spinner + caption (see LoadingPage)."""
+    return LoadingPage()
 
 
 def make_loading_stack(content_widget, text=None):

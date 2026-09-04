@@ -72,3 +72,41 @@ class TestStorageMonitoringTab:
         panel, stack = self._build(qtbot, monkeypatch)
         assert panel.storage_detail_tf_combo.count() == 5
         assert panel.storage_detail_tf_combo.currentData() == "hour"
+
+
+class TestLoadingPageCompat:
+    """v2.11.2 hotfix: loading pages must keep QLabel-compatible API.
+
+    Worker callbacks call .setText() on loading pages (final states like
+    "No data" or "Error: ..."); a bare QWidget container raised
+    AttributeError: 'PySide6.QtWidgets.QWidget' object has no attribute
+    'setText'.
+    """
+
+    def test_settext_proxy(self, qtbot):
+        page = loading_label()
+        qtbot.addWidget(page)
+        initial = page.text()
+        assert initial, "caption must be set"
+        page.setText("No data")
+        assert page.text() == "No data"
+
+    def test_final_text_stops_spinner(self, qtbot):
+        page = loading_label()
+        qtbot.addWidget(page)
+        page.show()
+        sp = page.findChildren(SpinnerWidget)[0]
+        assert sp.is_running
+        page.setText("Error: boom")
+        assert not sp.is_running
+
+    def test_loading_text_rearms_spinner(self, qtbot):
+        page = loading_label()
+        qtbot.addWidget(page)
+        page.show()
+        sp = page.findChildren(SpinnerWidget)[0]
+        initial = page.text()
+        page.setText("No data")
+        assert not sp.is_running
+        page.setText(initial)
+        assert sp.is_running
