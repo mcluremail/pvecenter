@@ -105,7 +105,11 @@ def global_search(
 
     for storage in storage_repo.all():
         if _matches(q, storage.storage, storage.cluster, storage.host_name):
-            if storage.cluster:
+            # Key must mirror the tree (B20): shared storages hang off the
+            # cluster ("name (@cluster)"), local ones off the host — a local
+            # storage on a cluster node has cluster set but is NOT a
+            # cluster-scope item in the tree.
+            if storage.shared and storage.cluster:
                 detail = f"@{storage.cluster}"
                 key = ("storage", storage.storage, "cluster", storage.cluster)
             else:

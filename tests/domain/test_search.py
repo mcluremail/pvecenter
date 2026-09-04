@@ -42,10 +42,11 @@ def make_node(host: str, node: str, cluster: str = ""):
     )
 
 
-def make_storage(host: str, node: str, storage: str, cluster: str = ""):
+def make_storage(host: str, node: str, storage: str, cluster: str = "",
+                 shared: bool = False):
     return Storage.from_pve(
         {"storage": storage, "node": node, "type": "dir", "content": "iso",
-         "used": 1024**3, "total": 10 * 1024**3},
+         "used": 1024**3, "total": 10 * 1024**3, "shared": int(shared)},
         host,
         cluster,
     )
@@ -67,6 +68,7 @@ def make_repos():
     ])
     storage_repo.add_many([
         make_storage("h1", "pve01", "local-lvm", "ros"),
+        make_storage("h1", "pve01", "ros-pool", "ros", shared=True),
         make_storage("h2", "standalone", "ceph"),
     ])
     pool_repo.add_many([Pool.from_pve({"poolid": "prod"}),
@@ -145,11 +147,19 @@ class TestGlobalSearch:
         assert results[0].detail == "h2"
         assert results[0].key == ("storage", "ceph", "host", "h2")
 
-    def test_storage_cluster(self):
-        results = search("local-lvm")
+    def test_storage_shared_in_cluster(self):
+        results = search("ros-pool")
         assert len(results) == 1
         assert results[0].detail == "@ros"
-        assert results[0].key == ("storage", "local-lvm", "cluster", "ros")
+        assert results[0].key == ("storage", "ros-pool", "cluster", "ros")
+
+    def test_storage_local_on_cluster_node(self):
+        # B20 audit: a local storage on a cluster node must keep a host-scope
+        # key — the tree has no cluster-scope item for it
+        results = search("local-lvm")
+        assert len(results) == 1
+        assert results[0].detail == "h1"
+        assert results[0].key == ("storage", "local-lvm", "host", "h1")
 
     def test_order_vms_hosts_pools_storages(self):
         results = search("prod")
