@@ -7,7 +7,7 @@ import requests
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ...backend import _suppress_ssl_warnings
-from ...provider import ProxmoxProvider
+from ...plugins import create_provider
 from ..i18n import tr
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class StorageMetricsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             rrd_api = provider.rrd
             rrd_response = rrd_api.get_storage_rrddata(
                 self.node_name, self.storage_name, self.timeframe
@@ -575,7 +575,7 @@ class HostMetricsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             rrd_api = provider.rrd
             rrd_response = rrd_api.get_node_rrddata(self.node_name, self.timeframe)
 
@@ -626,7 +626,7 @@ class MetricsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             rrd_api = provider.rrd
             rrd_response = rrd_api.get_vm_rrddata(
                 self.node_name, self.vmid, self.vm_type, self.timeframe

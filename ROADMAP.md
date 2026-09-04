@@ -14,7 +14,9 @@
 - ✅ Стабильная модель объектов (миграция UI с dict на доменные модели завершена в v2.10)
 - ✅ Data Provider API: шов `DataProvider` (Protocol) + фасад `ProxmoxProvider`
   (`provider/_provider.py`); backend и metrics работают через фасад
-- Plugin API
+- ✅ Plugin API (seed): `plugins/` — `ProviderPlugin` + `PluginRegistry`, диспетчеризация
+  `create_provider(cfg)` по `cfg["type"]`; feature-плагины (Notifications, Policies, ...)
+  — продолжение шва
 
 ### Техдолг миграции (осознанно не переводится на доменные модели)
 - Backups-таблица и vzdump/backup jobs — dict'ами до B17 (модели бэкапов появятся там)

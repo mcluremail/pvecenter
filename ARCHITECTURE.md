@@ -72,6 +72,21 @@ AlertRaised
 - Prometheus
 - Redfish
 
+### Plugins (реализация, v3.5 seed)
+
+Шов: `pve_center/plugins/` (`Plugin`, `ProviderPlugin` — Protocol, `PluginRegistry`).
+
+- Плагин — именованный юнит (`id`, `name`); registration явная, без динамического
+  импорта. Реестр — процесс-wide singleton (`get_registry()`).
+- Семейство data-source плагинов: `create_provider(cfg, timeout)` собирает
+  `DataProvider` из host-конфига; диспетчеризация по `cfg["type"]` (по умолчанию `"pve"`).
+  Встроен только `PvePlugin` (оборачивает `ProxmoxProvider`); PBS (B17 этап 2) и
+  ServerProvider (v4.0) регистрируются как отдельные плагины.
+- Backend-воркеры и `ui/api/metrics.py` создают провайдеров только через
+  `plugins.create_provider(cfg)` — тип источника определяется конфигом хоста.
+- Feature-плагины (Notifications, Policies, Reports, Prometheus, Redfish) —
+  продолжение этого шва позже.
+
 ## Будущий Server
 
 Desktop

@@ -10,7 +10,7 @@ from .domain.cluster import ClusterStatus
 from .domain.ha_resource import HaResource
 from .domain.snapshot import Snapshot
 from .domain.task import Task
-from .provider import ProxmoxProvider
+from .plugins import create_provider
 from .ui.i18n import tr
 from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 
@@ -238,7 +238,7 @@ class FetchWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.node_cfg, timeout=15)
+            provider = create_provider(self.node_cfg, timeout=15)
             cluster_api = provider.cluster
             pool_api = provider.pools
             node_api = provider.nodes
@@ -604,7 +604,7 @@ class VmDetailWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             status = vm_api.get_status(self.node_name, self.vmid, self.vm_type)
             try:
@@ -655,7 +655,7 @@ class VmConfigWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             config = vm_api.get_config(self.node_name, self.vmid, self.vm_type)
             try:
@@ -700,7 +700,7 @@ class VmConfigUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             result = vm_api.update_config(self.node_name, self.vmid, self.vm_type, **self.params)
             try:
@@ -746,7 +746,7 @@ class VmDiskResizeWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             vm_api = provider.vms
             result = vm_api.resize_disk(self.node_name, self.vmid, self.vm_type,
                                         self.disk, self.size)
@@ -795,7 +795,7 @@ class VmDiskMoveWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=60)
+            provider = create_provider(self.host_cfg, timeout=60)
             vm_api = provider.vms
             result = vm_api.move_disk(self.node_name, self.vmid, self.vm_type,
                                       self.disk, self.storage, delete=self.delete)
@@ -840,7 +840,7 @@ class VmTaskHistoryWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             task_api = provider.tasks
             tasks = [Task.from_pve(t)
                      for t in task_api.list_for_vm(self.node_name, self.vmid,
@@ -924,7 +924,7 @@ class VmSnapshotsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             snaps = vm_api.list_snapshots(self.node_name, self.vmid, self.vm_type)
             filtered = []
@@ -980,7 +980,7 @@ def delete_host_token(host_cfg):
        Возвращает True при успехе, False при ошибке."""
     provider = None
     try:
-        provider = ProxmoxProvider(host_cfg, timeout=10)
+        provider = create_provider(host_cfg, timeout=10)
         access_api = provider.access
         access_api.delete_token(host_cfg["user"], host_cfg["token_name"])
         logger.info("Token %s for user %s deleted from %s",
@@ -1015,7 +1015,7 @@ class VmActionWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             vm_api.perform_action(self.node_name, self.vmid, self.vm_type, self.action)
             try:
@@ -1081,7 +1081,7 @@ class BulkVmActionWorker(QRunnable):
             ok = False
             msg = ""
             try:
-                provider = ProxmoxProvider(target["host_cfg"], timeout=10)
+                provider = create_provider(target["host_cfg"], timeout=10)
                 provider.vms.perform_action(
                     target["node"], vmid, target["vm_type"], self.action,
                 )
@@ -1149,7 +1149,7 @@ class VmSnapshotCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -1210,7 +1210,7 @@ class VmSnapshotDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -1268,7 +1268,7 @@ class VmSnapshotRollbackWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -1333,7 +1333,7 @@ class ClusterTasksWorker:  # not QRunnable — runs via threading.Thread
             def fetch_node(host_cfg, node_name):
                 provider = None
                 try:
-                    provider = ProxmoxProvider(host_cfg, timeout=10)
+                    provider = create_provider(host_cfg, timeout=10)
                     task_api = provider.tasks
                     tasks = task_api.list(node_name, limit=100)
                     with lock:
@@ -1456,7 +1456,7 @@ class VmConsoleWorker(QRunnable):
         used_vnc = False
         try:
             try:
-                provider = ProxmoxProvider(self.host_cfg, timeout=10)
+                provider = create_provider(self.host_cfg, timeout=10)
                 vm_api = provider.vms
                 if self.vm_type == "lxc":
                     config = vm_api.get_vnc_proxy(
@@ -1635,7 +1635,7 @@ class CreateVmWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             cluster_api = provider.cluster
             vm_api = provider.vms
 
@@ -1721,7 +1721,7 @@ class DeleteVmWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -1774,7 +1774,7 @@ class HaResourcesWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             data = cluster_api.list_ha_resources()
             resources = [HaResource.from_pve(r) for r in data]
@@ -1813,7 +1813,7 @@ class HaResourceAddWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             params = {
                 "sid": self.sid,
@@ -1858,7 +1858,7 @@ class HaResourceDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             cluster_api.delete_ha_resource(self.sid)
             _safe_emit(self.signals.result,
@@ -1893,7 +1893,7 @@ class NetworkCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             node_api = provider.nodes
             node_api.create_network(self.node_name, **self.params)
             iface = self.params.get("iface", "")
@@ -1922,7 +1922,7 @@ class NetworkUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             node_api = provider.nodes
             p = dict(self.params)
             if self.digest:
@@ -1952,7 +1952,7 @@ class NetworkDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             node_api = provider.nodes
             params = {}
             if self.digest:
@@ -1980,7 +1980,7 @@ class NetworkApplyWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             node_api = provider.nodes
             node_api.apply_network(self.node_name)
             _safe_emit(self.signals.result, tr("Network changes applied"))
@@ -2004,7 +2004,7 @@ class NetworkRevertWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             node_api = provider.nodes
             node_api.revert_network(self.node_name)
             _safe_emit(self.signals.result, tr("Network changes reverted"))
@@ -2037,7 +2037,7 @@ class ClusterStatusWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=self.timeout)
+            provider = create_provider(self.host_cfg, timeout=self.timeout)
             cluster_api = provider.cluster
             status = cluster_api.get_status()
             corosync_nodes = []
@@ -2091,7 +2091,7 @@ class MigrateVmWorker(QRunnable):
             return
         try:
             provider = None
-            provider = ProxmoxProvider(self.host_cfg, timeout=120)
+            provider = create_provider(self.host_cfg, timeout=120)
             vm_api = provider.vms
             vm_api.migrate(self.node_name, self.vmid, self.target_node,
                            self.with_local_disks)
@@ -2141,7 +2141,7 @@ class CloneVmWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=120)
+            provider = create_provider(self.host_cfg, timeout=120)
             cluster_api = provider.cluster
             vm_api = provider.vms
 
@@ -2231,7 +2231,7 @@ class ConvertToTemplateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -2288,7 +2288,7 @@ class ConvertToVmWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             vm_api = provider.vms
             ok, err = _await_task(
                 provider, self.node_name,
@@ -2345,7 +2345,7 @@ class StorageContentDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             storage_api = provider.storage
             ok, err = _await_task(
                 provider, self.node_name,
@@ -2412,7 +2412,7 @@ class StorageUploadWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             storage_api = provider.storage
             file_name = os.path.basename(self.file_path)
 
@@ -2479,7 +2479,7 @@ class StorageDownloadUrlWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=30)
+            provider = create_provider(self.host_cfg, timeout=30)
             storage_api = provider.storage
             params = {
                 "url": self.url,
@@ -2534,7 +2534,7 @@ class StorageMoveWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             storage_api = provider.storage
             ok, err = _await_task(
                 provider, self.node_name,
@@ -2589,7 +2589,7 @@ class VzdumpWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             node_api = provider.nodes
             params = {
                 "vmid": str(self.vmid),
@@ -2650,7 +2650,7 @@ class VmRestoreWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            provider = create_provider(self.host_cfg, timeout=10)
             vm_api = provider.vms
             params = {
                 "vmid": int(self.vmid),
@@ -2705,7 +2705,7 @@ class ClusterJobsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             jobs = cluster_api.list_all_jobs(pve_major=self.pve_major)
             _safe_emit(self.signals.jobs_ready, jobs)
@@ -2740,7 +2740,7 @@ class ClusterJobCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             cluster_api.create_backup_job(self.params, pve_major=self.pve_major)
             _safe_emit(self.signals.result, tr("Backup job created"))
@@ -2776,7 +2776,7 @@ class ClusterJobUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             cluster_api.update_backup_job(self.job_id, self.params, pve_major=self.pve_major)
             _safe_emit(self.signals.result, tr("Backup job updated"))
@@ -2811,7 +2811,7 @@ class ClusterJobDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             cluster_api = provider.cluster
             cluster_api.delete_backup_job(self.job_id, pve_major=self.pve_major)
             _safe_emit(self.signals.result, tr("Backup job deleted"))
@@ -2845,7 +2845,7 @@ class AccessUsersWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.list_users()
             _safe_emit(self.signals.users_ready, data)
@@ -2876,7 +2876,7 @@ class AccessUserCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.create_user(**self.params)
             _safe_emit(self.signals.result, tr("User created"))
@@ -2908,7 +2908,7 @@ class AccessUserUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.update_user(self.userid, **self.params)
             _safe_emit(self.signals.result, tr("User updated"))
@@ -2939,7 +2939,7 @@ class AccessUserDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.delete_user(self.userid)
             _safe_emit(self.signals.result, tr("User deleted"))
@@ -2974,7 +2974,7 @@ class AccessTokensWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.list_tokens(self.userid)
             _safe_emit(self.signals.tokens_ready, data)
@@ -3007,7 +3007,7 @@ class AccessTokenCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.create_token(self.userid, self.tokenid, **self.params)
             full = data.get("full-tokenid", "")
@@ -3042,7 +3042,7 @@ class AccessTokenUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.update_token(self.userid, self.tokenid, **self.params)
             full = (data or {}).get("full-tokenid", "")
@@ -3076,7 +3076,7 @@ class AccessTokenDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.delete_token(self.userid, self.tokenid)
             _safe_emit(self.signals.result, tr("Token deleted"))
@@ -3110,7 +3110,7 @@ class AccessGroupsWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.list_groups()
             _safe_emit(self.signals.groups_ready, data)
@@ -3141,7 +3141,7 @@ class AccessGroupCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.create_group(**self.params)
             _safe_emit(self.signals.result, tr("Group created"))
@@ -3173,7 +3173,7 @@ class AccessGroupUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.update_group(self.groupid, **self.params)
             _safe_emit(self.signals.result, tr("Group updated"))
@@ -3204,7 +3204,7 @@ class AccessGroupDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.delete_group(self.groupid)
             _safe_emit(self.signals.result, tr("Group deleted"))
@@ -3238,7 +3238,7 @@ class AccessRolesWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.list_roles()
             _safe_emit(self.signals.roles_ready, data)
@@ -3269,7 +3269,7 @@ class AccessRoleCreateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.create_role(**self.params)
             _safe_emit(self.signals.result, tr("Role created"))
@@ -3301,7 +3301,7 @@ class AccessRoleUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.update_role(self.roleid, **self.params)
             _safe_emit(self.signals.result, tr("Role updated"))
@@ -3332,7 +3332,7 @@ class AccessRoleDeleteWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.delete_role(self.roleid)
             _safe_emit(self.signals.result, tr("Role deleted"))
@@ -3366,7 +3366,7 @@ class AccessAclWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             data = access_api.list_acl()
             _safe_emit(self.signals.acl_ready, data)
@@ -3397,7 +3397,7 @@ class AccessAclUpdateWorker(QRunnable):
     def run(self):
         provider = None
         try:
-            provider = ProxmoxProvider(self.host_cfg, timeout=15)
+            provider = create_provider(self.host_cfg, timeout=15)
             access_api = provider.access
             access_api.update_acl(**self.params)
             is_delete = int(self.params.get("delete", 0) or 0)

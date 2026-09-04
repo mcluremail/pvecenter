@@ -12,7 +12,7 @@ from pve_center import backend
 
 
 class FakeProvider:
-    """Stands in for ProxmoxProvider: facade attrs + close()."""
+    """Stands in for the plugin-dispatched provider factory: facade attrs + close()."""
 
     def __init__(self, cfg=None, timeout=10):
         self.cfg = cfg
@@ -245,7 +245,7 @@ class TestCreateAdminToken:
 class TestDeleteHostToken:
     def test_success(self, monkeypatch):
         fake = FakeProvider()
-        monkeypatch.setattr(backend, "ProxmoxProvider", lambda cfg, timeout=10: fake)
+        monkeypatch.setattr(backend, "create_provider", lambda cfg, timeout=10: fake)
         cfg = {"host": "10.0.0.1", "user": "root@pam", "token_name": "pvecenter-x"}
         assert backend.delete_host_token(cfg) is True
         fake.access.delete_token.assert_called_once_with("root@pam", "pvecenter-x")
@@ -254,7 +254,7 @@ class TestDeleteHostToken:
     def test_failure_returns_false(self, monkeypatch):
         fake = FakeProvider()
         fake.access.delete_token.side_effect = RuntimeError("nope")
-        monkeypatch.setattr(backend, "ProxmoxProvider", lambda cfg, timeout=10: fake)
+        monkeypatch.setattr(backend, "create_provider", lambda cfg, timeout=10: fake)
         assert backend.delete_host_token({"user": "u", "token_name": "t"}) is False
         assert fake.closed
 
@@ -265,7 +265,7 @@ class TestDeleteHostToken:
 class TestBulkVmActionWorker:
     @staticmethod
     def _make_worker(monkeypatch, failures=None):
-        """Build a bulk worker with mocked ProxmoxProvider facade.
+        """Build a bulk worker with a plugin-dispatched provider stub.
 
         failures: dict {vmid: exception} — those VMs raise in perform_action.
         Returns (worker, recorded) where recorded collects signal emissions.
@@ -284,7 +284,7 @@ class TestBulkVmActionWorker:
                 providers.append(self)
                 self.vms = SimpleNamespace(perform_action=fake_perform)
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", ActionProvider)
+        monkeypatch.setattr(backend, "create_provider", ActionProvider)
 
         targets = [
             {"host_cfg": {"name": "h1"}, "node": "n1", "vmid": v, "vm_type": "qemu"}
@@ -345,7 +345,7 @@ class TestBulkVmActionWorker:
                 super().__init__(cfg, timeout)
                 self.vms = SimpleNamespace(perform_action=fake_perform)
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", MidwayProvider)
+        monkeypatch.setattr(backend, "create_provider", MidwayProvider)
         worker = backend.BulkVmActionWorker(
             [{"host_cfg": {"name": "h1"}, "node": "n1", "vmid": v, "vm_type": "qemu"}
              for v in (100, 101, 102)], "start")
@@ -388,7 +388,7 @@ class TestTaskWorkers:
                         or list_for_vm_result or []),
                 )
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", TaskProvider)
+        monkeypatch.setattr(backend, "create_provider", TaskProvider)
         return calls
 
     def test_vm_task_history_emits_domain_objects(self, monkeypatch):
@@ -436,7 +436,7 @@ class TestTaskWorkers:
                 self.tasks = SimpleNamespace(
                     list=lambda node_name, limit=100: results.get(node_name, []))
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", ClusterTaskProvider)
+        monkeypatch.setattr(backend, "create_provider", ClusterTaskProvider)
 
         worker = backend.ClusterTasksWorker([({"name": "h1"}, "n1"),
                                              ({"name": "h2"}, "n2")])
@@ -473,7 +473,7 @@ class TestVmSnapshotsWorker:
                         cfgs[name] if cfgs and name in cfgs else no_cfg(name)),
                 )
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", SnapshotProvider)
+        monkeypatch.setattr(backend, "create_provider", SnapshotProvider)
         worker = backend.VmSnapshotsWorker({"name": "h1"}, "n1", 100)
         recorded = {"ready": [], "error": [], "finished": []}
         worker.signals.snapshots_ready.connect(
@@ -537,7 +537,7 @@ class TestHaResourcesWorker:
                         {"sid": "vm:200", "group": "g2", "state": "stopped"},
                     ])
 
-        monkeypatch.setattr(backend, "ProxmoxProvider", HaProvider)
+        monkeypatch.setattr(backend, "create_provider", HaProvider)
 
         worker = backend.HaResourcesWorker({"name": "h1"})
         recorded = {"ready": [], "error": [], "finished": []}
