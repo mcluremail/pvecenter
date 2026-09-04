@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (2.11.0) — tree redesign: flat tree, Hosts/Storages view modes
+## v2.11.0 — tree redesign: flat tree, Hosts/Storages view modes
 
 **New features**
 - Tree redesign (B20): the "Clusters" / "Standalone hosts" / "Storage" sections are gone — user groups (B16), clusters and standalone hosts now form one flat, name-sorted top level

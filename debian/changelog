@@ -1,3 +1,15 @@
+pve-center (2.11.0-1) unstable; urgency=medium
+
+  * New: tree redesign — flat top level (groups, clusters, standalone hosts),
+    Hosts/Storages view modes with deduplicated shared storages
+  * New: global search storage results switch the tree to the Storages view
+  * Fix: global search jump to a local storage of a cluster node
+    (search keys now mirror the tree)
+  * Changed: ungroup via context menu "Remove from group" (drag&drop onto
+    sections removed together with the sections)
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 12:00:00 +0300
+
 pve-center (2.10.0-1) unstable; urgency=medium
 
   * New: per-item tree notes in a second tree column (host default = FQDN)

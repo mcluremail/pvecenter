@@ -57,8 +57,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Audit log filters: text search + status filter (All/OK/Errors/Running)
 
 **Interface**
-- Object tree: user-defined groups, Clusters → Hosts → VMs/Containers with color status indicators; templates get a distinct icon
-- User-defined host groups: named groups above the tree sections, assign hosts/clusters via context menu or drag&drop; clicking a group shows an aggregated summary
+- Object tree: one flat, name-sorted top level — user groups, clusters and standalone hosts → Hosts → VMs/Containers with color status indicators; templates get a distinct icon; "Hosts"/"Storages" view modes
+- User-defined host groups: named groups at the tree top level, assign hosts/clusters via context menu or drag&drop; clicking a group shows an aggregated summary
 - Tree notes: short per-item note (host, cluster, group, VM, storage) in a muted second column; host notes default to the host FQDN
 - Global search (Ctrl+F): find VMs, hosts, pools and storages across all clusters and jump to the object in the tree
 - Monitoring dashboard: metric cards with progress bars (CPU, RAM, Disk, Network, Uptime) and live charts
@@ -178,7 +178,7 @@ python -m pve_center
 ### First run
 
 1. Launch the application.
-2. Click `[+]` in the tree panel (on the "Clusters" or "Standalone hosts" folder).
+2. Click `[+]` in the tree panel toolbar.
 3. In the dialog that opens, enter:
    - **Host address** (FQDN or IP)
    - **User** (e.g., `root@pam`)
