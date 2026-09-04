@@ -66,10 +66,6 @@ class ProxmoxSession:
                 verify_ssl=_verify_ssl(self.cfg),
                 timeout=self.timeout,
             )
-            sess = self._proxmox._store.get("session")
-            if sess is not None:
-                sess.max_redirects = 0
-                sess.allow_redirects = False
         return self._proxmox
 
     def close(self) -> None:

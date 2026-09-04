@@ -15,7 +15,7 @@ _OLD_SALT = "nodes.salt"
 _OLD_JSON = "nodes.json"
 
 _KEYRING_SERVICE = "pve-center"
-_DB_LOCK = threading.Lock()
+_DB_LOCK = threading.RLock()
 
 # ── paths ──────────────────────────────────────────────────────
 
@@ -438,13 +438,12 @@ def import_config(src_path: str, merge: bool = True) -> list[dict] | None:
 
 # ── tasks cache ─────────────────────────────────────────────────
 
-_tasks_cache_lock = threading.Lock()
 
 
 def save_tasks_cache(tasks: list[dict]):
     try:
         data = json.dumps(tasks, ensure_ascii=False, default=str)
-        with _tasks_cache_lock:
+        with _DB_LOCK:
             conn = _init_db()
             conn.execute("INSERT OR REPLACE INTO tasks_cache (id, data) VALUES (1, ?)", (data,))
             conn.commit()
@@ -455,7 +454,7 @@ def save_tasks_cache(tasks: list[dict]):
 
 def load_tasks_cache() -> list[dict]:
     try:
-        with _tasks_cache_lock:
+        with _DB_LOCK:
             conn = _init_db()
             cur = conn.execute("SELECT data FROM tasks_cache WHERE id = 1")
             row = cur.fetchone()
@@ -469,7 +468,6 @@ def load_tasks_cache() -> list[dict]:
 
 # ── resources cache (offline mode) ───────────────────────────────
 
-_resources_cache_lock = threading.Lock()
 
 
 def save_resources_cache(nodes, vms, storages):
@@ -484,7 +482,7 @@ def save_resources_cache(nodes, vms, storages):
         )
         from datetime import datetime, timezone
         ts = datetime.now(timezone.utc).isoformat()
-        with _resources_cache_lock:
+        with _DB_LOCK:
             conn = _init_db()
             conn.execute("INSERT OR REPLACE INTO resources_cache (id, data, ts) VALUES (1, ?, ?)", (data, ts))
             conn.commit()
@@ -495,7 +493,7 @@ def save_resources_cache(nodes, vms, storages):
 
 def load_resources_cache():
     try:
-        with _resources_cache_lock:
+        with _DB_LOCK:
             conn = _init_db()
             cur = conn.execute("SELECT data, ts FROM resources_cache WHERE id = 1")
             row = cur.fetchone()
@@ -509,12 +507,11 @@ def load_resources_cache():
 
 # ── ui state ────────────────────────────────────────────────────
 
-_ui_state_lock = threading.Lock()
 
 
 def save_ui_state(key: str, value: str):
     try:
-        with _ui_state_lock:
+        with _DB_LOCK:
             conn = _init_db()
             conn.execute("INSERT OR REPLACE INTO ui_state (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
@@ -525,7 +522,7 @@ def save_ui_state(key: str, value: str):
 
 def load_ui_state(key: str) -> str | None:
     try:
-        with _ui_state_lock:
+        with _DB_LOCK:
             conn = _init_db()
             cur = conn.execute("SELECT value FROM ui_state WHERE key = ?", (key,))
             row = cur.fetchone()
@@ -538,12 +535,11 @@ def load_ui_state(key: str) -> str | None:
 
 # ── translations ────────────────────────────────────────────────
 
-_translations_lock = _ui_state_lock
 
 
 def seed_translations(lang: str, translations: dict[str, str], version: int = 0):
     try:
-        with _translations_lock:
+        with _DB_LOCK:
             conn = _init_db()
             if version:
                 cur = conn.execute(
