@@ -647,6 +647,35 @@ class TestTreeModes:
         assert s2.parent() is items[("host", "n2", "h2")]
         assert not any(k[0] in ("section", "storage_section") for k in items)
 
+    def test_storages_mode_false_cluster_cfg(self, qtbot, make_node):
+        """Real-world regression: standalone host configs store
+        "cluster": false (JSON bool). The worker used to pass it through
+        raw, so Storage.cluster was False and the storages view dropped
+        all local storages (False == "" is False)."""
+        from pve_center.domain.storage import Storage as DomainStorage
+
+        cfg = [{"name": "h1", "cluster": False, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        # Same path as mainwindow.on_worker_finished: cluster arg comes
+        # from node_cfg["cluster"] == False and must normalize to "".
+        st = DomainStorage.from_pve(
+            {"storage": "local", "node": "n1", "type": "dir",
+             "content": "images", "plugintype": "dir",
+             "disk": 1, "maxdisk": 10},
+            "h1", False,  # type: ignore[arg-type]
+        )
+        assert st.cluster == ""
+        tp.update_data(node_repo.all(), [], [st], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        items = _collect_items(tp)
+        assert ("storage", "local", "host", "h1") in items
+
     def test_shared_storage_dedup(self, qtbot, make_node, make_storage):
         """The same shared storage reported by several nodes appears once."""
         cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False}]

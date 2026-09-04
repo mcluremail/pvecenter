@@ -59,6 +59,13 @@ class TestStorageFromPve:
         assert s.shared is True
         assert s.cluster == ""
 
+    def test_cluster_false_normalized(self):
+        # "cluster": false from standalone host configs must become "" so
+        # scope filters (s.cluster == cluster_scope) match and the
+        # storage shows up in the tree's Storages view.
+        s = Storage.from_pve(STORAGE_DICT, "h1", False)  # type: ignore[arg-type]
+        assert s.cluster == ""
+
     def test_cluster_resources_plugintype(self):
         # /cluster/resources entries: "type" is "storage", backend is in
         # "plugintype" (v2.11.2: detail table showed "Type: storage")

@@ -126,7 +126,9 @@ class Storage(DictCompat):
             storage=d.get("storage", "") or "",
             node=d.get("node", "") or "",
             host_name=host_name,
-            cluster=cluster,
+            # Standalone host configs store "cluster": false — normalize
+            # falsy to "" so scope filters (s.cluster == "") match.
+            cluster=cluster or "",
             # /cluster/resources reports the backend in "plugintype" ("dir",
             # "cephfs", ...) while "type" is just "storage"; per-node
             # /nodes/{node}/storage has the backend in "type".

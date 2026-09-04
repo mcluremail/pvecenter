@@ -198,10 +198,13 @@ class Node(DictCompat):
 
         Missing fields default to zero/empty — never raises on shape.
         """
+        # Standalone host configs store "cluster": false — normalize any
+        # falsy value to "" so tree/scope comparisons (== cluster_scope)
+        # match instead of failing on False == "".
         return Node(
             host_name=host_name,
             node=d.get("node", ""),
-            cluster=cluster,
+            cluster=cluster or "",
             status=NodeStatus.from_pve(d.get("status")),
             error=d.get("error", ""),
             cpu_fraction=d.get("cpu", 0.0) or 0.0,

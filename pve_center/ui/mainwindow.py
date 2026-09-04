@@ -1219,7 +1219,7 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
-            cluster_name = worker.node_cfg.get("cluster", "") if worker else ""
+            cluster_name = (worker.node_cfg.get("cluster", "") or "") if worker else ""
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster
@@ -1396,7 +1396,7 @@ class MainWindow(QMainWindow):
         host = data.get("host", "")
         if status == "ok":
             is_cluster = worker.node_cfg.get("cluster_rep", False) if worker else False
-            cluster_name = worker.node_cfg.get("cluster", "") if worker else ""
+            cluster_name = (worker.node_cfg.get("cluster", "") or "") if worker else ""
             for node in data.get("nodes", []):
                 node["host_name"] = host
                 node["_is_cluster"] = is_cluster

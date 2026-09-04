@@ -91,6 +91,13 @@ class TestFromPveBasic:
         assert n.status is NodeStatus.OFFLINE
         assert n.is_cluster is False
 
+    def test_cluster_false_normalized(self):
+        # Standalone host configs store "cluster": false (JSON bool); a
+        # raw False leaked into Node.cluster and broke tree scope
+        # comparisons (False == "" is False).
+        n = Node.from_pve(STANDALONE_NODE_DICT, "h7", False, is_cluster=False)  # type: ignore[arg-type]
+        assert n.cluster == ""
+
     def test_error_node(self):
         n = Node.from_pve(ERROR_NODE_DICT, "h9", "", is_cluster=False)
         assert n.status is NodeStatus.ERROR
