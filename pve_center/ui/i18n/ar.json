@@ -1156,5 +1156,7 @@
   "{sid} removed from HA": "تمت إزالة {sid} من HA",
   "{} results": "{} من النتائج",
   "— none —": "— لا شيء —",
-  "❌ {} is unavailable": "❌ {} غير متاح"
+  "❌ {} is unavailable": "❌ {} غير متاح",
+  "Hosts view": "المضيفون",
+  "Storages view": "التخزين"
 }

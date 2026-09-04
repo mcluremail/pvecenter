@@ -138,8 +138,6 @@ class MainWindow(QMainWindow):
         self.detail_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.detail_panel.vm_convert_requested.connect(self._on_vm_convert)
 
-        self.tree_panel.add_server_requested_context.connect(self._on_add_server)
-
         self.tree_panel.host_remove_requested.connect(self._on_host_remove)
         self.tree_panel.host_token_refresh_requested.connect(self._on_host_token_refresh)
         self.tree_panel.host_trust_ssl_changed.connect(self._on_host_trust_ssl)
@@ -1082,15 +1080,6 @@ class MainWindow(QMainWindow):
             count = sum(1 for c in self.nodes_cfg if c.get("cluster") == item_name)
             text = tr("Remove cluster «{name}» ({count} records) from configuration?").format(name=item_name, count=count)
             matched = [c for c in self.nodes_cfg if c.get("cluster") == item_name]
-        elif item_type == "section":
-            if item_name == tr("Clusters"):
-                matched = [c for c in self.nodes_cfg if c.get("cluster") and c.get("cluster") not in (False, None, "Standalone")]
-                text = tr("Remove all {} cluster records from configuration?").format(len(matched))
-            elif item_name == tr("Standalone hosts"):
-                matched = [c for c in self.nodes_cfg if not c.get("cluster") or c.get("cluster") in (False, None, "Standalone")]
-                text = tr("Remove all {} standalone host records from configuration?").format(len(matched))
-            else:
-                return
         else:
             return
         if not self._confirm_delete(text):
@@ -1157,7 +1146,7 @@ class MainWindow(QMainWindow):
             lambda: (self._node_repo, self._vm_repo, self._storage_repo, self._pool_repo),
             self,
         )
-        dlg.object_selected.connect(self.tree_panel.find_and_select)
+        dlg.object_selected.connect(self.tree_panel.reveal_key)
         dlg.exec()
 
     def refresh_data(self):

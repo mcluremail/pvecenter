@@ -1156,5 +1156,7 @@
   "{sid} removed from HA": "{sid}已从HA移除",
   "{} results": "{} 条结果",
   "— none —": "— 无 —",
-  "❌ {} is unavailable": "❌ {} 不可用"
+  "❌ {} is unavailable": "❌ {} 不可用",
+  "Hosts view": "主机",
+  "Storages view": "存储"
 }

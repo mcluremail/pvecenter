@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (2.11.0) — tree redesign: flat tree, Hosts/Storages view modes
+
+**New features**
+- Tree redesign (B20): the "Clusters" / "Standalone hosts" / "Storage" sections are gone — user groups (B16), clusters and standalone hosts now form one flat, name-sorted top level
+- View switcher at the top of the tree panel: "Hosts" (previous tree structure) / "Storages" (shared cluster storages deduplicated at the cluster level as "name (@cluster)", local storages under each host, standalone hosts keep all their storages, shared storages are not repeated under cluster hosts); the choice is persisted in config.sqlite (ui_state `treeMode`)
+- Host groups participate in the Storages view too (group counter = number of unique storage names)
+- Global search: picking a storage result switches the tree to the Storages view automatically
+
+**Changed**
+- Drag&drop onto a tree section for ungrouping is no longer available — use "Remove from group" in the context menu
+- i18n: 2 new keys in all 5 languages ("Hosts view", "Storages view"), _I18N_VERSION bumped to 28
+
 ## v2.10.0 — tree notes, global search, snapshot rollback, bulk actions, host groups
 
 **New features**

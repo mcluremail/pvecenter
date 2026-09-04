@@ -7,12 +7,12 @@ from PySide6.QtCore import QMimeData, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QBrush, QColor, QDrag
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
     QLabel,
     QMenu,
-    QPushButton,
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -52,8 +52,7 @@ class GroupTreeWidget(QTreeWidget):
     """QTreeWidget with drag&drop for host groups (B16).
 
     Dragging a host/cluster item onto a group item emits
-    group_move_requested(kind, name, group); dropping onto the
-    Clusters/Standalone hosts section removes the item from its group.
+    group_move_requested(kind, name, group).
     The tree is never mutated directly — the panel rebuilds it.
     """
 
@@ -100,18 +99,13 @@ class GroupTreeWidget(QTreeWidget):
 
     def _drop_group(self, item):
         """Group name for the drop target item:
-        group item -> its name; Clusters/Standalone hosts section -> ''
-        (remove from group); host/cluster directly inside a group -> that
+        group item -> its name; host/cluster directly inside a group -> that
         group; anything else -> None (drop not allowed)."""
         while item is not None:
             key = item.data(0, ITEM_KEY_ROLE)
             if isinstance(key, tuple):
                 if key[0] == "group":
                     return key[1]
-                if key[0] == "section":
-                    if key[1] in (tr("Clusters"), tr("Standalone hosts")):
-                        return ""
-                    return None
                 if key[0] in ("host", "cluster"):
                     parent = item.parent()
                     if parent is not None:
@@ -152,7 +146,6 @@ class GroupTreeWidget(QTreeWidget):
 
 class TreePanel(QWidget):
     item_selected = Signal(str, str, object)
-    add_server_requested_context = Signal(str)
     host_remove_requested = Signal(str, str)
     host_token_refresh_requested = Signal(str)
     host_trust_ssl_changed = Signal(str, bool)
@@ -204,6 +197,22 @@ class TreePanel(QWidget):
 
         init_icons()
 
+        # B20: tree view mode switcher (hosts / storages)
+        self._tree_mode = load_ui_state("treeMode") or "hosts"
+        if self._tree_mode not in ("hosts", "storages"):
+            self._tree_mode = "hosts"
+        self._mode_combo = QComboBox()
+        self._mode_combo.addItem(get_icon("host"), tr("Hosts view"), "hosts")
+        self._mode_combo.addItem(get_icon("storage"), tr("Storages view"), "storages")
+        mode_idx = self._mode_combo.findData(self._tree_mode)
+        self._mode_combo.setCurrentIndex(max(mode_idx, 0))
+        self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        mode_row = QHBoxLayout()
+        mode_row.setContentsMargins(4, 4, 4, 0)
+        mode_row.addWidget(self._mode_combo)
+        mode_row.addStretch()
+        layout.addLayout(mode_row)
+
         self._toggle_btn = QToolButton()
         self._toggle_btn.setIcon(get_icon("expand"))
         self._toggle_btn.setFixedSize(22, 22)
@@ -251,6 +260,32 @@ class TreePanel(QWidget):
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self._build_tree()
+
+    def set_mode(self, mode):
+        """B20: switch the tree view mode ('hosts'/'storages')."""
+        if mode == self._tree_mode:
+            return
+        idx = self._mode_combo.findData(mode)
+        if idx >= 0:
+            self._mode_combo.setCurrentIndex(idx)
+
+    def _on_mode_changed(self, index):
+        mode = self._mode_combo.itemData(index)
+        if not mode or mode == self._tree_mode:
+            return
+        self._tree_mode = mode
+        save_ui_state("treeMode", mode)
+        self._build_tree()
+        self._sync_toggle_button()
+        self._update_empty_visibility()
+
+    def reveal_key(self, key_data):
+        """B20: jump to a tree item, switching the view mode if needed
+        (storage objects live in the 'storages' view)."""
+        if isinstance(key_data, tuple) and key_data[0] == "storage" \
+                and self._tree_mode != "storages":
+            self.set_mode("storages")
+        self.find_and_select(key_data)
 
     def _toggle_expand(self):
         self._toggled = not self._toggled
@@ -500,46 +535,9 @@ class TreePanel(QWidget):
             )
             menu.addAction(note_act)
 
-        elif item_type == "section" and item_name in (tr("Clusters"), tr("Standalone hosts")):
-            delete_action = QAction(tr("Remove all hosts from") + f' "{item_name}"', self.tree)
-            delete_action.triggered.connect(lambda: self.host_remove_requested.emit("section", item_name))
-            menu.addAction(delete_action)
-
         if not menu.actions():
             return
         menu.exec(self.tree.viewport().mapToGlobal(pos))
-
-    def _make_section_item(self, parent, label):
-        item = QTreeWidgetItem(parent)
-        item.setData(0, ITEM_KEY_ROLE, ("section", label))
-        item.setText(0, label)
-        item.setIcon(0, get_icon("folder"))
-
-        context_map = {tr("Clusters"): "cluster", tr("Standalone hosts"): "standalone"}
-        ctx = context_map.get(label, "")
-        if not ctx:
-            return item
-
-        w = QWidget()
-        w.setAttribute(Qt.WA_TranslucentBackground)
-        hbox = QHBoxLayout(w)
-        hbox.setContentsMargins(0, 0, 4, 0)
-        hbox.addStretch()
-        btn = QPushButton("+")
-        btn.setFixedSize(20, 20)
-        btn.setFocusPolicy(Qt.NoFocus)
-        btn.setStyleSheet(
-            f"QPushButton {{ border: 1px solid {Color.SLATE_300}; border-radius: 3px; "
-            f"background: {Color.SLATE_100}; font-size: 13px; font-weight: bold; "
-            f"color: {Color.SLATE_500}; padding: 0; outline: none; }}"
-            f"QPushButton:hover {{ background: {Color.SLATE_200}; border-color: {Color.SLATE_400}; color: {Color.SLATE_700}; }}"
-        )
-        btn.setToolTip(tr("Add host to") + f' "{label}"')
-        btn.clicked.connect(lambda checked, c=ctx: self.add_server_requested_context.emit(c))
-        hbox.addWidget(btn)
-        self.tree.setItemWidget(item, 0, w)
-
-        return item
 
     def _tick_spinner(self):
         self._spinner_angle = (self._spinner_angle + 45) % 360
@@ -597,23 +595,21 @@ class TreePanel(QWidget):
             else:
                 standalone.append(name)
 
-        folder = self._make_section_item(self.tree, tr("Clusters"))
-        for cl_name in sorted(hosts_by_cluster.keys(), key=str.lower):
-            cl_item = QTreeWidgetItem(folder)
-            cl_item.setText(0, cl_name)
-            cl_item.setIcon(0, make_loading_icon(0))
-            cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cl_name))
-            cl_item.setExpanded(True)
-            self._loading_hosts.add(f"cluster:{cl_name}")
-
-        folder_standalone = self._make_section_item(self.tree, tr("Standalone hosts"))
-        if standalone:
-            for hname in sorted(standalone, key=str.lower):
-                hi = QTreeWidgetItem(folder_standalone)
-                hi.setText(0, hname)
-                hi.setIcon(0, make_loading_icon(0))
-                hi.setData(0, ITEM_KEY_ROLE, ("host", hname))
-                self._loading_hosts.add(hname)
+        # B20: clusters + standalone hosts flat (no sections)
+        entries = [(cl.lower(), "cluster", cl) for cl in hosts_by_cluster]
+        entries += [(h.lower(), "host", h) for h in standalone]
+        entries.sort(key=lambda e: e[0])
+        for _, kind, name in entries:
+            item = QTreeWidgetItem(self.tree)
+            item.setText(0, name)
+            item.setIcon(0, make_loading_icon(0))
+            if kind == "cluster":
+                item.setData(0, ITEM_KEY_ROLE, ("cluster", name))
+                item.setExpanded(True)
+                self._loading_hosts.add(f"cluster:{name}")
+            else:
+                item.setData(0, ITEM_KEY_ROLE, ("host", name))
+                self._loading_hosts.add(name)
 
         self.tree.expandAll()
         self._building = False
@@ -848,7 +844,28 @@ class TreePanel(QWidget):
         scroll_val = self.tree.verticalScrollBar().value()
         self.tree.clear()
 
-        # B16: host groups — cfg["group"] per host; cluster group via any member cfg
+        grouping = self._compute_grouping()
+        group_names = sorted(set(grouping["group_clusters"]) | set(grouping["group_standalone"]),
+                             key=str.lower)
+        if self._tree_mode == "storages":
+            self._build_storages_view(grouping, group_names)
+        else:
+            self._build_hosts_view(grouping, group_names)
+
+        raw = load_ui_state("expandedTreePaths")
+        if raw:
+            self._restore_expanded_state()
+        else:
+            self.tree.expandAll()
+        if saved_key is not None:
+            item = self.find_item_by_key(saved_key)
+            if item is not None:
+                self.tree.setCurrentItem(item)
+        self.tree.verticalScrollBar().setValue(scroll_val)
+        self._building = False
+
+    def _compute_grouping(self):
+        """B16/B20: split hosts into cluster/standalone/group buckets."""
         host_group = {}
         cluster_group = {}
         for cfg in self.nodes_cfg:
@@ -928,8 +945,28 @@ class TreePanel(QWidget):
                     if cl_name:
                         self._loading_hosts.discard(f"cluster:{cl_name}")
 
-        # B16: group items at top level, above Clusters/Standalone sections
-        group_names = sorted(set(group_clusters) | set(group_standalone), key=str.lower)
+        return {
+            "cluster_nodes": cluster_nodes,
+            "standalone_nodes": standalone_nodes,
+            "group_clusters": group_clusters,
+            "group_standalone": group_standalone,
+        }
+
+    @staticmethod
+    def _flat_entries(cluster_nodes, standalone_nodes):
+        """B20: clusters + standalone hosts merged flat, sorted by name."""
+        entries = [(name.lower(), "cluster", name) for name in cluster_nodes]
+        entries += [((n.display_name or n.node).lower(), "host", n) for n in standalone_nodes]
+        entries.sort(key=lambda e: e[0])
+        return entries
+
+    def _build_hosts_view(self, grouping, group_names):
+        """B20 'Hosts' mode: groups, then clusters + standalone hosts flat."""
+        cluster_nodes = grouping["cluster_nodes"]
+        standalone_nodes = grouping["standalone_nodes"]
+        group_clusters = grouping["group_clusters"]
+        group_standalone = grouping["group_standalone"]
+
         for g in group_names:
             g_item = QTreeWidgetItem(self.tree)
             g_item.setData(0, ITEM_KEY_ROLE, ("group", g))
@@ -945,78 +982,89 @@ class TreePanel(QWidget):
             for node in sorted(g_nodes, key=lambda n: (n.display_name or n.node).lower()):
                 self._make_host_item(g_item, node)
 
-        cluster_folder = self._make_section_item(self.tree, tr("Clusters"))
-        standalone_folder = self._make_section_item(self.tree, tr("Standalone hosts"))
+        for _, kind, obj in self._flat_entries(cluster_nodes, standalone_nodes):
+            if kind == "cluster":
+                self._make_cluster_item(self.tree, obj, cluster_nodes[obj])
+            else:
+                self._make_host_item(self.tree, obj)
 
-        if cluster_nodes:
-            for cluster_name in sorted(cluster_nodes.keys(), key=str.lower):
-                self._make_cluster_item(cluster_folder, cluster_name, cluster_nodes[cluster_name])
+    def _build_storages_view(self, grouping, group_names):
+        """B20 'Storages' mode: shared storages under the cluster, local
+        storages under each host; clusters + standalone hosts flat."""
+        cluster_nodes = grouping["cluster_nodes"]
+        standalone_nodes = grouping["standalone_nodes"]
+        group_clusters = grouping["group_clusters"]
+        group_standalone = grouping["group_standalone"]
 
-        if standalone_nodes:
-            for node in sorted(standalone_nodes, key=lambda n: (n.display_name or n.node).lower()):
-                self._make_host_item(standalone_folder, node)
+        for g in group_names:
+            g_item = QTreeWidgetItem(self.tree)
+            g_item.setData(0, ITEM_KEY_ROLE, ("group", g))
+            g_nodes = group_standalone.get(g, [])
+            g_cl_nodes = [n for nodes in group_clusters.get(g, {}).values() for n in nodes]
+            g_host_names = {n.host_name for n in g_nodes + g_cl_nodes}
+            g_storages = [st for st in self.all_storages if st.host_name in g_host_names]
+            g_item.setText(0, f"{g}  [{len({st.storage for st in g_storages})}]")
+            g_item.setIcon(0, get_icon("folder"))
+            self._refresh_note(g_item, f"group:{g}")
+            for cl_name in sorted(group_clusters.get(g, {}), key=str.lower):
+                self._make_cluster_storage_item(g_item, cl_name, group_clusters[g][cl_name])
+            for node in sorted(g_nodes, key=lambda n: (n.display_name or n.node).lower()):
+                self._make_host_storage_item(g_item, node)
 
-        if self.all_storages:
-            st_folder = self._make_section_item(self.tree, tr("Storage"))
+        for _, kind, obj in self._flat_entries(cluster_nodes, standalone_nodes):
+            if kind == "cluster":
+                self._make_cluster_storage_item(self.tree, obj, cluster_nodes[obj])
+            else:
+                self._make_host_storage_item(self.tree, obj)
 
-            cluster_storages = defaultdict(list)
-            standalone_storages = []
-            for st in self.all_storages:
-                cluster = st.cluster
-                if cluster:
-                    cluster_storages[cluster].append(st)
-                else:
-                    standalone_storages.append(st)
+    def _make_cluster_storage_item(self, parent, cluster_name, nodes_in_cl):
+        """B20 storages mode: cluster with shared storages and member hosts."""
+        cl_item = QTreeWidgetItem(parent)
+        cl_item.setText(0, cluster_name)
+        cl_item.setIcon(0, get_icon("cluster"))
+        cl_item.setData(0, ITEM_KEY_ROLE, ("cluster", cluster_name))
+        self._refresh_note(cl_item, f"cluster:{cluster_name}")
 
-            for cluster_name in sorted(cluster_storages.keys(), key=str.lower):
-                cl_item = QTreeWidgetItem(st_folder)
-                cl_item.setText(0, cluster_name)
-                cl_item.setIcon(0, get_icon("cluster"))
-                cl_item.setData(0, ITEM_KEY_ROLE, ("storage_section", cluster_name))
-                cl_item.setFlags(cl_item.flags() & ~Qt.ItemIsSelectable)
+        seen_names = set()
+        for st in self.all_storages:
+            if st.cluster != cluster_name or not st.shared:
+                continue
+            sname = st.storage
+            if sname in seen_names:
+                continue
+            seen_names.add(sname)
+            si = QTreeWidgetItem(cl_item)
+            si.setText(0, f"{sname} (@{cluster_name})")
+            si.setIcon(0, get_icon("storage"))
+            si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "cluster", cluster_name))
+            self._refresh_note(si, f"storage:{sname}:{cluster_name}")
 
-                seen_names = set()
-                for st in cluster_storages[cluster_name]:
-                    sname = st.storage
-                    if sname not in seen_names:
-                        seen_names.add(sname)
-                        si = QTreeWidgetItem(cl_item)
-                        si.setText(0, f"{sname} (@{cluster_name})")
-                        si.setIcon(0, get_icon("storage"))
-                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "cluster", cluster_name))
-                        self._refresh_note(si, f"storage:{sname}:{cluster_name}")
+        for node in sorted(nodes_in_cl, key=lambda n: (n.display_name or n.node).lower()):
+            self._make_host_storage_item(cl_item, node)
+        return cl_item
 
-            if standalone_storages:
-                so_item = QTreeWidgetItem(st_folder)
-                so_item.setText(0, tr("Standalone"))
-                so_item.setIcon(0, get_icon("folder"))
-                so_item.setData(0, ITEM_KEY_ROLE, ("storage_section", tr("Standalone")))
-                so_item.setFlags(so_item.flags() & ~Qt.ItemIsSelectable)
+    def _make_host_storage_item(self, parent, node):
+        """B20 storages mode: host with its local storages."""
+        host_name = node.host_name
+        cluster_scope = node.cluster or ""
+        host_item = QTreeWidgetItem(parent)
+        host_item.setText(0, node.display_name or node.node)
+        host_item.setIcon(0, get_icon("host", node.status_value))
+        host_item.setData(0, ITEM_KEY_ROLE, ("host", node.node, host_name))
+        host_item.setToolTip(0, _node_tooltip(node))
+        self._refresh_note(host_item, f"host:{host_name}",
+                           self._host_default_note(host_name))
 
-                seen_keys = set()
-                for st in standalone_storages:
-                    sname = st.storage
-                    shost = st.host_name
-                    key = (sname, shost)
-                    if key not in seen_keys:
-                        seen_keys.add(key)
-                        si = QTreeWidgetItem(so_item)
-                        si.setText(0, f"{sname} ({shost})")
-                        si.setIcon(0, get_icon("storage"))
-                        si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "host", shost))
-                        self._refresh_note(si, f"storage:{sname}:{shost}")
-
-        raw = load_ui_state("expandedTreePaths")
-        if raw:
-            self._restore_expanded_state()
-        else:
-            self.tree.expandAll()
-        if saved_key is not None:
-            item = self.find_item_by_key(saved_key)
-            if item is not None:
-                self.tree.setCurrentItem(item)
-        self.tree.verticalScrollBar().setValue(scroll_val)
-        self._building = False
+        for st in sorted((s for s in self.all_storages
+                          if s.host_name == host_name and s.cluster == cluster_scope
+                          and (not cluster_scope or not s.shared)),
+                         key=lambda s: s.storage.lower()):
+            si = QTreeWidgetItem(host_item)
+            si.setText(0, st.storage)
+            si.setIcon(0, get_icon("storage"))
+            si.setData(0, ITEM_KEY_ROLE, ("storage", st.storage, "host", host_name))
+            self._refresh_note(si, f"storage:{st.storage}:{host_name}")
+        return host_item
 
     def update_node_statuses(self, all_nodes, all_vms, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
@@ -1188,7 +1236,7 @@ class TreePanel(QWidget):
                 host_name = host.host_name if host else ""
             if host_name:
                 self.host_remove_requested.emit("host", host_name)
-        elif item_type in ("cluster", "section"):
+        elif item_type == "cluster":
             self.host_remove_requested.emit(item_type, item_name)
 
     def _on_item_clicked(self, item, column):
@@ -1211,15 +1259,6 @@ class TreePanel(QWidget):
 
         item_type = key[0]
         item_name = key[1] if len(key) > 1 else ""
-
-        if item_type == "section":
-            if item_name == tr("Clusters"):
-                self.item_selected.emit("cluster_folder", item_name, {})
-            elif item_name == tr("Standalone hosts"):
-                self.item_selected.emit("standalone_folder", item_name, {})
-            elif item_name == tr("Storage"):
-                self.item_selected.emit("storage_folder", item_name, {})
-            return
 
         if item_type == "cluster":
             self.item_selected.emit("cluster", item_name, {})

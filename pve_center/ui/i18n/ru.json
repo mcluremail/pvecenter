@@ -1156,5 +1156,7 @@
   "{sid} removed from HA": "{sid} удалён из HA",
   "{} results": "Результатов: {}",
   "— none —": "— нет —",
-  "❌ {} is unavailable": "❌ {} недоступен"
+  "❌ {} is unavailable": "❌ {} недоступен",
+  "Hosts view": "Хосты",
+  "Storages view": "Хранилища"
 }

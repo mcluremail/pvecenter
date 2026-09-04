@@ -1156,5 +1156,7 @@
   "{sid} removed from HA": "{sid} retiré du HA",
   "{} results": "{} résultats",
   "— none —": "— aucun —",
-  "❌ {} is unavailable": "❌ {} est indisponible"
+  "❌ {} is unavailable": "❌ {} est indisponible",
+  "Hosts view": "Hôtes",
+  "Storages view": "Stockages"
 }
