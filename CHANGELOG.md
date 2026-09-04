@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.11.1 — hotfix: crash on cluster summary quorum card
+
+**Bug fixes**
+- MetricCard.set_value() now accepts an optional `subtitle` keyword (cluster detail quorum card called it as `set_value("2/4", subtitle=...)`, which raised TypeError on every cluster metrics refresh)
+
 ## v2.11.0 — tree redesign: flat tree, Hosts/Storages view modes
 
 **New features**

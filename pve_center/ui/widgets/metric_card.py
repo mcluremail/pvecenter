@@ -61,8 +61,10 @@ class MetricCard(QFrame):
     def set_title(self, title):
         self._title_label.setText(title)
 
-    def set_value(self, value):
+    def set_value(self, value, subtitle=None):
         self._value_label.setText(str(value))
+        if subtitle is not None:
+            self.set_subtitle(subtitle)
 
     def set_subtitle(self, subtitle):
         self._subtitle_label.setText(str(subtitle))

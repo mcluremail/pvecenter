@@ -1,3 +1,10 @@
+pve-center (2.11.1-1) unstable; urgency=medium
+
+  * Fix: TypeError on every cluster metrics refresh — MetricCard.set_value()
+    now accepts the optional subtitle kwarg (cluster quorum card)
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 13:00:00 +0300
+
 pve-center (2.11.0-1) unstable; urgency=medium
 
   * New: tree redesign — flat top level (groups, clusters, standalone hosts),
