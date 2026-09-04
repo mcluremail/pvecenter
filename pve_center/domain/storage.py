@@ -127,7 +127,10 @@ class Storage(DictCompat):
             node=d.get("node", "") or "",
             host_name=host_name,
             cluster=cluster,
-            storage_type=d.get("type", "") or "",
+            # /cluster/resources reports the backend in "plugintype" ("dir",
+            # "cephfs", ...) while "type" is just "storage"; per-node
+            # /nodes/{node}/storage has the backend in "type".
+            storage_type=d.get("plugintype") or d.get("type", "") or "",
             content=d.get("content", "") or "",
             # /cluster/resources reports usage as disk/maxdisk; per-node
             # /nodes/{node}/storage reports used/total/avail. Accept both.

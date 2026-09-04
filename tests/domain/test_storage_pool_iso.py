@@ -59,6 +59,23 @@ class TestStorageFromPve:
         assert s.shared is True
         assert s.cluster == ""
 
+    def test_cluster_resources_plugintype(self):
+        # /cluster/resources entries: "type" is "storage", backend is in
+        # "plugintype" (v2.11.2: detail table showed "Type: storage")
+        s = Storage.from_pve(
+            {"storage": "ocfs-store", "node": "pve02", "type": "storage",
+             "plugintype": "ocfs2", "content": "images", "shared": 1},
+            "h1", "ros")
+        assert s.storage_type == "ocfs2"
+
+    def test_per_node_type_fallback(self):
+        # /nodes/{node}/storage entries have no "plugintype"; "type" is the
+        # backend and must keep working
+        s = Storage.from_pve(
+            {"storage": "local", "node": "pve01", "type": "dir"},
+            "h1", "")
+        assert s.storage_type == "dir"
+
     def test_empty_dict(self):
         s = Storage.from_pve({}, "h", "")
         assert s.storage == ""

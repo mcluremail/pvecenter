@@ -209,7 +209,7 @@ class StorageTabs:
             import pyqtgraph as pg
             date_axis = pg.DateAxisItem(orientation='bottom')
             panel.storage_plot_widget = pg.PlotWidget(
-                axisItems={'bottom': date_axis}, title=tr("Fill level")
+                axisItems={'bottom': date_axis}, title=tr("Used")
             )
             panel.storage_plot_widget.setLabel('left', 'GiB')
             panel.storage_plot_widget.showGrid(x=False, y=True, alpha=0.3)
