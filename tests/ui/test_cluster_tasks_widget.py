@@ -1,5 +1,8 @@
 """Tests for ClusterTasksWidget with domain Task objects."""
+import json
+
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHeaderView
 
 from pve_center.domain.task import Task
 from pve_center.ui.widgets.cluster_tasks_widget import ClusterTasksWidget
@@ -71,3 +74,23 @@ class TestClusterTasksWidget:
         w._status_filter.setCurrentIndex(0)  # All
         w._apply_filter()
         assert w.table.rowCount() == 2
+
+    def test_description_column_stretches(self, qtbot, monkeypatch):
+        """v2.11.2: Description used to be a fixed 250px Interactive
+        column — with old saved widths the table overflowed its panel
+        at FullHD. It must stretch, and old saved widths must not
+        apply to it."""
+
+        import pve_center.ui.widgets.cluster_tasks_widget as mod
+
+        monkeypatch.setattr(
+            mod, "load_ui_state",
+            lambda key: json.dumps([300, 300, 300, 300, 999, 300]),
+        )
+        w = ClusterTasksWidget()
+        qtbot.addWidget(w)
+        h = w.table.horizontalHeader()
+        assert h.sectionResizeMode(4) == QHeaderView.Stretch
+        # Restore skips the stretch column even with old saved widths
+        assert w.table.columnWidth(4) != 999
+        assert w.table.columnWidth(0) == 300

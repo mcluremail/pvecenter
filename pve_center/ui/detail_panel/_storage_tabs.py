@@ -243,7 +243,13 @@ class StorageTabs:
         layout.addWidget(panel.storage_detail_nodes_table)
 
         layout.addStretch()
-        return widget
+        # Content (params + fill bar + chart + per-node table) can exceed
+        # the tab height at FullHD — wrap in a scroll area so nothing is
+        # clipped.
+        tab = QScrollArea()
+        tab.setWidgetResizable(True)
+        tab.setWidget(widget)
+        return tab
 
     def build_backups_tab(self):
         panel = self.panel

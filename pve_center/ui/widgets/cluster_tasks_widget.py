@@ -137,12 +137,13 @@ class ClusterTasksWidget(QWidget):
         h.setSectionResizeMode(1, QHeaderView.Interactive)
         h.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         h.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(4, QHeaderView.Interactive)
+        # Description stretches so the table always fits the panel width
+        # (no horizontal scrollbar at FullHD).
+        h.setSectionResizeMode(4, QHeaderView.Stretch)
         h.setSectionResizeMode(5, QHeaderView.Interactive)
 
         self.table.setColumnWidth(0, 155)
         self.table.setColumnWidth(1, 155)
-        self.table.setColumnWidth(4, 250)
         self.table.setColumnWidth(5, 180)
 
         # Restore column widths (changes saved via sectionResized)
@@ -437,6 +438,8 @@ class ClusterTasksWidget(QWidget):
             widths = json.loads(raw)
             if isinstance(widths, list) and len(widths) == self.table.columnCount():
                 for c, w in enumerate(widths):
+                    if c == 4:  # stretch column — always fills the panel
+                        continue
                     self.table.setColumnWidth(c, w)
         except (TypeError, ValueError):
             pass
