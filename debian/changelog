@@ -1,3 +1,15 @@
+pve-center (2.10.0-1) unstable; urgency=medium
+
+  * New: per-item tree notes in a second tree column (host default = FQDN)
+  * New: user-defined host groups with drag&drop and aggregated summary
+  * New: global search (Ctrl+F) across VMs, hosts, pools and storages
+  * New: bulk VM actions (multi-select Start/Shutdown/Reboot/Stop)
+  * New: snapshot rollback for VMs and containers
+  * Refactor: DataProvider protocol + ProxmoxProvider facade, Plugin API seed
+  * Fix: audit batches 1-7 (worker queueing, stale-result guards, dialogs, UI polish, i18n)
+
+ -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 08:00:00 +0300
+
 pve-center (2.8.1-1) unstable; urgency=medium
 
   * Fix: LXC restore used 'name' instead of 'hostname' param; 'unique' only for QEMU
