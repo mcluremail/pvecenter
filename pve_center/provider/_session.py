@@ -49,7 +49,7 @@ def _q(value) -> str:
 class ProxmoxSession:
     """Wraps ProxmoxAPI with unified error handling and connection lifecycle."""
 
-    def __init__(self, cfg: dict, timeout: int = 15) -> None:
+    def __init__(self, cfg: dict, timeout: float = 15) -> None:
         self.cfg = cfg
         self.timeout = timeout
         self._proxmox: ProxmoxAPI | None = None

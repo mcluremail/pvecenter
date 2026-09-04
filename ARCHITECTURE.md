@@ -19,6 +19,20 @@ Data Provider
 ↓
 ProxmoxProvider | ServerProvider
 
+## Data Provider (реализация)
+
+Шов определён протоколом `provider.DataProvider` (см. `pve_center/provider/_provider.py`):
+единая поверхность доступа — `nodes / vms / cluster / storage / tasks / pools / access / rrd` + `close()`.
+
+- `ProxmoxProvider` — единственная реализация сегодня: фасад над `ProxmoxSession`
+  (proxmoxer) и типизированными `XxxAPI`-классами; фасады создаются лениво и
+  разделяют пул соединений сессии.
+- Backend-воркеры (`backend.py`) зависят только от фасада `ProxmoxProvider` —
+  не от API-классов напрямую; `ui/api/metrics.py` использует `provider.rrd`.
+- Тесты подменяют `backend.ProxmoxProvider` целиком (фейк с атрибутами-фасадами).
+- Задел v3.5: второй `ServerProvider` (pve-center server) или PBS-плагин
+  реализует тот же протокол без изменения воркеров.
+
 ## Domain Model
 
 Datacenter

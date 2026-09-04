@@ -12,7 +12,8 @@
 
 ## v3.5 — Платформа
 - ✅ Стабильная модель объектов (миграция UI с dict на доменные модели завершена в v2.10)
-- Data Provider API
+- ✅ Data Provider API: шов `DataProvider` (Protocol) + фасад `ProxmoxProvider`
+  (`provider/_provider.py`); backend и metrics работают через фасад
 - Plugin API
 
 ### Техдолг миграции (осознанно не переводится на доменные модели)

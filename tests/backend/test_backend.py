@@ -10,6 +10,26 @@ import requests
 
 from pve_center import backend
 
+
+class FakeProvider:
+    """Stands in for ProxmoxProvider: facade attrs + close()."""
+
+    def __init__(self, cfg=None, timeout=10):
+        self.cfg = cfg
+        self.timeout = timeout
+        self.closed = False
+        self.nodes = MagicMock()
+        self.vms = MagicMock()
+        self.cluster = MagicMock()
+        self.storage = MagicMock()
+        self.tasks = MagicMock()
+        self.pools = MagicMock()
+        self.access = MagicMock()
+        self.rrd = MagicMock()
+
+    def close(self):
+        self.closed = True
+
 # --- _verify_ssl ---
 
 
@@ -224,23 +244,19 @@ class TestCreateAdminToken:
 
 class TestDeleteHostToken:
     def test_success(self, monkeypatch):
-        sess = MagicMock()
-        monkeypatch.setattr(backend, "ProxmoxSession", lambda cfg, timeout=10: sess)
-        api = MagicMock()
-        monkeypatch.setattr(backend, "AccessAPI", lambda session: api)
+        fake = FakeProvider()
+        monkeypatch.setattr(backend, "ProxmoxProvider", lambda cfg, timeout=10: fake)
         cfg = {"host": "10.0.0.1", "user": "root@pam", "token_name": "pvecenter-x"}
         assert backend.delete_host_token(cfg) is True
-        api.delete_token.assert_called_once_with("root@pam", "pvecenter-x")
-        sess.close.assert_called_once()
+        fake.access.delete_token.assert_called_once_with("root@pam", "pvecenter-x")
+        assert fake.closed
 
     def test_failure_returns_false(self, monkeypatch):
-        sess = MagicMock()
-        monkeypatch.setattr(backend, "ProxmoxSession", lambda cfg, timeout=10: sess)
-        api = MagicMock()
-        api.delete_token.side_effect = RuntimeError("nope")
-        monkeypatch.setattr(backend, "AccessAPI", lambda session: api)
+        fake = FakeProvider()
+        fake.access.delete_token.side_effect = RuntimeError("nope")
+        monkeypatch.setattr(backend, "ProxmoxProvider", lambda cfg, timeout=10: fake)
         assert backend.delete_host_token({"user": "u", "token_name": "t"}) is False
-        sess.close.assert_called_once()
+        assert fake.closed
 
 
 # --- BulkVmActionWorker ---
@@ -249,36 +265,26 @@ class TestDeleteHostToken:
 class TestBulkVmActionWorker:
     @staticmethod
     def _make_worker(monkeypatch, failures=None):
-        """Build a bulk worker with mocked ProxmoxSession/VmAPI.
+        """Build a bulk worker with mocked ProxmoxProvider facade.
 
         failures: dict {vmid: exception} — those VMs raise in perform_action.
         Returns (worker, recorded) where recorded collects signal emissions.
         """
-        sessions = []
-
-        class FakeSession:
-            def __init__(self, cfg, timeout=10):
-                self.closed = False
-                sessions.append(self)
-
-            def close(self):
-                self.closed = True
-
+        providers = []
         calls = []
 
-        def fake_perform_action(api_self, node, vmid, vm_type, action):
+        def fake_perform(node, vmid, vm_type, action):
             calls.append((node, vmid, vm_type, action))
             if failures and vmid in failures:
                 raise failures[vmid]
 
-        class FakeVmAPI:
-            def __init__(self, session):
-                self.session = session
+        class ActionProvider(FakeProvider):
+            def __init__(self, cfg, timeout=10):
+                super().__init__(cfg, timeout)
+                providers.append(self)
+                self.vms = SimpleNamespace(perform_action=fake_perform)
 
-            perform_action = fake_perform_action
-
-        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
-        monkeypatch.setattr(backend, "VmAPI", FakeVmAPI)
+        monkeypatch.setattr(backend, "ProxmoxProvider", ActionProvider)
 
         targets = [
             {"host_cfg": {"name": "h1"}, "node": "n1", "vmid": v, "vm_type": "qemu"}
@@ -291,22 +297,22 @@ class TestBulkVmActionWorker:
         worker.signals.vm_done.connect(
             lambda v, ok, m: recorded["vm_done"].append((v, ok, m)))
         worker.signals.finished.connect(lambda: recorded["finished"].append(True))
-        return worker, recorded, calls, sessions
+        return worker, recorded, calls, providers
 
     def test_all_success(self, monkeypatch):
-        worker, recorded, calls, sessions = self._make_worker(monkeypatch)
+        worker, recorded, calls, providers = self._make_worker(monkeypatch)
         worker.run()
         assert [c[1] for c in calls] == [100, 101, 102]
         assert all(c[3] == "start" for c in calls)
         assert all(ok for _v, ok, _m in recorded["vm_done"])
         assert recorded["finished"] == [True]
         assert recorded["progress"] == [(0, 3, 100), (1, 3, 101), (2, 3, 102)]
-        assert all(s.closed for s in sessions)
+        assert all(p.closed for p in providers)
         assert not worker.was_cancelled
 
     def test_partial_failure_continues(self, monkeypatch):
         failures = {101: RuntimeError("vm locked")}
-        worker, recorded, calls, _sessions = self._make_worker(
+        worker, recorded, calls, _providers = self._make_worker(
             monkeypatch, failures=failures)
         worker.run()
         assert [c[1] for c in calls] == [100, 101, 102]  # loop continues
@@ -316,7 +322,7 @@ class TestBulkVmActionWorker:
         assert "locked" in msg
 
     def test_cancel_stops_loop(self, monkeypatch):
-        worker, recorded, calls, _sessions = self._make_worker(monkeypatch)
+        worker, recorded, calls, _providers = self._make_worker(monkeypatch)
         worker.cancel()
         worker.run()
         assert calls == []
@@ -325,16 +331,28 @@ class TestBulkVmActionWorker:
         assert recorded["finished"] == [True]
 
     def test_cancel_midway(self, monkeypatch):
-        worker, recorded, calls, _sessions = self._make_worker(monkeypatch)
         state = {"count": 0}
+        calls = []
 
-        def fake_perform(api_self, node, vmid, vm_type, action):
+        def fake_perform(node, vmid, vm_type, action):
             state["count"] += 1
             if state["count"] >= 2:
                 worker.cancel()
             calls.append((node, vmid, vm_type, action))
 
-        monkeypatch.setattr(backend.VmAPI, "perform_action", fake_perform)
+        class MidwayProvider(FakeProvider):
+            def __init__(self, cfg, timeout=10):
+                super().__init__(cfg, timeout)
+                self.vms = SimpleNamespace(perform_action=fake_perform)
+
+        monkeypatch.setattr(backend, "ProxmoxProvider", MidwayProvider)
+        worker = backend.BulkVmActionWorker(
+            [{"host_cfg": {"name": "h1"}, "node": "n1", "vmid": v, "vm_type": "qemu"}
+             for v in (100, 101, 102)], "start")
+        recorded = {"vm_done": [], "finished": []}
+        worker.signals.vm_done.connect(
+            lambda v, ok, m: recorded["vm_done"].append((v, ok, m)))
+        worker.signals.finished.connect(lambda: recorded["finished"].append(True))
         worker.run()
         # VM 100 done, VM 101 triggers cancel mid-run but still completes it;
         # VM 102 skipped
@@ -343,7 +361,6 @@ class TestBulkVmActionWorker:
         assert recorded["finished"] == [True]
 
     def test_empty_targets(self, monkeypatch):
-        monkeypatch.setattr(backend, "ProxmoxSession", MagicMock())
         worker = backend.BulkVmActionWorker([], "start")
         recorded = {"finished": []}
         worker.signals.finished.connect(lambda: recorded["finished"].append(True))
@@ -357,29 +374,21 @@ class TestTaskWorkers:
 
     @staticmethod
     def _patch_task_api(monkeypatch, list_result=None, list_for_vm_result=None):
-        class FakeSession:
-            def __init__(self, cfg, timeout=10):
-                pass
-
-            def close(self):
-                pass
-
         calls = {}
 
-        class FakeTaskAPI:
-            def __init__(self, session):
-                pass
+        class TaskProvider(FakeProvider):
+            def __init__(self, cfg, timeout=10):
+                super().__init__(cfg, timeout)
+                self.tasks = SimpleNamespace(
+                    list=lambda node_name, limit=100: (
+                        calls.setdefault("list", []).append(node_name)
+                        or list_result or []),
+                    list_for_vm=lambda node_name, vmid, limit=50: (
+                        calls.setdefault("list_for_vm", []).append((node_name, vmid))
+                        or list_for_vm_result or []),
+                )
 
-            def list(self, node_name, limit=100):
-                calls.setdefault("list", []).append(node_name)
-                return list_result or []
-
-            def list_for_vm(self, node_name, vmid, limit=50):
-                calls.setdefault("list_for_vm", []).append((node_name, vmid))
-                return list_for_vm_result or []
-
-        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
-        monkeypatch.setattr(backend, "TaskAPI", FakeTaskAPI)
+        monkeypatch.setattr(backend, "ProxmoxProvider", TaskProvider)
         return calls
 
     def test_vm_task_history_emits_domain_objects(self, monkeypatch):
@@ -421,22 +430,13 @@ class TestTaskWorkers:
             ],
         }
 
-        class FakeSession:
+        class ClusterTaskProvider(FakeProvider):
             def __init__(self, cfg, timeout=10):
-                pass
+                super().__init__(cfg, timeout)
+                self.tasks = SimpleNamespace(
+                    list=lambda node_name, limit=100: results.get(node_name, []))
 
-            def close(self):
-                pass
-
-        class FakeTaskAPI:
-            def __init__(self, session):
-                pass
-
-            def list(self, node_name, limit=100):
-                return results.get(node_name, [])
-
-        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
-        monkeypatch.setattr(backend, "TaskAPI", FakeTaskAPI)
+        monkeypatch.setattr(backend, "ProxmoxProvider", ClusterTaskProvider)
 
         worker = backend.ClusterTasksWorker([({"name": "h1"}, "n1"),
                                              ({"name": "h2"}, "n2")])
@@ -461,27 +461,19 @@ class TestVmSnapshotsWorker:
 
     @staticmethod
     def _make_worker(monkeypatch, snaps, cfgs=None):
-        class FakeSession:
+        def no_cfg(name):
+            raise RuntimeError(f"no cfg for {name}")
+
+        class SnapshotProvider(FakeProvider):
             def __init__(self, cfg, timeout=10):
-                pass
+                super().__init__(cfg, timeout)
+                self.vms = SimpleNamespace(
+                    list_snapshots=lambda node, vmid, vm_type: snaps,
+                    get_snapshot_config=lambda node, vmid, vm_type, name: (
+                        cfgs[name] if cfgs and name in cfgs else no_cfg(name)),
+                )
 
-            def close(self):
-                pass
-
-        class FakeVmAPI:
-            def __init__(self, session):
-                pass
-
-            def list_snapshots(self, node, vmid, vm_type):
-                return snaps
-
-            def get_snapshot_config(self, node, vmid, vm_type, name):
-                if cfgs and name in cfgs:
-                    return cfgs[name]
-                raise RuntimeError("no cfg")
-
-        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
-        monkeypatch.setattr(backend, "VmAPI", FakeVmAPI)
+        monkeypatch.setattr(backend, "ProxmoxProvider", SnapshotProvider)
         worker = backend.VmSnapshotsWorker({"name": "h1"}, "n1", 100)
         recorded = {"ready": [], "error": [], "finished": []}
         worker.signals.snapshots_ready.connect(
@@ -535,26 +527,17 @@ class TestHaResourcesWorker:
     """HA resources flow emits domain HaResource objects."""
 
     def test_emits_domain_ha_resources(self, monkeypatch):
-        class FakeSession:
+        class HaProvider(FakeProvider):
             def __init__(self, cfg, timeout=10):
-                pass
+                super().__init__(cfg, timeout)
+                self.cluster = SimpleNamespace(
+                    list_ha_resources=lambda: [
+                        {"sid": "vm:100", "group": "g1", "state": "started",
+                         "max_restart": 2, "max_relocate": 1, "comment": "db"},
+                        {"sid": "vm:200", "group": "g2", "state": "stopped"},
+                    ])
 
-            def close(self):
-                pass
-
-        class FakeClusterAPI:
-            def __init__(self, session):
-                pass
-
-            def list_ha_resources(self):
-                return [
-                    {"sid": "vm:100", "group": "g1", "state": "started",
-                     "max_restart": 2, "max_relocate": 1, "comment": "db"},
-                    {"sid": "vm:200", "group": "g2", "state": "stopped"},
-                ]
-
-        monkeypatch.setattr(backend, "ProxmoxSession", FakeSession)
-        monkeypatch.setattr(backend, "ClusterAPI", FakeClusterAPI)
+        monkeypatch.setattr(backend, "ProxmoxProvider", HaProvider)
 
         worker = backend.HaResourcesWorker({"name": "h1"})
         recorded = {"ready": [], "error": [], "finished": []}

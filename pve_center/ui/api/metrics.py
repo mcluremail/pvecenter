@@ -7,7 +7,7 @@ import requests
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ...backend import _suppress_ssl_warnings
-from ...provider import ProxmoxSession, RrdAPI
+from ...provider import ProxmoxProvider
 from ..i18n import tr
 
 logger = logging.getLogger(__name__)
@@ -63,10 +63,10 @@ class StorageMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
-        session = None
+        provider = None
         try:
-            session = ProxmoxSession(self.host_cfg, timeout=10)
-            rrd_api = RrdAPI(session)
+            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            rrd_api = provider.rrd
             rrd_response = rrd_api.get_storage_rrddata(
                 self.node_name, self.storage_name, self.timeframe
             )
@@ -88,8 +88,8 @@ class StorageMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            if session:
-                session.close()
+            if provider:
+                provider.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -573,10 +573,10 @@ class HostMetricsWorker(QRunnable):
         self.signals = HostMetricsSignals()
 
     def run(self):
-        session = None
+        provider = None
         try:
-            session = ProxmoxSession(self.host_cfg, timeout=10)
-            rrd_api = RrdAPI(session)
+            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            rrd_api = provider.rrd
             rrd_response = rrd_api.get_node_rrddata(self.node_name, self.timeframe)
 
             metrics = {
@@ -604,8 +604,8 @@ class HostMetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            if session:
-                session.close()
+            if provider:
+                provider.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:
@@ -624,10 +624,10 @@ class MetricsWorker(QRunnable):
         self.signals = MetricsSignals()
 
     def run(self):
-        session = None
+        provider = None
         try:
-            session = ProxmoxSession(self.host_cfg, timeout=10)
-            rrd_api = RrdAPI(session)
+            provider = ProxmoxProvider(self.host_cfg, timeout=10)
+            rrd_api = provider.rrd
             rrd_response = rrd_api.get_vm_rrddata(
                 self.node_name, self.vmid, self.vm_type, self.timeframe
             )
@@ -658,8 +658,8 @@ class MetricsWorker(QRunnable):
             except RuntimeError:
                 pass
         finally:
-            if session:
-                session.close()
+            if provider:
+                provider.close()
             try:
                 self.signals.finished.emit()
             except RuntimeError:
