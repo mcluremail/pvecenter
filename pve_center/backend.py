@@ -1115,12 +1115,23 @@ class BulkVmActionWorker(QRunnable):
             pass
 
 
-def _poll_task(session, node_name, upid, timeout=60, interval=1.0):
-    """Poll PVE async task until it finishes or timeout.
-    Returns (status, exitstatus) tuple: ('stopped', 'OK') on success.
+def _await_task(session, node_name, result, timeout=120):
+    """Wait for a PVE async task started by an API call.
+
+    PVE returns a UPID for async operations and a data payload for
+    synchronous ones. Returns (True, "") on success — task finished with
+    exitstatus OK, or the call completed synchronously without a UPID —
+    and (False, errmsg) on task failure or timeout.
     """
-    task_api = TaskAPI(session)
-    return task_api.poll(node_name, upid, timeout=timeout, interval=interval)
+    upid = result.get("data", result) if isinstance(result, dict) else result
+    if not (isinstance(upid, str) and upid.startswith("UPID:")):
+        return True, ""
+    status, exitstatus = TaskAPI(session).poll(
+        node_name, upid, timeout=timeout, interval=1.0
+    )
+    if status == "stopped" and exitstatus == "OK":
+        return True, ""
+    return False, exitstatus or status
 
 
 # ----------------------------------------------------------------------
@@ -1149,33 +1160,25 @@ class VmSnapshotCreateWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             vm_api = VmAPI(session)
-            upid = vm_api.create_snapshot(
-                self.node_name, self.vmid, self.vm_type,
-                self.snap_name, self.description, self.vmstate,
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.create_snapshot(
+                    self.node_name, self.vmid, self.vm_type,
+                    self.snap_name, self.description, self.vmstate,
+                ),
+                timeout=120,
             )
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(session, self.node_name, upid, timeout=120)
-                if status == "stopped" and exitstatus == "OK":
-                    try:
-                        self.signals.result.emit(
-                            tr("Snapshot \"{name}\" created").format(name=self.snap_name)
-                        )
-                    except RuntimeError:
-                        pass
-                else:
-                    err = exitstatus or status
-                    try:
-                        self.signals.error.emit(
-                            tr("Snapshot create failed: {err}").format(err=err)
-                        )
-                    except RuntimeError:
-                        pass
-            else:
+            if ok:
                 try:
                     self.signals.result.emit(
                         tr("Snapshot \"{name}\" created").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    self.signals.error.emit(
+                        tr("Snapshot create failed: {err}").format(err=err)
                     )
                 except RuntimeError:
                     pass
@@ -1218,30 +1221,22 @@ class VmSnapshotDeleteWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             vm_api = VmAPI(session)
-            upid = vm_api.delete_snapshot(self.node_name, self.vmid, self.vm_type, self.snap_name)
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(session, self.node_name, upid, timeout=120)
-                if status == "stopped" and exitstatus == "OK":
-                    try:
-                        self.signals.result.emit(
-                            tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
-                        )
-                    except RuntimeError:
-                        pass
-                else:
-                    err = exitstatus or status
-                    try:
-                        self.signals.error.emit(
-                            tr("Snapshot delete failed: {err}").format(err=err)
-                        )
-                    except RuntimeError:
-                        pass
-            else:
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.delete_snapshot(self.node_name, self.vmid, self.vm_type, self.snap_name),
+                timeout=120,
+            )
+            if ok:
                 try:
                     self.signals.result.emit(
                         tr("Snapshot \"{name}\" deleted").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    self.signals.error.emit(
+                        tr("Snapshot delete failed: {err}").format(err=err)
                     )
                 except RuntimeError:
                     pass
@@ -1284,32 +1279,24 @@ class VmSnapshotRollbackWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             vm_api = VmAPI(session)
-            upid = vm_api.rollback_snapshot(
-                self.node_name, self.vmid, self.vm_type, self.snap_name
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.rollback_snapshot(
+                    self.node_name, self.vmid, self.vm_type, self.snap_name
+                ),
+                timeout=180,
             )
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(session, self.node_name, upid, timeout=180)
-                if status == "stopped" and exitstatus == "OK":
-                    try:
-                        self.signals.result.emit(
-                            tr("Rolled back to snapshot \"{name}\"").format(name=self.snap_name)
-                        )
-                    except RuntimeError:
-                        pass
-                else:
-                    err = exitstatus or status
-                    try:
-                        self.signals.error.emit(
-                            tr("Snapshot rollback failed: {err}").format(err=err)
-                        )
-                    except RuntimeError:
-                        pass
-            else:
+            if ok:
                 try:
                     self.signals.result.emit(
                         tr("Rolled back to snapshot \"{name}\"").format(name=self.snap_name)
+                    )
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    self.signals.error.emit(
+                        tr("Snapshot rollback failed: {err}").format(err=err)
                     )
                 except RuntimeError:
                     pass
@@ -1675,7 +1662,19 @@ class CreateVmWorker(QRunnable):
                         pass
                     return
 
-            vm_api.create_qemu(self.node_name, **params)
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.create_qemu(self.node_name, **params),
+                timeout=300,
+            )
+            if not ok:
+                try:
+                    self.signals.vm_error.emit(
+                        tr("VM create failed: {err}").format(err=err)
+                    )
+                except RuntimeError:
+                    pass
+                return
             vmid = params.get("vmid", "?")
             msg = tr("VM {vmid} created on {node}").format(vmid=vmid, node=self.node_name)
 
@@ -1733,7 +1732,19 @@ class DeleteVmWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=30)
             vm_api = VmAPI(session)
-            vm_api.delete(self.node_name, self.vmid, self.vm_type, purge=True)
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.delete(self.node_name, self.vmid, self.vm_type, purge=True),
+                timeout=600,
+            )
+            if not ok:
+                try:
+                    self.signals.vm_error.emit(
+                        tr("VM delete failed: {err}").format(err=err)
+                    )
+                except RuntimeError:
+                    pass
+                return
             msg = tr("VM {vmid} deleted from {node}").format(vmid=self.vmid, node=self.node_name)
             try:
                 self.signals.vm_deleted.emit(msg)
@@ -2169,8 +2180,19 @@ class CloneVmWorker(QRunnable):
                     clone_params["full"] = 1
                 if params.get("storage"):
                     clone_params["storage"] = params["storage"]
-            vm_api.clone(self.node_name, self.vmid, self.vm_type, **clone_params)
-
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.clone(self.node_name, self.vmid, self.vm_type, **clone_params),
+                timeout=900,
+            )
+            if not ok:
+                try:
+                    self.signals.vm_error.emit(
+                        tr("Clone failed: {err}").format(err=err)
+                    )
+                except RuntimeError:
+                    pass
+                return
             newid = params.get("newid", "?")
             msg = tr("VM {vmid} cloned to {newid} on {target}").format(
                 vmid=self.vmid, newid=newid,
@@ -2220,7 +2242,19 @@ class ConvertToTemplateWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=30)
             vm_api = VmAPI(session)
-            vm_api.convert_to_template(self.node_name, self.vmid)
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.convert_to_template(self.node_name, self.vmid),
+                timeout=120,
+            )
+            if not ok:
+                try:
+                    self.signals.error.emit(
+                        tr("Convert to template failed: {err}").format(err=err)
+                    )
+                except RuntimeError:
+                    pass
+                return
             msg = tr("VM {vmid} converted to template").format(vmid=self.vmid)
             try:
                 self.signals.result.emit(msg)
@@ -2265,7 +2299,19 @@ class ConvertToVmWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=30)
             vm_api = VmAPI(session)
-            vm_api.post_config(self.node_name, self.vmid, "qemu", template=0)
+            ok, err = _await_task(
+                session, self.node_name,
+                vm_api.post_config(self.node_name, self.vmid, "qemu", template=0),
+                timeout=120,
+            )
+            if not ok:
+                try:
+                    self.signals.error.emit(
+                        tr("Convert to VM failed: {err}").format(err=err)
+                    )
+                except RuntimeError:
+                    pass
+                return
             msg = tr("Template {vmid} converted to VM").format(vmid=self.vmid)
             try:
                 self.signals.result.emit(msg)
@@ -2310,32 +2356,22 @@ class StorageContentDeleteWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             storage_api = StorageAPI(session)
-            upid = storage_api.delete_content(self.node_name, self.storage, self.volid)
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, upid, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    try:
-                        self.signals.result.emit(
-                            tr("File deleted: {volid}").format(volid=self.volid)
-                        )
-                    except RuntimeError:
-                        pass
-                else:
-                    err = exitstatus or status
-                    try:
-                        self.signals.error.emit(
-                            tr("Delete failed: {err}").format(err=err)
-                        )
-                    except RuntimeError:
-                        pass
-            else:
+            ok, err = _await_task(
+                session, self.node_name,
+                storage_api.delete_content(self.node_name, self.storage, self.volid),
+                timeout=self.timeout,
+            )
+            if ok:
                 try:
                     self.signals.result.emit(
                         tr("File deleted: {volid}").format(volid=self.volid)
+                    )
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    self.signals.error.emit(
+                        tr("Delete failed: {err}").format(err=err)
                     )
                 except RuntimeError:
                     pass
@@ -2392,29 +2428,23 @@ class StorageUploadWorker(QRunnable):
             def progress_cb(pct: int) -> None:
                 _safe_emit(self.signals.progress, pct)
 
-            result = storage_api.upload_file(
-                self.node_name, self.storage_name, self.content_type,
-                self.file_path, timeout=self.timeout, progress_callback=progress_cb,
+            ok, err = _await_task(
+                session, self.node_name,
+                storage_api.upload_file(
+                    self.node_name, self.storage_name, self.content_type,
+                    self.file_path, timeout=self.timeout, progress_callback=progress_cb,
+                ),
+                timeout=self.timeout,
             )
-            if isinstance(result, str) and result.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, result, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    _safe_emit(
-                        self.signals.result,
-                        tr("Upload complete: {name}").format(name=file_name),
-                    )
-                else:
-                    err = exitstatus or status
-                    _safe_emit(
-                        self.signals.error,
-                        tr("Upload failed: {err}").format(err=err),
-                    )
-            else:
+            if ok:
                 _safe_emit(
                     self.signals.result,
                     tr("Upload complete: {name}").format(name=file_name),
+                )
+            else:
+                _safe_emit(
+                    self.signals.error,
+                    tr("Upload failed: {err}").format(err=err),
                 )
         except Exception as e:
             logger.debug("upload error: %s", e)
@@ -2469,21 +2499,18 @@ class StorageDownloadUrlWorker(QRunnable):
                 params["filename"] = self.filename
             if self.checksum:
                 params["checksum"] = self.checksum
-            result = storage_api.download_url(self.node_name, self.storage_name, **params)
-            if isinstance(result, str) and result.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, result, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    name = self.filename or self.url.split("/")[-1].split("?")[0] or "file"
-                    _safe_emit(self.signals.result,
-                               tr("Download complete: {name}").format(name=name))
-                else:
-                    err = exitstatus or status
-                    _safe_emit(self.signals.error,
-                               tr("Download failed: {err}").format(err=err))
+            ok, err = _await_task(
+                session, self.node_name,
+                storage_api.download_url(self.node_name, self.storage_name, **params),
+                timeout=self.timeout,
+            )
+            if ok:
+                name = self.filename or self.url.split("/")[-1].split("?")[0] or "file"
+                _safe_emit(self.signals.result,
+                           tr("Download complete: {name}").format(name=name))
             else:
-                _safe_emit(self.signals.result, tr("Download complete"))
+                _safe_emit(self.signals.error,
+                           tr("Download failed: {err}").format(err=err))
         except Exception as e:
             logger.debug("download-url error: %s", e)
             _safe_emit(self.signals.error, _sanitize_error(e))
@@ -2518,28 +2545,21 @@ class StorageMoveWorker(QRunnable):
         try:
             session = ProxmoxSession(self.host_cfg, timeout=10)
             storage_api = StorageAPI(session)
-            upid = storage_api.move_content(
-                self.node_name, self.storage_name, self.volid,
-                self.target_storage, target_vmid=self.target_vmid,
-                delete_source=self.delete_source,
+            ok, err = _await_task(
+                session, self.node_name,
+                storage_api.move_content(
+                    self.node_name, self.storage_name, self.volid,
+                    self.target_storage, target_vmid=self.target_vmid,
+                    delete_source=self.delete_source,
+                ),
+                timeout=self.timeout,
             )
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, upid, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    _safe_emit(self.signals.result,
-                               tr("Move complete: {volid} → {storage}").format(
-                                   volid=self.volid, storage=self.target_storage))
-                else:
-                    err = exitstatus or status
-                    _safe_emit(self.signals.error, tr("Move failed: {err}").format(err=err))
-            else:
+            if ok:
                 _safe_emit(self.signals.result,
                            tr("Move complete: {volid} → {storage}").format(
                                volid=self.volid, storage=self.target_storage))
+            else:
+                _safe_emit(self.signals.error, tr("Move failed: {err}").format(err=err))
         except Exception as e:
             logger.debug("move error: %s", e)
             _safe_emit(self.signals.error, _sanitize_error(e))
@@ -2592,22 +2612,16 @@ class VzdumpWorker(QRunnable):
                 params["remove"] = 1
             if self.bwlimit > 0:
                 params["bwlimit"] = self.bwlimit
-            upid = node_api.backup_vzdump(self.node_name, **params)
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, upid, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    _safe_emit(self.signals.result,
-                               tr("Backup completed for VM {vmid}").format(vmid=self.vmid))
-                else:
-                    err = exitstatus or status
-                    _safe_emit(self.signals.error, tr("Backup failed: {err}").format(err=err))
-            else:
+            ok, err = _await_task(
+                session, self.node_name,
+                node_api.backup_vzdump(self.node_name, **params),
+                timeout=self.timeout,
+            )
+            if ok:
                 _safe_emit(self.signals.result,
                            tr("Backup completed for VM {vmid}").format(vmid=self.vmid))
+            else:
+                _safe_emit(self.signals.error, tr("Backup failed: {err}").format(err=err))
         except Exception as e:
             logger.debug("vzdump error: %s", e)
             _safe_emit(self.signals.error, _sanitize_error(e))
@@ -2657,28 +2671,19 @@ class VmRestoreWorker(QRunnable):
             if self.vm_type == "lxc":
                 if self.name:
                     params["hostname"] = self.name
-                upid = vm_api.create_lxc(self.node_name, **params)
+                result = vm_api.create_lxc(self.node_name, **params)
             else:
                 if self.name:
                     params["name"] = self.name
                 if self.unique:
                     params["unique"] = 1
-                upid = vm_api.create_qemu(self.node_name, **params)
-            if isinstance(upid, dict):
-                upid = upid.get("data", upid)
-            if isinstance(upid, str) and upid.startswith("UPID:"):
-                status, exitstatus = _poll_task(
-                    session, self.node_name, upid, timeout=self.timeout
-                )
-                if status == "stopped" and exitstatus == "OK":
-                    _safe_emit(self.signals.result,
-                               tr("Restore completed for VM {vmid}").format(vmid=self.vmid))
-                else:
-                    err = exitstatus or status
-                    _safe_emit(self.signals.error, tr("Restore failed: {err}").format(err=err))
-            else:
+                result = vm_api.create_qemu(self.node_name, **params)
+            ok, err = _await_task(session, self.node_name, result, timeout=self.timeout)
+            if ok:
                 _safe_emit(self.signals.result,
                            tr("Restore completed for VM {vmid}").format(vmid=self.vmid))
+            else:
+                _safe_emit(self.signals.error, tr("Restore failed: {err}").format(err=err))
         except Exception as e:
             logger.debug("restore error: %s", e)
             _safe_emit(self.signals.error, _sanitize_error(e))
