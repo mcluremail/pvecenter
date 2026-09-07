@@ -1158,5 +1158,8 @@
   "— none —": "— ninguno —",
   "❌ {} is unavailable": "❌ {} no está disponible",
   "Hosts view": "Hosts",
-  "Storages view": "Almacenamientos"
+  "Storages view": "Almacenamientos",
+  "Owner": "Propietario",
+  "Verify": "Verificación",
+  "Notes": "Notas"
 }

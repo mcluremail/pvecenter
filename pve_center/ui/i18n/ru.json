@@ -1158,5 +1158,8 @@
   "— none —": "— нет —",
   "❌ {} is unavailable": "❌ {} недоступен",
   "Hosts view": "Хосты",
-  "Storages view": "Хранилища"
+  "Storages view": "Хранилища",
+  "Owner": "Владелец",
+  "Verify": "Проверка",
+  "Notes": "Заметки"
 }

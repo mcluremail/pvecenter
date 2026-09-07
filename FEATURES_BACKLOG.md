@@ -80,7 +80,7 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 
 ## Backlog
 
-### B10. Replication
+### B10. Replication (low priority)
 Настройка zfs replication между нодами.
 - `GET/POST/DELETE /nodes/{node}/replication`
 - Просмотр статуса репликации
@@ -108,11 +108,6 @@ poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Na
 `TreePanel.find_and_select`. 14 тестов в `tests/domain/test_search.py`.
 Не вошло (следующий шаг): поиск по IP (нет в list-level данных), владелец.
 
-### B15. Dry Run
-Предварительный просмотр опасных действий (из ROADMAP v0.x).
-- Перед подтверждением показывать: какие API-запросы будут отправлены
-- Ожидаемые последствия (например, "диск X будет удалён со storage")
-
 ### B16. Пользовательские группы серверов и кластеров ✅ (v2.10.0, main)
 Группировка отдельных серверов и кластеров в именованные группы (по площадкам, датацентрам, назначению).
 - Дополнительный уровень в дереве поверх секций «Clusters» и «Standalone hosts» (с агрегированной сводкой [running/total])
@@ -122,7 +117,7 @@ poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Na
 - Сводка по группе: SUMMARY + Host VMs с агрегированными карточками (аналог сводки кластера)
 - Фундамент для сущностей Site/Datacenter из VISION.md
 
-### B17. Резервное копирование и PBS (Proxmox Backup Server)
+### B17. Резервное копирование и PBS (Proxmox Backup Server) — В РАБОТЕ (этап 1, v2.12)
 Расширенная работа с бэкапами, включая PBS (плагин PBS заявлен в VISION.md / ARCHITECTURE.md).
 Этап 1 — через PVE API (стorage типа pbs):
 - Статус и заполненность PBS-хранилищ

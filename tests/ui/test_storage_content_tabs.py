@@ -26,6 +26,7 @@ def test_content_tabs_use_tab_index(qtbot):
         content_list=["backup", "images", "iso", "vztmpl"],
         node="n1",
         host_name="h1",
+        storage_type="dir",
     )
     storage_tabs.load_storage_content("local", [rep], rep)
 
@@ -46,6 +47,7 @@ def test_monitoring_tab_not_reused(qtbot):
         content_list=["backup", "images", "iso", "vztmpl"],
         node="n1",
         host_name="h1",
+        storage_type="dir",
     )
     storage_tabs.load_storage_content("local", [rep], rep)
 

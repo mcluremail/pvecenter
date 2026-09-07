@@ -1158,5 +1158,8 @@
   "— none —": "— 无 —",
   "❌ {} is unavailable": "❌ {} 不可用",
   "Hosts view": "主机",
-  "Storages view": "存储"
+  "Storages view": "存储",
+  "Owner": "所有者",
+  "Verify": "校验",
+  "Notes": "备注"
 }

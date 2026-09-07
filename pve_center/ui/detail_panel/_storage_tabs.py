@@ -2,6 +2,7 @@ import warnings
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -28,6 +30,7 @@ from ..icons import get_icon
 from ..object_id import StorageId
 from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
+from ..utils import parse_pve_error
 from ._constants import _HAS_PG, TabIndex, _progress_style, ensure_pg, pg_loaded
 from ._table_utils import (
     format_volsize,
@@ -282,6 +285,9 @@ class StorageTabs:
         )
         panel.storage_backups_table = table
         table.cellDoubleClicked.connect(self._on_storage_table_nav)
+        table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        table.customContextMenuRequested.connect(self._on_storage_backups_menu)
+        panel._storage_backups_pbs = False
         toolbar = StorageToolbar()
         panel.storage_backups_toolbar = toolbar
         stack = QStackedWidget()
@@ -574,6 +580,13 @@ class StorageTabs:
             "vztmpl": (TabIndex.TEMPLATES, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
             "snippets": (TabIndex.TEMPLATES, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
         }
+        panel._storage_backups_pbs = rep.storage_type == "pbs"
+        if panel._storage_backups_pbs:
+            tab_map["backup"] = (
+                TabIndex.BACKUPS, tr("Backups"),
+                [tr("Snapshot"), tr("Owner"), tr("Verify"),
+                 tr("Size"), tr("Created"), tr("Notes")],
+            )
         panel.storage_backups_table.setRowCount(0)
         panel.storage_disks_table.setRowCount(0)
         panel.storage_iso_table.setRowCount(0)
@@ -617,9 +630,9 @@ class StorageTabs:
             for idx in seen_tabs:
                 stack = loading_map.get(idx)
                 if stack:
-                    stack.setCurrentIndex(0)
                     stack.widget(0).setText(tr("No data"))
             return
+        panel._storage_backups_ctx = (storage_name, node_name, host_name, cfg)
         panel._storage_content_pending = {}
         workers_launched = 0
         from ..api.metrics import StorageContentListWorker
@@ -872,6 +885,9 @@ class StorageTabs:
 
     def populate_storage_backups_table(self, backups, host_name="", node=""):
         table = self.panel.storage_backups_table
+        if getattr(self.panel, "_storage_backups_pbs", False):
+            self._populate_storage_backups_pbs(backups, host_name, node)
+            return
         table.setRowCount(len(backups))
         for i, b in enumerate(backups):
             vm_item = QTableWidgetItem(f"VM {b.get('vmid', '')}")
@@ -899,6 +915,142 @@ class StorageTabs:
         for r in range(table.rowCount()):
             if table.rowHeight(r) > 24:
                 table.setRowHeight(r, 24)
+
+    def _populate_storage_backups_pbs(self, backups, host_name="", node=""):
+        """Populate the Backups table for PBS storages (snapshot columns)."""
+        from ...domain.backup import BackupSnapshot
+
+        table = self.panel.storage_backups_table
+        table.setRowCount(len(backups))
+        for i, b in enumerate(backups):
+            snap = BackupSnapshot.from_content_item(b)
+            name_item = QTableWidgetItem(snap.snapshot_name)
+            name_item.setIcon(get_icon("backup"))
+            name_item.setData(Qt.UserRole, snap.volid)
+            name_item.setToolTip(snap.volid)
+            if snap.vmid is not None and host_name:
+                name_item.setData(Qt.UserRole + 1, (host_name, snap.vmid, node))
+            table.setItem(i, 0, name_item)
+            table.setItem(i, 1, QTableWidgetItem(snap.owner))
+            verify_item = QTableWidgetItem(snap.verify or "—")
+            if snap.verify == "failed":
+                verify_item.setForeground(QBrush(QColor(Color.DANGER)))
+            table.setItem(i, 2, verify_item)
+            size = snap.size_bytes
+            table.setItem(i, 3, QTableWidgetItem(format_volsize(size) if size else "0"))
+            created = snap.time.astimezone().strftime("%Y-%m-%d %H:%M") if snap.time else ""
+            table.setItem(i, 4, QTableWidgetItem(created))
+            notes_item = QTableWidgetItem(snap.notes)
+            notes_item.setToolTip(snap.notes)
+            table.setItem(i, 5, notes_item)
+        table.resizeRowsToContents()
+        for r in range(table.rowCount()):
+            if table.rowHeight(r) > 24:
+                table.setRowHeight(r, 24)
+
+    def _on_storage_backups_menu(self, pos):
+        panel = self.panel
+        table = panel.storage_backups_table
+        row = table.rowAt(pos.y())
+        if row < 0:
+            return
+        item = table.item(row, 0)
+        if not item:
+            return
+        volid = item.data(Qt.UserRole)
+        if not volid:
+            return
+        menu = QMenu(table)
+        restore_act = menu.addAction(get_icon("restore"), tr("Restore"))
+        del_act = menu.addAction(get_icon("remove"), tr("Delete"))
+        chosen = menu.exec(table.viewport().mapToGlobal(pos))
+        if chosen == restore_act:
+            self._restore_storage_backup(volid)
+        elif chosen == del_act:
+            self._delete_storage_backup(volid)
+
+    def _storage_backup_vm_type(self, volid):
+        """Guest type for a backup volid: PBS snapshot path or vzdump name."""
+        from ...domain.backup import parse_pbs_volid
+
+        pbs = parse_pbs_volid(volid)
+        if pbs:
+            return pbs["vm_type"]
+        return "lxc" if "vzdump-lxc" in volid else "qemu"
+
+    def _restore_storage_backup(self, volid):
+        panel = self.panel
+        ctx = getattr(panel, "_storage_backups_ctx", None)
+        if not ctx:
+            return
+        storage_name, node_name, host_name, cfg = ctx
+        vm_type = self._storage_backup_vm_type(volid)
+        used_vmids = {v.vmid for v in panel.all_vms if v.vmid}
+        next_vmid = next((v for v in range(100, 999999999) if v not in used_vmids), 100)
+        from ..vm_restore_dialog import VmRestoreDialog
+        storages = [s for s in panel.all_storages
+                    if s.node == node_name and s.host_name == host_name]
+        dlg = VmRestoreDialog(panel, volid=volid, vm_type=vm_type,
+                              storages=storages, next_vmid=next_vmid)
+        if dlg.exec() != VmRestoreDialog.Accepted:
+            return
+        params = dlg.get_params()
+        from ...backend import VmRestoreWorker
+        worker = VmRestoreWorker(
+            cfg, node_name, params["vmid"], vm_type, volid,
+            storage=params["storage"],
+            name=params["name"],
+            force=params["force"],
+            unique=params["unique"],
+        )
+        key = f"restore:{host_name}:{params['vmid']}"
+        panel.transfer_started.emit(key, tr("Restore VM {vmid}").format(vmid=params["vmid"]))
+        worker.signals.result.connect(lambda msg, k=key, w=worker: (
+            panel.transfer_finished.emit(k, True, msg),
+            panel.config_update_result.emit(msg),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, k=key, w=worker: (
+            panel.transfer_finished.emit(k, False, err),
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_worker(worker)
+
+    def _delete_storage_backup(self, volid):
+        panel = self.panel
+        ctx = getattr(panel, "_storage_backups_ctx", None)
+        if not ctx:
+            return
+        storage_name, node_name, host_name, cfg = ctx
+        if not confirm_file_delete(volid, parent=panel):
+            return
+        from ...backend import StorageContentDeleteWorker
+        worker = StorageContentDeleteWorker(cfg, node_name, storage_name, volid, timeout=600)
+        key = f"deletebackup:{host_name}:{volid}"
+        panel.transfer_started.emit(key, tr("Delete backup {volid}").format(volid=volid))
+        worker.signals.result.connect(lambda msg, k=key, w=worker: (
+            panel.transfer_finished.emit(k, True, msg),
+            panel.config_update_result.emit(msg),
+            self._refresh_storage_backups(),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        worker.signals.error.connect(lambda err, k=key, w=worker: (
+            panel.transfer_finished.emit(k, False, err),
+            panel.config_update_result.emit(parse_pve_error(err)),
+            panel._workers_mgr.discard_worker(w),
+        ))
+        panel._workers_mgr.run_worker(worker)
+
+    def _refresh_storage_backups(self):
+        panel = self.panel
+        ctx = getattr(panel, "_storage_backups_ctx", None)
+        if not ctx or panel.current_obj_type != "storage":
+            return
+        storage_name, node_name, host_name, cfg = ctx
+        panel.storage_backups_stack.setCurrentIndex(0)
+        panel.storage_backups_loading.setText(tr("Loading..."))
+        self.fetch_storage_backups_simple(storage_name, node_name, host_name, cfg)
 
     def fetch_storage_disks_simple(self, storage_name, node_name, host_name, cfg, node_vms):
         panel = self.panel

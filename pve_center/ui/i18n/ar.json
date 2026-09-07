@@ -1158,5 +1158,8 @@
   "— none —": "— لا شيء —",
   "❌ {} is unavailable": "❌ {} غير متاح",
   "Hosts view": "المضيفون",
-  "Storages view": "التخزين"
+  "Storages view": "التخزين",
+  "Owner": "المالك",
+  "Verify": "التحقق",
+  "Notes": "ملاحظات"
 }
