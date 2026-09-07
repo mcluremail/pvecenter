@@ -561,12 +561,12 @@ class StorageTabs:
         panel = self.panel
         allowed = rep.content_list
         tab_map = {
-            "backup": (10, tr("Backups"), [tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")]),
-            "images": (11, tr("VM Disks"), [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")]),
-            "rootdir": (11, tr("VM Disks"), [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")]),
-            "iso": (12, tr("ISO"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
-            "vztmpl": (13, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
-            "snippets": (13, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
+            "backup": (TabIndex.BACKUPS, tr("Backups"), [tr("VM"), tr("Type"), tr("Format"), tr("Size"), tr("Created")]),
+            "images": (TabIndex.DISKS_VM, tr("VM Disks"), [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")]),
+            "rootdir": (TabIndex.DISKS_VM, tr("VM Disks"), [tr("VM"), tr("Name"), tr("Volume"), tr("Bus"), tr("Size")]),
+            "iso": (TabIndex.ISO, tr("ISO"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
+            "vztmpl": (TabIndex.TEMPLATES, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
+            "snippets": (TabIndex.TEMPLATES, tr("Templates"), [tr("Volume"), tr("Format"), tr("Size"), tr("Modified")]),
         }
         panel.storage_backups_table.setRowCount(0)
         panel.storage_disks_table.setRowCount(0)
@@ -581,20 +581,20 @@ class StorageTabs:
                 panel.tabs.setTabVisible(idx, True)
                 panel.tabs.setTabText(idx, title)
                 table_map = {
-                    10: panel.storage_backups_table,
-                    11: panel.storage_disks_table,
-                    12: panel.storage_iso_table,
-                    13: panel.storage_tpl_table,
+                    TabIndex.BACKUPS: panel.storage_backups_table,
+                    TabIndex.DISKS_VM: panel.storage_disks_table,
+                    TabIndex.ISO: panel.storage_iso_table,
+                    TabIndex.TEMPLATES: panel.storage_tpl_table,
                 }
                 tbl = table_map.get(idx)
                 if tbl:
                     tbl.setColumnCount(len(headers))
                     tbl.setHorizontalHeaderLabels(headers)
         loading_map = {
-            10: panel.storage_backups_stack,
-            11: panel.storage_disks_stack,
-            12: panel.storage_iso_stack,
-            13: panel.storage_tpl_stack,
+            TabIndex.BACKUPS: panel.storage_backups_stack,
+            TabIndex.DISKS_VM: panel.storage_disks_stack,
+            TabIndex.ISO: panel.storage_iso_stack,
+            TabIndex.TEMPLATES: panel.storage_tpl_stack,
         }
         for idx in seen_tabs:
             stack = loading_map.get(idx)
