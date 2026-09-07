@@ -115,8 +115,7 @@ class DetailPanel(QWidget):
             self._extra_action_buttons[action_key] = btn
 
         self.tabs = QTabWidget()
-        self._build_tabs()
-
+        self._tabs_built = False
         self.tabs.hide()
 
         title_block = QHBoxLayout()
@@ -157,6 +156,17 @@ class DetailPanel(QWidget):
         main_layout.addWidget(self.tabs)
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(main_layout)
+
+    def _ensure_tabs(self):
+        """Build tab pages on first use.
+
+        The panel starts with an empty (hidden) QTabWidget; the ~1.3s of
+        widget construction plus the pyqtgraph import happen once the first
+        object is actually selected.
+        """
+        if not self._tabs_built:
+            self._tabs_built = True
+            self._build_tabs()
 
     def _build_tabs(self):
         tabs = self.tabs
@@ -252,6 +262,7 @@ class DetailPanel(QWidget):
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
 
     def show_details(self, obj_type, obj_name, data):
+        self._ensure_tabs()
         self.tabs.show()
         if obj_type == "vm":
             self.vm_action_bar.setVisible(True)
@@ -351,6 +362,7 @@ class DetailPanel(QWidget):
     def refresh_current_view(self):
         if self.current_obj_type is None:
             return
+        self._ensure_tabs()
         saved_tab = self.tabs.currentIndex()
 
         if self.current_obj_type in ("standalone_folder", "cluster_folder", "storage_folder"):

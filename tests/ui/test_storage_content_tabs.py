@@ -16,6 +16,7 @@ def _build(qtbot):
     panel = DetailPanel([])
     qtbot.addWidget(panel)
     panel._cfg_by_name = {}
+    panel._ensure_tabs()
     return panel, StorageTabs(panel)
 
 

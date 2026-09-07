@@ -1,3 +1,5 @@
+from importlib.util import find_spec
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
@@ -5,14 +7,18 @@ from ...config import load_ui_state, save_ui_state
 from ..i18n import tr
 from ..theme import Color
 
-try:
-    import pyqtgraph as pg
-    pg.setConfigOption('background', '#fafafa')
-    pg.setConfigOption('foreground', '#6b7280')
-    _HAS_PG = True
-except ImportError:
-    pg = None
-    _HAS_PG = False
+_HAS_PG = find_spec("pyqtgraph") is not None
+pg = None  # published by _get_pg() on first successful import
+
+
+def _get_pg():
+    global pg
+    if pg is None and _HAS_PG:
+        import pyqtgraph as pg_mod
+        pg_mod.setConfigOption('background', '#fafafa')
+        pg_mod.setConfigOption('foreground', '#6b7280')
+        pg = pg_mod
+    return pg
 
 _METRIC_KEYS = [("cpu", "CPU"), ("ram", "RAM"), ("net", "Network"), ("disk", "Disk")]
 
@@ -62,7 +68,7 @@ class VmMetricsWidget(QWidget):
         top.addStretch()
         self._layout.addLayout(top)
 
-        if _HAS_PG:
+        if _get_pg() is not None:
             date_axis = pg.DateAxisItem(orientation='bottom')
             self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title=tr("CPU, %"))
             self.plot.setLabel('left', '%')

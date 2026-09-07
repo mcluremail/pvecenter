@@ -28,7 +28,7 @@ from ..icons import get_icon
 from ..object_id import StorageId
 from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
-from ._constants import _HAS_PG, TabIndex, _progress_style
+from ._constants import _HAS_PG, TabIndex, _progress_style, ensure_pg
 from ._table_utils import (
     format_volsize,
     loading_label,
@@ -238,7 +238,7 @@ class StorageTabs:
 
         panel.storage_detail_plot = QWidget()
         if _HAS_PG:
-            import pyqtgraph as pg
+            pg = ensure_pg()
             date_axis = pg.DateAxisItem(orientation='bottom')
             panel.storage_plot_widget = pg.PlotWidget(
                 axisItems={'bottom': date_axis}, title=tr("Used")

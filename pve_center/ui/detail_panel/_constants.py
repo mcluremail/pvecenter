@@ -1,4 +1,5 @@
 from enum import IntEnum
+from importlib.util import find_spec
 
 from ..theme import Color
 
@@ -6,14 +7,23 @@ _HEADER_STYLE = "QHeaderView::section { padding: 6px 8px; border: none; border-b
 
 _MAX_WORKERS_DP = 12
 
-try:
-    import pyqtgraph as pg
-    pg.setConfigOption('background', '#fafafa')
-    pg.setConfigOption('foreground', '#6b7280')
-    _HAS_PG = True
-except ImportError:
-    pg = None
-    _HAS_PG = False
+_HAS_PG = find_spec("pyqtgraph") is not None
+_pg_module = None
+
+
+def ensure_pg():
+    """Import pyqtgraph on first use and apply chart styling.
+
+    Keeps the 0.6s pyqtgraph import out of the startup path: charts are
+    only needed once the Monitoring tabs are actually built.
+    """
+    global _pg_module
+    if _pg_module is None and _HAS_PG:
+        import pyqtgraph as pg
+        pg.setConfigOption('background', '#fafafa')
+        pg.setConfigOption('foreground', '#6b7280')
+        _pg_module = pg
+    return _pg_module
 
 
 class TabIndex(IntEnum):

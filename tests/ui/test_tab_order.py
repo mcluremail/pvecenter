@@ -42,6 +42,7 @@ EXPECTED_LABELS = {
 def panel(qtbot):
     p = DetailPanel([])
     qtbot.addWidget(p)
+    p._ensure_tabs()
     return p
 
 
