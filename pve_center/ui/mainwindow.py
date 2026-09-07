@@ -85,6 +85,16 @@ logger = logging.getLogger(__name__)
 # Максимум одновременно работающих воркеров
 MAX_WORKERS = 16
 
+
+def _repo_signature(node_repo, vm_repo, storage_repo):
+    """Identity snapshot of all repos — detects structural changes."""
+    return (
+        frozenset((n.host_name, n.node) for n in node_repo.all()),
+        frozenset((v.host_name, v.vmid) for v in vm_repo.all()),
+        frozenset((s.host_name, s.node, s.storage) for s in storage_repo.all()),
+    )
+
+
 class MainWindow(QMainWindow):
     def __init__(self, nodes_cfg=None):
         super().__init__()
@@ -1426,6 +1436,8 @@ class MainWindow(QMainWindow):
         if self._soft_counter >= active_count:
             if self._soft_node_repo or self._soft_vm_repo:
                 try:
+                    old_sig = _repo_signature(
+                        self._node_repo, self._vm_repo, self._storage_repo)
                     # Swap: replace main repos with soft repos' contents
                     self._node_repo.clear()
                     self._vm_repo.clear()
@@ -1436,10 +1448,19 @@ class MainWindow(QMainWindow):
                         self._vm_repo.add(v)
                     for s in self._soft_storage_repo.all():
                         self._storage_repo.add(s)
-                    self.tree_panel.update_node_statuses(
-                        self._node_repo.all(), self._vm_repo.all(),
-                        node_repo=self._node_repo, vm_repo=self._vm_repo,
-                    )
+                    new_sig = _repo_signature(
+                        self._node_repo, self._vm_repo, self._storage_repo)
+                    if old_sig != new_sig:
+                        self.tree_panel.update_data(
+                            self._node_repo.all(), self._vm_repo.all(),
+                            self._storage_repo.all(), final=True,
+                            node_repo=self._node_repo, vm_repo=self._vm_repo,
+                        )
+                    else:
+                        self.tree_panel.update_node_statuses(
+                            self._node_repo.all(), self._vm_repo.all(),
+                            node_repo=self._node_repo, vm_repo=self._vm_repo,
+                        )
                     self.detail_panel.set_lists(
                         self._node_repo.all(), self._vm_repo.all(), self._storage_repo.all(),
                         node_repo=self._node_repo, vm_repo=self._vm_repo
