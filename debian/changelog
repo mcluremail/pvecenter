@@ -1,3 +1,14 @@
+pve-center (2.11.3-1) unstable; urgency=medium
+
+  * Perf: window appears in ~1s instead of ~3.3s — deferred detail tab
+    building, background pyqtgraph warm-up, requests import moved out of
+    the startup path, keyring backend detected once
+  * Perf: detail tabs are built in small chunks after the window shows;
+    charts are created lazily on first data — selecting an object no
+    longer freezes the UI for seconds on first click
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 07 Sep 2026 18:00:00 +0300
+
 pve-center (2.11.2-1) unstable; urgency=medium
 
   * New: animated spinners for async data loading (storage tables, monitoring

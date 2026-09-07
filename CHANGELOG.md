@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.11.3 — performance: fast startup, no freeze on first selection
+
+**Performance**
+- Much faster startup: the window appears in ~1s instead of ~3.3s — detail tab building is deferred, the `pyqtgraph` import (~0.6s) happens in a background thread after launch, `requests` is imported only where used (file upload, update checker) and the keyring backend is detected once instead of per token
+- Selecting an object no longer freezes the UI: the 25 detail tab pages are built in small chunks between event-loop ticks right after the window appears, and the remaining pages (if any) are finished synchronously on the first selection; charts (VM metrics, storage monitoring) are created lazily on first data once the pyqtgraph warm-up completes
+- First selection pays at most a fraction of the old ~1-3.5s tab construction cost; subsequent selections are unchanged (~ms)
+
+**Internal**
+- 521 tests (+6): lazy tab building contract (nothing built at construction, chunked queue drains in TabIndex order, `_ensure_tabs()` finishes partial builds), chart deferral guards
+
+
 ## v2.11.2 — spinners, stale-tree fix, faster startup/shutdown
 
 **New features**
