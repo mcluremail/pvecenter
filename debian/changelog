@@ -1,3 +1,20 @@
+pve-center (2.11.2-1) unstable; urgency=medium
+
+  * New: animated spinners for async data loading (storage tables, monitoring
+    charts, VM metrics, task history, host metrics, quorum card)
+  * Fix: storage content tabs shifted by one (stale raw indexes 10-13 in
+    load_storage_content) — chart under "Backups", ISO under "Templates" etc.
+  * Fix: soft refresh rebuilds the tree when cluster structure changes, so
+    storages/VMs/nodes removed on the PVE side disappear promptly
+  * Fix: fetch workers cancelled on quit — shutdown no longer lingers up to
+    ~80s; pool wait reduced 3s -> 1s
+  * Fix: loading pages keep QLabel-compatible setText/text API
+  * Fix: right-panel tables fit at FullHD; standalone local storages visible
+    in Storages view; storage detail prefers plugintype
+  * Perf: deferred requests import and cached keyring backend — faster startup
+
+ -- Taurus McLure <taurus@mclure.ru>  Mon, 07 Sep 2026 12:00:00 +0300
+
 pve-center (2.11.1-1) unstable; urgency=medium
 
   * Fix: TypeError on every cluster metrics refresh — MetricCard.set_value()

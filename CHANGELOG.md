@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.11.2 — spinners, stale-tree fix, faster startup/shutdown
+
+**New features**
+- Animated spinners for async data loading: storage detail tables, storage monitoring chart, VM metrics and task history, host metrics and cluster quorum card show a spinner while data is fetched; loading pages keep the QLabel-compatible `setText`/`text` API so error/empty states work unchanged
+
+**Bug fixes**
+- Storage content tabs were shifted by one after the Monitoring tab insertion: `load_storage_content` used stale raw indexes 10-13, so the chart appeared under "Backups", backups under "VM Disks", disks under "ISO" and ISO images under "Templates"; now addressed via `TabIndex` (regression test added)
+- Soft refresh now rebuilds the tree when the cluster structure changes — storages/VMs/nodes removed on the PVE side disappear from the tree within one auto-refresh cycle instead of lingering until a hard refresh
+- Faster shutdown: on quit all fetch workers are cancelled and the pool wait is reduced from 3s to 1s; the process no longer lingers up to ~80s after the window closes
+- Fix: loading pages keep the QLabel-compatible `setText`/`text` API (fixes "QWidget object has no attribute 'setText'" on every error/empty state shown in a loading stack)
+- Fix: right-panel tables fit at FullHD
+- Fix: standalone hosts' local storages were hidden in the Storages view
+- Fix: storage detail showed "Type: storage" — prefer the `plugintype` field
+
+**Performance**
+- Faster startup: `requests` import is deferred (used only by file upload and the update checker, ~0.5s saved); the keyring backend is detected once instead of per token (~0.3s saved with many hosts)
+
+**Internal**
+- Test suite grown to 515 tests: tab order pinned to `TabIndex`, storage content tabs regression, soft-refresh structure diff, `FetchWorker.cancel()`, `LoadingPage` compatibility
+
+
 ## v2.11.1 — hotfix: crash on cluster summary quorum card
 
 **Bug fixes**
