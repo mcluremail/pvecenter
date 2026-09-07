@@ -2,7 +2,6 @@ import logging
 import os
 import threading
 
-import requests
 import urllib3
 from PySide6.QtCore import QObject, QRunnable, Signal
 
@@ -3462,6 +3461,7 @@ class VersionCheckWorker(QRunnable):
 
     def run(self):
         try:
+            import requests
             resp = requests.get(_GITHUB_API_LATEST, timeout=10,
                                 headers={"Accept": "application/vnd.github+json"})
             resp.raise_for_status()

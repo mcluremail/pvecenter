@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import os
 
-import requests
-
 from ._session import ProxmoxSession, _q
 
 
@@ -116,6 +114,7 @@ class StorageAPI:
             def fileno(self):
                 return self._fp.fileno()
 
+        import requests
         with open(file_path, "rb") as fp:
             wrapper = _ProgressReader(fp, file_size, progress_callback)
             files = {"filename": (file_name, wrapper, "application/octet-stream")}

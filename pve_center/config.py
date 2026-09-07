@@ -58,15 +58,19 @@ def _db_path():
 # ── keyring ────────────────────────────────────────────────────
 
 _keyring_available: bool | None = None
+_keyring_module = None
 
 
 def _get_keyring():
-    global _keyring_available
+    global _keyring_available, _keyring_module
     if _keyring_available is False:
         return None
+    if _keyring_module is not None:
+        return _keyring_module
     try:
         import keyring as _kr
         _kr.get_keyring()
+        _keyring_module = _kr
         _keyring_available = True
         return _kr
     except Exception:
