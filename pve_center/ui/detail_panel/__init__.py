@@ -1,6 +1,7 @@
 import logging
+import threading
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
 from ...domain import VmStatus, VmType
@@ -16,7 +17,7 @@ from ..vm_actions import (
     VM_EXTRA_ACTION_LABELS,
     VM_EXTRA_ACTION_TOOLTIPS,
 )
-from ._constants import TabIndex
+from ._constants import _HAS_PG, TabIndex, ensure_pg
 from ._host_tabs import HostTabs
 from ._storage_tabs import StorageTabs
 from ._table_utils import set_cell_text
@@ -116,7 +117,12 @@ class DetailPanel(QWidget):
 
         self.tabs = QTabWidget()
         self._tabs_built = False
+        self._tab_queue = None
         self.tabs.hide()
+        if _HAS_PG:
+            threading.Thread(target=self._pg_warm, daemon=True,
+                             name="pg-warm").start()
+        QTimer.singleShot(0, self._build_tab_chunk)
 
         title_block = QHBoxLayout()
         title_block.setContentsMargins(24, 20, 24, 0)
@@ -157,90 +163,106 @@ class DetailPanel(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(main_layout)
 
-    def _ensure_tabs(self):
-        """Build tab pages on first use.
+    _TAB_BUILD_CHUNK = 2
 
-        The panel starts with an empty (hidden) QTabWidget; the ~1.3s of
-        widget construction plus the pyqtgraph import happen once the first
-        object is actually selected.
+    def _pg_warm(self):
+        """Import pyqtgraph off the main thread so charts never block the UI."""
+        try:
+            ensure_pg()
+        except Exception:
+            logger.debug("pyqtgraph warm-up failed", exc_info=True)
+
+    def _tab_specs(self):
+        """Tab pages in TabIndex order: (builder, icon, title, hide_after_add)."""
+        return [
+            # 0: Monitoring
+            (self._vm_tabs.build_monitoring_tab, "monitor", tr("Monitoring"), False),
+            # 1: Hardware
+            (self._vm_tabs.build_hardware_tab, "hardware", tr("Hardware"), False),
+            # 2: Options
+            (self._vm_tabs.build_options_tab, "options", tr("Options"), False),
+            # 3: History
+            (self._vm_tabs.build_history_tab, "history", tr("History"), False),
+            # 4: Summary
+            (self._host_tabs.build_summary_tab, "host", tr("Summary"), True),
+            # 5: Host VMs
+            (self._host_tabs.build_host_vm_tab, "vm", tr("Virtual Machines"), True),
+            # 6: Pool VMs
+            (self._vm_tabs.build_pool_tab, "pool", tr("Pool VMs"), True),
+            # 7: Storages overview
+            (self._storage_tabs.build_storage_overview_tab, "storage", tr("Storage"), True),
+            # 8: Host storage
+            (self._host_tabs.build_host_storage_tab, "storage", tr("Storage"), True),
+            # 9: Storage detail
+            (self._storage_tabs.build_storage_detail_tab, "storage", tr("Storage Detail"), True),
+            # 10: Storage monitoring (fill-level chart)
+            (self._storage_tabs.build_storage_monitoring_tab, "monitor", tr("Monitoring"), True),
+            # 11: Backups
+            (self._storage_tabs.build_backups_tab, "backup", tr("Backups"), True),
+            # 12: VM Disks
+            (self._storage_tabs.build_disks_vm_tab, "disk", tr("VM Disks"), True),
+            # 13: ISO
+            (self._storage_tabs.build_iso_tab, "iso", tr("ISO"), True),
+            # 14: Templates
+            (self._storage_tabs.build_templates_tab, "template", tr("Templates"), True),
+            # 15: Network
+            (self._host_tabs.build_network_tab, "network", tr("Network"), True),
+            # 16: Services
+            (self._host_tabs.build_services_tab, "services", tr("Services"), True),
+            # 17: Host disks
+            (self._host_tabs.build_host_disks_tab, "disk", tr("Disks"), True),
+            # 18: Snapshots
+            (self._host_tabs.build_snapshots_tab, "snapshot", tr("Snapshots"), True),
+            # 19: Health
+            (self._host_tabs.build_health_tab, "monitor", tr("Health"), True),
+            # 20: VM Snapshots
+            (self._vm_tabs.build_snapshots_tab, "snapshot", tr("Snapshots"), True),
+            # 21: VM Backup
+            (self._vm_tabs.build_vm_backup_tab, "backup", tr("Backup"), True),
+            # 22: Backup Jobs
+            (self._host_tabs.build_backup_jobs_tab, "backup", tr("Backup Jobs"), True),
+            # 23: Access Management
+            (self._host_tabs.build_access_tab, "user", tr("Access"), True),
+            # 24: HA
+            (self._host_tabs.build_ha_tab, "ha", tr("HA"), True),
+        ]
+
+    def _add_next_tab(self):
+        builder, icon_key, title, hide = self._tab_queue.pop(0)
+        idx = self.tabs.addTab(builder(), get_icon(icon_key), title)
+        if hide:
+            self.tabs.setTabVisible(idx, False)
+
+    def _build_tab_chunk(self):
+        """Build a couple of tab pages per event-loop tick.
+
+        Spreads the ~1s of widget construction over the idle time right
+        after the window appears instead of freezing the main thread for
+        seconds on the first selection. If the user selects an object
+        before the queue drains, _ensure_tabs() finishes the rest at once.
         """
-        if not self._tabs_built:
+        if self._tabs_built:
+            return
+        if self._tab_queue is None:
+            self._tab_queue = self._tab_specs()
+        for _ in range(self._TAB_BUILD_CHUNK):
+            if not self._tab_queue:
+                break
+            self._add_next_tab()
+        if self._tab_queue:
+            QTimer.singleShot(0, self._build_tab_chunk)
+        else:
             self._tabs_built = True
-            self._build_tabs()
 
-    def _build_tabs(self):
-        tabs = self.tabs
-        # 0: Monitoring
-        tabs.addTab(self._vm_tabs.build_monitoring_tab(), get_icon("monitor"), tr("Monitoring"))
-        # 1: Hardware
-        tabs.addTab(self._vm_tabs.build_hardware_tab(), get_icon("hardware"), tr("Hardware"))
-        # 2: Options
-        tabs.addTab(self._vm_tabs.build_options_tab(), get_icon("options"), tr("Options"))
-        # 3: History
-        tabs.addTab(self._vm_tabs.build_history_tab(), get_icon("history"), tr("History"))
-        # 4: Summary
-        tabs.addTab(self._host_tabs.build_summary_tab(), get_icon("host"), tr("Summary"))
-        tabs.setTabVisible(TabIndex.SUMMARY, False)
-        # 5: Host VMs
-        tabs.addTab(self._host_tabs.build_host_vm_tab(), get_icon("vm"), tr("Virtual Machines"))
-        tabs.setTabVisible(TabIndex.HOST_VMS, False)
-        # 6: Pool VMs
-        tabs.addTab(self._vm_tabs.build_pool_tab(), get_icon("pool"), tr("Pool VMs"))
-        tabs.setTabVisible(TabIndex.POOL_VMS, False)
-        # 7: Storages overview
-        tabs.addTab(self._storage_tabs.build_storage_overview_tab(), get_icon("storage"), tr("Storage"))
-        tabs.setTabVisible(TabIndex.STORAGES, False)
-        # 8: Host storage
-        tabs.addTab(self._host_tabs.build_host_storage_tab(), get_icon("storage"), tr("Storage"))
-        tabs.setTabVisible(TabIndex.HOST_STORAGE, False)
-        # 9: Storage detail
-        tabs.addTab(self._storage_tabs.build_storage_detail_tab(), get_icon("storage"), tr("Storage Detail"))
-        tabs.setTabVisible(TabIndex.STORAGE_DETAIL, False)
-        # 10: Storage monitoring (fill-level chart)
-        tabs.addTab(self._storage_tabs.build_storage_monitoring_tab(), get_icon("monitor"), tr("Monitoring"))
-        tabs.setTabVisible(TabIndex.STORAGE_MONITORING, False)
-        # 11: Backups
-        tabs.addTab(self._storage_tabs.build_backups_tab(), get_icon("backup"), tr("Backups"))
-        tabs.setTabVisible(TabIndex.BACKUPS, False)
-        # 11: VM Disks
-        tabs.addTab(self._storage_tabs.build_disks_vm_tab(), get_icon("disk"), tr("VM Disks"))
-        tabs.setTabVisible(TabIndex.DISKS_VM, False)
-        # 12: ISO
-        tabs.addTab(self._storage_tabs.build_iso_tab(), get_icon("iso"), tr("ISO"))
-        tabs.setTabVisible(TabIndex.ISO, False)
-        # 13: Templates
-        tabs.addTab(self._storage_tabs.build_templates_tab(), get_icon("template"), tr("Templates"))
-        tabs.setTabVisible(TabIndex.TEMPLATES, False)
-        # 14: Network
-        tabs.addTab(self._host_tabs.build_network_tab(), get_icon("network"), tr("Network"))
-        tabs.setTabVisible(TabIndex.NETWORK, False)
-        # 15: Services
-        tabs.addTab(self._host_tabs.build_services_tab(), get_icon("services"), tr("Services"))
-        tabs.setTabVisible(TabIndex.SERVICES, False)
-        # 16: Host disks
-        tabs.addTab(self._host_tabs.build_host_disks_tab(), get_icon("disk"), tr("Disks"))
-        tabs.setTabVisible(TabIndex.HOST_DISKS, False)
-        # 17: Snapshots
-        tabs.addTab(self._host_tabs.build_snapshots_tab(), get_icon("snapshot"), tr("Snapshots"))
-        tabs.setTabVisible(TabIndex.SNAPSHOTS, False)
-        # 18: Health
-        tabs.addTab(self._host_tabs.build_health_tab(), get_icon("monitor"), tr("Health"))
-        tabs.setTabVisible(TabIndex.HEALTH, False)
-        # 19: VM Snapshots
-        tabs.addTab(self._vm_tabs.build_snapshots_tab(), get_icon("snapshot"), tr("Snapshots"))
-        tabs.setTabVisible(TabIndex.VM_SNAPSHOTS, False)
-        # 20: VM Backup
-        tabs.addTab(self._vm_tabs.build_vm_backup_tab(), get_icon("backup"), tr("Backup"))
-        tabs.setTabVisible(TabIndex.VM_BACKUP, False)
-        # 21: Backup Jobs
-        tabs.addTab(self._host_tabs.build_backup_jobs_tab(), get_icon("backup"), tr("Backup Jobs"))
-        tabs.setTabVisible(TabIndex.BACKUP_JOBS, False)
-        # 22: Access Management
-        tabs.addTab(self._host_tabs.build_access_tab(), get_icon("user"), tr("Access"))
-        tabs.setTabVisible(TabIndex.ACCESS, False)
-        # 23: HA
-        tabs.addTab(self._host_tabs.build_ha_tab(), get_icon("ha"), tr("HA"))
-        tabs.setTabVisible(TabIndex.HA, False)
+    def _ensure_tabs(self):
+        """Synchronously finish tab building (first selection or tests)."""
+        if self._tabs_built:
+            return
+        if self._tab_queue is None:
+            self._tab_queue = self._tab_specs()
+        while self._tab_queue:
+            self._add_next_tab()
+        self._tabs_built = True
 
     # ------------------------------------------------------------------
     # Public API

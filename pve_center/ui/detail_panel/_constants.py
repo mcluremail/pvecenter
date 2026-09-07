@@ -11,6 +11,11 @@ _HAS_PG = find_spec("pyqtgraph") is not None
 _pg_module = None
 
 
+def pg_loaded():
+    """Return pyqtgraph if already imported, else None (never imports)."""
+    return _pg_module
+
+
 def ensure_pg():
     """Import pyqtgraph on first use and apply chart styling.
 

@@ -28,7 +28,7 @@ from ..icons import get_icon
 from ..object_id import StorageId
 from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
-from ._constants import _HAS_PG, TabIndex, _progress_style, ensure_pg
+from ._constants import _HAS_PG, TabIndex, _progress_style, ensure_pg, pg_loaded
 from ._table_utils import (
     format_volsize,
     loading_label,
@@ -237,8 +237,10 @@ class StorageTabs:
         layout.addLayout(metrics_row)
 
         panel.storage_detail_plot = QWidget()
-        if _HAS_PG:
-            pg = ensure_pg()
+        sd_plot_layout = QVBoxLayout(panel.storage_detail_plot)
+        sd_plot_layout.setContentsMargins(0, 0, 0, 0)
+        pg = pg_loaded() if _HAS_PG else None
+        if pg is not None:
             date_axis = pg.DateAxisItem(orientation='bottom')
             panel.storage_plot_widget = pg.PlotWidget(
                 axisItems={'bottom': date_axis}, title=tr("Used")
@@ -252,13 +254,15 @@ class StorageTabs:
                 [], [], pen=pg.mkPen(Color.STATUS_WARN, width=2),
                 fillLevel=0, fillBrush=pg.mkBrush(Color.STATUS_WARN + "33")
             )
-            sd_plot_layout = QVBoxLayout(panel.storage_detail_plot)
-            sd_plot_layout.setContentsMargins(0, 0, 0, 0)
             sd_plot_layout.addWidget(panel.storage_plot_widget)
+            panel._storage_plot_deferred = False
+        elif _HAS_PG:
+            # pyqtgraph is still importing in the background thread;
+            # the chart is built on first data (see _ensure_storage_plot).
+            panel._storage_plot_deferred = True
         else:
-            sd_plot_layout = QVBoxLayout(panel.storage_detail_plot)
-            sd_plot_layout.setContentsMargins(0, 0, 0, 0)
             sd_plot_layout.addWidget(QLabel(tr("PyQtGraph not installed")))
+            panel._storage_plot_deferred = False
         layout.addWidget(panel.storage_detail_plot)
         layout.addStretch()
 
@@ -552,8 +556,10 @@ class StorageTabs:
         for r in range(panel.storage_detail_nodes_table.rowCount()):
             if panel.storage_detail_nodes_table.rowHeight(r) > 24:
                 panel.storage_detail_nodes_table.setRowHeight(r, 24)
-        if _HAS_PG:
-            panel.storage_plot_curve.setData([], [])
+        self._ensure_storage_plot(panel)
+        curve = getattr(panel, "storage_plot_curve", None)
+        if curve is not None:
+            curve.setData([], [])
         self.fetch_storage_metrics(storage_name, filtered)
         self.load_storage_content(storage_name, filtered, rep)
 
@@ -774,8 +780,10 @@ class StorageTabs:
         if not cfg:
             return
         timeframe = panel.storage_detail_tf_combo.currentData()
-        if _HAS_PG:
-            panel.storage_plot_curve.setData([], [])
+        self._ensure_storage_plot(panel)
+        curve = getattr(panel, "storage_plot_curve", None)
+        if curve is not None:
+            curve.setData([], [])
         # Spinner while the rrddata request runs.
         panel.storage_monitor_stack.setCurrentIndex(0)
         from ..api.metrics import StorageMetricsWorker
@@ -795,17 +803,42 @@ class StorageTabs:
         )
         panel._workers_mgr.run_worker(worker)
 
+    def _ensure_storage_plot(self, panel):
+        """Build the storage usage chart if it was deferred (pg warm-up)."""
+        if not panel._storage_plot_deferred:
+            return
+        pg = ensure_pg()
+        if pg is None:
+            return
+        panel._storage_plot_deferred = False
+        date_axis = pg.DateAxisItem(orientation='bottom')
+        panel.storage_plot_widget = pg.PlotWidget(
+            axisItems={'bottom': date_axis}, title=tr("Used")
+        )
+        panel.storage_plot_widget.setLabel('left', 'GiB')
+        panel.storage_plot_widget.showGrid(x=False, y=True, alpha=0.3)
+        panel.storage_plot_widget.enableAutoRange(axis='y')
+        panel.storage_plot_widget.setMouseEnabled(x=False, y=False)
+        panel.storage_plot_widget.setMinimumHeight(260)
+        panel.storage_plot_curve = panel.storage_plot_widget.plot(
+            [], [], pen=pg.mkPen(Color.STATUS_WARN, width=2),
+            fillLevel=0, fillBrush=pg.mkBrush(Color.STATUS_WARN + "33")
+        )
+        panel.storage_detail_plot.layout().addWidget(panel.storage_plot_widget)
+
     def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict, sid=None):
         panel = self.panel
         panel.storage_monitor_stack.setCurrentIndex(1)
         if sid is None or panel.current_obj_type != "storage" or panel.current_obj_id != sid:
             return
-        if not _HAS_PG or not metrics_dict.get("usage"):
+        self._ensure_storage_plot(panel)
+        curve = getattr(panel, "storage_plot_curve", None)
+        if curve is None or not metrics_dict.get("usage"):
             return
         times = [pt["time"] for pt in metrics_dict["usage"]]
         # StorageMetricsWorker already converted bytes to GiB.
         values = [pt["value"] for pt in metrics_dict["usage"]]
-        panel.storage_plot_curve.setData(times, values)
+        curve.setData(times, values)
 
     def fetch_storage_backups_simple(self, storage_name, node_name, host_name, cfg):
         panel = self.panel

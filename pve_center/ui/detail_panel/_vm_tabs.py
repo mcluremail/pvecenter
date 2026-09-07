@@ -477,7 +477,7 @@ class VMTabs:
 
     def show_vm_metrics(self, vm_data):
         panel = self.panel
-        if not panel.metrics_widget._has_plot:
+        if not panel.metrics_widget.has_pg:
             return
         panel.metrics_widget.show_disk_io(True)
         vmid = vm_data.vmid

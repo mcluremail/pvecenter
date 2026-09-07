@@ -1,7 +1,7 @@
 """Tab order invariant: TabIndex values must match the real addTab order.
 
 v2.11.2 inserted TabIndex.STORAGE_MONITORING = 10 and shifted every
-later tab by +1. If the addTab sequence in DetailPanel._build_tabs ever
+later tab by +1. If the addTab sequence in DetailPanel._tab_specs ever
 drifts from the enum, the UI shows the wrong widget under each label.
 """
 import pytest

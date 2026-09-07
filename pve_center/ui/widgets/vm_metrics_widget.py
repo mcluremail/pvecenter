@@ -38,6 +38,8 @@ class VmMetricsWidget(QWidget):
         super().__init__(parent)
         self._has_plot = False
         self._cached_data = None
+        self._legend = None
+        self.has_pg = _HAS_PG
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -68,20 +70,33 @@ class VmMetricsWidget(QWidget):
         top.addStretch()
         self._layout.addLayout(top)
 
-        if _get_pg() is not None:
-            date_axis = pg.DateAxisItem(orientation='bottom')
-            self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title=tr("CPU, %"))
-            self.plot.setLabel('left', '%')
-            self.plot.showGrid(x=False, y=True, alpha=0.3)
-            self.plot.enableAutoRange(axis='y')
-            self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.ACCENT, width=2),
-                                        fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
-            self.plot.setMouseEnabled(x=False, y=False)
-            self._legend = self.plot.addLegend()
-            self._layout.addWidget(self.plot, 1)
-            self._has_plot = True
-        else:
+        if not _HAS_PG:
             self._layout.addWidget(QLabel(tr("PyQtGraph not installed. Charts unavailable.")))
+        elif pg is not None:
+            self._build_plot(pg)
+        # else: pyqtgraph is still importing in the background thread;
+        # the chart is created on first data (see ensure_plot).
+
+    def _build_plot(self, pg):
+        date_axis = pg.DateAxisItem(orientation='bottom')
+        self.plot = pg.PlotWidget(axisItems={'bottom': date_axis}, title=tr("CPU, %"))
+        self.plot.setLabel('left', '%')
+        self.plot.showGrid(x=False, y=True, alpha=0.3)
+        self.plot.enableAutoRange(axis='y')
+        self.curve = self.plot.plot([], [], pen=pg.mkPen(Color.ACCENT, width=2),
+                                    fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
+        self.plot.setMouseEnabled(x=False, y=False)
+        self._legend = self.plot.addLegend()
+        self._layout.addWidget(self.plot, 1)
+        self._has_plot = True
+
+    def ensure_plot(self):
+        """Create the chart if it was deferred while pyqtgraph was importing."""
+        if self._has_plot or not _HAS_PG:
+            return
+        pg_mod = _get_pg()
+        if pg_mod is not None:
+            self._build_plot(pg_mod)
 
     def _on_metric_changed(self):
         key = self.metric_combo.currentData()
@@ -123,6 +138,7 @@ class VmMetricsWidget(QWidget):
         self._render_current_metric()
 
     def _render_current_metric(self):
+        self.ensure_plot()
         if not self._has_plot or self._cached_data is None:
             return
         metric = self.metric_combo.currentData()
