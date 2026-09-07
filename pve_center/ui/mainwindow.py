@@ -1825,8 +1825,12 @@ class MainWindow(QMainWindow):
         save_ui_state("saved_obj_type", str(self.detail_panel.current_obj_type or ""))
         save_ui_state("splitter_h", json.dumps(self.h_splitter.sizes()))
         save_ui_state("splitter_v", json.dumps(self.v_splitter.sizes()))
+        for w in list(self._workers):
+            cancel = getattr(w, "cancel", None)
+            if callable(cancel):
+                cancel()
         QThreadPool.globalInstance().clear()
-        QThreadPool.globalInstance().waitForDone(3000)
+        QThreadPool.globalInstance().waitForDone(1000)
         if self._tray:
             self._tray.hide()
         from PySide6.QtWidgets import QApplication

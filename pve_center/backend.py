@@ -234,6 +234,10 @@ class FetchWorker(QRunnable):
         super().__init__()
         self.node_cfg = node_cfg
         self.signals = FetchSignals()
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
 
     def run(self):
         provider = None
@@ -244,6 +248,9 @@ class FetchWorker(QRunnable):
             node_api = provider.nodes
             vm_api = provider.vms
             storage_api = provider.storage
+
+            if self._cancelled:
+                return
 
             is_cluster_rep = self.node_cfg.get("cluster_rep", False)
 
@@ -346,6 +353,8 @@ class FetchWorker(QRunnable):
                 t.start()
             for t in phase1:
                 t.join(timeout=20)
+            if self._cancelled:
+                return
 
             # -- Parallel phase 2: storage details per node / standalone data --
             iso_images = {}
@@ -380,6 +389,8 @@ class FetchWorker(QRunnable):
                     t.start()
                 for t in storage_threads:
                     t.join(timeout=20)
+                if self._cancelled:
+                    return
 
                 # Подтягиваем версии с каждой ноды параллельно
                 version_lock = threading.Lock()
@@ -414,6 +425,8 @@ class FetchWorker(QRunnable):
                     t.start()
                 for t in ver_threads:
                     t.join(timeout=10)
+                if self._cancelled:
+                    return
 
                 for s in storages:
                     detail = detail_by_node.get(s.get("node", ""), {}).get(s.get("storage", ""), {})
@@ -493,6 +506,8 @@ class FetchWorker(QRunnable):
 
                 standalone_thread = threading.Thread(target=fetch_standalone, daemon=True)
                 standalone_thread.start()
+                if self._cancelled:
+                    return
                 standalone_thread.join(timeout=30)
 
                 # Повторно применяем pool после завершения pool-потоков
@@ -548,12 +563,17 @@ class FetchWorker(QRunnable):
                     with iso_lock:
                         iso_images[nhost] = []
 
+            if self._cancelled:
+                return
             iso_threads = [threading.Thread(target=fetch_iso_for_node, args=(n,), daemon=True)
                            for n in nodes]
             for t in iso_threads:
                 t.start()
             for t in iso_threads:
                 t.join(timeout=15)
+
+            if self._cancelled:
+                return
 
             # -- Emit result --
             self.signals.result_ready.emit({
