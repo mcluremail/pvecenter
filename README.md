@@ -2,7 +2,7 @@
 
 Desktop client for Proxmox VE management. Written in Python with PySide6.
 
-Monitor clusters and hosts, manage virtual machines and containers, view task history — all in one window, no browser needed.
+Monitor clusters and hosts, manage virtual machines and containers, browse Proxmox Backup Server backups — all in one window, no browser needed.
 
 ![PVE Center](Screenshots/main.png)
 
@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, view task hi
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.10.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.10.0)
+Latest release: [v2.11.3](https://github.com/mcluremail/pvecenter/releases/tag/v2.11.3)
 
 ## Changelog
 
@@ -47,6 +47,14 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - SPICE console (requires virt-viewer)
 - Delete host with API token removal on the server
 - Token recreation via context menu
+
+**Backups**
+- PBS backup browsing via PVE: backups table on PBS storages with owner, verify state and notes columns
+- Delete a single backup (prune one) from the storage content table
+- Restore a PBS backup into a new VM or container
+- Direct Proxmox Backup Server connection (port 8007): PBS servers added via the Add Server dialog (with connection check) appear in the object tree with their datastores and fill levels
+- PBS panel: datastore status and usage, snapshots per namespace with verify state, owner and size, snapshot deletion
+- PBS jobs: sync / verify / prune schedules with manual run
 
 **Security & Audit**
 - User-bound API tokens: created automatically when adding a server, actual operator visible in PVE audit log
@@ -85,6 +93,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - proxmoxer (not in Debian/Ubuntu repos — install via pip)
 - Proxmox VE (cluster or standalone host)
 - API access to PVE host (port 8006)
+- Proxmox Backup Server (port 8007) — for direct PBS integration
 - virt-viewer (for SPICE console)
 
 ## Installation
@@ -207,6 +216,9 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 | `pve_center/__main__.py` | Module entry (`python -m pve_center`) |
 | `pve_center/main.py` | Application entry point |
 | `pve_center/backend.py` | API client, token management, VM actions, migrate/clone workers |
+| `pve_center/pbs/` | Proxmox Backup Server API client (ticket auth) and workers |
+| `pve_center/plugins/_pbs.py` | PBS plugin (dispatch by `cfg["type"] = "pbs"`) |
+| `pve_center/domain/pbs.py` | PBS domain models (datastores, snapshots, jobs) |
 | `pve_center/config.py` | Keyring, SQLite config storage, export/import |
 | `pve_center/ui/mainwindow.py` | Main window |
 | `pve_center/ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
@@ -219,6 +231,7 @@ For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, 
 | `pve_center/ui/vm_device_editors.py` | Specialized device editors |
 | `pve_center/ui/vm_config_display.py` | VM config display widget |
 | `pve_center/ui/vm_actions.py` | VM power action labels and confirmation |
+| `pve_center/ui/pbs_panel.py` | PBS panel: datastores, snapshots, jobs |
 | `pve_center/ui/about_dialog.py` | About dialog |
 | `pve_center/ui/theme.py` | Color constants, fonts, QSS theme |
 | `pve_center/ui/icons.py` | SVG icon registry |

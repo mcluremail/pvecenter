@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QSystemTrayIcon,
     QToolBar,
     QVBoxLayout,
@@ -143,7 +144,12 @@ class MainWindow(QMainWindow):
             lambda key, ok, msg: self.tasks_widget.finish_progress_row(key, ok, msg)
         )
 
-        self.tree_panel.item_selected.connect(self.detail_panel.show_details)
+        from .pbs_panel import PbsPanel
+        self.pbs_panel = PbsPanel()
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.datastores_loaded.connect(self.tree_panel.set_pbs_datastores)
+
+        self.tree_panel.item_selected.connect(self._on_tree_item_selected)
         self.detail_panel.navigate_requested.connect(self.tree_panel.find_and_select)
         self.detail_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.detail_panel.vm_convert_requested.connect(self._on_vm_convert)
@@ -174,8 +180,11 @@ class MainWindow(QMainWindow):
             self._init_tray()
 
         self.h_splitter = QSplitter(Qt.Horizontal)
+        self.right_stack = QStackedWidget()
+        self.right_stack.addWidget(self.detail_panel)
+        self.right_stack.addWidget(self.pbs_panel)
         self.h_splitter.addWidget(self.tree_panel)
-        self.h_splitter.addWidget(self.detail_panel)
+        self.h_splitter.addWidget(self.right_stack)
 
         self.tasks_widget = ClusterTasksWidget()
 
@@ -484,6 +493,7 @@ class MainWindow(QMainWindow):
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.tree_panel.set_servers(merged)
         self.detail_panel.update_nodes_cfg(merged)
+        self.pbs_panel.update_nodes_cfg(merged)
         save_config(self.nodes_cfg)
         self.refresh_data()
         QMessageBox.information(self, tr("Import"),
@@ -503,6 +513,7 @@ class MainWindow(QMainWindow):
         self._cfg_by_name[cfg.get("name", "")] = cfg
         self.tree_panel.set_servers(self.nodes_cfg)
         self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
 
@@ -773,6 +784,7 @@ class MainWindow(QMainWindow):
         save_config(self.nodes_cfg)
         self.tree_panel.set_servers(self.nodes_cfg)
         self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
 
     def _on_group_rename(self, old_name, new_name):
         for cfg in self.nodes_cfg:
@@ -1108,6 +1120,7 @@ class MainWindow(QMainWindow):
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self.tree_panel.set_servers(self.nodes_cfg)
         self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         from ..config import delete_node_tokens
         delete_node_tokens([c.get("name", "") for c in matched])
@@ -1138,6 +1151,7 @@ class MainWindow(QMainWindow):
             self._cfg_by_name[host_name] = new_cfg
         self.tree_panel.set_servers(self.nodes_cfg)
         self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
         save_config(self.nodes_cfg)
         self.refresh_data()
 
@@ -1198,7 +1212,9 @@ class MainWindow(QMainWindow):
 
         self.tree_panel.start_loading()
 
-        active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
+        active_cfgs = [cfg for cfg in self.nodes_cfg
+                       if not cfg.get("skip", False)
+                       and cfg.get("type", "pve") != "pbs"]
 
         self._refresh_gen += 1
         refresh_gen = self._refresh_gen
@@ -1220,6 +1236,23 @@ class MainWindow(QMainWindow):
                 node_repo=self._node_repo, vm_repo=self._vm_repo
             )
             self._update_status_bar()
+
+    @Slot(str, str, dict)
+    def _on_tree_item_selected(self, obj_type, obj_name, data):
+        current_key = self.tree_panel.get_current_item_key()
+        if current_key is not None:
+            self._saved_key = current_key
+        if obj_type in ("pbs", "pbs_datastore"):
+            self.right_stack.setCurrentWidget(self.pbs_panel)
+            if obj_type == "pbs":
+                self.pbs_panel.show_server(obj_name)
+            else:
+                self.pbs_panel.show_datastore(
+                    data.get("server", obj_name), data.get("store", "")
+                )
+            return
+        self.right_stack.setCurrentWidget(self.detail_panel)
+        self.detail_panel.show_details(obj_type, obj_name, data)
 
     @Slot(dict)
     def on_worker_finished(self, data, worker=None, gen=0):
@@ -1387,7 +1420,9 @@ class MainWindow(QMainWindow):
         self._soft_counter = 0
         self._soft_had_errors = False
 
-        active_cfgs = [cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)]
+        active_cfgs = [cfg for cfg in self.nodes_cfg
+                       if not cfg.get("skip", False)
+                       and cfg.get("type", "pve") != "pbs"]
         if not active_cfgs:
             self._soft_refresh_running = False
             return
@@ -1693,6 +1728,10 @@ class MainWindow(QMainWindow):
 
     def _do_first_selection(self):
         self._first_selection_done = True
+        # Если пользователь уже выбрал элемент (например, PBS-сервер) —
+        # не перехватываем выделение на первый элемент дерева.
+        if self.tree_panel.get_current_item_key() is not None:
+            return
         saved_key = getattr(self, '_saved_key', None)
         if saved_key:
             item = self.tree_panel.find_item_by_key(saved_key)

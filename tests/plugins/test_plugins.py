@@ -19,8 +19,8 @@ _CFG = {"host": "h", "user": "u", "token_name": "t", "token_value": "v"}
 
 
 class TestRegistry:
-    def test_default_registry_has_pve(self):
-        assert default_registry().ids() == ["pve"]
+    def test_default_registry_has_pve_and_pbs(self):
+        assert default_registry().ids() == ["pbs", "pve"]
 
     def test_register_and_get(self):
         reg = PluginRegistry()
@@ -92,3 +92,17 @@ class TestCustomPlugin:
 
     def test_pve_plugin_satisfies_provider_plugin_protocol(self):
         assert isinstance(PvePlugin(), ProviderPlugin)
+
+    def test_pbs_plugin_dispatch(self):
+        from pve_center.pbs.provider import PbsProvider
+        from pve_center.plugins import PbsPlugin
+
+        provider = create_provider({**_CFG, "type": "pbs"})
+        assert isinstance(provider, PbsProvider)
+        assert isinstance(PbsPlugin(), ProviderPlugin)
+        assert provider.client._port == 8007
+
+    def test_pbs_plugin_custom_port(self):
+
+        provider = create_provider({**_CFG, "type": "pbs", "port": 8008})
+        assert provider.client._port == 8008

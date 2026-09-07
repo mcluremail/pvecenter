@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFrame,
     QGridLayout,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..backend import TokenCreationWorker
+from ..pbs.workers import PbsApiWorker
 from .i18n import tr
 from .theme import Color
 
@@ -64,49 +66,67 @@ class AddServerDialog(QDialog):
         conn_grid.setHorizontalSpacing(12)
         conn_grid.setVerticalSpacing(10)
 
+        type_lbl = QLabel(tr("Type:"))
+        type_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(type_lbl, 0, 0)
+        self.type_combo = QComboBox()
+        self.type_combo.addItem("Proxmox VE", "pve")
+        self.type_combo.addItem("Proxmox Backup Server", "pbs")
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        conn_grid.addWidget(self.type_combo, 0, 1)
+
         host_lbl = QLabel(tr("Host:"))
         host_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        conn_grid.addWidget(host_lbl, 0, 0)
+        conn_grid.addWidget(host_lbl, 1, 0)
         self.host_input = QLineEdit()
         self.host_input.setPlaceholderText("pve01.example.com")
         self.host_input.setValidator(QRegularExpressionValidator(
             r"^[A-Za-z0-9._:\-]{1,255}$"
         ))
-        conn_grid.addWidget(self.host_input, 0, 1)
+        conn_grid.addWidget(self.host_input, 1, 1)
+
+        port_lbl = QLabel(tr("Port:"))
+        port_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(port_lbl, 2, 0)
+        self.port_input = QLineEdit("8007")
+        self.port_input.setValidator(QRegularExpressionValidator(r"\d{1,5}"))
+        conn_grid.addWidget(self.port_input, 2, 1)
 
         user_lbl = QLabel(tr("User:"))
         user_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        conn_grid.addWidget(user_lbl, 1, 0)
+        conn_grid.addWidget(user_lbl, 3, 0)
         self.user_input = QLineEdit()
         self.user_input.setPlaceholderText("username@realm (root@pam, user@ipa...)")
-        conn_grid.addWidget(self.user_input, 1, 1)
+        conn_grid.addWidget(self.user_input, 3, 1)
 
         pwd_lbl = QLabel(tr("Password:"))
         pwd_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        conn_grid.addWidget(pwd_lbl, 2, 0)
+        conn_grid.addWidget(pwd_lbl, 4, 0)
         self.pwd_input = QLineEdit()
         self.pwd_input.setEchoMode(QLineEdit.Password)
         self.pwd_input.setPlaceholderText("••••••••")
-        conn_grid.addWidget(self.pwd_input, 2, 1)
+        conn_grid.addWidget(self.pwd_input, 4, 1)
 
         info_label = QLabel(tr("An API token will be created for the specified user"))
         info_label.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 12px;")
-        conn_grid.addWidget(info_label, 3, 0, 1, 2)
+        conn_grid.addWidget(info_label, 5, 0, 1, 2)
 
         self.trust_ssl_cb = QCheckBox(tr("Trust SSL certificate"))
         self.trust_ssl_cb.setChecked(False)
         self.trust_ssl_cb.setToolTip(tr("Accept self-signed certificates. Check only for internal PVE hosts with self-signed certs."))
-        conn_grid.addWidget(self.trust_ssl_cb, 4, 0, 1, 2)
+        conn_grid.addWidget(self.trust_ssl_cb, 6, 0, 1, 2)
 
         self.auth_btn = QPushButton(tr("Get token"))
-        conn_grid.addWidget(self.auth_btn, 5, 0, 1, 2)
+        conn_grid.addWidget(self.auth_btn, 7, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
         conn_grid.setColumnStretch(1, 1)
         layout.addLayout(conn_grid)
         layout.addWidget(_section_sep())
 
-        layout.addWidget(_section_title(tr("Token")))
+        token_title = _section_title(tr("Token"))
+        layout.addWidget(token_title)
+        self._token_title = token_title
 
         token_grid = QGridLayout()
         token_grid.setHorizontalSpacing(12)
@@ -140,6 +160,7 @@ class AddServerDialog(QDialog):
 
         token_grid.setColumnStretch(1, 1)
         layout.addLayout(token_grid)
+        self._token_grid = token_grid
         layout.addWidget(_section_sep())
 
         layout.addWidget(_section_title(tr("Node settings")))
@@ -168,13 +189,18 @@ class AddServerDialog(QDialog):
         node_grid.setColumnStretch(1, 1)
         layout.addLayout(node_grid)
 
+        # PVE-only widgets hidden in PBS mode (token flow + cluster row)
+        self._pve_only_labels = [info_label, tn_lbl, tv_lbl, cl_lbl]
+        self._pve_only_widgets = [self.token_name_label, self.token_value_label,
+                                  self._token_show_btn, self.cluster_rep_cb]
+
         layout.addStretch()
 
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton(tr("Add"))
         self.add_btn.setObjectName("accentBtn")
         self.add_btn.setEnabled(False)
-        self.add_btn.clicked.connect(self.accept)
+        self.add_btn.clicked.connect(self._on_add)
         cancel_btn = QPushButton(tr("Cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addStretch()
@@ -190,6 +216,54 @@ class AddServerDialog(QDialog):
         elif ctx == "standalone":
             self.cluster_input.setPlaceholderText(tr("leave empty — standalone host"))
             self.cluster_rep_cb.setChecked(False)
+
+    # ── PBS mode ─────────────────────────────────────────────────
+
+    def _is_pbs(self):
+        return self.type_combo.currentData() == "pbs"
+
+    def _on_type_changed(self):
+        pbs = self._is_pbs()
+        self.port_input.setVisible(pbs)
+        # PVE-only widgets: token flow + cluster assignment
+        self._token_title.setVisible(not pbs)
+        for w in (self.auth_btn, *self._pve_only_labels, *self._pve_only_widgets):
+            w.setVisible(not pbs)
+        self.user_input.setPlaceholderText(
+            "user@realm (root@pam) or user@pbs!tokenid" if pbs
+            else "username@realm (root@pam, user@ipa...)")
+        # PVE: Add is enabled only after a token has been created; PBS: always
+        self.add_btn.setEnabled(pbs or self._token_data is not None)
+        self._set_status("")
+
+    def _on_add(self):
+        if not self._is_pbs():
+            self.accept()
+            return
+        host = self.host_input.text().strip()
+        password = self.pwd_input.text()
+        if not host or not password:
+            self._set_status(tr("Enter host and password"), Color.STATUS_ERR)
+            return
+        self.add_btn.setEnabled(False)
+        self._set_status(tr("Checking connection..."), Color.GRAY_500)
+        cfg = self.get_config()
+        self._validate_worker = PbsApiWorker(cfg, "datastores", tag="validate")
+        self._validate_worker.signals.done.connect(self._on_validate_done)
+        self._validate_worker.signals.failed.connect(self._on_validate_failed)
+        QThreadPool.globalInstance().start(self._validate_worker)
+
+    def _on_validate_done(self, tag, _result):
+        if tag != "validate" or not self.isVisible():
+            return
+        self._set_status(tr("Connected"), Color.STATUS_OK)
+        self.accept()
+
+    def _on_validate_failed(self, tag, error):
+        if tag != "validate" or not self.isVisible():
+            return
+        self._set_status(error, Color.STATUS_ERR)
+        self.add_btn.setEnabled(True)
 
     def _on_auth(self):
         host = self.host_input.text().strip()
@@ -259,6 +333,18 @@ class AddServerDialog(QDialog):
         host = self.host_input.text().strip()
         name = self.name_input.text().strip() or host
         cluster_text = self.cluster_input.text().strip()
+
+        if self._is_pbs():
+            return {
+                "name": name,
+                "type": "pbs",
+                "host": host,
+                "port": int(self.port_input.text().strip() or "8007"),
+                "user": self.user_input.text().strip() or "root@pam",
+                "token_name": "",
+                "token_value": self.pwd_input.text(),
+                "trust_ssl": self.trust_ssl_cb.isChecked(),
+            }
 
         cfg = {
             "name": name,

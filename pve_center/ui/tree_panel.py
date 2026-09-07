@@ -187,6 +187,8 @@ class TreePanel(QWidget):
         self._rebuild_timer.timeout.connect(self._do_rebuild)
 
         self._loading_hosts = set()
+        # B17: datastore child to re-select after datastores refill post-rebuild
+        self._pending_ds_key = None
         self._spinner_angle = 0
         self._spin_timer = QTimer()
         self._spin_timer.setInterval(150)
@@ -260,6 +262,58 @@ class TreePanel(QWidget):
         self.nodes_cfg = nodes_cfg
         self._cfg_by_name = build_cfg_index(self.nodes_cfg)
         self._build_tree()
+
+    def set_pbs_datastores(self, server_name, stores):
+        """B17 stage 2: fill datastore children of a PBS server item.
+
+        ``stores`` — list of domain PbsDatastore (or dicts with "name").
+        """
+        for i in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(i)
+            key = item.data(0, ITEM_KEY_ROLE)
+            if not (isinstance(key, tuple) and key[0] == "pbs"
+                    and key[1] == server_name):
+                continue
+            expanded = item.isExpanded()
+            cur_key = self.get_current_item_key()
+            self._building = True
+            try:
+                item.takeChildren()
+                for st in stores:
+                    name = st.name if hasattr(st, "name") else st.get("name", "")
+                    if not name:
+                        continue
+                    child = QTreeWidgetItem(item)
+                    child.setText(0, name)
+                    child.setIcon(0, get_icon("backup"))
+                    child.setData(0, ITEM_KEY_ROLE,
+                                  ("pbs_datastore", server_name, name))
+                    if hasattr(st, "usage_pct"):
+                        usage = st.usage_pct()
+                    elif hasattr(st, "usage"):
+                        usage = int(round(st.usage * 100))
+                    else:
+                        usage = 0
+                    child.setText(1, f"{usage}%")
+                if expanded and item.childCount():
+                    item.setExpanded(True)
+                # takeChildren()/refill may have destroyed the current item
+                # and let Qt hop selection elsewhere: bring it back. Done
+                # while _building=True so the restore does not re-emit
+                # item_selected (the detail panel already shows this item).
+                target = None
+                if self._pending_ds_key is not None:
+                    target = self.find_item_by_key(self._pending_ds_key)
+                    if target is not None:
+                        self._pending_ds_key = None
+                if target is None and cur_key is not None \
+                        and self.get_current_item_key() != cur_key:
+                    target = self.find_item_by_key(cur_key)
+                if target is not None:
+                    self.tree.setCurrentItem(target)
+            finally:
+                self._building = False
+            return
 
     def set_mode(self, mode):
         """B20: switch the tree view mode ('hosts'/'storages')."""
@@ -585,8 +639,14 @@ class TreePanel(QWidget):
 
         hosts_by_cluster = {}
         standalone = []
+        pbs_servers = []
         for cfg in self.nodes_cfg:
             if cfg.get("skip", False):
+                continue
+            if cfg.get("type") == "pbs":
+                name = cfg.get("name", "")
+                if name:
+                    pbs_servers.append(name)
                 continue
             name = cfg.get("name", "")
             cluster = cfg.get("cluster")
@@ -595,18 +655,24 @@ class TreePanel(QWidget):
             else:
                 standalone.append(name)
 
-        # B20: clusters + standalone hosts flat (no sections)
+        # B20: clusters + standalone hosts flat (no sections); PBS servers
+        # (B17 stage 2) join the same flat list with their own item kind.
         entries = [(cl.lower(), "cluster", cl) for cl in hosts_by_cluster]
         entries += [(h.lower(), "host", h) for h in standalone]
+        entries += [(n.lower(), "pbs", n) for n in pbs_servers]
         entries.sort(key=lambda e: e[0])
         for _, kind, name in entries:
             item = QTreeWidgetItem(self.tree)
             item.setText(0, name)
-            item.setIcon(0, make_loading_icon(0))
+            item.setIcon(0, make_loading_icon(0) if kind != "pbs"
+                         else get_icon("storage"))
             if kind == "cluster":
                 item.setData(0, ITEM_KEY_ROLE, ("cluster", name))
                 item.setExpanded(True)
                 self._loading_hosts.add(f"cluster:{name}")
+            elif kind == "pbs":
+                item.setData(0, ITEM_KEY_ROLE, ("pbs", name))
+                item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
             else:
                 item.setData(0, ITEM_KEY_ROLE, ("host", name))
                 self._loading_hosts.add(name)
@@ -859,6 +925,13 @@ class TreePanel(QWidget):
             self.tree.expandAll()
         if saved_key is not None:
             item = self.find_item_by_key(saved_key)
+            if item is None and isinstance(saved_key, tuple) \
+                    and saved_key[0] == "pbs_datastore":
+                # Datastore children are not present right after a rebuild
+                # (they arrive later via set_pbs_datastores): fall back to the
+                # parent PBS server and re-select the child on refill.
+                item = self.find_item_by_key(("pbs", saved_key[1]))
+                self._pending_ds_key = saved_key
             if item is not None:
                 self.tree.setCurrentItem(item)
         self.tree.verticalScrollBar().setValue(scroll_val)
@@ -918,7 +991,7 @@ class TreePanel(QWidget):
         standalone_names = {n.host_name for n in standalone_nodes}
         grouped_standalone_names = {n.host_name for nodes in group_standalone.values() for n in nodes}
         for cfg in self.nodes_cfg:
-            if cfg.get("skip"):
+            if cfg.get("skip") or cfg.get("type") == "pbs":
                 continue
             host_name = cfg.get("name", "")
             cluster = cfg.get("cluster")
@@ -987,6 +1060,19 @@ class TreePanel(QWidget):
                 self._make_cluster_item(self.tree, obj, cluster_nodes[obj])
             else:
                 self._make_host_item(self.tree, obj)
+
+        for cfg in self.nodes_cfg:
+            if cfg.get("skip") or cfg.get("type") != "pbs":
+                continue
+            name = cfg.get("name", "")
+            if not name:
+                continue
+            item = QTreeWidgetItem(self.tree)
+            item.setText(0, name)
+            item.setIcon(0, get_icon("storage"))
+            item.setData(0, ITEM_KEY_ROLE, ("pbs", name))
+            item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+            self._refresh_note(item, f"pbs:{name}", default=cfg.get("host", ""))
 
     def _build_storages_view(self, grouping, group_names):
         """B20 'Storages' mode: shared storages under the cluster, local
@@ -1266,6 +1352,16 @@ class TreePanel(QWidget):
 
         if item_type == "group":
             self.item_selected.emit("group", item_name, {})
+            return
+
+        if item_type == "pbs":
+            self.item_selected.emit("pbs", item_name, {})
+            return
+
+        if item_type == "pbs_datastore":
+            store = key[2] if len(key) > 2 else ""
+            self.item_selected.emit("pbs_datastore", item_name,
+                                    {"server": item_name, "store": store})
             return
 
         if item_type == "host":

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -148,7 +148,14 @@ class ClusterTasksWidget(QWidget):
 
         # Restore column widths (changes saved via sectionResized)
         self._restore_column_widths()
-        h.sectionResized.connect(self._save_column_widths)
+        # Debounced save: sectionResized fires per pixel while dragging and
+        # each save_ui_state is a SQLite round-trip on the main thread —
+        # persisting directly here froze the UI (B17 follow-up).
+        self._col_save_timer = QTimer(self)
+        self._col_save_timer.setSingleShot(True)
+        self._col_save_timer.setInterval(800)
+        self._col_save_timer.timeout.connect(self._save_column_widths)
+        h.sectionResized.connect(self._col_save_timer.start)
 
         self.table.setWordWrap(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)

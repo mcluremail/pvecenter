@@ -7,10 +7,11 @@ Built-in registry carries the Proxmox VE data-source plugin;
 from __future__ import annotations
 
 from ..provider import DataProvider
+from ._pbs import PbsPlugin
 from ._pve import PvePlugin
 from .base import Plugin, PluginError, PluginRegistry, ProviderPlugin
 
-_BUILTINS = (PvePlugin(),)
+_BUILTINS = (PvePlugin(), PbsPlugin())
 
 
 def default_registry() -> PluginRegistry:
@@ -42,6 +43,7 @@ __all__ = [
     "PluginError",
     "PluginRegistry",
     "ProviderPlugin",
+    "PbsPlugin",
     "PvePlugin",
     "create_provider",
     "default_registry",
