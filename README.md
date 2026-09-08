@@ -305,6 +305,14 @@ Supported languages:
 
 Translations are stored in the `translations` table. To add a new language, insert rows with `(lang, msgid, msgstr)`.
 
+## Third-party software
+
+This project bundles noVNC (vendored, MPL-2.0, unmodified — see
+`pve_center/ui/console/novnc/LICENSE.txt`) and uses several third-party
+Python packages (PySide6/LGPL-3.0, proxmoxer/MIT, requests/Apache-2.0,
+etc.). Full list with licenses and sources:
+[docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md).
+
 ## License
 
 GNU General Public License v3.0. See `LICENSE` file.
