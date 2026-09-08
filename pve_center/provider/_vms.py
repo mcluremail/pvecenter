@@ -187,22 +187,39 @@ class VmAPI:
     # -- console proxies --
 
     def get_vnc_proxy(self, node: str, vmid: int | str, vm_type: str,
-                      proxy_host: str) -> dict:
-        """POST .../vncproxy."""
+                      proxy_host: str | None = None) -> dict:
+        """POST .../vncproxy. websocket=1 обязателен для noVNC-пути: PVE
+        поднимает websocket-подготовленный листенер (qm vncproxy --websocket).
+        proxy_host опционален: без него PVE выбирает адрес сам."""
         if vm_type == "lxc":
-            return self._s.call(
-                self._s.proxmox.nodes(_q(node)).lxc(vmid).vncproxy.post,
-                proxy=proxy_host,
-            )
-        return self._s.call(
-            self._s.proxmox.nodes(_q(node)).qemu(vmid).vncproxy.post,
-            proxy=proxy_host,
-        )
+            post = self._s.proxmox.nodes(_q(node)).lxc(vmid).vncproxy.post
+        else:
+            post = self._s.proxmox.nodes(_q(node)).qemu(vmid).vncproxy.post
+        params: dict = {"websocket": 1}
+        if proxy_host:
+            params["proxy"] = proxy_host
+        return self._s.call(post, **params)
 
     def get_spice_proxy(self, node: str, vmid: int | str,
-                         proxy_host: str) -> dict:
+                         proxy_host: str) -> object:
         """POST .../spiceproxy (QEMU only)."""
         return self._s.call(
             self._s.proxmox.nodes(_q(node)).qemu(vmid).spiceproxy.post,
             proxy=proxy_host,
+        )
+
+    def get_vnc_websocket(self, node: str, vmid: int | str, vm_type: str,
+                          port: int, vncticket: str) -> dict:
+        """GET .../vncwebsocket — validates the VNC ticket and arms the
+        websocket endpoint on the API port (used by the noVNC console)."""
+        if vm_type == "lxc":
+            return self._s.call(
+                self._s.proxmox.nodes(_q(node)).lxc(vmid).vncwebsocket.get,
+                port=port,
+                vncticket=vncticket,
+            )
+        return self._s.call(
+            self._s.proxmox.nodes(_q(node)).qemu(vmid).vncwebsocket.get,
+            port=port,
+            vncticket=vncticket,
         )

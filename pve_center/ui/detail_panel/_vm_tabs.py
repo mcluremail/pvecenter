@@ -337,6 +337,45 @@ class VMTabs:
         ))
         panel._workers_mgr.run_worker(worker)
 
+    def on_vm_novnc(self):
+        panel = self.panel
+        if not panel._last_vm_data:
+            return
+        vm = panel._last_vm_data
+        vm_type = vm.vm_type.value
+        vmid = vm.vmid
+        host_name = vm.host_name or vm.node
+        cfg = panel._cfg_by_name.get(host_name)
+        if not cfg:
+            return
+        node_name = vm.node or host_name
+        panel._console_btn.setEnabled(False)
+        panel.detail_label.setText(tr("VM {vmid}: opening noVNC console...").format(vmid=vmid))
+        from ...backend import NoVncWorker
+        worker = NoVncWorker(cfg, node_name, vmid, vm_type)
+        worker.signals.ready.connect(lambda ws_url, ticket, w=worker: (
+            self._open_novnc_window(cfg, node_name, vmid, vm_type, ws_url, ticket),
+            panel._console_btn.setEnabled(True),
+            panel._workers_mgr.discard_worker(w)
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            panel.detail_label.setText(err),
+            panel._console_btn.setEnabled(True),
+            panel._workers_mgr.discard_worker(w)
+        ))
+        panel._workers_mgr.run_worker(worker)
+
+    def _open_novnc_window(self, cfg, node_name, vmid, vm_type, ws_url, ticket):
+        panel = self.panel
+        from ..console.window import NoVncWindow
+        try:
+            NoVncWindow.open_console(
+                cfg, node_name, vmid, vm_type, ws_url, ticket,
+                parent=panel.window(),
+            )
+        except RuntimeError as e:
+            panel.detail_label.setText(str(e))
+
     def refresh_after_action(self):
         panel = self.panel
         if not panel._last_vm_data:

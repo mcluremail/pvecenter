@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 
 from PySide6.QtWidgets import QApplication
 
@@ -18,7 +19,12 @@ def _excepthook(exc_type, exc_value, tb):
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, tb)
         return
-    logger.error("Unhandled exception: %s: %s", exc_type.__name__, exc_value)
+    logger.error(
+        "Unhandled exception: %s: %s\n%s",
+        exc_type.__name__,
+        exc_value,
+        "".join(traceback.format_exception(exc_type, exc_value, tb)),
+    )
 
 
 def main():

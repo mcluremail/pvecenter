@@ -475,7 +475,8 @@ class TestVmAPI:
         api = VmAPI(mock_session)
         result = api.get_vnc_proxy("n1", 200, "lxc", "pve.host")
         assert result["port"] == 5900
-        lxc_chain.return_value.vncproxy.post.assert_called_once_with(proxy="pve.host")
+        lxc_chain.return_value.vncproxy.post.assert_called_once_with(
+            websocket=1, proxy="pve.host")
 
     def test_get_spice_proxy(self, mock_session):
         chain = mock_session.proxmox.nodes

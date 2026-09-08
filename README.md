@@ -89,12 +89,20 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 ## Requirements
 
 - Python 3.10+ (for pip/source install; not needed for Windows .zip or installer)
-- PySide6
-- proxmoxer (not in Debian/Ubuntu repos — install via pip)
+- PySide6 (full package, incl. WebEngine — for the built-in noVNC console)
+- proxmoxer (Debian 12+/Ubuntu 23.04+ have `python3-proxmoxer`; older — via pip)
+- requests / urllib3
+- pyqtgraph
+- keyring — system keyring access (KWallet / GNOME Keyring / Windows Credential Manager)
+- cryptography (export/import encrypted config bundle)
+- websockets — **optional on Linux**: required only for the built-in noVNC
+  console (`pip install pvecenter[novnc]`); the app runs fine without it.
+  On **Windows** it is a hard dependency — Windows builds (zip/installer)
+  bundle everything, no system Python needed.
 - Proxmox VE (cluster or standalone host)
 - API access to PVE host (port 8006)
 - Proxmox Backup Server (port 8007) — for direct PBS integration
-- virt-viewer (for SPICE console)
+- virt-viewer (for SPICE/VNC console via remote-viewer)
 
 ## Installation
 
@@ -112,8 +120,34 @@ For SPICE console, install [virt-viewer for Windows](https://virt-manager.org/do
 
 ```bash
 pip install pvecenter
+# optional: built-in noVNC console
+pip install "pvecenter[novnc]"
 pvecenter
 ```
+
+### Linux system packages (system Python, no venv)
+
+```bash
+# Arch Linux
+sudo pacman -S --needed pyside6 python-proxmoxer python-requests \
+  python-urllib3 python-pyqtgraph python-keyring python-cryptography
+# optional: built-in noVNC console + remote-viewer console
+sudo pacman -S --needed python-websockets virt-viewer
+
+# Debian / Ubuntu
+sudo apt install python3-pyside6 python3-proxmoxer python3-requests \
+  python3-urllib3 python3-pyqtgraph python3-keyring python3-cryptography
+# optional
+sudo apt install python3-websockets virt-viewer
+
+# Fedora
+sudo dnf install python3-pyside6 python3-proxmoxer python3-requests \
+  python3-urllib3 python3-pyqtgraph python3-keyring python3-cryptography
+# optional
+sudo dnf install python3-websockets virt-viewer
+```
+
+Then run from the repo: `./run` (или `python -m pve_center`).
 
 ### Isolated environment
 
@@ -122,7 +156,9 @@ git clone https://github.com/mcluremail/pvecenter.git
 cd pvecenter
 python -m venv venv
 source venv/bin/activate
-pip install PySide6 proxmoxer requests pyqtgraph cryptography keyring
+pip install PySide6 proxmoxer requests urllib3 pyqtgraph cryptography keyring
+# optional: built-in noVNC console
+pip install websockets
 ```
 
 ### .deb package (Debian / Ubuntu)
@@ -132,10 +168,10 @@ Download `.deb` from [GitHub Releases](https://github.com/mcluremail/pvecenter/r
 ```bash
 # download .deb from release page
 sudo dpkg -i pve-center_*.deb
-# install proxmoxer (not in repos)
-pip install proxmoxer
-# install virt-viewer (if SPICE console needed)
+# virt-viewer (if SPICE/VNC console via remote-viewer needed)
 sudo apt install virt-viewer
+# optional: built-in noVNC console
+sudo apt install python3-websockets
 ```
 
 After installing the `.deb` package, launch from the menu or via `pvecenter`.
@@ -200,14 +236,22 @@ For a cluster, adding a single node is sufficient — others are discovered dyna
 
 | Package | Purpose |
 |---------|---------|
-| PySide6 | GUI framework |
+| PySide6 | GUI framework (WebEngine — built-in noVNC console) |
 | proxmoxer | Proxmox VE API client |
 | requests | HTTP library |
+| urllib3 | TLS/session handling (imported directly) |
 | pyqtgraph | Charts and plotting |
 | cryptography | PBKDF2 + Fernet encryption (export/import bundle) |
 | keyring | System keyring for token storage |
+| websockets | *Optional* — built-in noVNC console WS bridge |
 
-For `.deb` package: `python3-pyside6`, `python3-requests`, `python3-pyqtgraph`, `python3-cryptography` are available from Debian/Ubuntu repos. `proxmoxer` and `keyring` are installed via pip (not in repos).
+For `.deb` package: `python3-pyside6`, `python3-proxmoxer`, `python3-requests`,
+`python3-urllib3`, `python3-pyqtgraph`, `python3-cryptography`, `python3-keyring`
+are available from Debian/Ubuntu repos. `python3-websockets` (noVNC console)
+and `virt-viewer` (remote-viewer console) are Recommends.
+
+The application is designed to run on the **system Python** and system
+packages (no venv required): `./run` uses plain `python -m pve_center`.
 
 ### Project structure
 

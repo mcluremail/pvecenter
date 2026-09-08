@@ -2,7 +2,17 @@ import logging
 import threading
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QTabWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...domain import VmStatus, VmType
 from ..i18n import tr
@@ -70,6 +80,7 @@ class DetailPanel(QWidget):
         self._vm_tabs = VMTabs(self)
 
         self.detail_label = QLabel(tr("Select object in tree"))
+        self.detail_label.setWordWrap(True)
         self.detail_label.setAlignment(Qt.AlignTop)
         self.detail_label.setContentsMargins(0, 0, 0, 0)
         self.detail_label.setObjectName("titleMain")
@@ -98,10 +109,22 @@ class DetailPanel(QWidget):
             action_layout.addWidget(btn)
             self._action_buttons[action_key] = btn
 
-        self._console_btn = QPushButton(get_icon("console"), tr("Console"))
+        self._console_btn = QToolButton()
+        self._console_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._console_btn.setIcon(get_icon("console"))
+        self._console_btn.setText(tr("Console"))
         self._console_btn.setMinimumHeight(30)
         self._console_btn.setObjectName("accentBtn")
-        self._console_btn.setToolTip(tr("Open SPICE/VNC console"))
+        self._console_btn.setToolTip(tr("Open console"))
+        self._console_menu = QMenu(self._console_btn)
+        self._console_novnc_act = QAction(tr("noVNC (built-in)"), self)
+        self._console_novnc_act.triggered.connect(self._on_vm_novnc)
+        self._console_menu.addAction(self._console_novnc_act)
+        self._console_rv_act = QAction(tr("SPICE/VNC (remote-viewer)"), self)
+        self._console_rv_act.triggered.connect(self._on_vm_console)
+        self._console_menu.addAction(self._console_rv_act)
+        self._console_btn.setMenu(self._console_menu)
+        self._console_btn.setPopupMode(QToolButton.MenuButtonPopup)
         self._console_btn.clicked.connect(self._on_vm_console)
         action_layout.addWidget(self._console_btn)
 
@@ -473,6 +496,9 @@ class DetailPanel(QWidget):
 
     def _on_vm_console(self):
         self._vm_tabs.on_vm_console()
+
+    def _on_vm_novnc(self):
+        self._vm_tabs.on_vm_novnc()
 
     def _on_timeframe_changed(self, new_timeframe):
         if self.current_obj_type == "host" and isinstance(self.current_obj_id, HostId):

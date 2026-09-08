@@ -169,6 +169,7 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
         self.tree_panel.vm_clone_from_template_requested.connect(self._on_vm_clone_from_template)
         self.tree_panel.console_requested.connect(self._on_console_from_tree)
+        self.tree_panel.novnc_requested.connect(self._on_novnc_from_tree)
         self.tree_panel.vm_ha_add_requested.connect(self._on_vm_ha_add)
         self.tree_panel.vm_ha_remove_requested.connect(self._on_vm_ha_remove)
 
@@ -813,6 +814,26 @@ class MainWindow(QMainWindow):
         worker.signals.console_error.connect(lambda err: self._notifications.show(err, error=True))
         self._run_worker(worker)
 
+    def _on_novnc_from_tree(self, host_name, node, vmid):
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self._notifications.show(tr("Config not found for {}").format(host_name), error=True)
+            return
+        vm = self._vm_repo.get(host_name, vmid)
+        vm_type = (vm.vm_type.value if vm else "qemu")
+        from ..backend import NoVncWorker
+        worker = NoVncWorker(cfg, node, vmid, vm_type)
+        worker.signals.ready.connect(lambda ws_url, ticket: self._open_novnc(cfg, node, vmid, vm_type, ws_url, ticket))
+        worker.signals.error.connect(lambda err: self._notifications.show(err, error=True))
+        self._run_worker(worker)
+
+    def _open_novnc(self, cfg, node, vmid, vm_type, ws_url, ticket):
+        from .console.window import NoVncWindow
+        try:
+            NoVncWindow.open_console(cfg, node, vmid, vm_type, ws_url, ticket, parent=self)
+        except RuntimeError as e:
+            self._notifications.show(str(e), error=True)
+
     def _get_cluster_nodes(self, host_name, current_node):
         return [n for n in self._node_repo.get_by_host(host_name)
                 if n.node != current_node]
@@ -1455,7 +1476,14 @@ class MainWindow(QMainWindow):
         else:
             self._soft_had_errors = True
             err_msg = data.get("error", "Unknown error")
-            if not self._soft_node_repo.get(host, host):
+            existing_nodes = self._soft_node_repo.get_by_host(host)
+            if existing_nodes:
+                # Нода этого хоста уже есть (короткое имя) — помечаем её ошибкой,
+                # а не добавляем дубликат с именем-Hostname из конфига
+                for old in existing_nodes:
+                    self._soft_node_repo.add(
+                        replace(old, status=NodeStatus.ERROR, error=err_msg))
+            else:
                 err_node = {
                     "node": host,
                     "status": "error",

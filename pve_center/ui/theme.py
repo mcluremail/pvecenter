@@ -358,6 +358,30 @@ def _build_qss() -> str:
         border-color: {Color.BORDER};
         color: white;
     }}
+    QToolButton#accentBtn {{
+        background: {Color.ACCENT};
+        color: white;
+        border: 1px solid {Color.ACCENT};
+        border-radius: 4px;
+        padding: 5px 12px;
+        font-weight: 600;
+    }}
+    QToolButton#accentBtn:hover {{
+        background: {Color.ACCENT_HOVER};
+    }}
+    QToolButton#accentBtn:pressed {{
+        background: {Color.ACCENT_HOVER};
+    }}
+    QToolButton#accentBtn::menu-button {{
+        border: none;
+        width: 16px;
+        background: transparent;
+    }}
+    QToolButton#accentBtn:disabled {{
+        background: {Color.DISABLED};
+        border-color: {Color.BORDER};
+        color: white;
+    }}
 
     /* ── Сегментированные кнопки (Clusters/Nodes toggle) ── */
     QPushButton#segBtnLeft, QPushButton#segBtnRight {{

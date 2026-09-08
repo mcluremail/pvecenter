@@ -1629,6 +1629,98 @@ class VmConsoleWorker(QRunnable):
 
 
 # ----------------------------------------------------------------------
+# NoVncWorker — встроенная noVNC-консоль (websocket)
+# ----------------------------------------------------------------------
+class NoVncSignals(QObject):
+    ready = Signal(str, str)  # ws_url, vnc ticket (RFB password)
+    error = Signal(str)
+    finished = Signal()
+
+
+class NoVncWorker(QRunnable):
+    """Готовит параметры для встроенной noVNC-консоли.
+
+    POST vncproxy → GET vncwebsocket (валидация vncticket) → ws_url.
+    Подключение выполняет WsBridge в UI-потоке окна консоли.
+    """
+    def __init__(self, host_cfg, node_name, vmid, vm_type="qemu"):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.node_name = node_name
+        self.vmid = vmid
+        self.vm_type = vm_type
+        self.signals = NoVncSignals()
+
+    @staticmethod
+    def build_ws_url(host, node, vmid, vm_type, port, ticket):
+        """Строит wss:// URL websocket-эндпоинта PVE (порт API 8006)."""
+        from urllib.parse import quote
+        return (
+            f"wss://{quote(host, safe='')}:{PVE_PORT}"
+            f"/api2/json/nodes/{quote(str(node), safe='')}"
+            f"/{vm_type}/{quote(str(vmid), safe='')}"
+            f"/vncwebsocket?port={int(port)}"
+            f"&vncticket={quote(ticket, safe='')}"
+        )
+
+    @staticmethod
+    def extract_ticket(config):
+        """VNCTicket из ответа vncproxy: password (патченные 8.4.19+/9.1.9+)
+        или ticket (PVE 7/старые)."""
+        return config.get("password") or config.get("ticket") or ""
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=10)
+            vm_api = provider.vms
+            try:
+                config = vm_api.get_vnc_proxy(
+                    self.node_name, self.vmid, self.vm_type
+                )
+            except Exception as e:
+                raise RuntimeError(f"vncproxy: {e}") from e
+            port = int(config.get("port", 0))
+            ticket = self.extract_ticket(config)
+            if not port or not ticket:
+                raise ValueError(tr("VNC proxy returned no port/ticket"))
+            # Валидирует vncticket и «взводит» websocket-эндпоинт на сервере.
+            try:
+                vm_api.get_vnc_websocket(
+                    self.node_name, self.vmid, self.vm_type, port, ticket
+                )
+            except Exception as e:
+                raise RuntimeError(f"vncwebsocket: {e}") from e
+            ws_url = self.build_ws_url(
+                self.host_cfg["host"], self.node_name, self.vmid,
+                self.vm_type, port, ticket
+            )
+            try:
+                self.signals.ready.emit(ws_url, ticket)
+            except RuntimeError:
+                pass
+        except Exception as e:
+            msg = str(e).lower()
+            if "permission check failed" in msg or "403" in msg:
+                err = tr("PVE permission denied for console (requires VM.Console)")
+            elif "not supported" in msg or "vnc" in msg:
+                err = tr("Console not supported for this VM")
+            else:
+                err = tr("Console proxy error: {}").format(e)
+            try:
+                self.signals.error.emit(err)
+            except RuntimeError:
+                pass
+        finally:
+            if provider:
+                provider.close()
+            try:
+                self.signals.finished.emit()
+            except RuntimeError:
+                pass
+
+
+# ----------------------------------------------------------------------
 # CreateVmWorker — создание VM
 # ----------------------------------------------------------------------
 class CreateVmSignals(QObject):

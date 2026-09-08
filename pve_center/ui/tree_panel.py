@@ -159,6 +159,7 @@ class TreePanel(QWidget):
     vm_ha_add_requested = Signal(str, str, int)  # (host_name, node, vmid)
     vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
     console_requested = Signal(str, str, int)
+    novnc_requested = Signal(str, str, int)
     bulk_vm_action_requested = Signal(list, str)  # ([(host_name, vmid, node)], action)
     group_move_requested = Signal(str, str, str)  # kind ("host"|"cluster"), name, group ("" = none)
     group_rename_requested = Signal(str, str)     # old group name, new group name
@@ -234,9 +235,17 @@ class TreePanel(QWidget):
         self.tree.setColumnCount(2)
         self.tree.setHeaderHidden(True)
         header = self.tree.header()
-        header.setStretchLastSection(False)
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setMinimumSectionSize(48)
+        self.tree.setColumnWidth(0, 170)
+        self._restore_tree_columns()
+        # Сохраняем ширины колонок дерева (debounce при ручном растяжении).
+        self._col_save_timer = QTimer(self)
+        self._col_save_timer.setSingleShot(True)
+        self._col_save_timer.setInterval(400)
+        self._col_save_timer.timeout.connect(self._save_tree_columns)
+        header.sectionResized.connect(lambda *_: self._col_save_timer.start())
         self.tree.setAlternatingRowColors(True)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setIndentation(20)
@@ -257,6 +266,23 @@ class TreePanel(QWidget):
         layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
+
+    def _restore_tree_columns(self):
+        """Восстанавливает ширины колонок дерева из ui_state."""
+        raw = load_ui_state("tree_col_widths")
+        if not raw:
+            return
+        try:
+            widths = json.loads(raw)
+        except (ValueError, TypeError):
+            return
+        if isinstance(widths, list):
+            for i, w in enumerate(widths[:1]):
+                if isinstance(w, int) and w >= 48:
+                    self.tree.setColumnWidth(i, w)
+
+    def _save_tree_columns(self):
+        save_ui_state("tree_col_widths", json.dumps([self.tree.columnWidth(0)]))
 
     def set_servers(self, nodes_cfg):
         self.nodes_cfg = nodes_cfg
@@ -410,6 +436,14 @@ class TreePanel(QWidget):
             )
             console_act.setEnabled(vm_status == "running" and not is_template)
             menu.addAction(console_act)
+            novnc_act = QAction(tr("noVNC console"), self.tree)
+            novnc_act.setIcon(get_icon("console"))
+            novnc_act.triggered.connect(
+                lambda checked, hn=host_name, nd=node, vid=vmid:
+                    self.novnc_requested.emit(hn, nd, vid)
+            )
+            novnc_act.setEnabled(vm_status == "running" and not is_template)
+            menu.addAction(novnc_act)
             menu.addSeparator()
             migrate_act = QAction(tr("Migrate"), self.tree)
             migrate_act.setIcon(get_icon("migrate"))

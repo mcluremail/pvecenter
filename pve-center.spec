@@ -1,7 +1,7 @@
 %global pypi_name pvecenter
 
 Name:          pve-center
-Version:       2.3.1
+Version:       2.11.3
 Release:       1%{?dist}
 Summary:       Desktop client for Proxmox VE clusters
 
@@ -15,10 +15,15 @@ BuildRequires: python3-setuptools
 
 Requires:      python3
 Requires:      python3-pyside6
+Requires:      python3-proxmoxer
 Requires:      python3-requests
+Requires:      python3-urllib3
 Requires:      python3-pyqtgraph
 Requires:      python3-cryptography
+Requires:      python3-keyring
 
+# noVNC console bridge and remote-viewer console — optional features
+Recommends:    python3-websockets
 Recommends:    virt-viewer
 
 %description
@@ -42,6 +47,12 @@ install -m 644 -D debian/pve-center.desktop \
 %{_datadir}/applications/pve-center.desktop
 
 %changelog
+* Tue Sep 08 2026 Taurus McLure <taurus@mclure.ru> - 2.11.3-1
+- Sync version with pyproject (was stuck at 2.3.1).
+- Add missing Requires: python3-proxmoxer, python3-keyring, python3-urllib3.
+- Move python3-websockets to Recommends — built-in noVNC console is optional,
+  the app runs without it (fallback message in console menu).
+
 * Fri Jun 20 2026 Taurus McLure <taurus@mclure.ru> - 1.4.0-1
 - Redesign Monitoring tab: 3x2 MetricCard grid (Status/CPU/RAM/Disk/Net/Uptime)
   with progress bars + expanding chart. Replace flat parameter table.

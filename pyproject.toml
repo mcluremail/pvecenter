@@ -25,12 +25,20 @@ dependencies = [
     "PySide6>=6.5",
     "proxmoxer>=2.0",
     "requests>=2.32.0",
+    "urllib3>=1.26",
     "pyqtgraph>=0.12",
     "cryptography>=42.0.0",
     "keyring>=24.0",
+    # On Windows the app ships with bundled deps (PyInstaller build), so the
+    # noVNC console bridge must always be there; on Linux it is optional
+    # (system python) — see the "novnc" extra below.
+    "websockets>=12.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
+# Built-in noVNC console (WS bridge). Without it the app runs fine,
+# the console shows a clear "module not installed" hint.
+novnc = ["websockets>=12.0"]
 dev = ["pytest>=8.0", "pytest-qt>=4.4"]
 
 [project.urls]
@@ -45,6 +53,7 @@ include = ["pve_center*"]
 
 [tool.setuptools.package-data]
 "pve_center.ui.i18n" = ["*.json"]
+"pve_center.ui.console" = ["novnc/**/*.js", "novnc/LICENSE.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

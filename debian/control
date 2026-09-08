@@ -14,10 +14,13 @@ Package: pve-center
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends},
          python3-pyside6,
+         python3-proxmoxer,
          python3-requests,
+         python3-urllib3,
          python3-pyqtgraph,
          python3-cryptography,
-Recommends: virt-viewer
+         python3-keyring
+Recommends: virt-viewer, python3-websockets
 Description: Десктопная панель управления Proxmox VE
  PVE Center — десктопный инструмент для мониторинга и управления
  кластерами Proxmox VE. Работает через официальный API PVE.
