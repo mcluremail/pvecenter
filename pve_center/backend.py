@@ -1436,7 +1436,7 @@ class VmConsoleWorker(QRunnable):
         host_raw = config.get("host") or host_fallback
         if host_raw:
             lines.append(f"host={host_raw}")
-        ticket = config.get("ticket")
+        ticket = config.get("password") or config.get("ticket")
         if ticket:
             lines.append(f"password={ticket}")
         delete_file = config.get("delete-this-file")

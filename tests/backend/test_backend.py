@@ -557,3 +557,32 @@ class TestHaResourcesWorker:
         assert resources[0].comment == "db"
         assert resources[1].max_restart == 1  # PVE omits defaults
         assert recorded["finished"] == [True]
+
+
+class TestBuildVvLines:
+    """VNC .vv file: password field preferred (PSA-2026-00014-1), ticket as fallback."""
+
+    def test_prefers_password_field(self):
+        config = {"port": 5900, "host": "n1", "password": "pwd", "ticket": "old"}
+        lines = backend.VmConsoleWorker._build_vv_lines(config, "fallback")
+        assert lines[0] == "[virt-viewer]"
+        assert "type=vnc" in lines
+        assert "port=5900" in lines
+        assert "host=n1" in lines
+        assert "password=pwd" in lines
+        assert not any(line.startswith("password=old") for line in lines)
+
+    def test_falls_back_to_ticket(self):
+        # Old PVE (< 8.4.19 / < 9.1.9) responses have only the ticket field.
+        config = {"port": 5901, "host": "n2", "ticket": "old"}
+        lines = backend.VmConsoleWorker._build_vv_lines(config, "fallback")
+        assert "password=old" in lines
+
+    def test_no_auth_fields(self):
+        lines = backend.VmConsoleWorker._build_vv_lines({}, "fallback")
+        assert lines == ["[virt-viewer]", "type=vnc", "host=fallback"]
+
+    def test_delete_this_file_flag(self):
+        config = {"port": 5900, "ticket": "t", "delete-this-file": 1}
+        lines = backend.VmConsoleWorker._build_vv_lines(config, "fb")
+        assert "delete-this-file=1" in lines

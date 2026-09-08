@@ -268,6 +268,34 @@ class TestClusterAPI:
         api.delete_backup_job("job1", pve_major=8)
         chain_b.assert_called_with("job1")
 
+    def test_create_backup_job_pve7(self, mock_session):
+        mock_session.proxmox.cluster.backup.post = MagicMock(return_value="OK")
+        api = ClusterAPI(mock_session)
+        api.create_backup_job({"storage": "local"}, pve_major=7)
+        mock_session.proxmox.cluster.backup.post.assert_called_once_with(
+            storage="local"
+        )
+        mock_session.proxmox.cluster.jobs.post.assert_not_called()
+
+    def test_update_backup_job_pve7(self, mock_session):
+        chain = mock_session.proxmox.cluster.backup
+        chain.return_value.put = MagicMock(return_value="OK")
+        api = ClusterAPI(mock_session)
+        api.update_backup_job("job1", {"id": "job1", "schedule": "02:00"},
+                              pve_major=7)
+        chain.assert_called_with("job1")
+        chain.return_value.put.assert_called_once_with(schedule="02:00")
+        mock_session.proxmox.cluster.jobs.assert_not_called()
+
+    def test_delete_backup_job_pve7(self, mock_session):
+        chain = mock_session.proxmox.cluster.backup
+        chain.return_value.delete = MagicMock(return_value=None)
+        api = ClusterAPI(mock_session)
+        api.delete_backup_job("job1", pve_major=7)
+        chain.assert_called_with("job1")
+        chain.return_value.delete.assert_called_once()
+        mock_session.proxmox.cluster.jobs.assert_not_called()
+
 
 class TestNodeAPI:
     def test_list(self, mock_session):

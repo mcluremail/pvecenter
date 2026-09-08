@@ -22,6 +22,16 @@
   удаление), sync/verify/prune задачи (просмотр, запуск вручную)
 - ~~Server-side trash~~ — в PBS API нет публичных эндпоинтов trash (серверная фича)
 
+## Поддержка версий PVE
+- ✅ PVE 7.x — поддерживается (основная среда эксплуатации): jobs через
+  `/cluster/backup`, детект версии с fallback на 7, HA через `/cluster/ha/groups`
+- ✅ PVE 8.x — базовая линейка, полное покрытие
+- ✅ PVE 9.x — совместимость подтверждена аудитом по API-документации (2026-09):
+  breaking changes учтены — VNC password+TLS (PSA-2026-00014-1), `schedule` вместо
+  `starttime`/`dow` в backup jobs, HA groups deprecated (fallback в UI)
+- Нюансы PVE 7.0 (без 7.1+): в ответе jobs нет `schedule`, нет `download-url` —
+  UI показывает пустое расписание, загрузка ISO по URL недоступна; 7.1+ — полностью
+
 ## v3.0 — Production Desktop
 Цель: лучший desktop-клиент для управления несколькими независимыми PVE.
 
