@@ -21,12 +21,29 @@ PVE_PORT = 8006
 
 _WARN_SUPPRESSED = False
 
+# Явный прокси задаётся per-host: cfg["proxy"] (поле «Proxy» в диалоге
+# добавления сервера). Пусто/отсутствует — стандартное поведение requests:
+# env-прокси (HTTP(S)_PROXY, ALL_PROXY, no_proxy) учитываются, как в curl.
+# Явный URL полностью замещает env: trust_env=False + session.proxies,
+# иначе session-level proxies проигрывают env-прокси в requests.
+
 
 def _suppress_ssl_warnings() -> None:
     global _WARN_SUPPRESSED
     if not _WARN_SUPPRESSED:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         _WARN_SUPPRESSED = True
+
+
+def _proxy_url(cfg: dict) -> str | None:
+    """Explicit per-host proxy URL from cfg["proxy"] (empty → None)."""
+    url = str(cfg.get("proxy") or "").strip()
+    return url or None
+
+
+def _proxies(url: str | None) -> dict[str, str] | None:
+    """requests proxies dict for an explicit proxy URL (None → env default)."""
+    return {"http": url, "https": url} if url else None
 
 
 def _verify_ssl(cfg: dict) -> bool:
@@ -58,6 +75,7 @@ class ProxmoxSession:
     @property
     def proxmox(self) -> ProxmoxAPI:
         if self._proxmox is None:
+            proxy = _proxy_url(self.cfg)
             self._proxmox = ProxmoxAPI(
                 self.cfg["host"],
                 user=self.cfg["user"],
@@ -65,7 +83,15 @@ class ProxmoxSession:
                 token_value=self.cfg["token_value"],
                 verify_ssl=_verify_ssl(self.cfg),
                 timeout=self.timeout,
+                proxies=_proxies(proxy),
             )
+            if proxy:
+                # proxmoxer 2.3.0 для token-auth не применяет proxies-kwarg
+                # к запросам — фиксируем явный прокси на сессии напрямую.
+                sess = self._proxmox._store.get("session")
+                if sess is not None:
+                    sess.trust_env = False
+                    sess.proxies.update(_proxies(proxy))
         return self._proxmox
 
     def close(self) -> None:
@@ -112,6 +138,11 @@ class ProxmoxSession:
     @property
     def verify(self) -> bool:
         return _verify_ssl(self.cfg)
+
+    @property
+    def request_proxies(self) -> dict[str, str] | None:
+        """Explicit proxies for raw requests calls (None → env default)."""
+        return _proxies(_proxy_url(self.cfg))
 
     @property
     def base_url(self) -> str:

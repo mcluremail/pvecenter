@@ -10,6 +10,7 @@ from .domain.ha_resource import HaResource
 from .domain.snapshot import Snapshot
 from .domain.task import Task
 from .plugins import create_provider
+from .provider._session import _proxies
 from .ui.i18n import tr
 from .ui.vm_actions import VM_ACTION_MESSAGE_LABELS
 
@@ -70,11 +71,12 @@ def _sanitize_error(exc):
 # ----------------------------------------------------------------------
 
 
-def _pve_ticket_auth(host, user, password, verify=False):
+def _pve_ticket_auth(host, user, password, verify=False, proxy=None):
     import requests as rq
     url = f"https://{host}:{PVE_PORT}/api2/json/access/ticket"
     resp = rq.post(url, data={"username": user, "password": password},
-                   verify=verify, timeout=15, allow_redirects=False)
+                   verify=verify, timeout=15, allow_redirects=False,
+                   proxies=_proxies(proxy))
     resp.raise_for_status()
     data = resp.json().get("data", {})
     return {
@@ -83,7 +85,7 @@ def _pve_ticket_auth(host, user, password, verify=False):
     }
 
 
-def create_admin_token(host, user, password, trust_ssl=False):
+def create_admin_token(host, user, password, trust_ssl=False, proxy=None):
     """Create an API token for the specified PVE user.
     The token is created on behalf of the user — PVE audit shows
     the real operator, and permissions match their roles.
@@ -109,11 +111,16 @@ def create_admin_token(host, user, password, trust_ssl=False):
 
     try:
         sess = None
-        ticket_data = _pve_ticket_auth(host, user, password, verify=verify)
+        ticket_data = _pve_ticket_auth(host, user, password, verify=verify,
+                                       proxy=proxy)
         ticket = ticket_data["ticket"]
         csrf = ticket_data["csrf"]
         sess = rq.Session()
         sess.verify = verify
+        if proxy:
+            # Явный прокси: env-прокси не должен перебивать session-level.
+            sess.trust_env = False
+            sess.proxies.update(_proxies(proxy))
         sess.headers.update({
             "Cookie": f"PVEAuthCookie={ticket}",
             "CSRFPreventionToken": csrf,
@@ -152,6 +159,7 @@ def create_admin_token(host, user, password, trust_ssl=False):
                 f"https://{host}:{PVE_PORT}/api2/json/cluster/resources",
                 headers={"Authorization": auth_header},
                 verify=verify, timeout=10, allow_redirects=False,
+                proxies=_proxies(proxy),
             )
             if vr.status_code != 200:
                 logger.warning("verify FAILED: HTTP %s", vr.status_code)
@@ -187,18 +195,20 @@ class TokenCreationSignals(QObject):
 
 class TokenCreationWorker(QRunnable):
     """Создаёт API-токен в фоновом потоке, не блокируя UI."""
-    def __init__(self, host, user, password, trust_ssl=False):
+    def __init__(self, host, user, password, trust_ssl=False, proxy=None):
         super().__init__()
         self.host = host
         self.user = user
         self.password = password
         self.trust_ssl = trust_ssl
+        self.proxy = proxy
         self.signals = TokenCreationSignals()
 
     def run(self):
         try:
             result = create_admin_token(self.host, self.user, self.password,
-                                        trust_ssl=self.trust_ssl)
+                                        trust_ssl=self.trust_ssl,
+                                        proxy=self.proxy)
             self.password = None
             if "error" in result:
                 try:

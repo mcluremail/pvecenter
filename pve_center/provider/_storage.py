@@ -122,6 +122,7 @@ class StorageAPI:
             resp = requests.post(
                 url, headers=headers, data=data, files=files,
                 verify=self._s.verify, timeout=timeout, allow_redirects=False,
+                proxies=self._s.request_proxies,
             )
             if not resp.ok:
                 try:

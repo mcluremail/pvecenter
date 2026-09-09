@@ -78,8 +78,10 @@ class TestClusterTasksWidget:
     def test_description_column_stretches(self, qtbot, monkeypatch):
         """v2.11.2: Description used to be a fixed 250px Interactive
         column — with old saved widths the table overflowed its panel
-        at FullHD. It must stretch, and old saved widths must not
-        apply to it."""
+        at FullHD. Now every column is user-resizable: Description is
+        Interactive with content autofit (capped), and the table still
+        always fills its panel because the last column is the filler
+        (stretchLastSection). Old saved widths must not apply to them."""
 
         import pve_center.ui.widgets.cluster_tasks_widget as mod
 
@@ -90,7 +92,9 @@ class TestClusterTasksWidget:
         w = ClusterTasksWidget()
         qtbot.addWidget(w)
         h = w.table.horizontalHeader()
-        assert h.sectionResizeMode(4) == QHeaderView.Stretch
-        # Restore skips the stretch column even with old saved widths
+        assert h.sectionResizeMode(4) == QHeaderView.Interactive
+        assert h.stretchLastSection()
+        # Restore skips Description (autofit) and Status (filler)
         assert w.table.columnWidth(4) != 999
+        assert w.table.columnWidth(5) != 300
         assert w.table.columnWidth(0) == 300

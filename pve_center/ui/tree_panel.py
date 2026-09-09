@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 from datetime import timedelta
 
-from PySide6.QtCore import QMimeData, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QByteArray, QMimeData, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QBrush, QColor, QDrag
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -233,19 +233,26 @@ class TreePanel(QWidget):
 
         self.tree = GroupTreeWidget(self)
         self.tree.setColumnCount(2)
-        self.tree.setHeaderHidden(True)
+        # Заголовок нужен, чтобы колонки можно было двигать/растягивать
+        self.tree.setHeaderLabels([tr("Name"), tr("Info")])
         header = self.tree.header()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(0, QHeaderView.Interactive)
         header.setMinimumSectionSize(48)
+        header.setSectionsMovable(True)
+        header.setStyleSheet(
+            "QHeaderView::section { padding: 3px 6px; border: none;"
+            " border-bottom: 1px solid #f0f1f4; font-size: 11px; }")
         self.tree.setColumnWidth(0, 170)
+        self._last_saved_header_state = None
         self._restore_tree_columns()
-        # Сохраняем ширины колонок дерева (debounce при ручном растяжении).
+        # Сохраняем ширины/порядок колонок дерева (debounce при изменении).
         self._col_save_timer = QTimer(self)
         self._col_save_timer.setSingleShot(True)
         self._col_save_timer.setInterval(400)
         self._col_save_timer.timeout.connect(self._save_tree_columns)
         header.sectionResized.connect(lambda *_: self._col_save_timer.start())
+        header.sectionMoved.connect(lambda *_: self._col_save_timer.start())
         self.tree.setAlternatingRowColors(True)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setIndentation(20)
@@ -268,7 +275,18 @@ class TreePanel(QWidget):
         self.setLayout(layout)
 
     def _restore_tree_columns(self):
-        """Восстанавливает ширины колонок дерева из ui_state."""
+        """Восстанавливает ширины/порядок колонок дерева из ui_state."""
+        header = self.tree.header()
+        raw = load_ui_state("tree_header_state")
+        if raw:
+            try:
+                state = QByteArray.fromHex(str(raw).encode("ascii"))
+            except (ValueError, TypeError):
+                state = QByteArray()
+            if not state.isEmpty() and header.restoreState(state):
+                self._last_saved_header_state = str(raw)
+                return
+        # Фолбэк на старый ключ (сохранялась только ширина колонки 0).
         raw = load_ui_state("tree_col_widths")
         if not raw:
             return
@@ -278,11 +296,16 @@ class TreePanel(QWidget):
             return
         if isinstance(widths, list):
             for i, w in enumerate(widths[:1]):
-                if isinstance(w, int) and w >= 48:
-                    self.tree.setColumnWidth(i, w)
+                self.tree.setColumnWidth(i, int(w))
 
     def _save_tree_columns(self):
-        save_ui_state("tree_col_widths", json.dumps([self.tree.columnWidth(0)]))
+        current = bytes(self.tree.header().saveState().toHex()).decode("ascii")
+        if current == self._last_saved_header_state:
+            # Ранние sectionResized при раскладке не должны затирать
+            # сохранённое состояние промежуточными (дефолтными) значениями.
+            return
+        self._last_saved_header_state = current
+        save_ui_state("tree_header_state", current)
 
     def set_servers(self, nodes_cfg):
         self.nodes_cfg = nodes_cfg

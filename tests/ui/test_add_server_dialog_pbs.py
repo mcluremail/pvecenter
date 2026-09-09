@@ -126,3 +126,34 @@ class TestValidationFlow:
         dialog.show()
         dialog._on_validate_done("other", [])
         assert dialog.result() != QDialog.Accepted
+
+
+class TestGetConfigProxy:
+    def _pve_with_token(self, dialog):
+        dialog._token_data = {"user": "u", "token_name": "t",
+                              "token_value": "v"}
+        dialog.host_input.setText("pve.local")
+
+    def test_pbs_no_proxy_key_when_empty(self, dialog):
+        dialog.type_combo.setCurrentIndex(dialog.type_combo.findData("pbs"))
+        dialog.host_input.setText("pbs.local")
+        dialog.pwd_input.setText("secret")
+        assert "proxy" not in dialog.get_config()
+
+    def test_pbs_proxy_included(self, dialog):
+        dialog.type_combo.setCurrentIndex(dialog.type_combo.findData("pbs"))
+        dialog.host_input.setText("pbs.local")
+        dialog.pwd_input.setText("secret")
+        dialog.proxy_input.setText(" http://10.0.0.1:8888 ")
+        cfg = dialog.get_config()
+        assert cfg["proxy"] == "http://10.0.0.1:8888"
+
+    def test_pve_no_proxy_key_when_empty(self, dialog):
+        self._pve_with_token(dialog)
+        assert "proxy" not in dialog.get_config()
+
+    def test_pve_proxy_included(self, dialog):
+        self._pve_with_token(dialog)
+        dialog.proxy_input.setText("http://proxy.lan:3128")
+        cfg = dialog.get_config()
+        assert cfg["proxy"] == "http://proxy.lan:3128"

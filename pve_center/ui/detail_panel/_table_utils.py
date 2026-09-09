@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
+    QHeaderView,
     QLabel,
     QLineEdit,
     QStackedWidget,
@@ -16,7 +17,7 @@ from ...domain._format import (
 )
 from ..hover import enable_row_hover
 from ..i18n import tr
-from ..theme import Color
+from ..theme import Color, enable_column_reorder, enable_table_autofit
 from ..widgets.spinner import SpinnerWidget
 from ._constants import _HEADER_STYLE
 
@@ -79,10 +80,26 @@ def make_table(headers, col_specs, sortable=False):
     table.verticalHeader().hide()
     table.setColumnCount(len(headers))
     table.setHorizontalHeaderLabels(headers)
+    autofit_cols = []
     for col, (mode, width) in enumerate(col_specs):
+        if mode in (QHeaderView.ResizeToContents, QHeaderView.Fixed):
+            # Auto-режимы не дают тянуть колонку мышью — Interactive + autofit.
+            mode = QHeaderView.Interactive
+            autofit_cols.append(col)
+        elif mode == QHeaderView.Stretch:
+            mode = QHeaderView.Interactive
+            if col != len(col_specs) - 1:
+                # Средние Stretch-колонки подбираются по содержимому;
+                # последняя становится заполнителем (stretchLastSection).
+                autofit_cols.append(col)
         table.horizontalHeader().setSectionResizeMode(col, mode)
         if width is not None:
             table.setColumnWidth(col, width)
+    # Таблица всегда заполняет ширину панели: последняя колонка тянется.
+    table.horizontalHeader().setStretchLastSection(True)
+    enable_column_reorder(table.horizontalHeader())
+    if autofit_cols:
+        enable_table_autofit(table, autofit_cols, max_width=480)
     table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     table.horizontalHeader().setStyleSheet(_HEADER_STYLE)
     table.setAlternatingRowColors(True)

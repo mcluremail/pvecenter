@@ -1,7 +1,6 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QHeaderView,
     QProgressBar,
     QTableWidget,
     QTableWidgetItem,
@@ -14,6 +13,7 @@ from ..detail_panel._table_utils import set_empty_placeholder
 from ..hover import enable_row_hover
 from ..i18n import tr
 from ..icons import get_icon
+from ..theme import enable_column_reorder, enable_table_autofit
 from .metric_card import MetricCard
 
 
@@ -47,14 +47,12 @@ class VmPoolWidget(QWidget):
             tr("Name"), tr("Type"), tr("Disk %"), tr("RAM %"),
             tr("CPU %"), tr("Uptime")
         ])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        enable_table_autofit(self.table, [0, 1, 2, 3, 4], max_width=480)
+        # Uptime — заполнитель (Interactive + stretchLastSection).
+        self.table.horizontalHeader().setStretchLastSection(True)
 
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        enable_column_reorder(self.table.horizontalHeader())
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
         self.table.setAlternatingRowColors(True)
         enable_row_hover(self.table)

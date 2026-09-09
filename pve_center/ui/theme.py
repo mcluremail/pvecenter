@@ -7,8 +7,9 @@
 import logging
 import os
 
+from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtGui import QFont, QFontDatabase
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QHeaderView
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,70 @@ _MONO_CANDIDATES = (
     "Terminus", "Noto Sans Mono", "Cascadia Code", "Consolas",
     "Menlo", "DejaVu Sans Mono", "Liberation Mono",
 )
+
+
+def enable_column_reorder(header):
+    """Разрешает перетаскивать колонки за заголовок.
+
+    В Qt6 QHeaderView у QTableWidget создаётся с sectionsMovable=False,
+    поэтому без явного включения пользователь не может двигать колонки.
+    Возвращает header для цепочек вызовов.
+    """
+    header.setSectionsMovable(True)
+    return header
+
+
+class _AutofitGuard(QObject):
+    """Гасит автоподбор колонки после того, как пользователь потянул её заголовок."""
+
+    def __init__(self, header, state):
+        super().__init__(header)
+        self._header = header
+        self._state = state
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            col = self._header.logicalIndexAt(event.position().toPoint())
+            if 0 <= col < self._header.count():
+                self._state["cols"].discard(col)
+        return False
+
+
+def enable_table_autofit(view, cols, max_width=None):
+    """Ручной ресайз колонок с автоподбором ширины по содержимому.
+
+    В режимах ResizeToContents/Fixed/Stretch Qt не даёт менять ширину
+    колонки мышью, поэтому колонки из cols переводятся в Interactive,
+    а ширина автоматически подбирается по содержимому (с debounce) до
+    тех пор, пока пользователь не потянет заголовок этой колонки сам.
+    max_width ограничивает автоподбор (чтобы одна длинная колонка не
+    съедала всю таблицу).
+    """
+    header = (view.horizontalHeader() if hasattr(view, "horizontalHeader")
+              else view.header())
+    state = {"cols": set(cols)}
+    view.setProperty("_pve_autofit_cols", state["cols"])
+    for col in cols:
+        header.setSectionResizeMode(col, QHeaderView.Interactive)
+    timer = QTimer(view)
+    timer.setSingleShot(True)
+    timer.setInterval(60)
+
+    def _fit():
+        for col in list(state["cols"]):
+            view.resizeColumnToContents(col)
+            if max_width is not None and view.columnWidth(col) > max_width:
+                view.setColumnWidth(col, max_width)
+
+    timer.timeout.connect(_fit)
+    model = view.model()
+    if model is not None:
+        model.dataChanged.connect(timer.start)
+        model.rowsInserted.connect(timer.start)
+        model.modelReset.connect(timer.start)
+    guard = _AutofitGuard(header, state)
+    header.viewport().installEventFilter(guard)
+    return header
 
 
 def _pick_font(candidates):

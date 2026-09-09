@@ -13,7 +13,6 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QTreeWidget,
@@ -24,6 +23,7 @@ from PySide6.QtWidgets import (
 from ..domain.search import SearchResult, global_search
 from .i18n import tr
 from .icons import get_icon
+from .theme import enable_column_reorder, enable_table_autofit
 
 KEY_ROLE = Qt.UserRole + 1
 _DEBOUNCE_MS = 200
@@ -84,9 +84,9 @@ class GlobalSearchDialog(QDialog):
 
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self._input.setFocus)
 
-        self._tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self._tree.header().setSectionResizeMode(1, QHeaderView.Stretch)
-        self._tree.header().setSectionResizeMode(2, QHeaderView.Stretch)
+        enable_column_reorder(self._tree.header())
+        enable_table_autofit(self._tree, [0, 1], max_width=480)
+        self._tree.header().setStretchLastSection(True)
 
         self._input.setFocus()
 

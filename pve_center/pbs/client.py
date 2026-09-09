@@ -51,6 +51,11 @@ class PbsClient:
                 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             except Exception:  # pragma: no cover
                 pass
+        proxy = str(cfg.get("proxy") or "").strip()
+        if proxy:
+            # Явный прокси: env-прокси не должен перебивать session-level.
+            self._http.trust_env = False
+            self._http.proxies.update({"http": proxy, "https": proxy})
 
     # ── auth ─────────────────────────────────────────────────────
 

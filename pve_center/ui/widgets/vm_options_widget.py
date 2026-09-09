@@ -1,11 +1,11 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from ..detail_panel._table_utils import set_empty_placeholder
 from ..hover import enable_row_hover
 from ..i18n import tr
-from ..theme import Color
+from ..theme import Color, enable_column_reorder, enable_table_autofit
 from ..vm_config_display import OPT_DEFAULTS, get_editor_spec, get_options_rows
 from ..vm_config_editor_dialog import VmConfigEditorDialog
 from ..vm_device_editors import VmBootdiskEditorDialog, VmBootEditorDialog, VmStartupEditorDialog
@@ -33,9 +33,11 @@ class VmOptionsWidget(QWidget):
         self.table.verticalHeader().hide()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels([tr("Parameter"), tr("Value")])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        enable_table_autofit(self.table, [0])
+        # Value — заполнитель (Interactive + stretchLastSection: тянется мышью).
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        enable_column_reorder(self.table.horizontalHeader())
         self.table.setAlternatingRowColors(False)
         self.table.setShowGrid(False)
         self.table.setStyleSheet(

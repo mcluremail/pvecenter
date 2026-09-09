@@ -125,6 +125,42 @@ class TestSession:
             assert s._proxmox is mock_inst
             mock_px.assert_called_once()
 
+    def test_session_no_proxy_by_default(self):
+        with patch("pve_center.provider._session.ProxmoxAPI") as mock_px:
+            mock_inst = MagicMock()
+            sess = MagicMock()
+            sess.trust_env = True
+            mock_inst._store = {"session": sess}
+            mock_px.return_value = mock_inst
+
+            s = ProxmoxSession(self._cfg())
+            _ = s.proxmox
+            assert mock_px.call_args.kwargs["proxies"] is None
+            assert sess.trust_env is True  # default preserved
+            sess.proxies.update.assert_not_called()
+
+    def test_session_explicit_proxy(self):
+        with patch("pve_center.provider._session.ProxmoxAPI") as mock_px:
+            mock_inst = MagicMock()
+            sess = MagicMock()
+            mock_inst._store = {"session": sess}
+            mock_px.return_value = mock_inst
+
+            s = ProxmoxSession(self._cfg(proxy="http://10.0.0.1:8888"))
+            _ = s.proxmox
+            expected = {"http": "http://10.0.0.1:8888", "https": "http://10.0.0.1:8888"}
+            assert mock_px.call_args.kwargs["proxies"] == expected
+            assert sess.trust_env is False
+            sess.proxies.update.assert_called_once_with(expected)
+
+    def test_session_request_proxies_default_none(self):
+        s = ProxmoxSession(self._cfg())
+        assert s.request_proxies is None
+
+    def test_session_request_proxies_explicit(self):
+        s = ProxmoxSession(self._cfg(proxy=" http://p:3128 "))
+        assert s.request_proxies == {"http": "http://p:3128", "https": "http://p:3128"}
+
     def test_session_close_idempotent(self):
         s = ProxmoxSession(self._cfg())
         s._proxmox = MagicMock()

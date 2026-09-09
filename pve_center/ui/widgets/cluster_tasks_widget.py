@@ -19,7 +19,7 @@ from ...config import load_ui_state, save_ui_state
 from ...domain.task import Task
 from ..hover import enable_row_hover
 from ..i18n import tr
-from ..theme import Color
+from ..theme import Color, enable_column_reorder, enable_table_autofit
 
 TASK_COL_WIDTHS_KEY = "task_col_widths"
 
@@ -135,12 +135,12 @@ class ClusterTasksWidget(QWidget):
         h.setSectionResizeMode(QHeaderView.Interactive)
         h.setSectionResizeMode(0, QHeaderView.Interactive)
         h.setSectionResizeMode(1, QHeaderView.Interactive)
-        h.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        # Description stretches so the table always fits the panel width
-        # (no horizontal scrollbar at FullHD).
-        h.setSectionResizeMode(4, QHeaderView.Stretch)
+        # Все колонки тянутся мышью; Status (последняя) — заполнитель,
+        # поэтому таблица по-прежнему всегда заполняет ширину панели.
         h.setSectionResizeMode(5, QHeaderView.Interactive)
+        enable_column_reorder(h)
+        enable_table_autofit(self.table, [2, 3, 4], max_width=480)
+        h.setStretchLastSection(True)
 
         self.table.setColumnWidth(0, 155)
         self.table.setColumnWidth(1, 155)
@@ -445,7 +445,9 @@ class ClusterTasksWidget(QWidget):
             widths = json.loads(raw)
             if isinstance(widths, list) and len(widths) == self.table.columnCount():
                 for c, w in enumerate(widths):
-                    if c == 4:  # stretch column — always fills the panel
+                    if c in (4, 5):
+                        # 4 — Description: автоподбор по содержимому;
+                        # 5 — Status: заполнитель (stretchLastSection).
                         continue
                     self.table.setColumnWidth(c, w)
         except (TypeError, ValueError):

@@ -116,8 +116,15 @@ class AddServerDialog(QDialog):
         self.trust_ssl_cb.setToolTip(tr("Accept self-signed certificates. Check only for internal PVE hosts with self-signed certs."))
         conn_grid.addWidget(self.trust_ssl_cb, 6, 0, 1, 2)
 
+        proxy_lbl = QLabel(tr("Proxy:"))
+        proxy_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        conn_grid.addWidget(proxy_lbl, 7, 0)
+        self.proxy_input = QLineEdit()
+        self.proxy_input.setPlaceholderText(tr("http://host:port — empty uses system proxy settings"))
+        conn_grid.addWidget(self.proxy_input, 7, 1)
+
         self.auth_btn = QPushButton(tr("Get token"))
-        conn_grid.addWidget(self.auth_btn, 7, 0, 1, 2)
+        conn_grid.addWidget(self.auth_btn, 8, 0, 1, 2)
         self.auth_btn.clicked.connect(self._on_auth)
 
         conn_grid.setColumnStretch(1, 1)
@@ -285,7 +292,8 @@ class AddServerDialog(QDialog):
         self._set_status(tr("Connecting and creating token..."), Color.GRAY_500)
 
         worker = TokenCreationWorker(host, user, password,
-                                     trust_ssl=self.trust_ssl_cb.isChecked())
+                                     trust_ssl=self.trust_ssl_cb.isChecked(),
+                                     proxy=self.proxy_input.text().strip() or None)
         self._active_workers.add(worker)
         worker.signals.token_ready.connect(self._on_token_ready)
         worker.signals.token_error.connect(self._on_token_error)
@@ -333,9 +341,10 @@ class AddServerDialog(QDialog):
         host = self.host_input.text().strip()
         name = self.name_input.text().strip() or host
         cluster_text = self.cluster_input.text().strip()
+        proxy = self.proxy_input.text().strip()
 
         if self._is_pbs():
-            return {
+            cfg = {
                 "name": name,
                 "type": "pbs",
                 "host": host,
@@ -345,6 +354,9 @@ class AddServerDialog(QDialog):
                 "token_value": self.pwd_input.text(),
                 "trust_ssl": self.trust_ssl_cb.isChecked(),
             }
+            if proxy:
+                cfg["proxy"] = proxy
+            return cfg
 
         cfg = {
             "name": name,
@@ -354,6 +366,8 @@ class AddServerDialog(QDialog):
             "token_value": self._token_data["token_value"],
             "trust_ssl": self.trust_ssl_cb.isChecked(),
         }
+        if proxy:
+            cfg["proxy"] = proxy
 
         if self.cluster_rep_cb.isChecked():
             cfg["cluster_rep"] = True

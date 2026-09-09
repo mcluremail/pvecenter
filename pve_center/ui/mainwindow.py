@@ -251,15 +251,17 @@ class MainWindow(QMainWindow):
 
         # Поколение hard refresh — предотвращает race condition при повторных refresh_data()
         self._refresh_gen = 0
+        self._hard_pending: set = set()
 
         # Переменные для мягкого обновления
         self.last_refresh_ts = 0
         self.refresh_interval = 5
         self._soft_refresh_running = False
         self._soft_refresh_start = 0
-        self._soft_refresh_timeout = 30
+        self._soft_refresh_timeout = 90
         self._soft_gen = 0
         self._soft_counter = 0
+        self._soft_expected = 0
         self._soft_had_errors = False
 
         # Восстанавливаем состояние окна: геометрия, maximized, последний выбранный элемент
@@ -1158,6 +1160,7 @@ class MainWindow(QMainWindow):
         dialog.host_input.setEnabled(False)
         dialog.user_input.setText(cfg.get("user", "root@pam"))
         dialog.trust_ssl_cb.setChecked(bool(cfg.get("trust_ssl", True)))
+        dialog.proxy_input.setText(str(cfg.get("proxy") or ""))
         if dialog.exec() != AddServerDialog.Accepted:
             return
         new_cfg = dialog.get_config()
@@ -1239,9 +1242,11 @@ class MainWindow(QMainWindow):
 
         self._refresh_gen += 1
         refresh_gen = self._refresh_gen
+        self._hard_pending = set()
 
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
+            self._hard_pending.add(worker)
             worker.signals.result_ready.connect(
                 lambda data, w=worker, g=refresh_gen: self.on_worker_finished(data, w, g)
             )
@@ -1279,6 +1284,13 @@ class MainWindow(QMainWindow):
     def on_worker_finished(self, data, worker=None, gen=0):
         if gen != 0 and gen != self._refresh_gen:
             return
+        # Убираем воркер из _workers сразу: его finished (queued) придёт
+        # позже, чем собственный result_ready, и без этого сброса множество
+        # _workers никогда не пустеет в момент проверки ниже — финальная
+        # ветка (сохранение кэша, сброс offline) не выполняется никогда.
+        self._workers.discard(worker)
+        if gen == self._refresh_gen:
+            self._hard_pending.discard(worker)
         status = data.get("status", "error")
         host = data.get("host", "")
         if status == "ok":
@@ -1309,7 +1321,15 @@ class MainWindow(QMainWindow):
         else:
             is_cluster_err = worker.node_cfg.get("cluster_rep", False) if worker else False
             err_msg = data.get("error", "Unknown error")
-            if not self._node_repo.get(host, host):
+            existing_nodes = self._node_repo.get_by_host(host)
+            if existing_nodes:
+                # Нода этого хоста уже есть (короткое имя из кэша или
+                # успешного fetch) — помечаем её ошибкой, а не добавляем
+                # дубликат с именем из конфига (FQDN).
+                for old in existing_nodes:
+                    self._node_repo.add(
+                        replace(old, status=NodeStatus.ERROR, error=err_msg))
+            else:
                 err_node = {
                     "node": host,
                     "status": "error",
@@ -1354,8 +1374,10 @@ class MainWindow(QMainWindow):
             self._tasks_started = True
             QTimer.singleShot(0, self.refresh_cluster_tasks)
 
-        fetch_workers = [w for w in self._workers if isinstance(w, FetchWorker)]
-        if not fetch_workers:
+        # Финальная ветка — когда все воркеры ЭТОГО поколения отчитались
+        # (успехом или ошибкой). Общее множество _workers тут не годится:
+        # soft-воркеры и воркеры деталей держат его непустым постоянно.
+        if not self._hard_pending:
             # Выбираем первый элемент до финальной перестройки дерева —
             # сводка кластера появляется сразу, не дожидаясь _build_tree с сотнями VM
             if not getattr(self, '_first_selection_done', False):
@@ -1444,6 +1466,7 @@ class MainWindow(QMainWindow):
         active_cfgs = [cfg for cfg in self.nodes_cfg
                        if not cfg.get("skip", False)
                        and cfg.get("type", "pve") != "pbs"]
+        self._soft_expected = len(active_cfgs)
         if not active_cfgs:
             self._soft_refresh_running = False
             return
@@ -1494,7 +1517,9 @@ class MainWindow(QMainWindow):
                 self._soft_node_repo.add(DomainNode.from_pve(err_node, host, "", False))
 
         self._soft_counter += 1
-        active_count = len([cfg for cfg in self.nodes_cfg if not cfg.get("skip", False)])
+        # PBS-серверы не участвуют в soft refresh, но раньше попадали в
+        # active_count — цикл не завершался и кэш не сохранялся.
+        active_count = self._soft_expected
 
         if self._soft_counter >= active_count:
             if self._soft_node_repo or self._soft_vm_repo:

@@ -477,6 +477,16 @@ def load_tasks_cache() -> list[dict]:
 
 def save_resources_cache(nodes, vms, storages):
     try:
+        # Заглушки ошибок текущей сессии (status="error") не кэшируются:
+        # кэш — «последние успешные данные», а заглушки при загрузке
+        # порождают дубликаты в дереве (реальная нода хоста приходит
+        # с коротким именем, заглушка создаётся с FQDN из конфига).
+        nodes = [
+            dict(o) if not isinstance(o, dict) else o
+            for o in nodes
+            if (o.get("status") if isinstance(o, dict)
+                else getattr(o, "status_value", "")) != "error"
+        ]
         data = json.dumps(
             {
                 "nodes": [dict(o) if not isinstance(o, dict) else o for o in nodes],

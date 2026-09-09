@@ -2,11 +2,11 @@ from datetime import datetime
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from ..hover import enable_row_hover
 from ..i18n import tr
-from ..theme import Color
+from ..theme import Color, enable_column_reorder, enable_table_autofit
 
 
 class VmTaskHistoryWidget(QWidget):
@@ -19,13 +19,12 @@ class VmTaskHistoryWidget(QWidget):
             tr("Start time"), tr("End time"), tr("Status"),
             tr("User"), tr("Description")
         ])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        enable_table_autofit(self.table, [0, 1, 2, 3])
+        # Description — заполнитель (Interactive + stretchLastSection).
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.horizontalHeader().setStyleSheet("QHeaderView::section { padding-left: 4px; }")
+        enable_column_reorder(self.table.horizontalHeader())
 
         self.table.setWordWrap(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)

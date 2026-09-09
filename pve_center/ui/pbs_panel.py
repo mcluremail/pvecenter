@@ -14,7 +14,6 @@ from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QMenu,
     QProgressBar,
@@ -30,7 +29,7 @@ from PySide6.QtWidgets import (
 from ..pbs.workers import PbsApiWorker
 from .i18n import tr
 from .icons import get_icon
-from .theme import Color
+from .theme import Color, enable_column_reorder
 
 VERIFY_COLORS = {
     "ok": Color.STATUS_OK,
@@ -104,6 +103,8 @@ class PbsPanel(QWidget):
         self._ds_table.setSelectionMode(QTableWidget.SingleSelection)
         self._ds_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._ds_table.itemDoubleClicked.connect(self._on_ds_dblclicked)
+        enable_column_reorder(self._ds_table.horizontalHeader())
+        self._ds_table.horizontalHeader().setStretchLastSection(True)
         ds_page = QWidget()
         ds_layout = QVBoxLayout(ds_page)
         ds_layout.setContentsMargins(0, 4, 0, 0)
@@ -181,6 +182,8 @@ class PbsPanel(QWidget):
         self._snap_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._snap_table.customContextMenuRequested.connect(
             self._on_snap_menu)
+        enable_column_reorder(self._snap_table.horizontalHeader())
+        self._snap_table.horizontalHeader().setStretchLastSection(True)
         v.addWidget(self._snap_table, 1)
         self._tabs.addTab(w, tr("Snapshots"))
 
@@ -198,6 +201,8 @@ class PbsPanel(QWidget):
         self._jobs_table.setSelectionMode(QTableWidget.SingleSelection)
         self._jobs_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._jobs_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        enable_column_reorder(self._jobs_table.horizontalHeader())
+        self._jobs_table.horizontalHeader().setStretchLastSection(True)
         self._jobs_table.customContextMenuRequested.connect(self._on_job_menu)
         v.addWidget(self._jobs_table, 1)
 
@@ -358,9 +363,6 @@ class PbsPanel(QWidget):
                 _fmt_size(ds.total_bytes)))
             self._ds_table.setItem(row, 4, QTableWidgetItem(ds.path))
         self._ds_table.resizeColumnsToContents()
-        if self._ds_table.columnCount():
-            self._ds_table.horizontalHeader().setSectionResizeMode(
-                4, QHeaderView.Stretch)
 
     def _on_ds_dblclicked(self, item, _col):
         row = item.row()
@@ -401,8 +403,6 @@ class PbsPanel(QWidget):
                 _fmt_size(s.size_bytes)))
             self._snap_table.setItem(row, 4, QTableWidgetItem(s.comment))
         self._snap_table.resizeColumnsToContents()
-        self._snap_table.horizontalHeader().setSectionResizeMode(
-            4, QHeaderView.Stretch)
         if self._ns_combo.count() <= 1:
             self._load_namespaces()
 
