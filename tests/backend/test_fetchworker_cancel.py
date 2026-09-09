@@ -9,7 +9,7 @@ from tests.backend.test_backend import FakeProvider
 
 
 def _make_worker(monkeypatch, provider):
-    monkeypatch.setattr(backend, "create_provider", lambda cfg, timeout=15: provider)
+    monkeypatch.setattr(backend.fetch, "create_provider", lambda cfg, timeout=15: provider)
     return FetchWorker({"name": "h1"})
 
 

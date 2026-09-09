@@ -92,6 +92,59 @@ class TestErrors:
         assert isinstance(result, ProxmoxApiError)
         assert result.code == "api"
 
+
+class FakeResourceException(Exception):
+    """Имитация proxmoxer ResourceException (status_code + сообщение)."""
+
+    def __init__(self, status_code, status_message, content=""):
+        self.status_code = status_code
+        super().__init__(f"{status_code} {status_message}: {content}".strip())
+
+
+class TestAnyeventErrors:
+    """595-599 — ответы pveproxy: классифицируются как сетевые, с подсказкой."""
+
+    def test_595_by_status_code_attr(self):
+        exc = FakeResourceException(595, "Errors during connection establishment, proxy handshake", "ENXIO")
+        result = from_exception(exc)
+        assert isinstance(result, ProxmoxNetworkError)
+        assert "pvedaemon" in str(result)
+        assert "HTTP 595" in str(result)
+
+    def test_596_tls_hint(self):
+        exc = FakeResourceException(596, "Errors during TLS negotiation, request sending and header processing")
+        result = from_exception(exc)
+        assert isinstance(result, ProxmoxNetworkError)
+        assert "certificates" in str(result)
+
+    def test_all_codes_network_class(self):
+        for code in range(595, 600):
+            result = from_exception(FakeResourceException(code, "whatever"))
+            assert isinstance(result, ProxmoxNetworkError), code
+
+    def test_message_prefix_fallback_without_attr(self):
+        exc = Exception("595 Errors during connection establishment, proxy handshake: ENXIO")
+        result = from_exception(exc)
+        assert isinstance(result, ProxmoxNetworkError)
+        assert "pvedaemon" in str(result)
+
+    def test_no_false_positive_on_vmid(self):
+        exc = Exception("VM 595 config not found")
+        result = from_exception(exc)
+        assert not isinstance(result, ProxmoxNetworkError)
+
+    def test_parse_pve_error_anyevent(self):
+        from pve_center.ui.utils import parse_pve_error
+
+        msg = parse_pve_error("595 Errors during connection establishment, proxy handshake: ENXIO")
+        assert "pvedaemon" in msg or "pvedaemon" in msg.lower()
+        assert "HTTP 595" in msg
+
+    def test_parse_pve_error_no_false_positive(self):
+        from pve_center.ui.utils import parse_pve_error
+
+        assert parse_pve_error("VM 595 config not found") == "VM 595 config not found"
+
 # -- _session tests --
 
 

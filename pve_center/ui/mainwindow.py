@@ -35,6 +35,8 @@ from ..backend import (
     FetchWorker,
     delete_host_token,
 )
+from ..backend.events import Event, EventBus
+from ..backend.refresh import RefreshCoordinator
 from ..config import (
     export_config,
     import_config,
@@ -249,19 +251,15 @@ class MainWindow(QMainWindow):
         self._tasks_gen = 0
         self._tasks_started = False
 
-        # Поколение hard refresh — предотвращает race condition при повторных refresh_data()
-        self._refresh_gen = 0
-        self._hard_pending: set = set()
+        # Поколения hard/soft refresh, pending и guard-и — в координаторе
+        self._refresh = RefreshCoordinator(soft_timeout=90)
+
+        # Шина событий (seed v3.0): продюсеры публикуют, панели подписываются
+        self._events = EventBus()
 
         # Переменные для мягкого обновления
         self.last_refresh_ts = 0
         self.refresh_interval = 5
-        self._soft_refresh_running = False
-        self._soft_refresh_start = 0
-        self._soft_refresh_timeout = 90
-        self._soft_gen = 0
-        self._soft_counter = 0
-        self._soft_expected = 0
         self._soft_had_errors = False
 
         # Восстанавливаем состояние окна: геометрия, maximized, последний выбранный элемент
@@ -1199,10 +1197,8 @@ class MainWindow(QMainWindow):
 
     def refresh_data(self):
         # Отменяем все pending soft_refresh — их результаты устарели
-        self._soft_gen += 1
-        self._soft_refresh_running = False
+        self._refresh.reset_soft()
         self._soft_refresh_active = False
-        self._soft_counter = 0
         self._soft_had_errors = False
         self._soft_node_repo.clear()
         self._soft_vm_repo.clear()
@@ -1240,13 +1236,11 @@ class MainWindow(QMainWindow):
                        if not cfg.get("skip", False)
                        and cfg.get("type", "pve") != "pbs"]
 
-        self._refresh_gen += 1
-        refresh_gen = self._refresh_gen
-        self._hard_pending = set()
+        refresh_gen = self._refresh.begin_hard()
 
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
-            self._hard_pending.add(worker)
+            self._refresh.track_hard(worker)
             worker.signals.result_ready.connect(
                 lambda data, w=worker, g=refresh_gen: self.on_worker_finished(data, w, g)
             )
@@ -1282,15 +1276,14 @@ class MainWindow(QMainWindow):
 
     @Slot(dict)
     def on_worker_finished(self, data, worker=None, gen=0):
-        if gen != 0 and gen != self._refresh_gen:
+        if not self._refresh.hard_result_current(gen):
             return
         # Убираем воркер из _workers сразу: его finished (queued) придёт
         # позже, чем собственный result_ready, и без этого сброса множество
         # _workers никогда не пустеет в момент проверки ниже — финальная
         # ветка (сохранение кэша, сброс offline) не выполняется никогда.
         self._workers.discard(worker)
-        if gen == self._refresh_gen:
-            self._hard_pending.discard(worker)
+        self._refresh.hard_done(worker, gen)
         status = data.get("status", "error")
         host = data.get("host", "")
         if status == "ok":
@@ -1377,7 +1370,7 @@ class MainWindow(QMainWindow):
         # Финальная ветка — когда все воркеры ЭТОГО поколения отчитались
         # (успехом или ошибкой). Общее множество _workers тут не годится:
         # soft-воркеры и воркеры деталей держат его непустым постоянно.
-        if not self._hard_pending:
+        if not self._refresh.hard_pending_count:
             # Выбираем первый элемент до финальной перестройки дерева —
             # сводка кластера появляется сразу, не дожидаясь _build_tree с сотнями VM
             if not getattr(self, '_first_selection_done', False):
@@ -1389,7 +1382,6 @@ class MainWindow(QMainWindow):
                 node_repo=self._node_repo, vm_repo=self._vm_repo,
             )
             self.last_refresh_ts = time.time()
-            self._soft_refresh_start = time.time()
             self._update_status_bar()
             from ..config import save_resources_cache
             save_resources_cache(
@@ -1417,6 +1409,11 @@ class MainWindow(QMainWindow):
             if old is not None and old != status:
                 display = node.display_name or node.node
                 self._notifications.host_status_changed(display, old, status)
+                self._events.publish(Event(
+                    "node.status_changed",
+                    {"node": node.node, "host": node.host_name,
+                     "display": display, "old": old, "new": status},
+                ))
             self._last_host_statuses[key] = status
 
         for vm in vms:
@@ -1426,6 +1423,11 @@ class MainWindow(QMainWindow):
             if old is not None and old != status:
                 vm_name = vm.name or f"VM {vm.vmid}"
                 self._notifications.vm_status_changed(vm_name, vm.host_name, status)
+                self._events.publish(Event(
+                    "vm.status_changed",
+                    {"vmid": vm.vmid, "host": vm.host_name, "name": vm_name,
+                     "old": old, "new": status},
+                ))
             self._last_vm_statuses[key] = status
 
     # ------------------------------------------------------------
@@ -1435,40 +1437,32 @@ class MainWindow(QMainWindow):
         now = time.time()
         if now - self.last_refresh_ts < self.refresh_interval:
             return
-        if self._soft_refresh_running:
-            if now - self._soft_refresh_start > self._soft_refresh_timeout:
-                self._soft_gen += 1
-                self._soft_refresh_running = False
+        if self._refresh.soft_running:
+            if self._refresh.soft_timed_out(now):
+                self._refresh.reset_soft()
                 self._soft_refresh_active = False
-                self._soft_counter = 0
                 self._soft_node_repo.clear()
                 self._soft_vm_repo.clear()
                 self._soft_storage_repo.clear()
             else:
                 return
         # Atomic guard: claim ownership before any nested event loop can fire.
-        self._soft_refresh_running = True
         self._soft_refresh_active = True
-        my_gen = self._soft_gen + 1
-        self._soft_gen = my_gen
-        soft_gen = my_gen
         if not self._spin_timer.isActive():
             self._spin_timer.start()
-        self._soft_refresh_start = now
         self.last_refresh_ts = now
 
         self._soft_node_repo.clear()
         self._soft_vm_repo.clear()
         self._soft_storage_repo.clear()
-        self._soft_counter = 0
         self._soft_had_errors = False
 
         active_cfgs = [cfg for cfg in self.nodes_cfg
                        if not cfg.get("skip", False)
                        and cfg.get("type", "pve") != "pbs"]
-        self._soft_expected = len(active_cfgs)
+        soft_gen = self._refresh.begin_soft(len(active_cfgs), now)
         if not active_cfgs:
-            self._soft_refresh_running = False
+            self._refresh.finish_soft()
             return
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
@@ -1479,7 +1473,7 @@ class MainWindow(QMainWindow):
 
     @Slot(dict)
     def on_soft_refresh_result(self, data, worker=None, gen=0):
-        if gen != self._soft_gen:
+        if not self._refresh.soft_result_current(gen):
             return
         status = data.get("status", "error")
         host = data.get("host", "")
@@ -1516,12 +1510,9 @@ class MainWindow(QMainWindow):
                 }
                 self._soft_node_repo.add(DomainNode.from_pve(err_node, host, "", False))
 
-        self._soft_counter += 1
         # PBS-серверы не участвуют в soft refresh, но раньше попадали в
         # active_count — цикл не завершался и кэш не сохранялся.
-        active_count = self._soft_expected
-
-        if self._soft_counter >= active_count:
+        if self._refresh.soft_result(gen):
             if self._soft_node_repo or self._soft_vm_repo:
                 try:
                     old_sig = _repo_signature(
@@ -1578,8 +1569,7 @@ class MainWindow(QMainWindow):
             self._soft_node_repo.clear()
             self._soft_vm_repo.clear()
             self._soft_storage_repo.clear()
-            self._soft_counter = 0
-            self._soft_refresh_running = False
+            self._refresh.finish_soft()
             self._soft_refresh_active = False
 
     # ------------------------------------------------------------

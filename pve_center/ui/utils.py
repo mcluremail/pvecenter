@@ -31,6 +31,18 @@ def parse_pve_error(err):
     if not err:
         return ""
     err_lower = err.lower()
+    # Псевдо-статусы 595-599 (AnyEvent::HTTP): это ОТВЕТЫ pveproxy —
+    # проблема на стороне сервера, а не клиента или его прокси.
+    m = re.match(r"^(59[5-9])\b", err.strip())
+    if m:
+        hints = {
+            "595": tr("PVE web service cannot reach the PVE API backend (pvedaemon)"),
+            "596": tr("PVE web service TLS error — check node certificates (pveproxy)"),
+            "597": tr("PVE web service error while receiving response body"),
+            "598": tr("Request aborted inside PVE web service"),
+            "599": tr("PVE web service could not process the request"),
+        }
+        return f"{hints[m.group(1)]} (HTTP {m.group(1)})"
     if "permission check failed" in err_lower:
         m = re.search(r"Permission check failed\s*\(([^)]+)\)", err)
         if m:
