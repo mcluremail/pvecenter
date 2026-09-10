@@ -16,7 +16,7 @@ Monitor clusters and hosts, manage virtual machines and containers, browse Proxm
 | Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 | Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
 
-Latest release: [v2.11.3](https://github.com/mcluremail/pvecenter/releases/tag/v2.11.3)
+Latest release: [v2.13.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.13.0)
 
 ## Changelog
 
@@ -25,14 +25,15 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 ## Features
 
 **Monitoring**
-- CPU, RAM, network, and disk usage charts (RRD data from PVE)
+- CPU, RAM, network, and disk usage charts (RRD data from PVE); arbitrary time range (Custom From/To) and CSV export for VM, host and storage charts
 - VM pool summary with resource progress bars
 - Storage: aggregated overview, per-node detail, fill-level chart
 - Storage content: backups, VM disks, ISO images, templates
 - Snapshots — all snapshots on a host in a single table
 - VM hardware configuration, options, task history
 - VM hardware management: add/remove/edit devices (disk, CD/DVD, network, USB, PCI, serial, EFI, TPM) with hotplug awareness
-- Storage file operations: upload, move, remove files on storage content tables
+- Storage management: create, edit and delete cluster-wide storage definitions (9 common plugins, content types, node restriction) from the tree context menu
+- Storage file operations: upload, copy, move, remove files on storage content tables
 - Host network interfaces, PVE services, disks (with FC multipath dedup)
 - Health check tab: CPU/mem/disk thresholds, critical service status, subscription & apt updates
 - Status indicators with colored markers (green, red, yellow)
@@ -42,6 +43,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Bulk actions: multi-select VMs in the tree (Ctrl/Shift+click) and mass Start / Shutdown / Reboot / Stop with progress dialog and per-VM results
 - Snapshot rollback: revert a VM/container to a snapshot from the Snapshots tab (guarded for the pseudo-snapshot "current")
 - Create Virtual Machines: dialog with CPU, RAM, disk, network settings — right from the node context menu
+- Cluster operations: create a cluster from a standalone host and add a node to an existing cluster (peer hostname, root password, fingerprint, corosync link0, votes) via context menus
 - Migrate QEMU VMs between cluster nodes (with local disks option)
 - Clone QEMU VMs and LXC containers (full or linked, target node, storage selection), clone from templates, convert VM ↔ template
 - SPICE console (requires virt-viewer)
@@ -67,7 +69,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Audit log filters: text search + status filter (All/OK/Errors/Running)
 
 **Interface**
-- Object tree: one flat, name-sorted top level — user groups, clusters and standalone hosts → Hosts → VMs/Containers with color status indicators; templates get a distinct icon; "Hosts"/"Storages" view modes
+- Object tree: one flat, name-sorted top level — user groups, clusters and standalone hosts → Hosts → VMs/Containers with color status indicators; templates get a distinct icon; "Hosts"/"Storages"/"Backup servers" view modes; shared cluster storages show per-node usage rows
 - User-defined host groups: named groups at the tree top level, assign hosts/clusters via context menu or drag&drop; clicking a group shows an aggregated summary
 - Tree notes: short per-item note (host, cluster, group, VM, storage) in a muted second column; host notes default to the host FQDN
 - Global search (Ctrl+F): find VMs, hosts, pools and storages across all clusters and jump to the object in the tree

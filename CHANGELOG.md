@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.13.0 — cluster create/join via UI, storage management, stabilization (last 2.x)
+
+**New features**
+- Cluster operations via UI: create a cluster from a standalone node ("Create cluster…" host menu, optional corosync link0) and add a node to an existing cluster ("Add node to cluster…" cluster menu — peer hostname, root password, fingerprint, link0, votes); long-running join runs in a worker with 10-minute timeout
+- Storage management (B4 completion): create, edit and delete cluster-wide storage definitions from the tree context menu — dialog for the 9 most common plugins (dir, nfs, cifs, zfspool, lvm, lvmthin, rbd, btrfs, pbs) with content types, node restriction and enable flag; volume copy added next to move (move-content API with `delete=0`)
+- Metrics history (B11): arbitrary time range — "Custom" in the timeframe combo opens a From/To dialog; the smallest rrddata preset covering the span is fetched and filtered client-side; CSV export for VM, host and storage charts
+- Backup servers view: PBS servers moved into a dedicated tree mode ("Backup servers view"), hosts/storages views are PVE-only; shared cluster storages now show per-node rows (usage may differ per node)
+- Styling: accent color reserved for primary actions (Start, Create VM); Console and menu buttons use a neutral palette
+
+**Bug fixes**
+- Audit 2026-09-10 (E1): the cluster join worker received a stripped candidate dict without host/user/password — the join could not connect to the joinee and the cluster mark was never saved; candidates now carry full host configs
+- First tree selection no longer freezes the UI when it races the chunked detail-tab build (synchronous tab finishing deferred behind `all_tabs_built`)
+
+**Internal**
+- i18n: 51 keys translated in all 5 locales (ru/es/fr/ar/zh), key parity restored (1245 keys), i18n version 31
+- Incremental audit per `docs/AUDIT_PROCESS.md` (`docs/AUDIT_2026-09-10.md`, tag `audit/2026-09-10`)
+- 806 tests (+76), ruff clean; Python 3.10–3.12
+
 ## v2.12.0 — Proxmox Backup Server integration, built-in noVNC console, backend package
 
 **New features**

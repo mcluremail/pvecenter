@@ -36,9 +36,14 @@ Export/import — encrypted bundle с паролем.
 - Add/remove devices: disk, cdrom, net, usb, pci, serial, efi, tpm
 - Валидация перед применением
 
-### B4. Storage operations ✅ (v2.8.x)
+### B4. Storage operations ✅ (v2.8.x; CRUD — v2.13.0)
 - Перемещение диска между storage (`POST /nodes/{node}/qemu/{vmid}/move_disk`)
 - Resize диска (`PUT /nodes/{node}/qemu/{vmid}/resize`)
+- Копирование volume (`POST .../move-volume` с delete=0)
+- CRUD storage-определений кластера: создание/редактирование/удаление из
+  контекстного меню дерева (`GET/POST/PUT/DELETE /storage` — НЕ
+  `/cluster/storage`, такого эндпоинта в PVE нет), диалог для 9 основных
+  плагинов: dir, nfs, cifs, zfspool, lvm, lvmthin, rbd, btrfs, pbs
 
 ### B5. HA management ✅ (v2.9.x, main)
 HA-таб: группы и ресурсы, добавление/удаление ВМ в HA, контекстное меню.
@@ -86,14 +91,25 @@ CRUD сетевых интерфейсов хоста, apply/revert, расши�
 - Просмотр статуса репликации
 - Создание/удаление replication jobs
 
-### B11. Metrics history
+### B11. Metrics history ✅ (v2.13.0)
 Графики за произвольный период (не только hour/day/week/...).
-- `GET /nodes/{node}/rrddata?timeframe=...` с custom timeframe
-- DatePicker для выбора периода
-- Export данных в CSV
+- PVE `rrddata` принимает только пресеты — «Custom» в комбобоксе открывает
+  диалог From/To; запрашивается минимальный пресет, покрывающий диапазон,
+  точки фильтруются на клиенте (`ui/widgets/time_range.py`)
+- Export данных в CSV (VM/host/storage графики, union времён по сериям)
 
-### B12a. Add node to cluster (low priority)
-Добавление ноды в кластер через UI (`pvecm add`).
+### B12a. Add node to cluster ✅ (v2.13.0)
+Добавление ноды в кластер через UI (`POST /cluster/config/join` на joinee).
+Контекстное меню кластера «Add node to cluster…»: выбор ноды-кандидата,
+hostname/пароль члена кластера, fingerprint, link0, votes; после успеха нода
+помечается кластером в конфиге. Воркер с таймаутом 10 минут (join блокирует
+joinee до завершения).
+
+### B12b. Create cluster ✅ (v2.13.0)
+Создание кластера из standalone-хоста (`POST /cluster/config`): контекстное
+меню standalone-хоста «Create cluster…», имя кластера (проверка формата
+`pve-node`, ≤15 символов), опциональный link0; после успеха хост помечается
+кластером (cluster_rep=True).
 
 ### B14. Global search ✅ Done
 Глобальный поиск по всем кластерам из VISION.md.

@@ -48,6 +48,9 @@ uv lock                                       # только при измене
   (на английском, секции **New features** / **Bug fixes** / **Performance** /
   **Internal**, в Internal — счётчик тестов `N tests (+M)`), коммит
   `release: vX.Y.Z — ...`, тег, push тега.
+- Полная процедура релиза — чеклист в
+  [RELEASE_PROCESS.md](RELEASE_PROCESS.md) (CHANGELOG, FEATURES_BACKLOG,
+  ROADMAP, **README**, версии+`uv lock`, гейты, тег).
 
 ## Правила кодирования
 
