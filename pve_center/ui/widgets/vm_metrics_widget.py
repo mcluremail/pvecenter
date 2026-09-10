@@ -1,11 +1,22 @@
 from importlib.util import find_spec
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...config import load_ui_state, save_ui_state
 from ..i18n import tr
+from ..icons import get_icon
 from ..theme import Color
+from .time_range import RangeDialog, covering_preset, filter_series, write_metrics_csv
 
 _HAS_PG = find_spec("pyqtgraph") is not None
 pg = None  # published by _get_pg() on first successful import
@@ -39,6 +50,8 @@ class VmMetricsWidget(QWidget):
         self._has_plot = False
         self._cached_data = None
         self._legend = None
+        self._time_range = None
+        self._prev_tf_index = 0
         self.has_pg = _HAS_PG
 
         self._layout = QVBoxLayout(self)
@@ -60,13 +73,20 @@ class VmMetricsWidget(QWidget):
         self.timeframe_combo.addItem(tr("week"), "week")
         self.timeframe_combo.addItem(tr("month"), "month")
         self.timeframe_combo.addItem(tr("year"), "year")
+        self.timeframe_combo.addItem(tr("Custom"), "custom")
         saved_tf = load_ui_state("metrics_timeframe") or "hour"
         for i in range(self.timeframe_combo.count()):
             if self.timeframe_combo.itemData(i) == saved_tf:
                 self.timeframe_combo.setCurrentIndex(i)
                 break
+        self._prev_tf_index = self.timeframe_combo.currentIndex()
         self.timeframe_combo.currentIndexChanged.connect(self._on_timeframe_changed)
         top.addWidget(self.timeframe_combo)
+        self._export_btn = QToolButton()
+        self._export_btn.setIcon(get_icon("export"))
+        self._export_btn.setToolTip(tr("Export CSV"))
+        self._export_btn.clicked.connect(self._on_export_csv)
+        top.addWidget(self._export_btn)
         top.addStretch()
         self._layout.addLayout(top)
 
@@ -104,9 +124,80 @@ class VmMetricsWidget(QWidget):
         self._render_current_metric()
 
     def _on_timeframe_changed(self):
+        idx = self.timeframe_combo.currentIndex()
         tf = self.timeframe_combo.currentData()
+        if tf == "custom":
+            rng = self._ask_range()
+            if rng is None:
+                # Cancelled: revert the combo without emitting.
+                self.timeframe_combo.blockSignals(True)
+                self.timeframe_combo.setCurrentIndex(self._prev_tf_index)
+                self.timeframe_combo.blockSignals(False)
+                return
+            self._time_range = rng
+            self._prev_tf_index = idx
+            self.timeframe_changed.emit("custom")
+            return
+        self._time_range = None
+        self._prev_tf_index = idx
         save_ui_state("metrics_timeframe", tf)
         self.timeframe_changed.emit(tf)
+
+    def _ask_range(self):
+        dlg = RangeDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            return dlg.values()
+        return None
+
+    def custom_range(self):
+        """Active client-side [start, end] epoch range, or None."""
+        return self._time_range
+
+    def fetch_timeframe(self):
+        """(rrddata preset to request, client-side (start, end) filter or None)."""
+        tf = self.timeframe_combo.currentData()
+        if tf == "custom" and self._time_range:
+            s, e = self._time_range
+            return covering_preset(s, e), (s, e)
+        return tf, None
+
+    def _visible_series(self):
+        """Named series of the currently displayed metric, honoring the range."""
+        data = self._cached_data or {}
+        if self._time_range:
+            s, e = self._time_range
+            data = {k: filter_series(v, s, e) for k, v in data.items()}
+        metric = self.metric_combo.currentData()
+        if metric == "cpu":
+            return {"cpu": data.get("cpu", [])}
+        if metric == "ram":
+            return {
+                "ram_gib": [
+                    {"time": d["time"], "value": d["value"] / (1024**3)}
+                    for d in data.get("mem", [])
+                ]
+            }
+        if metric == "net":
+            return {"netin": data.get("netin", []), "netout": data.get("netout", [])}
+        if metric == "disk":
+            return {
+                "diskread": data.get("diskread", []),
+                "diskwrite": data.get("diskwrite", []),
+            }
+        return {}
+
+    def _on_export_csv(self):
+        if self._cached_data is None:
+            return
+        series_map = self._visible_series()
+        if not any(series_map.values()):
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("Export CSV"), "metrics.csv", "CSV (*.csv)"
+        )
+        if not path:
+            return
+        write_metrics_csv(path, series_map)
 
     def show_disk_io(self, visible=True):
         current_key = self.metric_combo.currentData()
@@ -143,6 +234,9 @@ class VmMetricsWidget(QWidget):
             return
         metric = self.metric_combo.currentData()
         data = self._cached_data
+        if self._time_range:
+            s, e = self._time_range
+            data = {k: filter_series(v, s, e) for k, v in data.items()}
 
         self.plot.clear()
         if self._legend:

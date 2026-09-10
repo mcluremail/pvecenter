@@ -31,6 +31,12 @@ from ..object_id import StorageId
 from ..storage_actions import StorageMoveDialog, confirm_file_delete
 from ..theme import Color
 from ..utils import parse_pve_error
+from ..widgets.time_range import (
+    RangeDialog,
+    covering_preset,
+    filter_series,
+    write_metrics_csv,
+)
 from ._constants import _HAS_PG, TabIndex, _progress_style, ensure_pg, pg_loaded
 from ._table_utils import (
     format_volsize,
@@ -227,6 +233,8 @@ class StorageTabs:
         panel.storage_detail_tf_combo.addItem(tr("week"), "week")
         panel.storage_detail_tf_combo.addItem(tr("month"), "month")
         panel.storage_detail_tf_combo.addItem(tr("year"), "year")
+        panel.storage_detail_tf_combo.addItem(tr("Custom"), "custom")
+        panel._storage_custom_range = None
         from ...config import load_ui_state
         saved_tf = load_ui_state("metrics_timeframe") or "hour"
         for i in range(panel.storage_detail_tf_combo.count()):
@@ -237,6 +245,11 @@ class StorageTabs:
             panel._on_storage_timeframe_changed
         )
         metrics_row.addWidget(panel.storage_detail_tf_combo)
+        panel.storage_export_btn = QToolButton()
+        panel.storage_export_btn.setIcon(get_icon("export"))
+        panel.storage_export_btn.setToolTip(tr("Export CSV"))
+        panel.storage_export_btn.clicked.connect(self._on_storage_export_csv)
+        metrics_row.addWidget(panel.storage_export_btn)
         layout.addLayout(metrics_row)
 
         panel.storage_detail_plot = QWidget()
@@ -767,6 +780,19 @@ class StorageTabs:
 
     def on_storage_timeframe_changed(self, idx):
         panel = self.panel
+        tf = panel.storage_detail_tf_combo.currentData()
+        if tf == "custom":
+            dlg = RangeDialog(panel)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                # Cancelled: revert without refetching.
+                prev = idx - 1 if idx > 0 else idx + 1
+                panel.storage_detail_tf_combo.blockSignals(True)
+                panel.storage_detail_tf_combo.setCurrentIndex(prev)
+                panel.storage_detail_tf_combo.blockSignals(False)
+                return
+            panel._storage_custom_range = dlg.values()
+        else:
+            panel._storage_custom_range = None
         if panel.current_obj_type == "storage" and isinstance(panel.current_obj_id, StorageId):
             sid = panel.current_obj_id
             storage_name = sid.storage
@@ -793,6 +819,13 @@ class StorageTabs:
         if not cfg:
             return
         timeframe = panel.storage_detail_tf_combo.currentData()
+        rng = getattr(panel, "_storage_custom_range", None)
+        fetch_tf = timeframe
+        if timeframe == "custom" and rng:
+            s, e = rng
+            fetch_tf = covering_preset(s, e)
+        else:
+            rng = None
         self._ensure_storage_plot(panel)
         curve = getattr(panel, "storage_plot_curve", None)
         if curve is not None:
@@ -800,11 +833,11 @@ class StorageTabs:
         # Spinner while the rrddata request runs.
         panel.storage_monitor_stack.setCurrentIndex(0)
         from ..api.metrics import StorageMetricsWorker
-        worker = StorageMetricsWorker(cfg, node_name, storage_name, timeframe)
+        worker = StorageMetricsWorker(cfg, node_name, storage_name, fetch_tf)
         sid = StorageId(host_name, node_name, storage_name)
         worker.signals.data_fetched.connect(
-            lambda tf, nn, md, w=worker, sid=sid: (
-                self.on_storage_metrics_fetched(tf, nn, md, sid),
+            lambda tf, nn, md, w=worker, sid=sid, rng=rng: (
+                self.on_storage_metrics_fetched(tf, nn, md, sid, rng),
                 panel._workers_mgr.discard_worker(w)
             )
         )
@@ -839,7 +872,7 @@ class StorageTabs:
         )
         panel.storage_detail_plot.layout().addWidget(panel.storage_plot_widget)
 
-    def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict, sid=None):
+    def on_storage_metrics_fetched(self, timeframe, node_name, metrics_dict, sid=None, rng=None):
         panel = self.panel
         panel.storage_monitor_stack.setCurrentIndex(1)
         if sid is None or panel.current_obj_type != "storage" or panel.current_obj_id != sid:
@@ -848,10 +881,28 @@ class StorageTabs:
         curve = getattr(panel, "storage_plot_curve", None)
         if curve is None or not metrics_dict.get("usage"):
             return
-        times = [pt["time"] for pt in metrics_dict["usage"]]
+        usage = metrics_dict["usage"]
+        if rng:
+            s, e = rng
+            usage = filter_series(usage, s, e)
+        # Keep the visible points for CSV export.
+        panel._storage_last_usage = usage
+        times = [pt["time"] for pt in usage]
         # StorageMetricsWorker already converted bytes to GiB.
-        values = [pt["value"] for pt in metrics_dict["usage"]]
+        values = [pt["value"] for pt in usage]
         curve.setData(times, values)
+
+    def _on_storage_export_csv(self):
+        panel = self.panel
+        usage = getattr(panel, "_storage_last_usage", None)
+        if not usage:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            panel, tr("Export CSV"), "storage_usage.csv", "CSV (*.csv)"
+        )
+        if not path:
+            return
+        write_metrics_csv(path, {"used_gib": usage})
 
     def fetch_storage_backups_simple(self, storage_name, node_name, host_name, cfg):
         panel = self.panel

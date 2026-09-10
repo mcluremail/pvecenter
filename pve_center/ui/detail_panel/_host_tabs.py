@@ -1466,8 +1466,9 @@ class HostTabs:
             panel.metrics_widget.clear_curves()
             panel.metrics_stack.setCurrentIndex(1)
             return
-        timeframe = panel.metrics_widget.timeframe_combo.currentData()
-        cache_key = ("host", node_name, timeframe)
+        timeframe, rng = panel.metrics_widget.fetch_timeframe()
+        s, e = rng if rng else (None, None)
+        cache_key = ("host", node_name, timeframe, s, e)
         if cache_key in panel.metrics_cache:
             panel.metrics_stack.setCurrentIndex(1)
             panel.metrics_widget.update_curves(panel.metrics_cache[cache_key])
@@ -1475,19 +1476,19 @@ class HostTabs:
         panel.metrics_stack.setCurrentIndex(0)
         from ..api.metrics import HostMetricsWorker
         worker = HostMetricsWorker(cfg, node_name, timeframe)
-        worker.signals.data_fetched.connect(lambda tf, nn, md, g=panel._generation, w=worker: (self.on_host_metrics_fetched(tf, nn, md, g), panel._workers_mgr.discard_worker(w)))
+        worker.signals.data_fetched.connect(lambda tf, nn, md, g=panel._generation, w=worker, s=s, e=e: (self.on_host_metrics_fetched(tf, nn, md, g, s, e), panel._workers_mgr.discard_worker(w)))
         worker.signals.error_occurred.connect(lambda err, w=worker: (
             panel.metrics_stack.setCurrentIndex(1),
             panel._workers_mgr.discard_worker(w),
         ))
         panel._workers_mgr.run_host_worker(worker)
 
-    def on_host_metrics_fetched(self, timeframe, node_name, metrics_dict, gen):
+    def on_host_metrics_fetched(self, timeframe, node_name, metrics_dict, gen, s=None, e=None):
         panel = self.panel
         if gen != panel._generation:
             return
         panel.metrics_stack.setCurrentIndex(1)
-        cache_key = ("host", node_name, timeframe)
+        cache_key = ("host", node_name, timeframe, s, e)
         panel.metrics_cache[cache_key] = metrics_dict
         panel.metrics_widget.update_curves(metrics_dict)
 

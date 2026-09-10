@@ -520,8 +520,9 @@ class VMTabs:
         panel.metrics_widget.show_disk_io(True)
         vmid = vm_data.vmid
         host_name = vm_data.host_name or vm_data.node
-        timeframe = panel.metrics_widget.timeframe_combo.currentData()
-        cache_key = (vmid, host_name, timeframe)
+        timeframe, rng = panel.metrics_widget.fetch_timeframe()
+        s, e = rng if rng else (None, None)
+        cache_key = (vmid, host_name, timeframe, s, e)
         if cache_key in panel.metrics_cache:
             panel.metrics_stack.setCurrentIndex(1)
             panel.metrics_widget.update_curves(panel.metrics_cache[cache_key])
@@ -537,14 +538,14 @@ class VMTabs:
 
         from ..api.metrics import MetricsWorker
         worker = MetricsWorker(cfg, node_name, vmid, vm_type, timeframe)
-        worker.signals.data_fetched.connect(lambda tf, v, md, g=panel._generation, h=host_name, w=worker: (self.on_metrics_fetched(tf, v, md, g, h), panel._workers_mgr.discard_worker(w)))
+        worker.signals.data_fetched.connect(lambda tf, v, md, g=panel._generation, h=host_name, w=worker, s=s, e=e: (self.on_metrics_fetched(tf, v, md, g, h, s, e), panel._workers_mgr.discard_worker(w)))
         worker.signals.error_occurred.connect(lambda err, w=worker: (
             panel.metrics_stack.setCurrentIndex(1),
             panel._workers_mgr.discard_worker(w),
         ))
         panel._workers_mgr.run_worker(worker)
 
-    def on_metrics_fetched(self, timeframe, vmid, metrics_dict, gen, host_name):
+    def on_metrics_fetched(self, timeframe, vmid, metrics_dict, gen, host_name, s=None, e=None):
         panel = self.panel
         if gen != panel._generation:
             return
@@ -555,7 +556,7 @@ class VMTabs:
         if current_vmid != vmid or current_host != host_name:
             return
         panel.metrics_stack.setCurrentIndex(1)
-        cache_key = (vmid, host_name, timeframe)
+        cache_key = (vmid, host_name, timeframe, s, e)
         panel.metrics_cache[cache_key] = metrics_dict
         panel.metrics_widget.update_curves(metrics_dict)
 

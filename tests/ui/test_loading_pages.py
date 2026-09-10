@@ -70,7 +70,8 @@ class TestStorageMonitoringTab:
 
     def test_timeframe_combo_moved(self, qtbot, monkeypatch):
         panel, stack = self._build(qtbot, monkeypatch)
-        assert panel.storage_detail_tf_combo.count() == 5
+        # 5 presets + "Custom" (B11 arbitrary range).
+        assert panel.storage_detail_tf_combo.count() == 6
         assert panel.storage_detail_tf_combo.currentData() == "hour"
 
 
