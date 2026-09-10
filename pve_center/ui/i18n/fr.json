@@ -83,6 +83,7 @@
   "Backup job updated": "Tâche de sauvegarde mise à jour",
   "Backup mode:": "Mode de sauvegarde :",
   "Backup now": "Sauvegarde",
+  "Backup servers view": "Serveurs de sauvegarde",
   "Backup storage:": "Stockage de sauvegarde :",
   "Backups": "Sauvegardes",
   "Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)": "Sauvegardes (*.vma *.vma.gz *.vma.zst);;Tous les fichiers (*.*)",

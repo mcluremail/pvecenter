@@ -83,6 +83,7 @@
   "Backup job updated": "Tarea de copia de seguridad actualizada",
   "Backup mode:": "Modo de copia:",
   "Backup now": "Copia de seguridad",
+  "Backup servers view": "Servidores de copia de seguridad",
   "Backup storage:": "Almacenamiento de copia de seguridad:",
   "Backups": "Copias de seguridad",
   "Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)": "Copias de seguridad (*.vma *.vma.gz *.vma.zst);;Todos los archivos (*.*)",

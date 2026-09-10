@@ -1,4 +1,5 @@
-"""Tests for TreePanel PBS items (B17 stage 2)."""
+"""Tests for TreePanel PBS items (B17 stage 2, reworked in v2.13: PBS
+servers live in the dedicated 'pbs' tree view only)."""
 import pytest
 
 from pve_center.ui.tree_panel import TreePanel
@@ -16,9 +17,10 @@ def _isolated_tree_state(monkeypatch):
     )
 
 
-def _panel(qtbot, cfgs):
+def _panel(qtbot, cfgs, mode="pbs"):
     tp = TreePanel(cfgs)
     qtbot.addWidget(tp)
+    tp.set_mode(mode)
     return tp
 
 
@@ -32,7 +34,8 @@ class TestPbsItems:
         tp.start_loading()
         items = _collect_items(tp)
         assert ("pbs", "pbs1") in items
-        assert ("host", "h1") in items
+        # 'Backup servers' view shows PBS servers only, no PVE hosts
+        assert ("host", "h1") not in items
         # PBS servers never join the loading-spinner bookkeeping
         assert "pbs1" not in tp._loading_hosts
 
@@ -41,24 +44,21 @@ class TestPbsItems:
         tp.start_loading()
         assert ("pbs", "pbs1") not in _collect_items(tp)
 
-    def test_hosts_view_includes_pbs(self, qtbot, make_node):
-        tp = _panel(qtbot, [{"name": "h1", "skip": False}, _PBS])
+    def test_hosts_view_excludes_pbs(self, qtbot, make_node):
+        tp = _panel(qtbot, [{"name": "h1", "skip": False}, _PBS], mode="hosts")
         tp.update_data([make_node()], [], [], final=True,
                        node_repo=tp._node_repo, vm_repo=tp._vm_repo)
         items = _collect_items(tp)
-        assert ("pbs", "pbs1") in items
-        assert items[("pbs", "pbs1")].text(1) == "pbs.local"
+        assert ("host", "n1", "h1") in items
+        assert ("pbs", "pbs1") not in items
 
-    def test_hosts_view_no_loading_stub_for_pbs(self, qtbot):
-        """_compute_grouping must not create a host loading-stub for a PBS
-        cfg (regression: eternal spinner duplicate of the PBS item)."""
+    def test_pbs_view_shows_server_with_note(self, qtbot, make_node):
         tp = _panel(qtbot, [_PBS])
         tp.update_data([], [], [], final=True,
                        node_repo=tp._node_repo, vm_repo=tp._vm_repo)
         items = _collect_items(tp)
-        assert ("pbs", "pbs1") in items
+        assert items[("pbs", "pbs1")].text(1) == "pbs.local"
         assert not [k for k in items if k[0] == "host" and "pbs1" in k]
-        assert "pbs1" not in tp._loading_hosts
 
     def test_set_pbs_datastores(self, qtbot):
         tp = _panel(qtbot, [_PBS])
@@ -126,7 +126,7 @@ class TestDatastoreSelectionPreserved:
             _collect_items(tp)[("pbs_datastore", "pbs1", "main")])
         # rebuild loses datastore children -> land on the PBS server item,
         # never on an unrelated group/cluster/host
-        tp.update_data([make_node()], [], [], final=True,
+        tp.update_data([], [], [], final=True,
                        node_repo=tp._node_repo, vm_repo=tp._vm_repo)
         assert tp.get_current_item_key() == ("pbs", "pbs1")
 
@@ -137,7 +137,7 @@ class TestDatastoreSelectionPreserved:
         tp.set_pbs_datastores("pbs1", stores)
         tp.tree.setCurrentItem(
             _collect_items(tp)[("pbs_datastore", "pbs1", "main")])
-        tp.update_data([make_node()], [], [], final=True,
+        tp.update_data([], [], [], final=True,
                        node_repo=tp._node_repo, vm_repo=tp._vm_repo)
         tp.set_pbs_datastores("pbs1", stores)
         assert tp.get_current_item_key() == ("pbs_datastore", "pbs1", "main")

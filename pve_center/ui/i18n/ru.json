@@ -83,6 +83,7 @@
   "Backup job updated": "Задание резервного копирования обновлено",
   "Backup mode:": "Режим копирования:",
   "Backup now": "Резервное копирование",
+  "Backup servers view": "Резервные серверы",
   "Backup storage:": "Хранилище резервных копий:",
   "Backups": "Резервные копии",
   "Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)": "Резервные копии (*.vma *.vma.gz *.vma.zst);;Все файлы (*.*)",

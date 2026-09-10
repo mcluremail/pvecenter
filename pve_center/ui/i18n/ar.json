@@ -83,6 +83,7 @@
   "Backup job updated": "تم تحديث مهمة النسخ الاحتياطي",
   "Backup mode:": "وضع النسخ:",
   "Backup now": "نسخ احتياطي",
+  "Backup servers view": "خوادم النسخ الاحتياطي",
   "Backup storage:": "تخزين النسخ الاحتياطي:",
   "Backups": "النسخ الاحتياطية",
   "Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)": "النسخ الاحتياطية (*.vma *.vma.gz *.vma.zst);;جميع الملفات (*.*)",

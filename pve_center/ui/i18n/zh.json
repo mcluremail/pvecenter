@@ -83,6 +83,7 @@
   "Backup job updated": "备份作业已更新",
   "Backup mode:": "备份模式：",
   "Backup now": "立即备份",
+  "Backup servers view": "备份服务器视图",
   "Backup storage:": "备份存储：",
   "Backups": "备份",
   "Backups (*.vma *.vma.gz *.vma.zst);;All files (*.*)": "备份 (*.vma *.vma.gz *.vma.zst);;所有文件 (*.*)",

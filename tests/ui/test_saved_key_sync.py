@@ -49,6 +49,7 @@ def _rebuild(mw):
 def test_pbs_selection_survives_hard_refresh(main_window):
     mw = main_window
     tp = mw.tree_panel
+    tp.set_mode("pbs")
     _rebuild(mw)
 
     # _saved_key holds the stale value restored from the DB at startup.

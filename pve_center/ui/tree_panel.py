@@ -200,13 +200,14 @@ class TreePanel(QWidget):
 
         init_icons()
 
-        # B20: tree view mode switcher (hosts / storages)
+        # B20: tree view mode switcher (hosts / storages / pbs)
         self._tree_mode = load_ui_state("treeMode") or "hosts"
-        if self._tree_mode not in ("hosts", "storages"):
+        if self._tree_mode not in ("hosts", "storages", "pbs"):
             self._tree_mode = "hosts"
         self._mode_combo = QComboBox()
         self._mode_combo.addItem(get_icon("host"), tr("Hosts view"), "hosts")
         self._mode_combo.addItem(get_icon("storage"), tr("Storages view"), "storages")
+        self._mode_combo.addItem(get_icon("backup"), tr("Backup servers view"), "pbs")
         mode_idx = self._mode_combo.findData(self._tree_mode)
         self._mode_combo.setCurrentIndex(max(mode_idx, 0))
         self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
@@ -365,7 +366,7 @@ class TreePanel(QWidget):
             return
 
     def set_mode(self, mode):
-        """B20: switch the tree view mode ('hosts'/'storages')."""
+        """B20: switch the tree view mode ('hosts'/'storages'/'pbs')."""
         if mode == self._tree_mode:
             return
         idx = self._mode_combo.findData(mode)
@@ -384,10 +385,13 @@ class TreePanel(QWidget):
 
     def reveal_key(self, key_data):
         """B20: jump to a tree item, switching the view mode if needed
-        (storage objects live in the 'storages' view)."""
-        if isinstance(key_data, tuple) and key_data[0] == "storage" \
-                and self._tree_mode != "storages":
-            self.set_mode("storages")
+        (storage objects live in the 'storages' view, PBS servers in
+        the 'pbs' view)."""
+        if isinstance(key_data, tuple):
+            if key_data[0] == "storage" and self._tree_mode != "storages":
+                self.set_mode("storages")
+            elif key_data[0] in ("pbs", "pbs_datastore") and self._tree_mode != "pbs":
+                self.set_mode("pbs")
         self.find_and_select(key_data)
 
     def _toggle_expand(self):
@@ -701,9 +705,13 @@ class TreePanel(QWidget):
             if cfg.get("skip", False):
                 continue
             if cfg.get("type") == "pbs":
-                name = cfg.get("name", "")
-                if name:
-                    pbs_servers.append(name)
+                # PBS servers only appear in the 'pbs' view (and in the
+                # loading stubs for that view); hosts/storages views are
+                # PVE-only.
+                if self._tree_mode == "pbs":
+                    name = cfg.get("name", "")
+                    if name:
+                        pbs_servers.append(name)
                 continue
             name = cfg.get("name", "")
             cluster = cfg.get("cluster")
@@ -714,9 +722,12 @@ class TreePanel(QWidget):
 
         # B20: clusters + standalone hosts flat (no sections); PBS servers
         # (B17 stage 2) join the same flat list with their own item kind.
-        entries = [(cl.lower(), "cluster", cl) for cl in hosts_by_cluster]
-        entries += [(h.lower(), "host", h) for h in standalone]
-        entries += [(n.lower(), "pbs", n) for n in pbs_servers]
+        if self._tree_mode == "pbs":
+            # 'Backup servers' mode: PBS servers only, no PVE hosts.
+            entries = [(n.lower(), "pbs", n) for n in pbs_servers]
+        else:
+            entries = [(cl.lower(), "cluster", cl) for cl in hosts_by_cluster]
+            entries += [(h.lower(), "host", h) for h in standalone]
         entries.sort(key=lambda e: e[0])
         for _, kind, name in entries:
             item = QTreeWidgetItem(self.tree)
@@ -972,6 +983,8 @@ class TreePanel(QWidget):
                              key=str.lower)
         if self._tree_mode == "storages":
             self._build_storages_view(grouping, group_names)
+        elif self._tree_mode == "pbs":
+            self._build_pbs_view()
         else:
             self._build_hosts_view(grouping, group_names)
 
@@ -1118,6 +1131,9 @@ class TreePanel(QWidget):
             else:
                 self._make_host_item(self.tree, obj)
 
+    def _build_pbs_view(self):
+        """B17 stage 2: 'Backup servers' mode — PBS servers flat with
+        their datastores (children are filled by set_pbs_datastores)."""
         for cfg in self.nodes_cfg:
             if cfg.get("skip") or cfg.get("type") != "pbs":
                 continue
@@ -1169,6 +1185,7 @@ class TreePanel(QWidget):
         self._refresh_note(cl_item, f"cluster:{cluster_name}")
 
         seen_names = set()
+        node_display = {n.node: (n.display_name or n.node) for n in nodes_in_cl}
         for st in self.all_storages:
             if st.cluster != cluster_name or not st.shared:
                 continue
@@ -1181,6 +1198,18 @@ class TreePanel(QWidget):
             si.setIcon(0, get_icon("storage"))
             si.setData(0, ITEM_KEY_ROLE, ("storage", sname, "cluster", cluster_name))
             self._refresh_note(si, f"storage:{sname}:{cluster_name}")
+            # Per-node rows under the shared storage: the same storage as
+            # seen by each member node (usage may differ per node).
+            for ps in sorted((s for s in self.all_storages
+                              if s.cluster == cluster_name and s.shared
+                              and s.storage == sname),
+                             key=lambda s: (node_display.get(s.node, s.node) or s.node).lower()):
+                child = QTreeWidgetItem(si)
+                child.setText(0, f"{sname} ({node_display.get(ps.node, ps.node)})")
+                child.setIcon(0, get_icon("storage"))
+                child.setData(0, ITEM_KEY_ROLE,
+                              ("storage", sname, "host", ps.host_name, ps.node))
+                child.setText(1, f"{ps.usage_pct}%")
 
         for node in sorted(nodes_in_cl, key=lambda n: (n.display_name or n.node).lower()):
             self._make_host_storage_item(cl_item, node)
@@ -1446,6 +1475,10 @@ class TreePanel(QWidget):
                     data["cluster"] = val
                 elif kind == "host":
                     data["host_name"] = val
+            if len(key) >= 5:
+                # Per-node row under a shared "@cluster" storage: the 5th
+                # element carries the PVE node name.
+                data["node"] = key[4]
             self.item_selected.emit("storage", item_name, data)
             return
 

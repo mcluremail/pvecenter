@@ -585,7 +585,7 @@ class TestTreeModes:
         qtbot.addWidget(tp)
         assert tp._tree_mode == "hosts"
         assert tp._mode_combo.currentData() == "hosts"
-        assert tp._mode_combo.count() == 2
+        assert tp._mode_combo.count() == 3
 
     def test_flat_top_level_mix(self, qtbot, make_node):
         """B20: clusters and standalone hosts share one flat top level."""
@@ -696,10 +696,45 @@ class TestTreeModes:
         tp.set_mode("storages")
 
         items = _collect_items(tp)
-        ceph_items = [k for k in items if k[:2] == ("storage", "ceph")]
-        assert len(ceph_items) == 1
+        # Top-level @cluster item appears once (dedup across nodes)
+        top = items[("storage", "ceph", "cluster", "cl1")]
+        assert "@cl1" in top.text(0)
+        assert top.parent() is items[("cluster", "cl1")]
         # 1 shared storage + 2 member hosts (n1, n2), nothing else
         assert items[("cluster", "cl1")].childCount() == 3
+
+    def test_shared_storage_per_node_children(self, qtbot, make_node, make_storage):
+        """Shared @cluster storage expands into per-node rows with
+        per-node usage (B12a prep: 'local cluster storages shown
+        correctly')."""
+        cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1", cluster="cl1", is_cluster=True))
+        node_repo.add(make_node(host_name="h1", node="n2", cluster="cl1", is_cluster=True))
+        storages = [
+            make_storage(host_name="h1", node="n1", cluster="cl1",
+                         storage="ceph", shared=True),
+            make_storage(host_name="h1", node="n2", cluster="cl1",
+                         storage="ceph", shared=True,
+                         used_bytes=50 * 1024**3),
+        ]
+        tp.update_data(node_repo.all(), [], storages, final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        items = _collect_items(tp)
+        parent = items[("storage", "ceph", "cluster", "cl1")]
+        assert parent.childCount() == 2
+        n1 = items[("storage", "ceph", "host", "h1", "n1")]
+        n2 = items[("storage", "ceph", "host", "h1", "n2")]
+        assert n1.parent() is parent
+        assert n1.text(0) == "ceph (n1@cl1)"
+        assert n1.text(1) == "10%"
+        assert n2.text(0) == "ceph (n2@cl1)"
+        assert n2.text(1) == "50%"
 
     def test_mode_persisted_and_restored(self, qtbot, make_node, monkeypatch):
         import pve_center.ui.tree_panel as tp_mod
@@ -757,3 +792,115 @@ class TestTreeModes:
         tp.reveal_key(("host", "n1", "h1"))
         assert tp._tree_mode == "hosts"
         assert tp.tree.currentItem().data(0, ITEM_KEY_ROLE) == ("host", "n1", "h1")
+
+
+class TestPbsView:
+    """'Backup servers view' (pbs) tree mode."""
+
+    @staticmethod
+    def _cfg():
+        return [
+            {"name": "h1", "cluster": "", "skip": False},
+            {"name": "pbs1", "type": "pbs", "host": "pbs.example", "skip": False},
+        ]
+
+    def test_pbs_mode_in_combo(self, qtbot):
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+        data = [tp._mode_combo.itemData(i) for i in range(tp._mode_combo.count())]
+        assert data == ["hosts", "storages", "pbs"]
+
+    def test_pbs_view_lists_servers_not_hosts(self, qtbot, make_node):
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        tp.update_data(node_repo.all(), [], [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("pbs")
+
+        keys = [tp.tree.topLevelItem(i).data(0, ITEM_KEY_ROLE)
+                for i in range(tp.tree.topLevelItemCount())]
+        assert keys == [("pbs", "pbs1")]
+        assert tp.tree.topLevelItem(0).text(0) == "pbs1"
+
+    def test_hosts_view_has_no_pbs(self, qtbot, make_node):
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        tp.update_data(node_repo.all(), [], [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+
+        keys = [tp.tree.topLevelItem(i).data(0, ITEM_KEY_ROLE)
+                for i in range(tp.tree.topLevelItemCount())]
+        assert keys == [("host", "n1", "h1")]
+
+    def test_loading_stubs_only_in_pbs_mode(self, qtbot):
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+
+        tp.start_loading()
+        keys = [tp.tree.topLevelItem(i).data(0, ITEM_KEY_ROLE)
+                for i in range(tp.tree.topLevelItemCount())]
+        assert ("pbs", "pbs1") not in keys
+
+        tp.set_mode("pbs")
+        tp.start_loading()
+        keys = [tp.tree.topLevelItem(i).data(0, ITEM_KEY_ROLE)
+                for i in range(tp.tree.topLevelItemCount())]
+        assert keys == [("pbs", "pbs1")]
+
+    def test_pbs_datastore_children(self, qtbot):
+        from pve_center.domain.pbs import PbsDatastore
+
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+        tp.set_mode("pbs")
+        tp.update_data(NodeRepository().all(), [], [], final=True,
+                       node_repo=NodeRepository(), vm_repo=None)
+        tp.set_pbs_datastores("pbs1", [PbsDatastore(
+            name="store1", usage=0.25)])
+
+        items = _collect_items(tp)
+        ds = items[("pbs_datastore", "pbs1", "store1")]
+        assert ds.parent().data(0, ITEM_KEY_ROLE) == ("pbs", "pbs1")
+        assert ds.text(1) == "25%"
+
+    def test_pbs_mode_persisted_and_restored(self, qtbot, monkeypatch):
+        import pve_center.ui.tree_panel as tp_mod
+
+        saved = {}
+        monkeypatch.setattr(tp_mod, "save_ui_state",
+                            lambda k, v: saved.__setitem__(k, v))
+        monkeypatch.setattr(tp_mod, "load_ui_state", lambda k: saved.get(k))
+
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+        tp.set_mode("pbs")
+        assert saved == {"treeMode": "pbs"}
+
+        tp2 = TreePanel(self._cfg())
+        qtbot.addWidget(tp2)
+        assert tp2._tree_mode == "pbs"
+
+    def test_invalid_saved_mode_falls_back(self, qtbot, monkeypatch):
+        import pve_center.ui.tree_panel as tp_mod
+
+        monkeypatch.setattr(tp_mod, "load_ui_state", lambda k: "bogus")
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+        assert tp._tree_mode == "hosts"
+
+    def test_reveal_key_pbs_switches_mode(self, qtbot):
+        tp = TreePanel(self._cfg())
+        qtbot.addWidget(tp)
+        tp.update_data(NodeRepository().all(), [], [], final=True,
+                       node_repo=NodeRepository(), vm_repo=None)
+        assert tp._tree_mode == "hosts"
+
+        tp.reveal_key(("pbs", "pbs1"))
+        assert tp._tree_mode == "pbs"
+        assert tp.tree.currentItem().data(0, ITEM_KEY_ROLE) == ("pbs", "pbs1")
