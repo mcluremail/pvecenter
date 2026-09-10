@@ -167,6 +167,8 @@ class TreePanel(QWidget):
     storage_create_requested = Signal(str)        # host_name (any member host)
     storage_edit_requested = Signal(str, str)     # (host_name, storage)
     storage_delete_requested = Signal(str, str)   # (host_name, storage)
+    cluster_join_requested = Signal(str)          # cluster name
+    cluster_create_requested = Signal(str)        # host_name (first member)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -587,6 +589,17 @@ class TreePanel(QWidget):
                 refresh_action.setIcon(get_icon("refresh"))
                 refresh_action.triggered.connect(lambda: self.host_token_refresh_requested.emit(host_name))
                 menu.addAction(refresh_action)
+                host_cfg = next(
+                    (c for c in self.nodes_cfg if c.get("name") == host_name),
+                    None)
+                if (host_cfg and not host_cfg.get("cluster")
+                        and host_cfg.get("type") != "pbs"):
+                    cc_act = QAction(tr("Create cluster…"), self.tree)
+                    cc_act.triggered.connect(
+                        lambda checked=False, hn=host_name:
+                            self.cluster_create_requested.emit(hn)
+                    )
+                    menu.addAction(cc_act)
                 menu.addSeparator()
                 trust_cfg = next((c for c in self.nodes_cfg if c.get("name") == host_name), None)
                 trust_ssl_current = bool(trust_cfg.get("trust_ssl", True)) if trust_cfg else True
@@ -629,6 +642,13 @@ class TreePanel(QWidget):
                     )
                     menu.addAction(cs_act)
                 menu.addSeparator()
+            if self._tree_mode == "hosts":
+                join_act = QAction(tr("Add node to cluster…"), self.tree)
+                join_act.triggered.connect(
+                    lambda checked=False, cl=item_name:
+                        self.cluster_join_requested.emit(cl)
+                )
+                menu.addAction(join_act)
             delete_action = QAction(tr("Delete cluster"), self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
             menu.addAction(delete_action)

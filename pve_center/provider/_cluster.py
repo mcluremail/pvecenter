@@ -64,6 +64,43 @@ class ClusterAPI:
         """DELETE /storage/{storage}."""
         return self._s.call(self._s.proxmox.storage(_q(storage)).delete)
 
+    # -- Cluster join (B12a) --
+
+    def get_join_info(self, node: str | None = None) -> dict:
+        """GET /cluster/config/join — join info of this cluster."""
+        if node:
+            return self._s.call(self._s.proxmox.cluster.config.join.get, node=node)
+        return self._s.call(self._s.proxmox.cluster.config.join.get)
+
+    def create_cluster(self, *, clustername: str,
+                       link0: str | None = None) -> object:
+        """POST /cluster/config — create a new cluster on THIS node.
+
+        pvecm create equivalent; executed on the first (sole) member. If no
+        link is given, PVE defaults to the local IP address as link0.
+        """
+        params: dict = {"clustername": clustername}
+        if link0:
+            params["link0"] = link0
+        return self._s.call(self._s.proxmox.cluster.config.post, **params)
+
+    def join_cluster(self, *, hostname: str, password: str,
+                     fingerprint: str | None = None, link0: str | None = None,
+                     votes: int | None = None) -> object:
+        """POST /cluster/config/join — join THIS node into an existing cluster.
+
+        Executed on the joinee; blocks until the join completes (service
+        restarts, minutes) — workers must use a generous timeout.
+        """
+        params: dict = {"hostname": hostname, "password": password}
+        if fingerprint:
+            params["fingerprint"] = fingerprint
+        if link0:
+            params["link0"] = link0
+        if votes is not None:
+            params["votes"] = votes
+        return self._s.call(self._s.proxmox.cluster.config.join.post, **params)
+
     # -- HA groups --
 
     def list_ha_groups(self) -> list[dict]:

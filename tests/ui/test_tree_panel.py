@@ -1128,3 +1128,94 @@ class TestStorageContextMenu:
             if act.text() == "Create storage…":
                 act.trigger()
         assert created == ["h1"]
+
+
+class TestClusterJoinContextMenu:
+    """B12a: "Add node to cluster…" in the cluster context menu."""
+
+    @staticmethod
+    def _make_panel(qtbot, make_node):
+        cfg = [
+            {"name": "rep1", "cluster": "mycluster",
+             "cluster_rep": True, "skip": False},
+            {"name": "solo", "cluster": "", "skip": False},
+        ]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="rep1", node="n1",
+                                cluster="mycluster", is_cluster=True))
+        tp.update_data(node_repo.all(), [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        return tp
+
+    def test_hosts_mode_has_join_action(self, qtbot, make_node, monkeypatch):
+        tp = self._make_panel(qtbot, make_node)
+        item = _collect_items(tp)[("cluster", "mycluster")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        texts = _menu_actions(menu)
+        assert "Add node to cluster…" in texts
+
+        fired = []
+        tp.cluster_join_requested.connect(fired.append)
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if isinstance(act, _QA) and act.text() == "Add node to cluster…":
+                act.trigger()
+        assert fired == ["mycluster"]
+
+    def test_storages_mode_has_no_join_action(self, qtbot, make_node,
+                                              monkeypatch):
+        tp = self._make_panel(qtbot, make_node)
+        tp.set_mode("storages")
+        item = _collect_items(tp)[("cluster", "mycluster")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        assert "Add node to cluster…" not in _menu_actions(menu)
+
+
+class TestClusterCreateContextMenu:
+    """B12b: "Create cluster…" on standalone PVE hosts."""
+
+    @staticmethod
+    def _make_panel(qtbot, make_node, cfg):
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        tp.update_data(node_repo.all(), [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        return tp
+
+    def test_standalone_pve_host_has_create_action(self, qtbot, make_node,
+                                                   monkeypatch):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = self._make_panel(qtbot, make_node, cfg)
+        item = _collect_items(tp)[("host", "n1", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        texts = _menu_actions(menu)
+        assert "Create cluster…" in texts
+
+        fired = []
+        tp.cluster_create_requested.connect(fired.append)
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if isinstance(act, _QA) and act.text() == "Create cluster…":
+                act.trigger()
+        assert fired == ["h1"]
+
+    def test_cluster_member_has_no_create_action(self, qtbot, make_node,
+                                                 monkeypatch):
+        cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True,
+                "skip": False}]
+        tp = self._make_panel(qtbot, make_node, cfg)
+        item = _collect_items(tp)[("host", "n1", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        assert "Create cluster…" not in _menu_actions(menu)
+
+    def test_pbs_host_has_no_create_action(self, qtbot, make_node,
+                                           monkeypatch):
+        cfg = [{"name": "h1", "cluster": "", "skip": False, "type": "pbs"}]
+        tp = self._make_panel(qtbot, make_node, cfg)
+        item = _collect_items(tp)[("host", "n1", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        assert "Create cluster…" not in _menu_actions(menu)

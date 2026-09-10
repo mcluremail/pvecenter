@@ -338,6 +338,50 @@ class TestClusterAPI:
         chain.assert_called_once_with("old1")
         chain.return_value.delete.assert_called_once()
 
+    def test_get_join_info(self, mock_session):
+        mock_session.proxmox.cluster.config.join.get = MagicMock(
+            return_value={"ipAddress": "10.0.0.1", "fingerprint": "AA:BB"})
+        api = ClusterAPI(mock_session)
+        assert api.get_join_info() == {"ipAddress": "10.0.0.1", "fingerprint": "AA:BB"}
+        mock_session.proxmox.cluster.config.join.get.assert_called_once_with()
+
+    def test_get_join_info_with_node(self, mock_session):
+        mock_session.proxmox.cluster.config.join.get = MagicMock(return_value={})
+        api = ClusterAPI(mock_session)
+        api.get_join_info(node="n2")
+        mock_session.proxmox.cluster.config.join.get.assert_called_once_with(node="n2")
+
+    def test_join_cluster_required_params(self, mock_session):
+        post = MagicMock(return_value=None)
+        mock_session.proxmox.cluster.config.join.post = post
+        api = ClusterAPI(mock_session)
+        api.join_cluster(hostname="10.0.0.1", password="secret")
+        post.assert_called_once_with(hostname="10.0.0.1", password="secret")
+
+    def test_join_cluster_optional_params(self, mock_session):
+        post = MagicMock(return_value=None)
+        mock_session.proxmox.cluster.config.join.post = post
+        api = ClusterAPI(mock_session)
+        api.join_cluster(hostname="pve1", password="s", fingerprint="AA",
+                         link0="10.0.0.1", votes=2)
+        post.assert_called_once_with(
+            hostname="pve1", password="s", fingerprint="AA",
+            link0="10.0.0.1", votes=2)
+
+    def test_create_cluster(self, mock_session):
+        post = MagicMock(return_value=None)
+        mock_session.proxmox.cluster.config.post = post
+        api = ClusterAPI(mock_session)
+        api.create_cluster(clustername="prod")
+        post.assert_called_once_with(clustername="prod")
+
+    def test_create_cluster_with_link(self, mock_session):
+        post = MagicMock(return_value=None)
+        mock_session.proxmox.cluster.config.post = post
+        api = ClusterAPI(mock_session)
+        api.create_cluster(clustername="prod", link0="10.0.0.1")
+        post.assert_called_once_with(clustername="prod", link0="10.0.0.1")
+
     def test_list_ha_groups(self, mock_session):
         mock_session.proxmox.cluster.ha.groups.get = MagicMock(return_value=[{"group": "g1"}])
         api = ClusterAPI(mock_session)

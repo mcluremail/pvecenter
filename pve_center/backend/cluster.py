@@ -250,5 +250,88 @@ class ClusterJobDeleteWorker(QRunnable):
             _safe_emit(self.signals.finished)
 
 # ----------------------------------------------------------------------
+# Cluster join (B12a)
+# ----------------------------------------------------------------------
+
+class ClusterJoinSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+class ClusterJoinWorker(QRunnable):
+    """Join this node into an existing cluster (POST /cluster/config/join).
+
+    Runs against the JOINEE node's config; peer credentials are passed as
+    parameters. The POST blocks until the join completes (service restarts,
+    minutes) — hence timeout=600.
+    """
+
+    def __init__(self, host_cfg, hostname, password, fingerprint="",
+                 link0="", votes=None):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.hostname = hostname
+        self.password = password
+        self.fingerprint = fingerprint
+        self.link0 = link0
+        self.votes = votes
+        self.signals = ClusterJoinSignals()
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=600)
+            provider.cluster.join_cluster(
+                hostname=self.hostname,
+                password=self.password,
+                fingerprint=self.fingerprint or None,
+                link0=self.link0 or None,
+                votes=self.votes,
+            )
+            _safe_emit(self.signals.result, tr("Node joined the cluster"))
+        except Exception as e:
+            logger.debug("cluster join error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            if provider:
+                provider.close()
+            _safe_emit(self.signals.finished)
+
+class ClusterCreateSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+
+class ClusterCreateWorker(QRunnable):
+    """Create a new cluster on this node (POST /cluster/config).
+
+    pvecm create equivalent; runs against the FIRST member's config.
+    """
+
+    def __init__(self, host_cfg, clustername, link0=""):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.clustername = clustername
+        self.link0 = link0
+        self.signals = ClusterCreateSignals()
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=120)
+            provider.cluster.create_cluster(
+                clustername=self.clustername,
+                link0=self.link0 or None,
+            )
+            _safe_emit(self.signals.result, tr("Cluster created"))
+        except Exception as e:
+            logger.debug("cluster create error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            if provider:
+                provider.close()
+            _safe_emit(self.signals.finished)
+
+# ----------------------------------------------------------------------
 # Access Management — Users
 # ----------------------------------------------------------------------

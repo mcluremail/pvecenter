@@ -170,6 +170,8 @@ class MainWindow(QMainWindow):
         self.tree_panel.storage_create_requested.connect(self._on_storage_create)
         self.tree_panel.storage_edit_requested.connect(self._on_storage_edit)
         self.tree_panel.storage_delete_requested.connect(self._on_storage_delete)
+        self.tree_panel.cluster_join_requested.connect(self._on_cluster_join)
+        self.tree_panel.cluster_create_requested.connect(self._on_cluster_create)
         self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
         self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
@@ -640,6 +642,93 @@ class MainWindow(QMainWindow):
         ))
         self._run_worker(worker)
         self.status_label.setText(tr("Working..."))
+
+    def _on_cluster_join(self, cluster_name):
+        from .cluster_join_dialog import ClusterJoinDialog
+        candidates = [
+            {"cfg_name": c.get("name", ""), "node_name": c.get("node", "")}
+            for c in self.nodes_cfg
+            if c.get("cluster") != cluster_name
+            and c.get("type") != "pbs" and not c.get("skip")
+        ]
+        if not candidates:
+            self._notifications.show(
+                tr("No node available to add to the cluster"), error=True)
+            return
+        peer = next(
+            (c for c in self.nodes_cfg if c.get("cluster") == cluster_name
+             and c.get("type") != "pbs"), None)
+        dialog = ClusterJoinDialog(
+            candidates, cluster_name, peer_host=(peer or {}).get("host", ""),
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        params = dialog.get_params()
+        from ..backend import ClusterJoinWorker
+        worker = ClusterJoinWorker(
+            params["cfg"], params["hostname"], params["password"],
+            fingerprint=params["fingerprint"], link0=params["link0"],
+            votes=params["votes"],
+        )
+        worker.signals.result.connect(lambda msg, w=worker: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            self._mark_joinee(params["cfg"], cluster_name),
+            QTimer.singleShot(3000, self.refresh_data),
+            self._discard_worker(w)
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            self._notifications.show(tr("Error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err)),
+            self._discard_worker(w)
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(
+            tr("Adding node to cluster (this may take several minutes)..."))
+
+    def _mark_joinee(self, cfg, cluster_name):
+        cfg["cluster"] = cluster_name
+        cfg.pop("cluster_rep", None)
+        self._persist_cfg_views()
+
+    def _on_cluster_create(self, host_name):
+        cfg = self._cfg_by_name.get(host_name)
+        if cfg is None:
+            return
+        from .cluster_create_dialog import ClusterCreateDialog
+        dialog = ClusterCreateDialog(host_name, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        params = dialog.get_params()
+        from ..backend import ClusterCreateWorker
+        worker = ClusterCreateWorker(
+            cfg, params["clustername"], link0=params["link0"])
+        worker.signals.result.connect(lambda msg, w=worker: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            self._mark_cluster_creator(cfg, params["clustername"]),
+            QTimer.singleShot(3000, self.refresh_data),
+            self._discard_worker(w)
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            self._notifications.show(tr("Error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err)),
+            self._discard_worker(w)
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Working..."))
+
+    def _mark_cluster_creator(self, cfg, cluster_name):
+        cfg["cluster"] = cluster_name
+        cfg["cluster_rep"] = True
+        self._persist_cfg_views()
+
+    def _persist_cfg_views(self):
+        save_config(self.nodes_cfg)
+        self.tree_panel.set_servers(self.nodes_cfg)
+        self.detail_panel.update_nodes_cfg(self.nodes_cfg)
+        self.pbs_panel.update_nodes_cfg(self.nodes_cfg)
 
     # ------------------------------------------------------------
     # Удаление ВМ
