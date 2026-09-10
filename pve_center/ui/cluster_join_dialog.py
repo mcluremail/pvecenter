@@ -25,7 +25,8 @@ class ClusterJoinDialog(QDialog):
     def __init__(self, candidates: list[dict], cluster_name: str,
                  peer_host: str = "", parent=None):
         super().__init__(parent)
-        # candidates: [{"cfg_name": ..., "node_name": ...}, ...]
+        # candidates: full host cfg dicts from nodes_cfg (currentData is
+        # passed to ClusterJoinWorker as host_cfg).
         self._candidates = candidates
         self.setWindowTitle(tr("Add node to cluster"))
         self.setMinimumWidth(420)
@@ -42,7 +43,7 @@ class ClusterJoinDialog(QDialog):
         self._node_combo = QComboBox()
         for c in candidates:
             self._node_combo.addItem(
-                f"{c['node_name']} ({c['cfg_name']})", c)
+                f"{c.get('node', '')} ({c.get('name', '')})", c)
         form.addRow(tr("Node to add"), self._node_combo)
 
         self._host_edit = QLineEdit(peer_host)

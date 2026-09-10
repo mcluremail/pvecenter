@@ -5,8 +5,10 @@ from PySide6.QtWidgets import QDialogButtonBox
 from pve_center.ui.cluster_join_dialog import ClusterJoinDialog
 
 CANDIDATES = [
-    {"cfg_name": "pve2", "node_name": "n2"},
-    {"cfg_name": "pve3", "node_name": "n3"},
+    {"name": "pve2", "node": "n2", "host": "10.0.1.2",
+     "user": "root@pam", "password": "p2"},
+    {"name": "pve3", "node": "n3", "host": "10.0.1.3",
+     "user": "root@pam", "password": "p3"},
 ]
 
 

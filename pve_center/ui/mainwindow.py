@@ -645,9 +645,10 @@ class MainWindow(QMainWindow):
 
     def _on_cluster_join(self, cluster_name):
         from .cluster_join_dialog import ClusterJoinDialog
+        # Candidates are the actual cfg dicts from nodes_cfg: the worker
+        # needs full credentials, and _mark_joinee mutates this dict in place.
         candidates = [
-            {"cfg_name": c.get("name", ""), "node_name": c.get("node", "")}
-            for c in self.nodes_cfg
+            c for c in self.nodes_cfg
             if c.get("cluster") != cluster_name
             and c.get("type") != "pbs" and not c.get("skip")
         ]
