@@ -287,6 +287,8 @@ packages (no venv required): `./run` uses plain `python -m pve_center`.
 | `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
 | `.github/workflows/ci.yml` | CI: ruff lint on PR/push (Python 3.10/3.11/3.12) |
 | `.github/workflows/release.yml` | Release: build deb/rpm/zip/installer, create GitHub release |
+| `docs/DEV_PROCESS.md` | Development methodology (workflow, gates, coding rules) |
+| `docs/AUDIT_PROCESS.md` | Code audit methodology + audit reports |
 
 ## Language switching
 
