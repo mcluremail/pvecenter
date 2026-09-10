@@ -67,3 +67,50 @@ def test_ensure_tabs_finishes_partial_chunked_build(qtbot):
     # a late chunk tick must not rebuild anything
     panel._build_tab_chunk()
     assert panel.tabs.count() == 25
+
+
+def test_all_tabs_built_emitted_on_drain(qtbot):
+    """Регресс FREEZE-фриза старта: по опустошении очереди чанковой стройки
+    панель сигналит all_tabs_built — MainWindow по нему выполняет отложенный
+    первый выбор вместо синхронного _ensure_tabs() в потоке воркера."""
+    panel = DetailPanel([])
+    qtbot.addWidget(panel)
+    fired = []
+    panel.all_tabs_built.connect(lambda: fired.append(True))
+    panel._build_tab_chunk()  # one chunk only: queue not drained yet
+    assert fired == []
+    while not panel._tabs_built:
+        panel._build_tab_chunk()
+    assert fired == [True]
+
+
+def test_do_first_selection_deferred_until_tabs_built(qtbot, monkeypatch, tmp_path):
+    """Первый выбор при недостроенных табах откладывается (pending), а не
+    достраивает все табы синхронно; _on_all_tabs_built выполняет его."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    from pve_center.domain.node import Node as DomainNode
+    from pve_center.domain.repositories import NodeRepository
+    from pve_center.ui.mainwindow import MainWindow
+
+    mw = MainWindow()
+    qtbot.addWidget(mw)
+    mw.tree_panel.set_servers([
+        {"name": "pve1", "host": "h1", "port": 8006, "user": "u",
+         "token_value": "t", "cluster": "", "cluster_rep": True},
+    ])
+    mw._node_repo = NodeRepository()
+    mw._node_repo.add(DomainNode.from_pve(
+        {"node": "n1", "status": "online"}, "pve1", "", True))
+    # Tab build queue is still full (chunk timer has not fired yet).
+    assert not mw.detail_panel._tabs_built
+    mw.tree_panel.update_data(
+        mw._node_repo.all(), [], [], final=True, node_repo=mw._node_repo,
+    )
+    mw._do_first_selection()
+    assert mw._pending_first_selection is True
+    assert mw.tree_panel.get_current_item_key() is None
+    # Drain finishes -> all_tabs_built -> pending selection runs.
+    while not mw.detail_panel._tabs_built:
+        mw.detail_panel._build_tab_chunk()
+    assert mw._pending_first_selection is False
+    assert mw.tree_panel.get_current_item_key() is not None

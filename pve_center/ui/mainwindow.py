@@ -145,6 +145,7 @@ class MainWindow(QMainWindow):
         self.detail_panel.transfer_finished.connect(
             lambda key, ok, msg: self.tasks_widget.finish_progress_row(key, ok, msg)
         )
+        self.detail_panel.all_tabs_built.connect(self._on_all_tabs_built)
 
         from .pbs_panel import PbsPanel
         self.pbs_panel = PbsPanel()
@@ -1787,6 +1788,13 @@ class MainWindow(QMainWindow):
 
     def _do_first_selection(self):
         self._first_selection_done = True
+        self._pending_first_selection = False
+        # Табы detail-панели ещё строятся чанками — откладываем выбор до их
+        # готовности, иначе _ensure_tabs() достроит всё синхронно и заморозит
+        # main thread на секунды (регресс: FREEZE DETECTED при старте).
+        if not self.detail_panel._tabs_built:
+            self._pending_first_selection = True
+            return
         # Если пользователь уже выбрал элемент (например, PBS-сервер) —
         # не перехватываем выделение на первый элемент дерева.
         if self.tree_panel.get_current_item_key() is not None:
@@ -1805,6 +1813,15 @@ class MainWindow(QMainWindow):
                 self.tree_panel.select_first_item()
         else:
             self.tree_panel.select_first_item()
+
+    def _on_all_tabs_built(self):
+        # Первое решение выбора было отложено до окончания чанковой стройки
+        # табов (см. _do_first_selection) — выполняем его сейчас.
+        if getattr(self, "_pending_first_selection", False):
+            self._pending_first_selection = False
+            if self.tree_panel.tree.topLevelItemCount() > 0:
+                self._do_first_selection()
+                self.detail_panel.refresh_current_view()
 
     # ------------------------------------------------------------
     # Детектор зависания

@@ -68,4 +68,8 @@ def test_pbs_selection_survives_hard_refresh(main_window):
     tp.tree.clear()
     _rebuild(mw)
     mw._do_first_selection()
+    # Restore is deferred until the chunked tab build drains (see
+    # test_lazy_tabs: no synchronous _ensure_tabs in the worker path).
+    while not mw.detail_panel._tabs_built:
+        mw.detail_panel._build_tab_chunk()
     assert tp.get_current_item_key() == ("pbs", "pbs1")

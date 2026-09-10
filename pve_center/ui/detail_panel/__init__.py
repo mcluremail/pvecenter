@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction
@@ -45,6 +46,7 @@ class DetailPanel(QWidget):
     navigate_requested = Signal(object)        # key_data tuple for tree navigation
     vm_clone_requested = Signal(str, str, int)  # (host_name, node, vmid)
     vm_convert_requested = Signal(str, str, int, str)  # (host_name, node, vmid, direction)
+    all_tabs_built = Signal()                  # chunked tab build drained the queue
     vm_ha_add_requested = Signal(str, str, int)  # (host_name, node, vmid)
     vm_ha_remove_requested = Signal(str, str, int)  # (host_name, node, vmid)
 
@@ -140,6 +142,7 @@ class DetailPanel(QWidget):
         self.tabs = QTabWidget()
         self._tabs_built = False
         self._tab_queue = None
+        self._tab_build_t0 = time.perf_counter()
         self.tabs.hide()
         if _HAS_PG:
             threading.Thread(target=self._pg_warm, daemon=True,
@@ -251,7 +254,11 @@ class DetailPanel(QWidget):
 
     def _add_next_tab(self):
         builder, icon_key, title, hide = self._tab_queue.pop(0)
+        t0 = time.perf_counter()
         idx = self.tabs.addTab(builder(), get_icon(icon_key), title)
+        dt = time.perf_counter() - t0
+        if dt > 0.2:
+            logger.info("tab '%s' built in %.2fs", title, dt)
         if hide:
             self.tabs.setTabVisible(idx, False)
 
@@ -267,6 +274,7 @@ class DetailPanel(QWidget):
             return
         if self._tab_queue is None:
             self._tab_queue = self._tab_specs()
+            self._tab_build_t0 = time.perf_counter()
         for _ in range(self._TAB_BUILD_CHUNK):
             if not self._tab_queue:
                 break
@@ -275,6 +283,10 @@ class DetailPanel(QWidget):
             QTimer.singleShot(0, self._build_tab_chunk)
         else:
             self._tabs_built = True
+            logger.info(
+                "detail tabs built in %.2fs", time.perf_counter() - self._tab_build_t0
+            )
+            self.all_tabs_built.emit()
 
     def _ensure_tabs(self):
         """Synchronously finish tab building (first selection or tests)."""
@@ -282,9 +294,14 @@ class DetailPanel(QWidget):
             return
         if self._tab_queue is None:
             self._tab_queue = self._tab_specs()
+            self._tab_build_t0 = time.perf_counter()
         while self._tab_queue:
             self._add_next_tab()
         self._tabs_built = True
+        logger.info(
+            "detail tabs built synchronously in %.2fs",
+            time.perf_counter() - self._tab_build_t0,
+        )
 
     # ------------------------------------------------------------------
     # Public API
