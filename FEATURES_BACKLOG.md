@@ -117,7 +117,7 @@ poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Na
 - Сводка по группе: SUMMARY + Host VMs с агрегированными карточками (аналог сводки кластера)
 - Фундамент для сущностей Site/Datacenter из VISION.md
 
-### B17. Резервное копирование и PBS (Proxmox Backup Server) — В РАБОТЕ (v2.12)
+### B17. Резервное копирование и PBS (Proxmox Backup Server) — РЕАЛИЗОВАНО (v2.12.0)
 Расширенная работа с бэкапами, включая PBS (плагин PBS заявлен в VISION.md / ARCHITECTURE.md).
 Этап 1 — через PVE API (storage типа pbs) — ГОТОВО:
 - Статус и заполненность PBS-хранилищ

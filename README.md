@@ -45,6 +45,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Migrate QEMU VMs between cluster nodes (with local disks option)
 - Clone QEMU VMs and LXC containers (full or linked, target node, storage selection), clone from templates, convert VM ↔ template
 - SPICE console (requires virt-viewer)
+- Built-in noVNC console for QEMU VMs: WebSocket bridge to `vncwebsocket`, sticky modifier keys (Ctrl/Alt/Shift stay pressed); bundled on Windows, optional `novnc` extra on Linux
 - Delete host with API token removal on the server
 - Token recreation via context menu
 
@@ -62,6 +63,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - Node config stored in SQLite database, no plaintext tokens on disk
 - Config export/import: encrypted bundle with password (PBKDF2 + Fernet)
 - SSL certificate validation: per-host toggle (trust / self-signed)
+- Optional per-host HTTP(S) proxy: all API traffic (provider, raw workers, PBS) goes through the configured proxy; an explicit proxy overrides env variables
 - Audit log filters: text search + status filter (All/OK/Errors/Running)
 
 **Interface**
@@ -259,7 +261,7 @@ packages (no venv required): `./run` uses plain `python -m pve_center`.
 |------|---------|
 | `pve_center/__main__.py` | Module entry (`python -m pve_center`) |
 | `pve_center/main.py` | Application entry point |
-| `pve_center/backend.py` | API client, token management, VM actions, migrate/clone workers |
+| `pve_center/backend/` | API client package: workers, `RefreshCoordinator` (hard/soft refresh), event bus seed, unified PVE error parsing |
 | `pve_center/pbs/` | Proxmox Backup Server API client (ticket auth) and workers |
 | `pve_center/plugins/_pbs.py` | PBS plugin (dispatch by `cfg["type"] = "pbs"`) |
 | `pve_center/domain/pbs.py` | PBS domain models (datastores, snapshots, jobs) |
@@ -283,6 +285,8 @@ packages (no venv required): `./run` uses plain `python -m pve_center`.
 | `pve_center/ui/i18n/` | Translation module (tr()), JSON translation files |
 | `pve_center/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options, card_list) |
 | `pve_center/ui/api/` | API workers (RRD data, storage content) |
+| `pve_center/ui/console/` | Built-in noVNC console: window, WebSocket bridge (vendored noVNC assets) |
+| `pve_center/provider/` | Data provider seam: `ProxmoxProvider` facade, session with per-host proxy |
 | `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
 | `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
 | `.github/workflows/ci.yml` | CI: ruff lint on PR/push (Python 3.10/3.11/3.12) |

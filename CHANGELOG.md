@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.12.0 — Proxmox Backup Server integration, built-in noVNC console, backend package
+
+**New features**
+- Direct Proxmox Backup Server connection (port 8007) as a provider plugin: PBS servers are added via the Add Server dialog (with connection check), appear in the object tree with their datastores and fill levels; dedicated PBS panel shows datastore status and usage, snapshots per namespace (verify state, owner, size, notes) with deletion, and sync/verify/prune jobs with manual run
+- PBS backup browsing via PVE: backups table on PBS storages with owner, verify state and notes columns, restore a backup into a new VM/container, prune a single backup from the storage content table
+- Built-in noVNC console for QEMU VMs: WebSocket bridge to `vncwebsocket` (127.0.0.1 only, TLS verify from host config), sticky modifier keys; vendored noVNC assets (MPL-2.0) and pako (MIT) with third-party notices
+- Optional per-host HTTP(S) proxy: all API traffic — provider session, raw workers and PBS — goes through the proxy configured per host; an explicit proxy overrides env variables
+- Detail tables: column reorder with saved layout and autofit
+- Readable error hints for PVE web service failures (TLS/certificates, pvedaemon unreachable, request processing, response body, aborted request)
+
+**Bug fixes**
+- VNC console password field (PSA-2026-00014-1); PVE 7/8/9 compatibility documented
+- Audit 2026-09-09 (11 findings): PBS provider/client were never closed (TLS pool leak); config import lost `type`/`port`/`proxy` (PBS host degraded to broken PVE host); WsBridge `stop()` before the event loop was assigned leaked a thread, and stopping during startup raised `CancelledError`; `websockets` pin raised to >=14 (`additional_headers`); timeouts on `vncproxy:` messages were misreported as "Console not supported"; noVNC window leaked without `WA_DeleteOnClose`; workers rejected by the full thread pool blocked hard/soft refresh cycles forever; 8 raw-requests workers ignored the per-host proxy (timeouts in proxy-only environments); i18n: 7 untranslated keys + parity restored; tests no longer touch the real user config
+- Audit 2026-09-04: global search could not jump to a cluster node's local storage (storage result key mirrored the pre-redesign tree)
+- Tree showed duplicate entries in some cluster layouts and could serve stale cached data; storage detail showed "Type: storage" instead of the plugin type; standalone hosts' local storages were hidden in the Storages view; storage content tabs appeared shifted by one after the Monitoring tab insertion (now pinned by a `TabIndex` contract test)
+
+**Performance**
+- Faster startup (~3.3s → ~1s): detail tabs are built lazily in chunks after the window shows, the `pyqtgraph` import warms up in a background thread, `requests` is imported only where used, keyring backend is detected once; spinners for async data loading instead of frozen tables
+
+**Internal**
+- `backend.py` split into a package: `RefreshCoordinator` (hard/soft refresh generations with timeouts), event bus seed, unified PVE error parsing (`parse_pve_error`); UI unchanged via facade
+- Incremental audits per the new methodology (`docs/AUDIT_PROCESS.md`, reports 2026-06-20/09-04/09-09), new development methodology (`docs/DEV_PROCESS.md`)
+- 730 tests (+209), ruff clean; Python 3.10–3.12
+
 ## v2.11.3 — performance: fast startup, no freeze on first selection
 
 **Performance**
