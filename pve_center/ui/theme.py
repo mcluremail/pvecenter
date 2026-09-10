@@ -405,7 +405,7 @@ def _build_qss() -> str:
         border-radius: 3px;
     }}
 
-    /* Акцентные кнопки (Start, Console, Создать ВМ) */
+    /* Акцентные кнопки (Создать ВМ) */
     QPushButton#accentBtn {{
         background: {Color.ACCENT};
         color: white;
@@ -423,26 +423,26 @@ def _build_qss() -> str:
         border-color: {Color.BORDER};
         color: white;
     }}
-    QToolButton#accentBtn {{
-        background: {Color.ACCENT};
-        color: white;
-        border: 1px solid {Color.ACCENT};
-        border-radius: 4px;
+    QToolButton#neutralBtn {{
+        background: {Color.PANEL};
+        color: {Color.TEXT};
+        border: 1px solid {Color.BORDER};
+        border-radius: 6px;
         padding: 5px 12px;
-        font-weight: 600;
+        font-weight: 500;
     }}
-    QToolButton#accentBtn:hover {{
-        background: {Color.ACCENT_HOVER};
+    QToolButton#neutralBtn:hover {{
+        background: {Color.HOVER};
     }}
-    QToolButton#accentBtn:pressed {{
-        background: {Color.ACCENT_HOVER};
+    QToolButton#neutralBtn:pressed {{
+        background: {Color.ALT_ROW};
     }}
-    QToolButton#accentBtn::menu-button {{
+    QToolButton#neutralBtn::menu-button {{
         border: none;
         width: 16px;
         background: transparent;
     }}
-    QToolButton#accentBtn:disabled {{
+    QToolButton#neutralBtn:disabled {{
         background: {Color.DISABLED};
         border-color: {Color.BORDER};
         color: white;

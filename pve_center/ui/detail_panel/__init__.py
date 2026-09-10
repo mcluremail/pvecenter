@@ -103,7 +103,6 @@ class DetailPanel(QWidget):
         for action_key, label in self._vm_actions.items():
             btn = QPushButton(get_icon(VM_ACTION_ICONS[action_key]), label)
             btn.setMinimumHeight(30)
-            btn.setObjectName("accentBtn" if action_key in ("start",) else "")
             btn.setToolTip(VM_ACTION_TOOLTIPS[action_key])
             btn.clicked.connect(lambda checked, a=action_key: self._on_vm_action(a))
             action_layout.addWidget(btn)
@@ -114,7 +113,7 @@ class DetailPanel(QWidget):
         self._console_btn.setIcon(get_icon("console"))
         self._console_btn.setText(tr("Console"))
         self._console_btn.setMinimumHeight(30)
-        self._console_btn.setObjectName("accentBtn")
+        self._console_btn.setObjectName("neutralBtn")
         self._console_btn.setToolTip(tr("Open console"))
         self._console_menu = QMenu(self._console_btn)
         self._console_novnc_act = QAction(tr("noVNC (built-in)"), self)
