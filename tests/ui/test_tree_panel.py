@@ -904,3 +904,227 @@ class TestPbsView:
         tp.reveal_key(("pbs", "pbs1"))
         assert tp._tree_mode == "pbs"
         assert tp.tree.currentItem().data(0, ITEM_KEY_ROLE) == ("pbs", "pbs1")
+
+
+class _FakeMenu:
+    """Stands in for QMenu (Shiboken forbids patching QMenu.exec)."""
+
+    def __init__(self, *a, **k):
+        self._actions = []
+
+    def addAction(self, action):
+        if isinstance(action, str):
+            from PySide6.QtGui import QAction
+            action = QAction(action, None)
+        self._actions.append(action)
+        return action
+
+    def addMenu(self, *a, **k):
+        sub = _FakeMenu()
+        self._actions.append(sub)
+        return sub
+
+    def addSeparator(self):
+        pass
+
+    def actions(self):
+        return self._actions
+
+    def setStyleSheet(self, *a, **k):
+        pass
+
+    def exec(self, *a, **k):
+        pass
+
+
+def _open_menu(qtbot, tp, item, monkeypatch):
+    """Open the context menu for an item (QMenu swapped for a fake)."""
+    import pve_center.ui.tree_panel as tp_mod
+
+    created = []
+
+    class _RecordingMenu(_FakeMenu):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            created.append(self)
+
+    monkeypatch.setattr(tp_mod, "QMenu", _RecordingMenu)
+    monkeypatch.setattr(tp.tree, "itemAt", lambda *a, **k: item)
+    tp._on_context_menu(QPointF(0, 0))
+    return created[0] if created else None
+
+
+def _menu_actions(menu):
+    from PySide6.QtGui import QAction
+    return [a.text() for a in menu.actions()
+            if isinstance(a, QAction) and a.text()]
+
+
+class TestStorageContextMenu:
+    """B4: storage config actions in the tree context menu."""
+
+    def test_host_storage_item_edit_delete(self, qtbot, make_node, make_storage,
+                                           monkeypatch):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        storages = [make_storage(host_name="h1", node="n1", storage="local")]
+        tp.update_data(node_repo.all(), [], storages, final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        item = _collect_items(tp)[("storage", "local", "host", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        texts = _menu_actions(menu)
+        assert "Edit storage…" in texts
+        assert "Delete storage" in texts
+
+        edits, deletes = [], []
+        tp.storage_edit_requested.connect(lambda h, s: edits.append((h, s)))
+        tp.storage_delete_requested.connect(lambda h, s: deletes.append((h, s)))
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if not isinstance(act, _QA):
+                continue
+            if act.text() == "Edit storage…":
+                act.trigger()
+            if act.text() == "Delete storage":
+                act.trigger()
+        assert edits == [("h1", "local")]
+        assert deletes == [("h1", "local")]
+
+    def test_per_node_storage_item_resolves_host(self, qtbot, make_node,
+                                                 make_storage, monkeypatch):
+        cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1", cluster="cl1",
+                                is_cluster=True))
+        node_repo.add(make_node(host_name="h1", node="n2", cluster="cl1",
+                                is_cluster=True))
+        storages = [
+            make_storage(host_name="h1", node="n1", cluster="cl1",
+                         storage="ceph", shared=True),
+            make_storage(host_name="h1", node="n2", cluster="cl1",
+                         storage="ceph", shared=True),
+        ]
+        tp.update_data(node_repo.all(), [], storages, final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        item = _collect_items(tp)[("storage", "ceph", "host", "h1", "n2")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        edits = []
+        tp.storage_edit_requested.connect(lambda h, s: edits.append((h, s)))
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if not isinstance(act, _QA):
+                continue
+            if act.text() == "Edit storage…":
+                act.trigger()
+        assert edits == [("h1", "ceph")]
+
+    def test_cluster_storage_item_resolves_first_member(self, qtbot, make_node,
+                                                        make_storage, monkeypatch):
+        cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1", cluster="cl1",
+                                is_cluster=True))
+        storages = [make_storage(host_name="h1", node="n1", cluster="cl1",
+                                 storage="ceph", shared=True)]
+        tp.update_data(node_repo.all(), [], storages, final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        item = _collect_items(tp)[("storage", "ceph", "cluster", "cl1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        deletes = []
+        tp.storage_delete_requested.connect(lambda h, s: deletes.append((h, s)))
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if not isinstance(act, _QA):
+                continue
+            if act.text() == "Delete storage":
+                act.trigger()
+        assert deletes == [("h1", "ceph")]
+
+    def test_no_actions_without_api_host(self, qtbot, make_node, monkeypatch):
+        """Cluster-scope storage with no matching cluster cfg → no CRUD actions."""
+        cfg = []
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+
+        # Fabricated item not present in the tree — the menu code only
+        # reads its key, and clX has no member configs.
+        from PySide6.QtWidgets import QTreeWidgetItem
+        item = QTreeWidgetItem()
+        item.setData(0, ITEM_KEY_ROLE, ("storage", "ceph", "cluster", "clX"))
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        texts = _menu_actions(menu)
+        assert "Edit storage…" not in texts
+        assert "Delete storage" not in texts
+
+    def test_create_storage_on_host(self, qtbot, make_node, monkeypatch):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        tp.update_data(node_repo.all(), [], [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        item = _collect_items(tp)[("host", "n1", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        assert "Create storage…" in _menu_actions(menu)
+        created = []
+        tp.storage_create_requested.connect(lambda h: created.append(h))
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if not isinstance(act, _QA):
+                continue
+            if act.text() == "Create storage…":
+                act.trigger()
+        assert created == ["h1"]
+
+    def test_no_create_storage_on_host_in_hosts_mode(self, qtbot, make_node,
+                                                     monkeypatch):
+        cfg = [{"name": "h1", "cluster": "", "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1"))
+        tp.update_data(node_repo.all(), [], [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+
+        item = _collect_items(tp)[("host", "n1", "h1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        assert "Create storage…" not in _menu_actions(menu)
+
+    def test_create_storage_on_cluster(self, qtbot, make_node, monkeypatch):
+        cfg = [{"name": "h1", "cluster": "cl1", "cluster_rep": True, "skip": False}]
+        tp = TreePanel(cfg)
+        qtbot.addWidget(tp)
+        node_repo = NodeRepository()
+        node_repo.add(make_node(host_name="h1", node="n1", cluster="cl1",
+                                is_cluster=True))
+        tp.update_data(node_repo.all(), [], [], final=True,
+                       node_repo=node_repo, vm_repo=None)
+        tp.set_mode("storages")
+
+        item = _collect_items(tp)[("cluster", "cl1")]
+        menu = _open_menu(qtbot, tp, item, monkeypatch)
+        created = []
+        tp.storage_create_requested.connect(lambda h: created.append(h))
+        from PySide6.QtGui import QAction as _QA
+        for act in menu.actions():
+            if not isinstance(act, _QA):
+                continue
+            if act.text() == "Create storage…":
+                act.trigger()
+        assert created == ["h1"]

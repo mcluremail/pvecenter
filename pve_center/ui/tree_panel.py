@@ -164,6 +164,9 @@ class TreePanel(QWidget):
     group_move_requested = Signal(str, str, str)  # kind ("host"|"cluster"), name, group ("" = none)
     group_rename_requested = Signal(str, str)     # old group name, new group name
     group_delete_requested = Signal(str)          # group name
+    storage_create_requested = Signal(str)        # host_name (any member host)
+    storage_edit_requested = Signal(str, str)     # (host_name, storage)
+    storage_delete_requested = Signal(str, str)   # (host_name, storage)
 
     def __init__(self, nodes_cfg):
         super().__init__()
@@ -560,6 +563,12 @@ class TreePanel(QWidget):
                     lambda checked, nn=item_name, hn=host_name: self.vm_create_requested.emit(nn, hn)
                 )
                 menu.addAction(create_vm_action)
+                if self._tree_mode == "storages":
+                    cs_act = QAction(tr("Create storage…"), self.tree)
+                    cs_act.triggered.connect(
+                        lambda checked, hn=host_name: self.storage_create_requested.emit(hn)
+                    )
+                    menu.addAction(cs_act)
                 templates = [vm for vm in self.all_vms
                              if vm.template and vm.host_name == host_name]
                 if templates:
@@ -613,6 +622,12 @@ class TreePanel(QWidget):
                         self.vm_create_requested.emit(nn, hn)
                 )
                 menu.addAction(create_vm_action)
+                if self._tree_mode == "storages":
+                    cs_act = QAction(tr("Create storage…"), self.tree)
+                    cs_act.triggered.connect(
+                        lambda checked, hn=cl_host_name: self.storage_create_requested.emit(hn)
+                    )
+                    menu.addAction(cs_act)
                 menu.addSeparator()
             delete_action = QAction(tr("Delete cluster"), self.tree)
             delete_action.triggered.connect(lambda: self.host_remove_requested.emit("cluster", item_name))
@@ -643,6 +658,29 @@ class TreePanel(QWidget):
 
         elif item_type == "storage":
             scope = key[3] if len(key) > 3 else ""
+            kind = key[2] if len(key) > 2 else ""
+            api_host = ""
+            if kind == "host":
+                api_host = scope
+            elif kind == "cluster":
+                first = next((c for c in self.nodes_cfg
+                              if c.get("cluster") == scope
+                              and c.get("type") != "pbs" and not c.get("skip")), None)
+                api_host = first.get("name", "") if first else ""
+            if api_host:
+                edit_act = QAction(tr("Edit storage…"), self.tree)
+                edit_act.triggered.connect(
+                    lambda checked, hn=api_host, sn=item_name:
+                        self.storage_edit_requested.emit(hn, sn)
+                )
+                menu.addAction(edit_act)
+                del_act = QAction(tr("Delete storage"), self.tree)
+                del_act.triggered.connect(
+                    lambda checked, hn=api_host, sn=item_name:
+                        self.storage_delete_requested.emit(hn, sn)
+                )
+                menu.addAction(del_act)
+                menu.addSeparator()
             note_act = QAction(tr("Edit note…"), self.tree)
             note_act.triggered.connect(
                 lambda checked, it=item, ks=f"storage:{item_name}:{scope}":

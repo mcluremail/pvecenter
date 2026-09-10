@@ -167,6 +167,9 @@ class MainWindow(QMainWindow):
         self.tree_panel.group_move_requested.connect(self._on_group_move)
         self.tree_panel.group_rename_requested.connect(self._on_group_rename)
         self.tree_panel.group_delete_requested.connect(self._on_group_delete)
+        self.tree_panel.storage_create_requested.connect(self._on_storage_create)
+        self.tree_panel.storage_edit_requested.connect(self._on_storage_edit)
+        self.tree_panel.storage_delete_requested.connect(self._on_storage_delete)
         self.tree_panel.vm_migrate_requested.connect(self._on_vm_migrate)
         self.tree_panel.vm_clone_requested.connect(self._on_vm_clone)
         self.tree_panel.vm_convert_requested.connect(self._on_vm_convert)
@@ -558,6 +561,85 @@ class MainWindow(QMainWindow):
         ))
         self._run_worker(worker)
         self.status_label.setText(tr("Creating VM..."))
+
+    # ------------------------------------------------------------
+    # Storage config CRUD (B4)
+    # ------------------------------------------------------------
+    def _on_storage_create(self, host_name):
+        from .storage_config_dialog import StorageConfigDialog
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self.status_label.setText(tr("Config not found for {}").format(host_name))
+            return
+        dialog = StorageConfigDialog(parent=self)
+        if dialog.exec() != StorageConfigDialog.Accepted:
+            return
+        params = dialog.get_params()
+        params["storage"] = dialog.get_storage_id()
+        params["type"] = dialog.get_storage_type()
+        from ..backend import StorageConfigSaveWorker
+        worker = StorageConfigSaveWorker(cfg, None, params)
+        self._run_storage_config_worker(worker)
+
+    def _on_storage_edit(self, host_name, storage):
+        from .storage_config_dialog import StorageConfigDialog
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self.status_label.setText(tr("Config not found for {}").format(host_name))
+            return
+        from ..backend import StorageConfigListWorker
+        list_worker = StorageConfigListWorker(cfg)
+
+        def _on_configs(configs, w=list_worker):
+            self._discard_worker(w)
+            config = next((c for c in configs if c.get("storage") == storage), None)
+            if config is None:
+                self.status_label.setText(tr("Storage not found: {}").format(storage))
+                return
+            dialog = StorageConfigDialog(config, parent=self)
+            if dialog.exec() != StorageConfigDialog.Accepted:
+                return
+            from ..backend import StorageConfigSaveWorker
+            worker = StorageConfigSaveWorker(cfg, storage, dialog.get_params())
+            self._run_storage_config_worker(worker)
+
+        list_worker.signals.result.connect(_on_configs)
+        list_worker.signals.error.connect(lambda err, w=list_worker: (
+            self._notifications.show(tr("Error: {}").format(err), error=True),
+            self._discard_worker(w)
+        ))
+        self._run_worker(list_worker)
+
+    def _on_storage_delete(self, host_name, storage):
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self, tr("Delete storage"),
+            tr("Delete storage {name}?").format(name=storage),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        cfg = self._cfg_by_name.get(host_name)
+        if not cfg:
+            self.status_label.setText(tr("Config not found for {}").format(host_name))
+            return
+        from ..backend import StorageConfigDeleteWorker
+        worker = StorageConfigDeleteWorker(cfg, storage)
+        self._run_storage_config_worker(worker)
+
+    def _run_storage_config_worker(self, worker):
+        worker.signals.result.connect(lambda msg, w=worker: (
+            self._notifications.show(msg),
+            self.status_label.setText(msg),
+            QTimer.singleShot(1500, self.refresh_data),
+            self._discard_worker(w)
+        ))
+        worker.signals.error.connect(lambda err, w=worker: (
+            self._notifications.show(tr("Error: {}").format(err), error=True),
+            self.status_label.setText(tr("Error: {}").format(err)),
+            self._discard_worker(w)
+        ))
+        self._run_worker(worker)
+        self.status_label.setText(tr("Working..."))
 
     # ------------------------------------------------------------
     # Удаление ВМ

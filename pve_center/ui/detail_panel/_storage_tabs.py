@@ -51,11 +51,12 @@ from ._table_utils import (
 
 
 class StorageToolbar(QWidget):
-    """Toolbar with Upload/Download URL/Move/Remove buttons for storage content tables."""
+    """Toolbar with Upload/Download URL/Move/Copy/Remove buttons for storage content tables."""
 
     upload_requested = Signal()
     download_url_requested = Signal()
     move_requested = Signal()
+    copy_requested = Signal()
     remove_requested = Signal()
 
     _UPLOAD_TYPES = {"iso", "vztmpl", "backup"}
@@ -90,6 +91,11 @@ class StorageToolbar(QWidget):
         self._move_btn.clicked.connect(self.move_requested)
         self._move_btn.setToolTip("")
 
+        self._copy_btn = QPushButton(tr("Copy"))
+        self._copy_btn.setEnabled(False)
+        self._copy_btn.clicked.connect(self.copy_requested)
+        self._copy_btn.setToolTip("")
+
         self._remove_btn = QPushButton(tr("Remove"))
         rm_icon = get_icon("remove")
         if rm_icon:
@@ -104,6 +110,7 @@ class StorageToolbar(QWidget):
         layout.addWidget(self._upload_btn)
         layout.addWidget(self._download_btn)
         layout.addWidget(self._move_btn)
+        layout.addWidget(self._copy_btn)
         layout.addWidget(self._remove_btn)
         layout.addStretch()
 
@@ -128,6 +135,7 @@ class StorageToolbar(QWidget):
         self._upload_btn.setEnabled(can_upload)
         self._download_btn.setEnabled(can_download)
         self._move_btn.setEnabled(has_sel)
+        self._copy_btn.setEnabled(has_sel)
         self._remove_btn.setEnabled(has_sel)
 
     def set_context(self, node_name, storage_name, host_name, cfg, content_type):
@@ -695,7 +703,8 @@ class StorageTabs:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", RuntimeWarning)
                     for sig in (tb.upload_requested, tb.download_url_requested,
-                                tb.move_requested, tb.remove_requested):
+                                tb.move_requested, tb.copy_requested,
+                                tb.remove_requested):
                         try:
                             sig.disconnect()
                         except (RuntimeError, TypeError):
@@ -706,6 +715,8 @@ class StorageTabs:
                     self._on_download_url(n, s, h, ct))
                 tb.move_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
                     self._on_move(n, s, h))
+                tb.copy_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
+                    self._on_move(n, s, h, mode="copy"))
                 tb.remove_requested.connect(lambda n=node_name, s=storage_name, h=host_name:
                     self._on_remove_file(n, s, h))
                 table_map_tb = {
@@ -1360,7 +1371,7 @@ class StorageTabs:
         )
         panel._workers_mgr.run_worker(worker)
 
-    def _on_move(self, node_name, storage_name, host_name):
+    def _on_move(self, node_name, storage_name, host_name, mode="move"):
         panel = self.panel
         cfg = panel._cfg_by_name.get(host_name)
         if not cfg:
@@ -1381,12 +1392,14 @@ class StorageTabs:
             and s.host_name == host_name
             and s.storage != storage_name
         ]
-        dlg = StorageMoveDialog(volid_full, target_storages, is_disk, self.panel)
+        dlg = StorageMoveDialog(volid_full, target_storages, is_disk, self.panel, mode=mode)
         if dlg.exec() != QDialog.Accepted:
             return
         params = dlg.get_params()
         if not params["target_storage"]:
             return
+        fail_msg = (tr("Copy failed: {err}") if mode == "copy"
+                    else tr("Move failed: {err}"))
         from ...backend import StorageMoveWorker
         worker = StorageMoveWorker(
             cfg, node_name, storage_name, volid_full,
@@ -1403,7 +1416,7 @@ class StorageTabs:
         )
         worker.signals.error.connect(
             lambda err, w=worker: (
-                panel.config_update_result.emit(tr("Move failed: {err}").format(err=err)),
+                panel.config_update_result.emit(fail_msg.format(err=err)),
                 panel._workers_mgr.discard_worker(w),
             )
         )

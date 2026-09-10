@@ -16,11 +16,13 @@ from .theme import Color
 
 
 class StorageMoveDialog(QDialog):
-    """Move a volume to another storage."""
+    """Move or copy a volume to another storage."""
 
-    def __init__(self, volid, storages, is_disk, parent=None):
+    def __init__(self, volid, storages, is_disk, parent=None, mode="move"):
         super().__init__(parent)
-        self.setWindowTitle(tr("Move volume"))
+        self._mode = mode if mode in ("move", "copy") else "move"
+        title = tr("Copy volume") if self._mode == "copy" else tr("Move volume")
+        self.setWindowTitle(title)
         self.setMinimumWidth(450)
         self._volid = volid
         self._is_disk = is_disk
@@ -29,7 +31,7 @@ class StorageMoveDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        header = QLabel(f"<b>{tr('Move volume')}</b>")
+        header = QLabel(f"<b>{title}</b>")
         layout.addWidget(header)
 
         vol_label = QLabel(f"{tr('Volume:')} {volid}")
@@ -57,13 +59,15 @@ class StorageMoveDialog(QDialog):
             self._vmid_spin.setVisible(False)
 
         self._delete_check = QCheckBox(tr("Delete source after move"))
+        if self._mode == "copy":
+            self._delete_check.setVisible(False)
         form.addRow("", self._delete_check)
 
         layout.addLayout(form)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        ok_btn = QPushButton(tr("Move"))
+        ok_btn = QPushButton(title)
         ok_btn.setObjectName("accentBtn")
         ok_btn.setFixedWidth(120)
         ok_btn.clicked.connect(self.accept)
@@ -78,7 +82,7 @@ class StorageMoveDialog(QDialog):
         return {
             "target_storage": self._target_combo.currentText().strip(),
             "target_vmid": self._vmid_spin.value() if self._is_disk else 0,
-            "delete_source": self._delete_check.isChecked(),
+            "delete_source": (self._mode == "move") and self._delete_check.isChecked(),
         }
 
 

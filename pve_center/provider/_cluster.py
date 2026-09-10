@@ -37,6 +37,33 @@ class ClusterAPI:
             return int(result.get("data", result))
         return int(result)
 
+    # -- Storage config (B4) --
+
+    # NOTE: storage config CRUD lives at top-level /storage, NOT /cluster/storage
+    # (verified against pve-manager PVE/API2.pm: subclass mounted at path 'storage').
+
+    def list_storage_configs(self) -> list[dict]:
+        """GET /storage — all storage definitions."""
+        return self._s.call(self._s.proxmox.storage.get)
+
+    def get_storage_config(self, storage: str) -> dict:
+        """GET /storage/{storage} — single storage definition."""
+        return self._s.call(self._s.proxmox.storage(_q(storage)).get)
+
+    def create_storage(self, **params) -> object:
+        """POST /storage — create a storage definition."""
+        return self._s.call(self._s.proxmox.storage.post, **params)
+
+    def update_storage(self, storage: str, **params) -> object:
+        """PUT /storage/{storage} — update a storage definition."""
+        return self._s.call(
+            self._s.proxmox.storage(_q(storage)).put, **params
+        )
+
+    def delete_storage(self, storage: str) -> object:
+        """DELETE /storage/{storage}."""
+        return self._s.call(self._s.proxmox.storage(_q(storage)).delete)
+
     # -- HA groups --
 
     def list_ha_groups(self) -> list[dict]:

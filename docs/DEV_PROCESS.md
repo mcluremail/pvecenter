@@ -54,6 +54,13 @@ uv lock                                       # только при измене
 Короткий список для *написания* кода (что проверяет аудит — в
 [AUDIT_PROCESS.md](AUDIT_PROCESS.md), чеклисты должны совпадать):
 
+**Документация, не догадки**: любой вызов внешнего API (PVE/PBS) — сначала
+сверить путь, метод и параметры с официальной документацией или исходником
+([api-viewer](https://pve.proxmox.com/pve-docs/api-viewer/), apidoc.js,
+git.proxmox.com), потом код. «По памяти» эндпоинты не пишутся — как
+`/cluster/storage` вместо реального `/storage` (501 от PVE, фаза B4).
+Сомнения в поведении сервера — проверять исходником/apidoc, не эмпирикой.
+
 **Воркеры / потоки** (`backend/`, `ui/api/`):
 - новый запрос к PVE/PBS — через `create_provider(cfg)` (или фабрику
   `build_requests_session(cfg)` для raw-requests), а не голый `requests`/proxmoxer;

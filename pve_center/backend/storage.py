@@ -1,4 +1,5 @@
-"""Storage content workers: delete, upload, download-url, move, vzdump."""
+"""Storage workers: content ops (delete, upload, download-url, move,
+vzdump) and cluster storage config CRUD (B4)."""
 
 import logging
 import os
@@ -283,3 +284,118 @@ class VzdumpWorker(QRunnable):
 # ----------------------------------------------------------------------
 # VmRestoreWorker — POST /nodes/{node}/qemu or /nodes/{node}/lxc (restore)
 # ----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
+# Storage config CRUD (B4) — /storage
+# ----------------------------------------------------------------------
+class StorageConfigListSignals(QObject):
+    result = Signal(list)
+    error = Signal(str)
+    finished = Signal()
+class StorageConfigListWorker(QRunnable):
+    """GET /storage — list all storage definitions."""
+    def __init__(self, host_cfg, timeout=30):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.timeout = timeout
+        self.signals = StorageConfigListSignals()
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=10)
+            configs = provider.cluster.list_storage_configs()
+            _safe_emit(self.signals.result, configs or [])
+        except Exception as e:
+            logger.debug("storage config list error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            if provider:
+                provider.close()
+            _safe_emit(self.signals.finished)
+
+
+class StorageConfigSaveSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+class StorageConfigSaveWorker(QRunnable):
+    """POST (create) or PUT (update) /storage.
+
+    ``storage`` None → create with params {"storage": id, ...};
+    otherwise update the given storage id.
+    """
+    def __init__(self, host_cfg, storage, params, timeout=60):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.storage = storage
+        self.params = params
+        self.timeout = timeout
+        self.signals = StorageConfigSaveSignals()
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=10)
+            if self.storage:
+                ok, err = _await_task(
+                    provider, None,
+                    provider.cluster.update_storage(self.storage, **self.params),
+                    timeout=self.timeout,
+                )
+                verb = tr("Storage updated: {name}")
+            else:
+                ok, err = _await_task(
+                    provider, None,
+                    provider.cluster.create_storage(**self.params),
+                    timeout=self.timeout,
+                )
+                verb = tr("Storage created: {name}")
+            name = self.params.get("storage", self.storage)
+            if ok:
+                _safe_emit(self.signals.result, verb.format(name=name))
+            else:
+                _safe_emit(self.signals.error, _sanitize_error(err))
+        except Exception as e:
+            logger.debug("storage config save error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            if provider:
+                provider.close()
+            _safe_emit(self.signals.finished)
+
+
+class StorageConfigDeleteSignals(QObject):
+    result = Signal(str)
+    error = Signal(str)
+    finished = Signal()
+class StorageConfigDeleteWorker(QRunnable):
+    """DELETE /storage/{storage}."""
+    def __init__(self, host_cfg, storage, timeout=60):
+        super().__init__()
+        self.host_cfg = host_cfg
+        self.storage = storage
+        self.timeout = timeout
+        self.signals = StorageConfigDeleteSignals()
+
+    def run(self):
+        provider = None
+        try:
+            provider = create_provider(self.host_cfg, timeout=10)
+            ok, err = _await_task(
+                provider, None,
+                provider.cluster.delete_storage(self.storage),
+                timeout=self.timeout,
+            )
+            if ok:
+                _safe_emit(self.signals.result,
+                           tr("Storage deleted: {name}").format(name=self.storage))
+            else:
+                _safe_emit(self.signals.error, _sanitize_error(err))
+        except Exception as e:
+            logger.debug("storage config delete error: %s", e)
+            _safe_emit(self.signals.error, _sanitize_error(e))
+        finally:
+            if provider:
+                provider.close()
+            _safe_emit(self.signals.finished)

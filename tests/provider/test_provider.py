@@ -300,6 +300,44 @@ class TestClusterAPI:
         api = ClusterAPI(mock_session)
         assert api.next_vmid() == 102
 
+    def test_list_storage_configs(self, mock_session):
+        mock_session.proxmox.storage.get = MagicMock(
+            return_value=[{"storage": "local", "type": "dir"}]
+        )
+        api = ClusterAPI(mock_session)
+        assert api.list_storage_configs() == [{"storage": "local", "type": "dir"}]
+
+    def test_get_storage_config(self, mock_session):
+        chain = mock_session.proxmox.storage
+        chain.return_value.get = MagicMock(return_value={"storage": "local"})
+        api = ClusterAPI(mock_session)
+        assert api.get_storage_config("local") == {"storage": "local"}
+        chain.assert_called_once_with("local")
+
+    def test_create_storage(self, mock_session):
+        mock_session.proxmox.storage.post = MagicMock(return_value="OK")
+        api = ClusterAPI(mock_session)
+        api.create_storage(storage="new1", type="dir", path="/mnt/x")
+        mock_session.proxmox.storage.post.assert_called_once_with(
+            storage="new1", type="dir", path="/mnt/x"
+        )
+
+    def test_update_storage(self, mock_session):
+        chain = mock_session.proxmox.storage
+        chain.return_value.put = MagicMock(return_value="OK")
+        api = ClusterAPI(mock_session)
+        api.update_storage("local", content="iso,vztmpl")
+        chain.assert_called_once_with("local")
+        chain.return_value.put.assert_called_once_with(content="iso,vztmpl")
+
+    def test_delete_storage(self, mock_session):
+        chain = mock_session.proxmox.storage
+        chain.return_value.delete = MagicMock(return_value="OK")
+        api = ClusterAPI(mock_session)
+        api.delete_storage("old1")
+        chain.assert_called_once_with("old1")
+        chain.return_value.delete.assert_called_once()
+
     def test_list_ha_groups(self, mock_session):
         mock_session.proxmox.cluster.ha.groups.get = MagicMock(return_value=[{"group": "g1"}])
         api = ClusterAPI(mock_session)
