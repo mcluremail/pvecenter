@@ -303,7 +303,12 @@ class NoVncWorker(QRunnable):
             msg = str(e).lower()
             if "permission check failed" in msg or "403" in msg:
                 err = tr("PVE permission denied for console (requires VM.Console)")
-            elif "not supported" in msg or "vnc" in msg:
+            elif ("not supported" in msg or "no console" in msg
+                  or "unsupported" in msg):
+                # ВАЖНО: не матчить по подстроке "vnc" — префиксы
+                # "vncproxy:"/"vncwebsocket:" есть в любом сообщении,
+                # catch-all превращал таймаут/сбой сети в ложное
+                # «консоль не поддерживается».
                 err = tr("Console not supported for this VM")
             else:
                 err = tr("Console proxy error: {}").format(e)

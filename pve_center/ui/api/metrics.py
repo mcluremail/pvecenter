@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ...backend import _suppress_ssl_warnings
 from ...plugins import create_provider
+from ...provider._session import build_requests_session
 from ..i18n import tr
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,7 @@ class StorageContentListWorker(QRunnable):
         self.signals = ContentListSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
@@ -157,7 +158,7 @@ class StorageBackupWorker(QRunnable):
         self.signals = BackupSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (f"PVEAPIToken={self.host_cfg['user']}!{self.host_cfg['token_name']}={self.host_cfg['token_value']}")
@@ -198,7 +199,7 @@ class HostNetworkWorker(QRunnable):
         self.signals = NetworkSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
@@ -241,7 +242,7 @@ class HostServicesWorker(QRunnable):
         self.signals = ServicesSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
@@ -284,7 +285,7 @@ class HostDisksWorker(QRunnable):
         self.signals = DisksSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (
@@ -382,7 +383,7 @@ class HostSnapshotsWorker(QRunnable):
                 vm_name = vm.name or ""
                 if not vmid:
                     return
-                s = requests.Session()
+                s = build_requests_session(self.host_cfg)
                 try:
                     s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(self.node_name, safe="")
@@ -477,7 +478,7 @@ class StorageDisksWorker(QRunnable):
                 vm_node = vm.node
                 if not vmid or not vm_node:
                     return
-                s = requests.Session()
+                s = build_requests_session(self.host_cfg)
                 try:
                     s.verify = _verify_ssl(self.host_cfg)
                     enc_node = urllib.parse.quote(vm_node, safe="")
@@ -699,7 +700,7 @@ class HealthCheckWorker(QRunnable):
         self.signals = HealthCheckSignals()
 
     def run(self):
-        session = requests.Session()
+        session = build_requests_session(self.host_cfg)
         try:
             session.verify = _verify_ssl(self.host_cfg)
             auth_token = (

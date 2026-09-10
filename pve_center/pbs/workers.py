@@ -45,10 +45,16 @@ class PbsApiWorker(QRunnable):
         try:
             provider = PbsProvider(self.cfg, timeout=self.timeout)
             result = getattr(provider, self.method)(*self.args, **self.kwargs)
-            self.signals.done.emit(self.tag, result)
+            try:
+                self.signals.done.emit(self.tag, result)
+            except RuntimeError:
+                pass
         except Exception as e:
             logger.debug("pbs worker error (%s)", self.method, exc_info=True)
             try:
                 self.signals.failed.emit(self.tag, str(e))
             except RuntimeError:
                 pass
+        finally:
+            if provider is not None:
+                provider.close()

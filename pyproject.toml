@@ -32,13 +32,16 @@ dependencies = [
     # On Windows the app ships with bundled deps (PyInstaller build), so the
     # noVNC console bridge must always be there; on Linux it is optional
     # (system python) — see the "novnc" extra below.
-    "websockets>=12.0; sys_platform == 'win32'",
+    # websockets >=14 required: WsBridge uses `additional_headers` from the
+    # asyncio implementation (in 12–13 top-level connect is legacy with
+    # `extra_headers` and the bridge would fail on every connection).
+    "websockets>=14.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 # Built-in noVNC console (WS bridge). Without it the app runs fine,
 # the console shows a clear "module not installed" hint.
-novnc = ["websockets>=12.0"]
+novnc = ["websockets>=14.0"]
 dev = ["pytest>=8.0", "pytest-qt>=4.4"]
 
 [project.urls]

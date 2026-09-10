@@ -435,6 +435,7 @@
   "In": "Вход",
   "Include RAM state": "Включить состояние RAM",
   "Include RAM state in snapshot": "Включить состояние RAM в снимок",
+  "Info": "Инфо",
   "Initial password": "Начальный пароль",
   "Install Ceph": "Установить Ceph",
   "Interface": "Интерфейс",

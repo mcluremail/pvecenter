@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QToolBar
 
@@ -43,6 +43,10 @@ class NoVncWindow(QMainWindow):
     def __init__(self, host_cfg, node, vmid, vm_type, ws_url, ticket,
                  parent=None):
         super().__init__(parent)
+        # Окно должно разрушаться при закрытии: без этого C++-объект
+        # (QMainWindow + QWebEngineView с рендер-процессом) остаётся
+        # скрытым ребёнком mainwindow на каждое открытие консоли.
+        self.setAttribute(Qt.WA_DeleteOnClose)
         self._host_cfg = host_cfg
         self._ticket = ticket
         title = host_cfg.get("name", host_cfg.get("host", ""))

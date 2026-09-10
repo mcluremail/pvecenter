@@ -25,6 +25,10 @@ class PbsProvider:
     def client(self) -> PbsClient:
         return self._client
 
+    def close(self) -> None:
+        """Release the underlying HTTP session."""
+        self._client.close()
+
     # ── datastores ───────────────────────────────────────────────
 
     def datastores(self) -> list[PbsDatastore]:

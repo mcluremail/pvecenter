@@ -379,6 +379,7 @@ def export_config(dest_path: str) -> bool:
 _ALLOWED_IMPORT_FIELDS = frozenset({
     "name", "host", "user", "token_name", "token_value",
     "cluster", "cluster_rep", "skip", "trust_ssl",
+    "type", "port", "proxy",
 })
 
 

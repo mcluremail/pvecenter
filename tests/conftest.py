@@ -6,6 +6,16 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+@pytest.fixture(autouse=True)
+def _isolate_xdg(tmp_path, monkeypatch):
+    """Изолировать пользовательские каталоги: тесты не должны трогать
+    реальный ~/.config/pve-center (config.sqlite, кэш i18n и т.п.).
+    Регресс аудита 2026-09-09."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+
+
 @pytest.fixture
 def make_node():
     """Factory fixture for building Node domain objects."""

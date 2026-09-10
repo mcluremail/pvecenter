@@ -57,6 +57,10 @@ class PbsClient:
             self._http.trust_env = False
             self._http.proxies.update({"http": proxy, "https": proxy})
 
+    def close(self) -> None:
+        """Release the underlying TLS connection pool."""
+        self._http.close()
+
     # ── auth ─────────────────────────────────────────────────────
 
     def login(self) -> None:

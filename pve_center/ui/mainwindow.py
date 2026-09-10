@@ -396,7 +396,10 @@ class MainWindow(QMainWindow):
             self._offline_mode = False
             self._offline_ts = None
 
-    def _run_worker(self, worker):
+    def _run_worker(self, worker) -> bool:
+        """Запускает воркер в пуле. False — отклонён (пул переполнен):
+        воркер никогда не стартует и не отчитается, поэтому вызывающий
+        код не должен учитывать его в ожиданиях (track_hard/begin_soft)."""
         if len(self._workers) >= MAX_WORKERS:
             try:
                 worker.signals.deleteLater()
@@ -406,11 +409,12 @@ class MainWindow(QMainWindow):
                 tr("Too many concurrent operations. Please wait and try again."),
                 error=True,
             )
-            return
+            return False
         self._workers.add(worker)
         if hasattr(worker.signals, "finished"):
             worker.signals.finished.connect(lambda w=worker: self._discard_worker(w))
         QThreadPool.globalInstance().start(worker)
+        return True
 
     def _discard_worker(self, worker):
         """Удаляет воркер из _workers и отключает signal connections."""
@@ -1240,11 +1244,13 @@ class MainWindow(QMainWindow):
 
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
-            self._refresh.track_hard(worker)
             worker.signals.result_ready.connect(
                 lambda data, w=worker, g=refresh_gen: self.on_worker_finished(data, w, g)
             )
-            self._run_worker(worker)
+            # track_hard только для фактически запущенных: отклонённый
+            # воркер не отчитается и навсегда заблокировал бы финализацию
+            if self._run_worker(worker):
+                self._refresh.track_hard(worker)
 
         if not active_cfgs:
             self.tree_panel.update_data(
@@ -1464,6 +1470,16 @@ class MainWindow(QMainWindow):
         if not active_cfgs:
             self._refresh.finish_soft()
             return
+        # Пул может быть переполнен: воркеры сверх лимита не стартуют,
+        # а begin_soft уже заявила их в expected → цикл висел бы до
+        # тайм-аута. Запускаем только влезающие, остаток — следующий тик.
+        capacity = max(0, MAX_WORKERS - len(self._workers))
+        if capacity == 0:
+            self._refresh.finish_soft()
+            return
+        if len(active_cfgs) > capacity:
+            active_cfgs = active_cfgs[:capacity]
+            soft_gen = self._refresh.begin_soft(len(active_cfgs), now)
         for cfg in active_cfgs:
             worker = FetchWorker(cfg)
             worker.signals.result_ready.connect(

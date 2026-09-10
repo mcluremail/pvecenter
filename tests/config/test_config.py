@@ -291,6 +291,24 @@ class TestBundle:
         assert config.load_config()[0]["cluster"] == "ros"
         assert config.load_config()[0]["token_value"] == "secret-1"
 
+    def test_import_preserves_type_port_proxy(self, cfg_dir, fake_keyring, monkeypatch):
+        """Регресс: import не должен терять type/port/proxy — иначе PBS-сервер
+        после переноса бандла превращается в битый PVE-хост."""
+        monkeypatch.setattr(config, "_ask_password", lambda mode="enter": "password123")
+        pbs = make_cfg("pbs1", "10.1.0.1", type="pbs", port=8007,
+                       proxy="http://squid:3128")
+        config.save_config([pbs])
+        bundle = cfg_dir / "bundle.enc"
+        assert config.export_config(str(bundle)) is True
+
+        config.save_config([])
+        imported = config.import_config(str(bundle), merge=False)
+        assert imported is not None
+        cfg = imported[0]
+        assert cfg["type"] == "pbs"
+        assert cfg["port"] == 8007
+        assert cfg["proxy"] == "http://squid:3128"
+
     def test_import_merge_replaces_by_host_user(self, cfg_dir, fake_keyring, monkeypatch):
         monkeypatch.setattr(config, "_ask_password", lambda mode="enter": "password123")
         config.save_config([make_cfg("h1", "10.0.0.1", cluster="old")])

@@ -8,12 +8,16 @@ of creating raw ProxmoxAPI / requests.Session instances.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import urllib3
 from proxmoxer import ProxmoxAPI
 
 from ._errors import ProxmoxError, from_exception
+
+if TYPE_CHECKING:
+    import requests
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +48,24 @@ def _proxy_url(cfg: dict) -> str | None:
 def _proxies(url: str | None) -> dict[str, str] | None:
     """requests proxies dict for an explicit proxy URL (None → env default)."""
     return {"http": url, "https": url} if url else None
+
+
+def build_requests_session(cfg: dict) -> requests.Session:
+    """Сырая requests-сессия с per-host прокси (для raw-воркеров UI).
+
+    Голая Session() игнорирует cfg["proxy"] — в proxy-only окружении все
+    raw-воркеры падали по тайм-ауту, пока дерево через provider работал.
+    Явный прокси: trust_env=False + proxies (env не перебивает session-level).
+    Пустой cfg["proxy"]: env-прокси учитываются как раньше (trust_env=True).
+    """
+    import requests  # deferred: не тянуть requests в startup path (cfce3cd)
+
+    sess = requests.Session()
+    proxy = _proxy_url(cfg)
+    if proxy:
+        sess.trust_env = False
+        sess.proxies.update({"http": proxy, "https": proxy})
+    return sess
 
 
 def _verify_ssl(cfg: dict) -> bool:

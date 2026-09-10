@@ -36,6 +36,7 @@ class WsBridge(QObject):
         self._server = None
         self._upstream = None
         self._error_sent = False
+        self._stop_requested = False
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
@@ -46,6 +47,10 @@ class WsBridge(QObject):
         self._thread.start()
 
     def stop(self):
+        # Флаг обязателен: stop() может прийти ДО назначения self._loop
+        # в потоке (гонка при быстром закрытии окна) — без флага запрос
+        # теряется и поток утекает вместе с сервером.
+        self._stop_requested = True
         if self._loop is None:
             return
         try:
@@ -67,10 +72,18 @@ class WsBridge(QObject):
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         try:
-            self._loop.run_until_complete(self._serve())
-            self._loop.run_forever()
+            if not self._stop_requested:
+                self._loop.run_until_complete(self._serve())
+                self._loop.run_forever()
+        except asyncio.CancelledError:
+            # остановка до завершения _serve: teardown отменяет serve-задачу —
+            # штатный сценарий, а не ошибка (CancelledError — BaseException)
+            pass
         except Exception as e:
-            self._emit_error(str(e))
+            if self._stop_requested:
+                logger.debug("noVNC bridge stopped during startup: %s", e)
+            else:
+                self._emit_error(str(e))
         finally:
             self._loop.close()
             try:
@@ -124,13 +137,31 @@ class WsBridge(QObject):
 
     def _shutdown(self):
         async def _close():
+            # Порядок важен: wait_closed() ждёт завершения conn_handler,
+            # а тот ждёт закрытия апстрима — закрывать апстрим ДО ожидания.
             if self._server is not None:
                 self._server.close()
-                await self._server.wait_closed()
             if self._upstream is not None:
                 await self._upstream.close()
+            if self._server is not None:
+                await self._server.wait_closed()
+            # Гасим оставшиеся задачи (conn_handler, keepalive) ДО остановки
+            # цикла: иначе close() ловит "Task was destroyed", а корутины —
+            # GeneratorExit с записью в уже закрытый fd (EBADF).
+            tasks = [t for t in asyncio.all_tasks()
+                     if t is not asyncio.current_task()]
+            for t in tasks:
+                t.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+        def _finalize(task):
+            if not task.cancelled() and task.exception() is not None:
+                logger.debug("bridge shutdown error", exc_info=task.exception())
+            self._loop.stop()
+
         try:
-            asyncio.ensure_future(_close())
-            self._loop.call_later(0.5, self._loop.stop)
+            # Останавливаем цикл только после завершения teardown.
+            asyncio.ensure_future(_close()).add_done_callback(_finalize)
         except RuntimeError:
             pass
