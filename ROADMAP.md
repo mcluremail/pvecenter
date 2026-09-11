@@ -152,7 +152,11 @@ sync-вызовы на путях конфига/редких действий.
 - Backup compliance: какие ВМ/CT не покрыты бэкап-джобом, у кого последний
   бэкап неудачный/старше N дней (`GET /cluster/backup` + PBS vmaidx,
   фундамент v2.12). Семантика покрытия: учёт all:1 / vmid[] / pool /
-  include-exclude джобов.
+  include-exclude джобов. **Matching-движок — отдельный доменный модуль**
+  (без Qt/API), table-driven юнит-тесты до UI: он определяет доверие ко
+  всему отчёту — false positive/negative подрывают Fleet Health с первого
+  запуска (пул может пересекаться с exclude-списком другого джоба, ВМ
+  мигрирует между пулами между запусками).
 - Version drift: ноды, отстающие по версии PVE (`GET /nodes/{node}/version`)
   — риск несовместимости при будущих cross-cluster операциях.
 - Storage runway: тренды rrddata → «хранилище кончится через ~N дней»
