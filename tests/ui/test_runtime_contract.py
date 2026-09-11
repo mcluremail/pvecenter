@@ -15,10 +15,7 @@ import tests.ui.runtime_contract as rc
 from tests.ui.runtime_contract import (
     RuntimeContractViolation,
     _SyncTrap,
-    install_autofire_dialogs,
-    install_fake_pool,
     install_guard,
-    install_pyqtgraph_shims,
 )
 
 
@@ -61,28 +58,6 @@ class TestGuard:
         t.join()
         assert result["value"] is None
         assert violations == []
-
-
-@pytest.fixture()
-def offline(monkeypatch):
-    """Полный офлайн-режим: guard + fake pool + autofire диалоги."""
-    violations = install_guard(monkeypatch)
-    pool = install_fake_pool(monkeypatch)
-    install_autofire_dialogs(monkeypatch)
-    install_pyqtgraph_shims(monkeypatch)
-    return violations, pool
-
-
-@pytest.fixture()
-def main_window(qtbot, monkeypatch, tmp_path, offline):
-    """MainWindow как в tests/ui/test_refresh_tracking.py + офлайн."""
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    from pve_center.ui.mainwindow import MainWindow
-
-    mw = MainWindow()
-    qtbot.addWidget(mw)
-    yield mw
-    mw.close()
 
 
 def _run_and_report(actions, violations, label):

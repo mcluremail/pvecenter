@@ -76,6 +76,7 @@ from .detail_panel import DetailPanel
 from .i18n import get_language, supported_languages, tr
 from .icons import get_icon
 from .notification import NotificationManager
+from .optimistic import OptimisticVMs
 from .search_dialog import GlobalSearchDialog
 from .theme import Color
 from .tree_panel import TreePanel
@@ -164,6 +165,10 @@ class MainWindow(QMainWindow):
         self.tree_panel.vm_delete_requested.connect(self._on_vm_delete_requested)
         self.tree_panel.vm_action_requested.connect(self._on_vm_action_from_tree)
         self.tree_panel.bulk_vm_action_requested.connect(self._on_bulk_vm_action)
+        # M0.3: optimistic UI — мгновенный статус + откат по ошибке.
+        self._optimistic = OptimisticVMs(
+            self._vm_repo, on_change=self._on_optimistic_change
+        )
         self.tree_panel.group_move_requested.connect(self._on_group_move)
         self.tree_panel.group_rename_requested.connect(self._on_group_rename)
         self.tree_panel.group_delete_requested.connect(self._on_group_delete)
@@ -855,6 +860,9 @@ class MainWindow(QMainWindow):
         dlg.exec()
         return result[0]
 
+    def _on_optimistic_change(self):
+        self.tree_panel.set_pending_vm_keys(self._optimistic.pending_keys())
+
     def _on_vm_action_from_tree(self, host_name, node, vmid, action):
         cfg = self._cfg_by_name.get(host_name)
         if not cfg:
@@ -867,13 +875,17 @@ class MainWindow(QMainWindow):
         vm_type = (vm.vm_type.value if vm else "qemu")
         if not confirm_vm_action(action, vmid, parent=self):
             return
+        # M0.3: применяем optimistic-статус сразу, подтверждаем по ответу.
+        self._optimistic.apply(host_name, vmid, action)
         from ..backend import VmActionWorker
         worker = VmActionWorker(cfg, node, vmid, vm_type, action)
         worker.signals.action_result.connect(lambda msg: (
+            self._optimistic.confirm(host_name, vmid),
             self._notifications.show(msg),
             self.refresh_data()
         ))
         worker.signals.action_error.connect(lambda err: (
+            self._optimistic.rollback(host_name, vmid),
             self._notifications.show(tr("Action error: {}").format(err), error=True)
         ))
         self._run_worker(worker)

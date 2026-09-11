@@ -193,6 +193,8 @@ class TreePanel(QWidget):
         self._rebuild_timer.timeout.connect(self._do_rebuild)
 
         self._loading_hosts = set()
+        # M0.3: VM в optimistic-pending (host_name, vmid) — спиннер.
+        self._pending_vm_keys: set[tuple[str, int]] = set()
         # B17: datastore child to re-select after datastores refill post-rebuild
         self._pending_ds_key = None
         self._spinner_angle = 0
@@ -731,10 +733,53 @@ class TreePanel(QWidget):
                     item.setIcon(0, icon)
                 elif key[0] == "cluster" and f"cluster:{key[1]}" in self._loading_hosts:
                     item.setIcon(0, icon)
+            # M0.3: optimistic power-действия — VM в pending крутится.
+            vm_key = item.data(0, VM_KEY_ROLE)
+            if vm_key and (vm_key[0], vm_key[1]) in self._pending_vm_keys:
+                item.setIcon(0, icon)
             for i in range(item.childCount()):
                 spin(item.child(i))
         for i in range(self.tree.topLevelItemCount()):
             spin(self.tree.topLevelItem(i))
+
+    def set_pending_vm_keys(self, keys):
+        """M0.3: множество (host_name, vmid) в optimistic-pending.
+
+        Спиннер на этих элементах дерева; при выходе из pending иконка
+        восстанавливается из репозитория (текущий/откатанный статус)."""
+        old = self._pending_vm_keys
+        self._pending_vm_keys = set(keys)
+        changed = old.symmetric_difference(self._pending_vm_keys)
+        if changed:
+            self._refresh_vm_items(changed)
+        self._sync_spinner()
+
+    def _sync_spinner(self):
+        if self._loading_hosts or self._pending_vm_keys:
+            self._spin_timer.start()
+        else:
+            self._spin_timer.stop()
+
+    def _refresh_vm_items(self, keys):
+        def refresh(item):
+            vm_key = item.data(0, VM_KEY_ROLE)
+            if vm_key and (vm_key[0], vm_key[1]) in keys:
+                vm = (
+                    self._vm_repo.get(vm_key[0], vm_key[1])
+                    if self._vm_repo else None
+                )
+                if vm is not None:
+                    if vm.template:
+                        item.setIcon(0, get_icon("template"))
+                    elif (vm.host_name, vm.vmid) in self._pending_vm_keys:
+                        item.setIcon(0, make_loading_icon(self._spinner_angle))
+                    else:
+                        item.setIcon(0, get_icon("vm", vm.status_value))
+            for i in range(item.childCount()):
+                refresh(item.child(i))
+
+        for i in range(self.tree.topLevelItemCount()):
+            refresh(self.tree.topLevelItem(i))
 
     def update_data(self, all_nodes, all_vms, all_storages=None, final=False, node_repo=None, vm_repo=None):
         self.all_nodes = all_nodes
@@ -744,11 +789,11 @@ class TreePanel(QWidget):
         self.all_storages = all_storages or []
         if final:
             self._loading_hosts.clear()
-            self._spin_timer.stop()
             self._rebuild_timer.stop()
             self._build_tree()
             self._sync_toggle_button()
             self._update_empty_visibility()
+            self._sync_spinner()
         else:
             self._rebuild_timer.start()
 
@@ -885,6 +930,8 @@ class TreePanel(QWidget):
         vm_item.setText(0, vm_name)
         if vm.template:
             vm_item.setIcon(0, get_icon("template"))
+        elif (vm.host_name, vm.vmid) in self._pending_vm_keys:
+            vm_item.setIcon(0, make_loading_icon(self._spinner_angle))
         else:
             vm_item.setIcon(0, get_icon("vm", vm.status_value))
         vm_item.setData(0, VM_KEY_ROLE, (vm.host_name, vm.vmid, vm.node))

@@ -103,9 +103,21 @@ sync-вызовы на путях конфига/редких действий.
   таймер-колбэк падал с RuntimeError после deleteLater панели. Для
   тестируемости `_on_context_menu` разделён: построение меню вынесено в
   `_build_context_menu(item)` (без exec).
-- **M0.3. Optimistic UI каркас.** Общий helper «применить к UI сразу →
+- **M0.3. Optimistic UI каркас. ✅** Общий helper «применить к UI сразу →
   подтвердить/откатить по ответу» (состояние + спиннер + откат с понятной
   ошибкой); пилот — power-действия (start/stop/shutdown), далее по вехам.
+  Реализовано: `ui/optimistic.py` — `OptimisticVMs` (патчит `VmRepository`
+  через `dataclasses.replace` на целевой статус `POWER_TARGET_STATUS`,
+  ведёт pending `(host, vmid)`, повторный apply сохраняет оригинальный
+  prev для отката; `OptimisticToken.confirm/rollback`); tree_panel —
+  `set_pending_vm_keys` крутит спиннер на VM-элементах (общий
+  `_sync_spinner` с host-загрузкой, иконка восстанавливается после
+  rebuild); mainwindow — apply после confirm-диалога, `action_result` →
+  confirm + refresh, `action_error` → rollback + error-нотификация.
+  Тесты `tests/ui/test_optimistic.py` (15): юнит менеджера, спиннер
+  дерева (PNG-сравнение иконок — `cacheKey` QIcon ненадёжен), сквозной
+  поток MainWindow (start без подтверждения → error → rollback →
+  result → confirm) + контроль офлайн-контракта M0.2.
 - **M0.4. Perf-бейслайн.** Скрипт профилирования типовой сессии (старт,
   дерево 1000+ объектов, открытие табов, refresh) → отчёт в `docs/`.
   Абсолютные пороги (дерево ≤300 мс, старт ≤1 с) — только в
