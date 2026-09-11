@@ -236,11 +236,18 @@ server+web-продукт). Мы агрегируем кластеры — вс�
 - **Гарантированный путь (по умолчанию, 7.x+):**
   1. vzdump снапшот-бэкап ВМ на source storage (`POST /nodes/{node}/vzdump`,
      snapshot mode) — running ВМ не останавливаем.
-  2. SSH-транспорт архива source→target напрямую между нодами (пайплайн
-     `ssh src "cat file" | ssh dst "cat > path"`, клиент — дирижёр, трафик
-     не идёт через десктоп). **Факт: у PVE нет API полного скачивания
-     vzdump-архива** (только file-restore для файлов внутри архива + upload),
-     поэтому SSH — основной транспорт.
+  2. SSH-транспорт архива source→target — **два варианта** (факт: у PVE
+     нет API полного скачивания vzdump-архива — только file-restore для
+     файлов внутри архива + upload, поэтому SSH — основной транспорт):
+     - **via-desktop** (просто): `ssh src "cat file" | ssh dst "cat > path"`
+       с десктопа — но трафик идёт src → десктоп → dst (дважды через VPN);
+     - **прямой src→dst** (предпочтителен): `ssh -A src "scp file dst:/path"`
+       — трафик идёт напрямую между нодами, ключи не раскладываются по нодам.
+       Осознанный tradeoff: agent forwarding означает, что скомпрометированная
+       src-нода может использовать ключ для auth куда угодно — приемлемо
+       для доверенных PVE-нод.
+     - **Fallback**: если у src нет прямого сетевого пути к dst (гео-площадки
+       без mesh) — via-desktop обязателен.
   3. Create+restore на target (`POST /nodes/{node}/qemu|lxc` с `archive:`,
      стабильные эндпоинты, работают с 7.x; restore PBS в v2.12 уже реализован).
      Конфиг-маппинг: bridges/storages (автоподбор + ручная правка),
@@ -283,9 +290,16 @@ read-only API — ноль EXPERIMENTAL, идеальный противовес
   cross-cluster операциях).
 - **Storage runway**: тренды rrddata → прогноз «кончится через ~N дней»
   (capacity forecasting влилась сюда); ценность взрывается на cross-cluster
-  виде: «у площадки Б кончится через 12 дней, остальные ок».
+  виде: «у площадки Б кончится через 12 дней, остальные ок». Прогноз с
+  доверительным интервалом — rrddata дырявый, наивная линейность врёт.
 - **Snapshot sprawl**: `GET /nodes/{node}/qemu|lxc/{vmid}/snapshot` —
-  1 запрос/ВМ (~10–20 с на парк 200 шт) → скан по кнопке + кэш, не фоновый.
+  1 запрос/ВМ (~10–20 с на парк 200 шт) → скан по кнопке + кэш, лимит
+  параллелизма, не фоновый.
+- **Partial failure (семантика зафиксирована до реализации)**: кластер
+  offline → плашка «данные от HH:MM» (последнее известное состояние),
+  отчёт не становится пустым и не падает целиком.
+- **M4.0 — тестовый харнесс до фич**: fake PVE/PBS API + record/replay
+  fixture'ы (фан-аут живыми кластерами не тестируем).
 - Запуск из меню/трея; отчёт «что где красное» с переходом к объекту.
 
 ### B25. Профили подключений — план v3.0 (веха M10 Платформа)
@@ -301,7 +315,7 @@ read-only API — ноль EXPERIMENTAL, идеальный противовес
   переподключений/фоновых воркеров); переключение профиля = пауза/резюме.
 - Экспорт/импорт профилей — не в скоупе минимальной версии.
 
-### B22. Maintenance mode — план v3.0 (веха M4)
+### B22. Maintenance mode — план v3.0 (веха M5)
 Режим обслуживания ноды (аналог vSphere Maintenance Mode). Нативного в PVE
 API нет — оркестрация выполняется нашим клиентом.
 
@@ -314,19 +328,21 @@ API нет — оркестрация выполняется нашим клие
 - Прогресс по задачам, отчёт «что куда улетело» (нода → список ВМ/целей).
 - Exit: снятие пометки; опционально «вернуть ВМ» по списку отчёта.
 
-### B23. UI-паритет с офиц. PVE — план v3.0 (веха M10, приоритеты определим)
+### B23. UI-паритет с офиц. PVE — план v3.0 (веха M11, приоритеты определим)
 Цель: не возвращаться в офиц. UI. Карта дыр проверена по коду 2026-09-10.
-1. Полный Hardware-редактор ВМ/CT: список устройств (cpu/mem/disk/netX/usb/pci)
+Подвехи: M11a — tags/notes/services/updates badge; M11b — xterm CT/syslog;
+M11c — hardware editor/node disks (отдельный крупный проект).
+1. Полный Hardware-редактор ВМ/CT (M11c): список устройств (cpu/mem/disk/netX/usb/pci)
    с Add/Remove/Edit, boot order, CPU/RAM limits (сейчас — точечная правка
    полей через `VmConfigEditorDialog`; задел: `vm_device_editors.py`).
-2. Node Disks: список (`GET /nodes/{node}/disks/list`), S.M.A.R.T.,
+2. Node Disks (M11c): список (`GET /nodes/{node}/disks/list`), S.M.A.R.T.,
    wipe/initialize.
-3. Tags ВМ: редактирование (`update_config tags=...`) + фильтры в дереве/поиске.
-4. xterm-консоль CT: vncwebsocket term-режим; WS-мост готов
+3. Tags ВМ (M11a): редактирование (`update_config tags=...`) + фильтры в дереве/поиске.
+4. xterm-консоль CT (M11b): vncwebsocket term-режим; WS-мост готов
    (`ui/console/bridge.py`).
-5. Node Syslog viewer (`GET /nodes/{node}/syslog`) + follow.
-6. PVE-ноты ВМ/CT: редактирование description (`PUT .../config`).
-7. Updates read-only badge: `GET /nodes/{node}/apt/updates` → «доступно N»
+5. Node Syslog viewer (M11b): `GET /nodes/{node}/syslog` + follow.
+6. PVE-ноты ВМ/CT (M11a): редактирование description (`PUT .../config`).
+7. Updates read-only badge (M11a): `GET /nodes/{node}/apt/updates` → «доступно N»
    (установка НЕ автоматизируем — осознанное решение).
-8. Services: restart/stop/start действия (сейчас только просмотр,
+8. Services restart/stop/start действия (M11a; сейчас только просмотр,
    `build_services_tab`).
