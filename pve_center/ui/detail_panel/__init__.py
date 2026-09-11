@@ -270,6 +270,14 @@ class DetailPanel(QWidget):
         seconds on the first selection. If the user selects an object
         before the queue drains, _ensure_tabs() finishes the rest at once.
         """
+        try:
+            self._build_tab_chunk_impl()
+        except RuntimeError:
+            # singleShot стреляет после deleteLater панели (окно закрыто,
+            # очередь табов не опустела) — C++ объект уже удалён.
+            pass
+
+    def _build_tab_chunk_impl(self):
         if self._tabs_built:
             return
         if self._tab_queue is None:

@@ -414,7 +414,17 @@ class TreePanel(QWidget):
         item = self.tree.itemAt(pos)
         if not item:
             return
+        menu = self._build_context_menu(item)
+        if menu is None:
+            return
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
 
+    def _build_context_menu(self, item):
+        """Построить контекст-меню для элемента дерева; None — не строится.
+
+        Выделено из _on_context_menu (M0.2 runtime-контракт): тесты
+        обходят actions построенного меню, не заходя в модальный exec.
+        """
         vm_key = item.data(0, VM_KEY_ROLE)
         if vm_key is not None:
             host_name, vmid, node = vm_key
@@ -537,12 +547,11 @@ class TreePanel(QWidget):
                 lambda checked, hn=host_name, nd=node, vid=vmid: self.vm_delete_requested.emit(hn, nd, vid)
             )
             menu.addAction(delete_action)
-            menu.exec(self.tree.viewport().mapToGlobal(pos))
-            return
+            return menu
 
         key = item.data(0, ITEM_KEY_ROLE)
         if not key or not isinstance(key, tuple):
-            return
+            return None
         item_type = key[0]
         item_name = key[1] if len(key) > 1 else ""
 
@@ -709,8 +718,8 @@ class TreePanel(QWidget):
             menu.addAction(note_act)
 
         if not menu.actions():
-            return
-        menu.exec(self.tree.viewport().mapToGlobal(pos))
+            return None
+        return menu
 
     def _tick_spinner(self):
         self._spinner_angle = (self._spinner_angle + 45) % 360

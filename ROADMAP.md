@@ -90,11 +90,19 @@ sync-вызовы на путях конфига/редких действий.
   старт воркеров (mainwindow, WorkerManager) не является sync-клиентом.
   Движок сканера покрыт своими тестами (relative импорты, legacy-пути,
   вызовы, false-positive-гварды). Регресс «sync-вызов в UI» = падение CI.
-- **M0.2. Runtime-контракт.** Фейковый провайдер, бросающий исключение при
-  вызове из main-потока; в офлайн-тестах прогоняются все action-слоты
-  (toolbar, контекст-меню дерева, диалоги) — ни один не выполнил сетевой
-  вызов в UI-потоке. База: `tests/ui/test_worker_manager.py`,
-  `tests/ui/test_tree_panel.py`.
+- ✅ **M0.2. Runtime-контракт** (`tests/ui/runtime_contract.py` +
+  `tests/ui/test_runtime_contract.py`). Guard-провайдер патчит единую
+  точку `PluginRegistry.create_provider`: любой вызов/доступ к провайдеру
+  из main-потока фиксируется как нарушение (в фоновых потоках — тихая
+  заглушка). Fake QThreadPool не выполняет воркеры; статические фабрики
+  диалогов отвечают «отменено»; instance-exec (QDialog/QMenu) закрывает
+  modal-closer (PySide6 не даёт перехватить exec патчем класса). В
+  офлайн-прогоне: все QAction MainWindow + контекст-меню дерева (VM и
+  host) — ни один слот не выполнил сетевой вызов в UI-потоке. Контракт
+  вскрыл и починил реальный баг: `_build_tab_chunk` DetailPanel —
+  таймер-колбэк падал с RuntimeError после deleteLater панели. Для
+  тестируемости `_on_context_menu` разделён: построение меню вынесено в
+  `_build_context_menu(item)` (без exec).
 - **M0.3. Optimistic UI каркас.** Общий helper «применить к UI сразу →
   подтвердить/откатить по ответу» (состояние + спиннер + откат с понятной
   ошибкой); пилот — power-действия (start/stop/shutdown), далее по вехам.
