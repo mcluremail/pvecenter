@@ -10,12 +10,35 @@ README/TODO проектов. Внешние обзоры App Store / форум
 Прямых desktop-аналогов pve_center (multi-cluster + управление ВМ/хранилищами
 + бэкапы + консоли в одном окне) **нет**. Рынок разбит на ниши:
 
-1. **Официальный web GUI** — единственный полнофункциональный клиент; главный
-   соперник по «полезной работе», не по нише.
-2. **VDI-лаунчеры** — только консоли, без управления.
-3. **Мониторинг-панели** — только наблюдение и алерты.
-4. **Скрипты/моды/темы** — заполняют UX-дыры web GUI (тёмная тема с ★2540 —
+1. **Официальный web GUI** — эталон по покрытию API; главный соперник по
+   «полезной работе».
+2. **Агрегаторы multi-cluster** — ниша больше не пуста: официальный
+   **Proxmox Datacenter Manager** и коммерческий **ProxCenter** закрывают
+   «агрегацию» (см. ниже). Их общий формат: web + отдельный сервер.
+3. **VDI-лаунчеры** — только консоли, без управления.
+4. **Мониторинг-панели** — только наблюдение и алерты.
+5. **Скрипты/моды/темы** — заполняют UX-дыры web GUI (тёмная тема с ★2540 —
    прямой спрос на современный визуал).
+
+**Итог для стратегии:** запрос подтверждён деньгами и штатом (PDM — целое
+направление Proxmox GmbH; ProxCenter — enterprise-клиенты), но desktop-ниша
+(запустил приложение → работаешь, без установки сервера) **свободна**.
+Агрегация — не уникальность, уникальность = **агрегация без сервера,
+на рабочем столе, со скоростью**. Позиционирование: «PDM для человека».
+
+## Коммерческие и официальные агрегаторы
+
+| Продукт | Формат | Цена | Функционал | Слабости |
+|---|---|---|---|---|
+| [Proxmox Datacenter Manager](https://www.proxmox.com/en/products/proxmox-datacenter-manager/overview) | Web, отдельный сервер (AGPL) | Бесплатен; поддержка/обновления — за Enterprise-подписку PVE | Агрегация PVE+PBS, live-миграция между кластерами, мощный поиск, custom views, LDAP/AD/OIDC, RBAC, EVPN-SDN, update management | Server+web (не desktop); сыроват для реальной работы (альфа-период 2024–25, UX в процессе); enterprise-заточен |
+| [ProxCenter](https://www.proxcenter.io) | Web, Docker self-hosted | Community free; Enterprise — лицензия | Дашборд drag-drop, инвентарь, PBS-мульти, Ceph-мониторинг; Enterprise: DRS, cross-cluster replication, LDAP/SSO, AI-аналитика, миграция с ESXi/XCP-ng/Nutanix/Hyper-V | Не desktop; киллер-фичи за деньгами; web-зависимости |
+| PegaProx | Web | Free (заявлено) | Мульти-кластер PVE+XCP-ng, cross-cluster миграции, load balancing, аудит | Молодой проект, зрелость неясна |
+| [ProxUI](https://github.com/greenlogles/ProxUI) | Web | Free (опенсорс) | Современный UI, mobile-подход, мульти-кластер, cloud-шаблоны | Молодой, масштаб неизвестен |
+
+Сигналы: ProxCenter имеет enterprise-клиентов (Bouygues, Millennium, EPI-USE,
+Atomic Data и др.) и прессу («vCenter-опыт для Proxmox», StarWind, Virtualization
+Howto). Вывод: **платят за готовое управление мульти-кластером** — наш сегмент
+подтверждён; при этом ни один из них не desktop.
 
 ## Реестр
 
@@ -50,6 +73,25 @@ README/TODO проектов. Внешние обзоры App Store / форум
 - Мобильные: bVNC/remote-desktop-clients (★2505) — консоли на Android;
   зрелых мобильных клиентов управления нет.
 
+### Другие системы виртуализации (что передираем, 2026-09-10)
+
+Проверены Xen Orchestra (XCP-ng), Nutanix Prism, SCVMM/RHV/Harvester.
+
+| Источник | Фича | Вердикт |
+|---|---|---|
+| Xen Orchestra | Incremental/Continuous Replication + DR (standby-копии на другом пуле) | Полный аналог требует живого планировщика; берём идею **«DR-режим»**: bulk-restore парка из PBS в другой кластер одной кнопкой (идеи без вехи) |
+| Xen Orchestra | Load Balancing | Мимо — server-часть, не desktop-архитектура |
+| Xen Orchestra | Rolling Pool Upgrades | Мимо — update management отвергнут (опасная зона) |
+| Nutanix Prism | Capacity Runway / What-if (прогноз «кончатся через N дней», сценарии добавления нагрузки) | Берём в идеи: **capacity forecasting** — чисто клиентские расчёты поверх уже собираемых rrddata |
+| Nutanix Prism | One-click ops, predictive ML | Мимо (ML-инфраструктура) |
+| SCVMM/RHV | Quotas, self-service, hosted engine, dynamic optimization | Мимо — всё server-side, desktop-клиенту нечего взять |
+| vSphere/vCenter | Maintenance Mode | **Берём** — веха M4 (у PVE нативного нет, оркестрируем сами) |
+| vSphere/vCenter | Affinity/Anti-affinity rules | Берём в идеи (`/cluster/ha/rules`, PVE 9 — API есть, UI нет ни у кого) |
+| vSphere/vCenter | Alarms, inventory reports | Уже в плане (M8-алерты, отчёты в идеях) |
+
+Общий принцип, зафиксированный 2026-09-10: **ориентир по фичам — лидер рынка
+(vSphere)**; передираем то, что реализуемо без постоянно живущего сервера.
+
 ## Боли конкурентов, валидирующие нашу стратегию
 
 1. **Блокирующий UI**: proxmanager честно пишет в TODO «добавить спиннеры на
@@ -69,9 +111,19 @@ README/TODO проектов. Внешние обзоры App Store / форум
 Уже впереди desktop-ниши: multi-cluster дерево, CRUD ВМ/CT/storage,
 backup jobs, PBS-панель, noVNC, массовые операции, 5 локалей, 806 тестов.
 Отстаём/дыры: нет тем, нет командной палитры, нет SSH/RDP-лаунчера, нет
-алертов, web GUI всё ещё покрывает 100% API (мы ~80/20).
+алертов; UI-паритет с офиц. PVE неполный (~80% сценариев) — карта дыр в
+FEATURES_BACKLOG B23; API-поверхность: ~12–15% эндпоинтов PVE (449 путей /
+680 endpoint'ов в apidoc), осознанные 80% сценариев админа.
+
+Ответ конкурентам по киллер-фичам (план 3.0): cross-cluster move (M3 —
+ни у кого нет GUI), maintenance mode (M4 — аналог vSphere), desktop-алерты
+(M8), движок тем-плагинов (M1 — ответ PVEDiscordDark). Полная карта
+агрегации (PDM/ProxCenter) при этом не копируется: наш формат —
+без сервера.
 
 ## Источники
 
-GitHub Search API (2026-09-10), README перечисленных репозиториев.
-Обновлять перед каждым циклом планирования мажора.
+GitHub Search API (2026-09-10), README перечисленных репозиториев,
+proxmox.com (PDM), proxcenter.io, duckduckgo-поиск по XO/Nutanix (2026-09-10),
+apidoc.js (PVE API, 449 путей). Обновлять перед каждым циклом планирования
+мажора.

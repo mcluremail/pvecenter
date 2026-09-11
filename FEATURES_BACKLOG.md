@@ -216,3 +216,53 @@ poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Na
 - Follow-up (не делали): удалить мёртвые `*_folder`-view в detail_panel
   (`show_cluster_folder` / `show_standalone_folder` / `show_storage_folder` —
   дерево больше не эмитит `*_folder`); раскрытие «name (@cluster)» → список нод.
+
+### B21. Cross-cluster move — план v3.0 (веха M3, киллер-фича)
+Перенос ВМ/CT между независимыми кластерами через UI. Единственный GUI-способ
+без установки сервера (у офиц. PVE UI кнопки нет; PDM делает это как
+server+web-продукт). Мы агрегируем кластеры — все данные уже в конфиге.
+
+- Основной путь: `POST /nodes/{node}/qemu/{vmid}/remote_migrate`
+  (и lxc-аналог; API помечен EXPERIMENTAL, PVE 8+):
+  - `target-endpoint` — собирается из cfg целевого кластера (host/token;
+    формат apitoken/host/fingerprint сверить по исходникам pve-manager);
+  - `target-storage` / `target-bridge` — маппинг source→target с автоподбором
+    по хранилищам/мостам, видимым обоим сторонам + ручная правка;
+  - `target-vmid`, `online` (live-миграция running ВМ), `bwlimit`;
+  - `delete` — удаление исходника после успеха, опция с явным предупреждением
+    (по умолчанию исходник остаётся остановленным).
+- Fallback (offline, работает везде где есть PBS): backup → restore снапшота
+  в целевом кластере; restore PBS-бэкапа в новую ВМ уже реализован (B17, v2.12).
+- Прогресс по task-UPID обоих кластеров, итоговый отчёт.
+- UX: контекст-меню ВМ/CT «Move to cluster…» → мастер (кластер → нода →
+  маппинги → VMID → режим) → прогресс.
+
+### B22. Maintenance mode — план v3.0 (веха M4)
+Режим обслуживания ноды (аналог vSphere Maintenance Mode). Нативного в PVE
+API нет — оркестрация выполняется нашим клиентом.
+
+- Контекст-меню ноды «Maintenance mode…»: эвакуация running ВМ —
+  live-миграция (`POST /nodes/{node}/qemu/{vmid}/migrate`) на целевые ноды,
+  подобранные по загрузке из `/cluster/resources` (CPU/RAM/mem, локальные
+  ресурсы дисков); для HA-ресурсов — `POST /cluster/ha/resources/{sid}/relocate`.
+- Пометка ноды «обслуживание» в дереве (локально в ui_state/config):
+  предупреждение/блокировка запуска новых ВМ на ноде на уровне UI.
+- Прогресс по задачам, отчёт «что куда улетело» (нода → список ВМ/целей).
+- Exit: снятие пометки; опционально «вернуть ВМ» по списку отчёта.
+
+### B23. UI-паритет с офиц. PVE — план v3.0 (веха M10, приоритеты определим)
+Цель: не возвращаться в офиц. UI. Карта дыр проверена по коду 2026-09-10.
+1. Полный Hardware-редактор ВМ/CT: список устройств (cpu/mem/disk/netX/usb/pci)
+   с Add/Remove/Edit, boot order, CPU/RAM limits (сейчас — точечная правка
+   полей через `VmConfigEditorDialog`; задел: `vm_device_editors.py`).
+2. Node Disks: список (`GET /nodes/{node}/disks/list`), S.M.A.R.T.,
+   wipe/initialize.
+3. Tags ВМ: редактирование (`update_config tags=...`) + фильтры в дереве/поиске.
+4. xterm-консоль CT: vncwebsocket term-режим; WS-мост готов
+   (`ui/console/bridge.py`).
+5. Node Syslog viewer (`GET /nodes/{node}/syslog`) + follow.
+6. PVE-ноты ВМ/CT: редактирование description (`PUT .../config`).
+7. Updates read-only badge: `GET /nodes/{node}/apt/updates` → «доступно N»
+   (установка НЕ автоматизируем — осознанное решение).
+8. Services: restart/stop/start действия (сейчас только просмотр,
+   `build_services_tab`).
