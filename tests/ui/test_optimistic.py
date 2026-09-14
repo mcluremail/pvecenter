@@ -9,14 +9,14 @@ import pytest
 from PySide6.QtCore import QBuffer, QIODevice
 from PySide6.QtGui import QAction
 
-from pve_center.domain.enums import VmStatus
-from pve_center.domain.repositories import NodeRepository, VmRepository
-from pve_center.ui.optimistic import (
+from virtdeck.domain.enums import VmStatus
+from virtdeck.domain.repositories import NodeRepository, VmRepository
+from virtdeck.ui.optimistic import (
     POWER_TARGET_STATUS,
     OptimisticToken,
     OptimisticVMs,
 )
-from pve_center.ui.tree_panel import VM_KEY_ROLE, TreePanel
+from virtdeck.ui.tree_panel import VM_KEY_ROLE, TreePanel
 
 
 @pytest.fixture()

@@ -1,4 +1,4 @@
-"""Tests for domain global search (pve_center/domain/search.py)."""
+"""Tests for domain global search (virtdeck/domain/search.py)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import dataclasses
 
 import pytest
 
-from pve_center.domain import (
+from virtdeck.domain import (
     Node,
     NodeRepository,
     NodeStatus,
@@ -18,7 +18,7 @@ from pve_center.domain import (
     VmRepository,
     VmStatus,
 )
-from pve_center.domain.search import SEARCH_LIMIT, SearchResult, global_search
+from virtdeck.domain.search import SEARCH_LIMIT, SearchResult, global_search
 
 # --- Helpers ---
 

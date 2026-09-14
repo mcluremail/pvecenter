@@ -1,4 +1,4 @@
-pve-center (2.11.3-1) unstable; urgency=medium
+virtdeck (2.11.3-1) unstable; urgency=medium
 
   * Perf: window appears in ~1s instead of ~3.3s — deferred detail tab
     building, background pyqtgraph warm-up, requests import moved out of
@@ -9,7 +9,7 @@ pve-center (2.11.3-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 07 Sep 2026 18:00:00 +0300
 
-pve-center (2.11.2-1) unstable; urgency=medium
+virtdeck (2.11.2-1) unstable; urgency=medium
 
   * New: animated spinners for async data loading (storage tables, monitoring
     charts, VM metrics, task history, host metrics, quorum card)
@@ -26,14 +26,14 @@ pve-center (2.11.2-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 07 Sep 2026 12:00:00 +0300
 
-pve-center (2.11.1-1) unstable; urgency=medium
+virtdeck (2.11.1-1) unstable; urgency=medium
 
   * Fix: TypeError on every cluster metrics refresh — MetricCard.set_value()
     now accepts the optional subtitle kwarg (cluster quorum card)
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 13:00:00 +0300
 
-pve-center (2.11.0-1) unstable; urgency=medium
+virtdeck (2.11.0-1) unstable; urgency=medium
 
   * New: tree redesign — flat top level (groups, clusters, standalone hosts),
     Hosts/Storages view modes with deduplicated shared storages
@@ -45,7 +45,7 @@ pve-center (2.11.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 12:00:00 +0300
 
-pve-center (2.10.0-1) unstable; urgency=medium
+virtdeck (2.10.0-1) unstable; urgency=medium
 
   * New: per-item tree notes in a second tree column (host default = FQDN)
   * New: user-defined host groups with drag&drop and aggregated summary
@@ -57,7 +57,7 @@ pve-center (2.10.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 04 Sep 2026 08:00:00 +0300
 
-pve-center (2.8.1-1) unstable; urgency=medium
+virtdeck (2.8.1-1) unstable; urgency=medium
 
   * Fix: LXC restore used 'name' instead of 'hostname' param; 'unique' only for QEMU
   * Fix: PVE8 /cluster/jobs filtered to vzdump type only (was returning all job types)
@@ -82,7 +82,7 @@ pve-center (2.8.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 13 Jul 2026 00:00:00 +0300
 
-pve-center (2.8.0-1) unstable; urgency=medium
+virtdeck (2.8.0-1) unstable; urgency=medium
 
   * New features: VM on-demand backup (vzdump) with storage, mode, compression
   * New features: VM restore from backup with auto-suggested VMID
@@ -95,7 +95,7 @@ pve-center (2.8.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 13 Jul 2026 00:00:00 +0300
 
-pve-center (2.6.0-1) unstable; urgency=medium
+virtdeck (2.6.0-1) unstable; urgency=medium
 
   * New features: status bar, tray icon, RRD timeframe persist, node comparison
   * New features: multi-cluster dashboard (Clusters|Nodes toggle)
@@ -118,7 +118,7 @@ pve-center (2.6.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Wed, 08 Jul 2026 12:00:00 +0300
 
-pve-center (2.5.1-1) unstable; urgency=medium
+virtdeck (2.5.1-1) unstable; urgency=medium
 
   * Bugfix release: comprehensive code audit (~21 bugs fixed)
   * Backend: token value bug, SSL inversion, session leak, pool race, KeyError guards
@@ -132,7 +132,7 @@ pve-center (2.5.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Tue, 07 Jul 2026 09:30:00 +0300
 
-pve-center (2.5.0-1) unstable; urgency=medium
+virtdeck (2.5.0-1) unstable; urgency=medium
 
   * CardList widget — replaces QTableWidget for list-style views
   * Redesign: Host VMs as card rows (dot + name + status/cpu/ram/disk/uptime)
@@ -144,7 +144,7 @@ pve-center (2.5.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 14:00:00 +0300
 
-pve-center (2.4.0-1) unstable; urgency=medium
+virtdeck (2.4.0-1) unstable; urgency=medium
 
   * Redesign: theme refresh — softer palette, borderless tables, more air
   * Redesign: header bar (icon-only toolbar, brand label right-aligned)
@@ -158,7 +158,7 @@ pve-center (2.4.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 13:00:00 +0300
 
-pve-center (2.3.2-1) unstable; urgency=medium
+virtdeck (2.3.2-1) unstable; urgency=medium
 
   * Fix: resolve fonts dynamically via QFontDatabase, drop hardcoded Terminus
   * Chore: move AUDIT_2026-06-20.md to docs/, expand .gitignore
@@ -167,7 +167,7 @@ pve-center (2.3.2-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 06 Jul 2026 12:00:00 +0300
 
-pve-center (2.3.1-1) unstable; urgency=medium
+virtdeck (2.3.1-1) unstable; urgency=medium
 
   * Fix: Windows build — add hidden imports for proxmoxer.backends,
     proxmoxer.tools, keyring.backends (lazy imports missed by PyInstaller)
@@ -175,7 +175,7 @@ pve-center (2.3.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 21:30:00 +0300
 
-pve-center (2.3.0-1) unstable; urgency=medium
+virtdeck (2.3.0-1) unstable; urgency=medium
 
   * Feature: VM migration within cluster (QEMU only, LXC not supported by PVE)
   * Feature: VM cloning (QEMU + LXC) — full/linked, target node, storage
@@ -184,14 +184,14 @@ pve-center (2.3.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 20:00:00 +0300
 
-pve-center (2.2.3-1) unstable; urgency=medium
+virtdeck (2.2.3-1) unstable; urgency=medium
 
   * Show SSL certificate trust state in host detail panel info table
     (between Address and PVE version rows)
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 19:30:00 +0300
 
-pve-center (2.2.2-1) unstable; urgency=medium
+virtdeck (2.2.2-1) unstable; urgency=medium
 
   * Fix: SSL trust toggle in host context menu now shows explicit state
     with lock/unlock icon and "trusted"/"untrusted" label instead of
@@ -199,7 +199,7 @@ pve-center (2.2.2-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 19:00:00 +0300
 
-pve-center (2.2.1-1) unstable; urgency=medium
+virtdeck (2.2.1-1) unstable; urgency=medium
 
   * Fix: invert trust_ssl logic — checkbox ON = accept cert (verify=False),
     checkbox OFF = strict verification (verify=True). Default: ON (backward
@@ -208,7 +208,7 @@ pve-center (2.2.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 18:30:00 +0300
 
-pve-center (2.2.0-1) unstable; urgency=medium
+virtdeck (2.2.0-1) unstable; urgency=medium
 
   * Feature: per-host SSL certificate validation toggle
     - Add "Trust SSL certificate" checkbox in add-server dialog
@@ -218,7 +218,7 @@ pve-center (2.2.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 18:00:00 +0300
 
-pve-center (2.1.2-1) unstable; urgency=medium
+virtdeck (2.1.2-1) unstable; urgency=medium
 
   * Fix: cluster summary showing ghost progressbar + missing host
     (table not cleared between cluster_folder (5 cols + span) and
@@ -226,7 +226,7 @@ pve-center (2.1.2-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 17:00:00 +0300
 
-pve-center (2.1.1-1) unstable; urgency=medium
+virtdeck (2.1.1-1) unstable; urgency=medium
 
   * Fix: host info collapsed from 10 fields to 4 after soft refresh
     (update_host_cells was rewriting full HTML with reduced version)
@@ -237,7 +237,7 @@ pve-center (2.1.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 16:00:00 +0300
 
-pve-center (2.1.0-1) unstable; urgency=medium
+virtdeck (2.1.0-1) unstable; urgency=medium
 
   * Tree: preserve expanded state on rebuild (don't collapse unsaved items)
   * Cluster summary: mark cluster_rep host with ★ and bold
@@ -254,7 +254,7 @@ pve-center (2.1.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 15:00:00 +0300
 
-pve-center (2.0.3-1) unstable; urgency=medium
+virtdeck (2.0.3-1) unstable; urgency=medium
 
   * save_config: keyring D-Bus calls moved outside _DB_LOCK (prevent blocking)
   * _migrate_old_db: remove orphaned tasks_cache.sqlite if config.sqlite exists
@@ -264,26 +264,26 @@ pve-center (2.0.3-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 14:00:00 +0300
 
-pve-center (2.0.2-1) unstable; urgency=medium
+virtdeck (2.0.2-1) unstable; urgency=medium
 
   * Fix: VM detail info not loading after adding host
     (detail_panel._cfg_by_name was stale — workers got empty token_value)
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 13:00:00 +0300
 
-pve-center (2.0.1-1) unstable; urgency=medium
+virtdeck (2.0.1-1) unstable; urgency=medium
 
   * Fix: newly added cluster host not loading until restart
     (tree_panel._cfg_by_name not updated on add/remove/refresh-token)
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 12:00:00 +0300
 
-pve-center (2.0.0-1) unstable; urgency=medium
+virtdeck (2.0.0-1) unstable; urgency=medium
 
   * BREAKING: master password removed, tokens now stored in system keyring
   * Config storage migrated from nodes.enc/nodes.json to config.sqlite
   * keyring library added as dependency (KWallet/GNOME Keyring/Windows Credential Manager)
-  * Each node's token_value stored as separate keyring secret (pve-center://node:{name})
+  * Each node's token_value stored as separate keyring secret (virtdeck://node:{name})
   * Export/import: encrypted bundle with password (includes tokens)
   * DB migration: tasks_cache.sqlite auto-renamed to config.sqlite
   * Node removal now cleans up keyring entries
@@ -291,7 +291,7 @@ pve-center (2.0.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Mon, 22 Jun 2026 00:00:00 +0300
 
-pve-center (1.5.0-1) unstable; urgency=medium
+virtdeck (1.5.0-1) unstable; urgency=medium
 
   * About dialog with version, author, license, source link
   * Toolbar: About button (info icon)
@@ -300,14 +300,14 @@ pve-center (1.5.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@example.com>  Sat, 21 Jun 2026 00:00:00 +0300
 
-pve-center (1.4.2-1) unstable; urgency=medium
+virtdeck (1.4.2-1) unstable; urgency=medium
 
   * Fix: FadeToast RuntimeError (C++ object deleted before Python ref cleared)
   * Fix: VM action buttons not updating after start/stop/shutdown
 
  -- Taurus McLure <taurus@example.com>  Fri, 20 Jun 2026 12:00:00 +0300
 
-pve-center (1.4.1-1) unstable; urgency=medium
+virtdeck (1.4.1-1) unstable; urgency=medium
 
   * Fix: config import not applied (nodes_cfg vs nodes_config typo)
   * Fix: import_config(merge=True) could write plaintext instead of encrypted
@@ -321,7 +321,7 @@ pve-center (1.4.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@example.com>  Fri, 20 Jun 2026 00:00:00 +0300
 
-pve-center (1.4.0-1) unstable; urgency=medium
+virtdeck (1.4.0-1) unstable; urgency=medium
 
   * Redesign Monitoring tab: 3x2 MetricCard grid with progress bars +
     expanding chart. Replace flat parameter table.
@@ -334,39 +334,39 @@ pve-center (1.4.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 20 Jun 2026 00:00:00 +0000
 
-pve-center (1.3.1-1) unstable; urgency=medium
+virtdeck (1.3.1-1) unstable; urgency=medium
 
   * Move export/import from File menu to toolbar. Add Add Server button
     and separators. Remove menu bar.
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.3.0-1) unstable; urgency=medium
+virtdeck (1.3.0-1) unstable; urgency=medium
 
   * Add config export/import (File menu). Encrypted nodes.enc can be
     transferred between computers. Import merges by host+user.
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.2.2-1) unstable; urgency=medium
+virtdeck (1.2.2-1) unstable; urgency=medium
 
-  * Add PyInstaller spec for Windows build (packaging/pve-center-win.spec).
+  * Add PyInstaller spec for Windows build (packaging/virtdeck-win.spec).
   * Add build-windows job to GitHub Actions release workflow.
   * Release now includes .zip for Windows alongside .deb, .rpm, .whl.
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.2.1-1) unstable; urgency=medium
+virtdeck (1.2.1-1) unstable; urgency=medium
 
-  * Cross-platform config paths: %APPDATA%/pve-center on Windows,
-    ~/Library/Application Support/pve-center on macOS.
+  * Cross-platform config paths: %APPDATA%/virtdeck on Windows,
+    ~/Library/Application Support/virtdeck on macOS.
   * Cross-platform remote-viewer launch: search Program Files on Windows,
     platform-aware install hint in error message.
   * Add Windows classifier to pyproject.toml.
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.2.0-1) unstable; urgency=medium
+virtdeck (1.2.0-1) unstable; urgency=medium
 
   * L3: replace hardcoded column widths with ResizeToContents for data
     columns in host_tabs (2 tables) and vm_pool_widget. cluster_tasks_widget
@@ -376,14 +376,14 @@ pve-center (1.2.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.1.9-1) unstable; urgency=medium
+virtdeck (1.1.9-1) unstable; urgency=medium
 
   * L1: setFixedSize -> setMinimumSize on 3 QDialogs (password dialog,
     security dialog, add_server_dialog).
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.1.8-1) unstable; urgency=medium
+virtdeck (1.1.8-1) unstable; urgency=medium
 
   * L6: vm_action_bar setFixedHeight(32) -> setMinimumHeight(32), action
     buttons setFixedHeight(24) -> setMinimumHeight(24).
@@ -391,7 +391,7 @@ pve-center (1.1.8-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:00:00 +0000
 
-pve-center (1.1.7-1) unstable; urgency=medium
+virtdeck (1.1.7-1) unstable; urgency=medium
 
   * H2: show notification toast with error text on traceback (3 sites:
     soft_refresh, show_details, display_full_vm_info). Full traceback
@@ -410,7 +410,7 @@ pve-center (1.1.7-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 21:00:00 +0300
 
-pve-center (1.1.6-1) unstable; urgency=medium
+virtdeck (1.1.6-1) unstable; urgency=medium
 
   * M1: replace ~30 hardcoded QColor("#hex") with Color.* constants from
     theme.py across _host_tabs, _vm_tabs, _constants, _storage_tabs,
@@ -428,7 +428,7 @@ pve-center (1.1.6-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 20:00:00 +0300
 
-pve-center (1.1.5-1) unstable; urgency=medium
+virtdeck (1.1.5-1) unstable; urgency=medium
 
   * H1: wrap hardcoded Russian status bar text "Хостов:/ВМ:/Обновлено:" and
     "running..." in tr() — now translatable (was invisible to i18n).
@@ -452,7 +452,7 @@ pve-center (1.1.5-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 19:00:00 +0300
 
-pve-center (1.1.4-1) unstable; urgency=medium
+virtdeck (1.1.4-1) unstable; urgency=medium
 
   * i18n: split tr("Serial") into "Serial" (disk serial number column, e.g.
     "Серийный номер") and "Serial port" (VM display type serial0, e.g.
@@ -464,7 +464,7 @@ pve-center (1.1.4-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 18:00:00 +0300
 
-pve-center (1.1.3-1) unstable; urgency=medium
+virtdeck (1.1.3-1) unstable; urgency=medium
 
   * i18n: add 213 missing Russian translations to ru.json.
   * i18n: add 20-21 missing keys to ar/zh/fr/es.json.
@@ -482,7 +482,7 @@ pve-center (1.1.3-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 17:00:00 +0300
 
-pve-center (1.1.2-1) unstable; urgency=medium
+virtdeck (1.1.2-1) unstable; urgency=medium
 
   * Fix QProgressBar OverflowError when storage/host reports used>0 but total=0.
   * Pre-existing bug surfaced by S3 verification runtime test.
@@ -497,7 +497,7 @@ pve-center (1.1.2-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 16:00:00 +0300
 
-pve-center (1.1.1-1) unstable; urgency=medium
+virtdeck (1.1.1-1) unstable; urgency=medium
 
   * Post-S3 cleanup: remove unused imports from detail_panel/ package.
   * Removed: parse_pve_error, save_ui_state, load_ui_state (__init__.py),
@@ -509,7 +509,7 @@ pve-center (1.1.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 15:00:00 +0300
 
-pve-center (1.1.0-1) unstable; urgency=medium
+virtdeck (1.1.0-1) unstable; urgency=medium
 
   * S3: decompose detail_panel.py (2509 lines) into detail_panel/ package.
   * Tab logic split into _host_tabs.py, _storage_tabs.py, _vm_tabs.py (controller classes).
@@ -519,7 +519,7 @@ pve-center (1.1.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 14:00:00 +0300
 
-pve-center (1.0.4-1) unstable; urgency=medium
+virtdeck (1.0.4-1) unstable; urgency=medium
 
   * R1/R2/R3: defensive race condition fixes — copy lists before iteration, atomic generation guard in soft_refresh.
   * M7: remove duplicate setStyleSheet/setDefaultAlignment on datacenter_summary (already set via _make_table).
@@ -528,7 +528,7 @@ pve-center (1.0.4-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 13:00:00 +0300
 
-pve-center (1.0.3-1) unstable; urgency=medium
+virtdeck (1.0.3-1) unstable; urgency=medium
 
   * O6: i18n translations moved from inline Python dicts to external JSON files (one per language).
   * Only the active language is loaded into memory instead of all five.
@@ -536,14 +536,14 @@ pve-center (1.0.3-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 12:40:00 +0300
 
-pve-center (1.0.2-1) unstable; urgency=medium
+virtdeck (1.0.2-1) unstable; urgency=medium
 
   * O1: debounced tree rebuild — intermediate updates (final=False) coalesce via 150ms QTimer instead of N full rebuilds.
   * Selection and scroll position preserved across tree rebuilds.
 
  -- Taurus McLure <taurus@mclure.ru>  Fri, 19 Jun 2026 00:30:00 +0300
 
-pve-center (1.0.1-1) unstable; urgency=medium
+virtdeck (1.0.1-1) unstable; urgency=medium
 
   * Code audit fixes: executor.map workers (snapshots/disks), ClusterTasksWorker leak, freeze detector logging.
   * i18n: 22 hardcoded Russian strings wrapped in tr(), translations added for 5 languages.
@@ -557,7 +557,7 @@ pve-center (1.0.1-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Thu, 18 Jun 2026 22:00:00 +0300
 
-pve-center (1.0.0-1) unstable; urgency=medium
+virtdeck (1.0.0-1) unstable; urgency=medium
 
   * v1.0 — Multilingual release (EN, RU, ZH, FR, ES, AR).
   * Full hardware config editor for running VMs.
@@ -568,14 +568,14 @@ pve-center (1.0.0-1) unstable; urgency=medium
 
  -- Taurus McLure <taurus@mclure.ru>  Tue, 09 Jun 2026 23:30:00 +0300
 
-pve-center (0.1.2-1) unstable; urgency=medium
+virtdeck (0.1.2-1) unstable; urgency=medium
 
   * Удалена диагностическая печать из SPICE-консоли.
   * Первый публичный релиз (v0.1.1 пропущен из-за диагностики).
 
  -- Taurus McLure <taurus@mclure.ru>  Sun, 07 Jun 2026 20:10:00 +0300
 
-pve-center (0.1.0-1) unstable; urgency=medium
+virtdeck (0.1.0-1) unstable; urgency=medium
 
   * Первый публичный релиз.
   * Мониторинг кластеров и хостов PVE.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pve_center.domain import ClusterInfo, ClusterNode, ClusterStatus, QuorumState
+from virtdeck.domain import ClusterInfo, ClusterNode, ClusterStatus, QuorumState
 
 CLUSTER_ENTRY = {
     "type": "cluster",

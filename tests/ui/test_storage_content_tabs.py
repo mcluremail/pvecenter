@@ -6,10 +6,10 @@ raw numbers and relabeled the wrong tabs (chart under "Backups" etc.).
 
 from types import SimpleNamespace
 
-from pve_center.ui.detail_panel import DetailPanel
-from pve_center.ui.detail_panel._constants import TabIndex
-from pve_center.ui.detail_panel._storage_tabs import StorageTabs
-from pve_center.ui.i18n import tr
+from virtdeck.ui.detail_panel import DetailPanel
+from virtdeck.ui.detail_panel._constants import TabIndex
+from virtdeck.ui.detail_panel._storage_tabs import StorageTabs
+from virtdeck.ui.i18n import tr
 
 
 def _build(qtbot):

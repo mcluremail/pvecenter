@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from pve_center.backend.events import Event, EventBus
+from virtdeck.backend.events import Event, EventBus
 
 
 class TestSubscribe:

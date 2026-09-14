@@ -3,9 +3,9 @@ so app shutdown is not delayed by in-flight refresh workers."""
 
 from __future__ import annotations
 
-from pve_center import backend
-from pve_center.backend import FetchWorker
 from tests.backend.test_backend import FakeProvider
+from virtdeck import backend
+from virtdeck.backend import FetchWorker
 
 
 def _make_worker(monkeypatch, provider):

@@ -1,7 +1,7 @@
-"""Tests for pve_center.domain.pbs — PBS domain models parsing."""
+"""Tests for virtdeck.domain.pbs — PBS domain models parsing."""
 from datetime import datetime
 
-from pve_center.domain.pbs import PbsDatastore, PbsJob, PbsSnapshot, _verify_state
+from virtdeck.domain.pbs import PbsDatastore, PbsJob, PbsSnapshot, _verify_state
 
 
 class TestVerifyState:

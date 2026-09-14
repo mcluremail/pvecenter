@@ -1,4 +1,4 @@
-"""Tests for pve_center.pbs.workers — PbsApiWorker lifecycle.
+"""Tests for virtdeck.pbs.workers — PbsApiWorker lifecycle.
 
 Регресс аудита 2026-09-09: провайдер (requests.Session) закрывается в
 finally — и при успехе, и при ошибке (раньше не закрывался вовсе).
@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.pbs.client import PbsError
-from pve_center.pbs.provider import PbsProvider
-from pve_center.pbs.workers import PbsApiWorker
+from virtdeck.pbs.client import PbsError
+from virtdeck.pbs.provider import PbsProvider
+from virtdeck.pbs.workers import PbsApiWorker
 
 
 class FakeClient:
@@ -39,7 +39,7 @@ def fake_provider(monkeypatch):
         made.append(p)
         return p
 
-    monkeypatch.setattr("pve_center.pbs.workers.PbsProvider", _make)
+    monkeypatch.setattr("virtdeck.pbs.workers.PbsProvider", _make)
     return made
 
 

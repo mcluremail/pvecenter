@@ -1,4 +1,4 @@
-"""Tests for pve_center/config.py (sqlite-backed config, caches, bundles)."""
+"""Tests for virtdeck/config.py (sqlite-backed config, caches, bundles)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sqlite3
 
 import pytest
 
-from pve_center import config
+from virtdeck import config
 
 # --- Fixtures ---
 
@@ -42,7 +42,7 @@ def fake_keyring(monkeypatch):
 
 def make_cfg(name, host, user="root@pam", token="secret-1", **extra):
     cfg = {"name": name, "host": host, "user": user,
-           "token_name": "pvecenter", "token_value": token}
+           "token_name": "virtdeck", "token_value": token}
     cfg.update(extra)
     return cfg
 

@@ -3,13 +3,13 @@ from types import SimpleNamespace
 
 from PySide6.QtWidgets import QLabel, QStackedWidget, QWidget
 
-from pve_center.ui.detail_panel._constants import TabIndex
-from pve_center.ui.detail_panel._storage_tabs import StorageTabs
-from pve_center.ui.detail_panel._table_utils import (
+from virtdeck.ui.detail_panel._constants import TabIndex
+from virtdeck.ui.detail_panel._storage_tabs import StorageTabs
+from virtdeck.ui.detail_panel._table_utils import (
     loading_label,
     make_loading_stack,
 )
-from pve_center.ui.widgets.spinner import SpinnerWidget
+from virtdeck.ui.widgets.spinner import SpinnerWidget
 
 
 class TestLoadingLabel:
@@ -42,7 +42,7 @@ class TestMakeLoadingStack:
 
 class TestStorageMonitoringTab:
     def _build(self, qtbot, monkeypatch):
-        import pve_center.config as config_mod
+        import virtdeck.config as config_mod
 
         monkeypatch.setattr(
             config_mod, "load_ui_state", lambda key: None

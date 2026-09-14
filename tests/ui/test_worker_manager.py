@@ -1,9 +1,9 @@
 """Tests for WorkerManager queueing instead of silently dropping workers."""
 import pytest
 
-import pve_center.ui.detail_panel._worker_manager as wmod
-from pve_center.ui.detail_panel._constants import _MAX_WORKERS_DP
-from pve_center.ui.detail_panel._worker_manager import WorkerManager
+import virtdeck.ui.detail_panel._worker_manager as wmod
+from virtdeck.ui.detail_panel._constants import _MAX_WORKERS_DP
+from virtdeck.ui.detail_panel._worker_manager import WorkerManager
 
 
 class _FakePool:

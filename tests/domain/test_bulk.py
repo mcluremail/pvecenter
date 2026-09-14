@@ -1,7 +1,7 @@
 """Tests for domain/bulk.py — bulk VM action planning."""
 
-from pve_center.domain.bulk import BulkTarget, plan_bulk_action
-from pve_center.domain.repositories import VmRepository
+from virtdeck.domain.bulk import BulkTarget, plan_bulk_action
+from virtdeck.domain.repositories import VmRepository
 
 
 class FakeVm:
@@ -101,7 +101,7 @@ def test_order_preserved():
 
 def test_real_vm_repository(tmp_path):
     """Integration: plan works with the real VmRepository + domain Vm."""
-    from pve_center.domain.vm import Vm
+    from virtdeck.domain.vm import Vm
 
     repo = VmRepository()
     repo.add(Vm.from_pve({"vmid": 100, "name": "web", "status": "stopped",

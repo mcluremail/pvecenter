@@ -3,7 +3,7 @@
 игнорируется и в proxy-only окружении все raw-запросы падают по тайм-ауту."""
 from __future__ import annotations
 
-from pve_center.provider._session import build_requests_session
+from virtdeck.provider._session import build_requests_session
 
 
 def test_explicit_proxy_sets_proxies_and_disables_env():
@@ -37,7 +37,7 @@ def test_missing_proxy_key_keeps_env_behaviour():
 def test_metrics_workers_use_factory(monkeypatch):
     """Все raw-воркеры metrics.py обязаны строить сессию фабрикой,
     а не голым requests.Session()."""
-    from pve_center.ui.api import metrics as m
+    from virtdeck.ui.api import metrics as m
 
     calls = []
 

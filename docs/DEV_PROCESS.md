@@ -1,4 +1,4 @@
-# Методика разработки pve_center
+# Методика разработки virtdeck
 
 Дополнение к [AUDIT_PROCESS.md](AUDIT_PROCESS.md): как ведётся разработка,
 чтобы следующий аудит находил как можно меньше. Принцип тот же — процесс
@@ -14,7 +14,7 @@
 
 ```bash
 .venv/bin/python -m pytest tests/ -q          # все тесты (~730, <2 мин)
-.venv/bin/ruff check pve_center/ tests/       # линт (gate до и после правок)
+.venv/bin/ruff check virtdeck/ tests/       # линт (gate до и после правок)
 uv lock                                       # только при изменении зависимостей
 ```
 
@@ -43,7 +43,7 @@ uv lock                                       # только при измене
 ## Версии и релизы
 
 - Нумерация (см. FEATURES_BACKLOG): багфикс `2.9.X`, фича `2.X.0`, мажор `X.0.0`.
-- Релиз = одно и то же число в `pyproject.toml` **и** `pve_center/__init__.py`
+- Релиз = одно и то же число в `pyproject.toml` **и** `virtdeck/__init__.py`
   (не бампать только одно), запись в [CHANGELOG.md](../CHANGELOG.md) сверху
   (на английском, секции **New features** / **Bug fixes** / **Performance** /
   **Internal**, в Internal — счётчик тестов `N tests (+M)`), коммит

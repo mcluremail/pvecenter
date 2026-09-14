@@ -4,8 +4,8 @@ import json
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView
 
-from pve_center.domain.task import Task
-from pve_center.ui.widgets.cluster_tasks_widget import ClusterTasksWidget
+from virtdeck.domain.task import Task
+from virtdeck.ui.widgets.cluster_tasks_widget import ClusterTasksWidget
 
 
 def _task(upid, starttime=100.0, endtime=0.0, status="OK", node="n1",
@@ -83,7 +83,7 @@ class TestClusterTasksWidget:
         always fills its panel because the last column is the filler
         (stretchLastSection). Old saved widths must not apply to them."""
 
-        import pve_center.ui.widgets.cluster_tasks_widget as mod
+        import virtdeck.ui.widgets.cluster_tasks_widget as mod
 
         monkeypatch.setattr(
             mod, "load_ui_state",

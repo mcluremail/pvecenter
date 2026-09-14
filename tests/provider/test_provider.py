@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pve_center.provider import (
+from virtdeck.provider import (
     AccessAPI,
     ClusterAPI,
     NodeAPI,
@@ -134,14 +134,14 @@ class TestAnyeventErrors:
         assert not isinstance(result, ProxmoxNetworkError)
 
     def test_parse_pve_error_anyevent(self):
-        from pve_center.ui.utils import parse_pve_error
+        from virtdeck.ui.utils import parse_pve_error
 
         msg = parse_pve_error("595 Errors during connection establishment, proxy handshake: ENXIO")
         assert "pvedaemon" in msg or "pvedaemon" in msg.lower()
         assert "HTTP 595" in msg
 
     def test_parse_pve_error_no_false_positive(self):
-        from pve_center.ui.utils import parse_pve_error
+        from virtdeck.ui.utils import parse_pve_error
 
         assert parse_pve_error("VM 595 config not found") == "VM 595 config not found"
 
@@ -167,7 +167,7 @@ class TestSession:
         assert s._proxmox is None
 
     def test_session_lazy_proxmox(self):
-        with patch("pve_center.provider._session.ProxmoxAPI") as mock_px:
+        with patch("virtdeck.provider._session.ProxmoxAPI") as mock_px:
             mock_inst = MagicMock()
             mock_store = {}
             mock_inst._store = mock_store
@@ -179,7 +179,7 @@ class TestSession:
             mock_px.assert_called_once()
 
     def test_session_no_proxy_by_default(self):
-        with patch("pve_center.provider._session.ProxmoxAPI") as mock_px:
+        with patch("virtdeck.provider._session.ProxmoxAPI") as mock_px:
             mock_inst = MagicMock()
             sess = MagicMock()
             sess.trust_env = True
@@ -193,7 +193,7 @@ class TestSession:
             sess.proxies.update.assert_not_called()
 
     def test_session_explicit_proxy(self):
-        with patch("pve_center.provider._session.ProxmoxAPI") as mock_px:
+        with patch("virtdeck.provider._session.ProxmoxAPI") as mock_px:
             mock_inst = MagicMock()
             sess = MagicMock()
             mock_inst._store = {"session": sess}

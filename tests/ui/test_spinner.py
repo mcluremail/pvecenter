@@ -1,7 +1,7 @@
 """Tests for the animated SpinnerWidget (v2.11.2 loading indicators)."""
 from PySide6.QtGui import QPixmap
 
-from pve_center.ui.widgets.spinner import SpinnerWidget
+from virtdeck.ui.widgets.spinner import SpinnerWidget
 
 
 class TestSpinnerWidget:

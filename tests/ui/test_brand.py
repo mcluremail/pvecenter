@@ -1,6 +1,6 @@
 """Бренд: знак рендерится, локап в тулбаре, перекраска под тему."""
 
-from pve_center.ui import brand
+from virtdeck.ui import brand
 
 
 class TestMark:
@@ -18,11 +18,11 @@ class TestBrandWidget:
         """Локап заменяет текстовую надпись справа в тулбаре."""
         widget = main_window._brand
         assert isinstance(widget, brand.BrandWidget)
-        assert "PVE" in widget._wordmark.text()
-        assert "Center" in widget._wordmark.text()
+        assert "Virt" in widget._wordmark.text()
+        assert "Deck" in widget._wordmark.text()
 
     def test_restyle_follows_theme_text(self, main_window):
-        from pve_center.ui.theme import LIGHT_TOKENS, Color
+        from virtdeck.ui.theme import LIGHT_TOKENS, Color
 
         assert f"color:{Color.TEXT}" in main_window._brand._wordmark.text()
         old = Color.TEXT

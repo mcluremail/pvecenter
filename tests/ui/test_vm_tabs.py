@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from PySide6.QtWidgets import QLabel, QStackedWidget, QTreeWidget
 
-from pve_center.domain.snapshot import Snapshot
-from pve_center.ui.detail_panel._vm_tabs import VMTabs
+from virtdeck.domain.snapshot import Snapshot
+from virtdeck.ui.detail_panel._vm_tabs import VMTabs
 
 
 def _panel():

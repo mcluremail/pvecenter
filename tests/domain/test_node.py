@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.domain import Node, NodeStatus
+from virtdeck.domain import Node, NodeStatus
 
 # --- Fixtures ---
 

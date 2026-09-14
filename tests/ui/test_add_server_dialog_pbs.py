@@ -4,8 +4,8 @@ from __future__ import annotations
 import pytest
 from PySide6.QtWidgets import QDialog
 
-from pve_center.ui import add_server_dialog as asd_mod
-from pve_center.ui.add_server_dialog import AddServerDialog
+from virtdeck.ui import add_server_dialog as asd_mod
+from virtdeck.ui.add_server_dialog import AddServerDialog
 
 
 @pytest.fixture

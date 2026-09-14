@@ -1,0 +1,17 @@
+PySide6>=6.5
+proxmoxer>=2.0
+requests>=2.32.0
+urllib3>=1.26
+pyqtgraph>=0.12
+cryptography>=42.0.0
+keyring>=24.0
+
+[:sys_platform == "win32"]
+websockets>=14.0
+
+[dev]
+pytest>=8.0
+pytest-qt>=4.4
+
+[novnc]
+websockets>=14.0

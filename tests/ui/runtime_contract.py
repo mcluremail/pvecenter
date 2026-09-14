@@ -85,7 +85,7 @@ def install_guard(monkeypatch, collect=None, raise_in_main=False):
     Единая точка: все импорты create_provider (backend/*, ui/api/*)
     доходят до реестра. Возвращает список нарушений (если collect
     не передан явно)."""
-    import pve_center.plugins as plugins_mod
+    import virtdeck.plugins as plugins_mod
 
     if collect is None:
         collect = []

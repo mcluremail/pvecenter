@@ -21,7 +21,7 @@ ProxmoxProvider | ServerProvider
 
 ## Data Provider (реализация)
 
-Шов определён протоколом `provider.DataProvider` (см. `pve_center/provider/_provider.py`):
+Шов определён протоколом `provider.DataProvider` (см. `virtdeck/provider/_provider.py`):
 единая поверхность доступа — `nodes / vms / cluster / storage / tasks / pools / access / rrd` + `close()`.
 
 - `ProxmoxProvider` — единственная реализация сегодня: фасад над `ProxmoxSession`
@@ -30,7 +30,7 @@ ProxmoxProvider | ServerProvider
 - Backend-воркеры (`backend.py`) зависят только от фасада `ProxmoxProvider` —
   не от API-классов напрямую; `ui/api/metrics.py` использует `provider.rrd`.
 - Тесты подменяют `backend.ProxmoxProvider` целиком (фейк с атрибутами-фасадами).
-- Задел v3.5: второй `ServerProvider` (pve-center server) или PBS-плагин
+- Задел v3.5: второй `ServerProvider` (virtdeck server) или PBS-плагин
   реализует тот же протокол без изменения воркеров.
 
 ## Domain Model
@@ -74,7 +74,7 @@ AlertRaised
 
 ### Plugins (реализация, v3.5 seed)
 
-Шов: `pve_center/plugins/` (`Plugin`, `ProviderPlugin` — Protocol, `PluginRegistry`).
+Шов: `virtdeck/plugins/` (`Plugin`, `ProviderPlugin` — Protocol, `PluginRegistry`).
 
 - Плагин — именованный юнит (`id`, `name`); registration явная, без динамического
   импорта. Реестр — процесс-wide singleton (`get_registry()`).
@@ -91,7 +91,7 @@ AlertRaised
 
 Desktop
 ↕ REST/WebSocket
-PVECenter Server
+VirtDeck Server
 - Inventory
 - Cache
 - History

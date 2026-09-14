@@ -2,8 +2,8 @@
 
 import pytest
 
-from pve_center.domain.compat import PveVersion
-from pve_center.provider._provider import ProxmoxProvider
+from virtdeck.domain.compat import PveVersion
+from virtdeck.provider._provider import ProxmoxProvider
 
 
 @pytest.fixture()

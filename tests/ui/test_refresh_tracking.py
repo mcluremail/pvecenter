@@ -11,7 +11,7 @@ import pytest
 @pytest.fixture()
 def main_window(qtbot, monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    from pve_center.ui.mainwindow import MainWindow
+    from virtdeck.ui.mainwindow import MainWindow
 
     mw = MainWindow()
     qtbot.addWidget(mw)
@@ -20,7 +20,7 @@ def main_window(qtbot, monkeypatch, tmp_path):
 
 
 def _fill_pool(mw):
-    from pve_center.ui.mainwindow import MAX_WORKERS
+    from virtdeck.ui.mainwindow import MAX_WORKERS
 
     dummies = []
     for _ in range(MAX_WORKERS):
@@ -57,7 +57,7 @@ def test_rejected_fetchworker_not_tracked_hard(main_window, monkeypatch):
             self.node_cfg = cfg
             created.append(self)
 
-    import pve_center.ui.mainwindow as mw_mod
+    import virtdeck.ui.mainwindow as mw_mod
     monkeypatch.setattr(mw_mod, "FetchWorker", _FakeFetch)
     mw.nodes_cfg = [{"name": "h1", "host": "10.0.0.1", "user": "u@pam",
                      "token_name": "t", "token_value": "s"}]
@@ -82,7 +82,7 @@ def test_soft_cycle_skips_overflow_hosts(main_window, monkeypatch):
             self.node_cfg = cfg
             created.append(self)
 
-    import pve_center.ui.mainwindow as mw_mod
+    import virtdeck.ui.mainwindow as mw_mod
     monkeypatch.setattr(mw_mod, "FetchWorker", _FakeFetch)
     mw.nodes_cfg = [{"name": f"h{i}", "host": f"10.0.0.{i}", "user": "u@pam",
                      "token_name": "t", "token_value": "s"} for i in range(3)]

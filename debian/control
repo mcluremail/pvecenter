@@ -1,16 +1,16 @@
-Source: pve-center
+Source: virtdeck
 Section: admin
 Priority: optional
 Maintainer: Taurus McLure <taurus@mclure.ru>
 Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-setuptools,
                pybuild-plugin-pyproject
 Standards-Version: 4.6.2
-Homepage: https://github.com/mcluremail/pvecenter
-Vcs-Git: https://github.com/mcluremail/pvecenter.git
-Vcs-Browser: https://github.com/mcluremail/pvecenter
+Homepage: https://github.com/mcluremail/virtdeck
+Vcs-Git: https://github.com/mcluremail/virtdeck.git
+Vcs-Browser: https://github.com/mcluremail/virtdeck
 Rules-Requires-Root: no
 
-Package: pve-center
+Package: virtdeck
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends},
          python3-pyside6,
@@ -22,7 +22,7 @@ Depends: ${python3:Depends}, ${misc:Depends},
          python3-keyring
 Recommends: virt-viewer, python3-websockets
 Description: Десктопная панель управления Proxmox VE
- PVE Center — десктопный инструмент для мониторинга и управления
+ VirtDeck — десктопный инструмент для мониторинга и управления
  кластерами Proxmox VE. Работает через официальный API PVE.
  .
  Возможности:

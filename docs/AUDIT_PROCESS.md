@@ -1,4 +1,4 @@
-# Методика аудита кода pve_center
+# Методика аудита кода virtdeck
 
 Принцип: приложение большое — каждый аудит проходит **не весь код**, а только
 дельту с прошлой точки аудита плюс точечные зоны риска. Полный проход —
@@ -71,7 +71,7 @@
 - тесты не пишут в реальный пользовательский config.sqlite (изоляция
   ui_state/notes через monkeypatch — пример: `_isolated_tree_state` в
   `tests/ui/test_tree_panel.py`);
-- `.venv/bin/ruff check pve_center/ tests/ && .venv/bin/pytest -q` зелёные.
+- `.venv/bin/ruff check virtdeck/ tests/ && .venv/bin/pytest -q` зелёные.
 
 **Безопасность**:
 - секреты (токены, пароли) не попадают в логи, json-кэш, исключения;
@@ -95,11 +95,11 @@
 .venv/bin/python - <<'EOF'
 import json, pathlib
 ls = ["ru","es","fr","ar","zh"]
-sets = {l: set(json.loads(pathlib.Path(f"pve_center/ui/i18n/{l}.json").read_text())) for l in ls}
+sets = {l: set(json.loads(pathlib.Path(f"virtdeck/ui/i18n/{l}.json").read_text())) for l in ls}
 ref = sets["ru"]
 for l in ls: assert sets[l] == ref, f"{l}: {ref ^ sets[l]}"
 print("i18n parity ok:", len(ref))
 EOF
 # остатки старого API после миграций
-rg -n "ProxmoxSession|_poll_task" pve_center/ --glob '!pve_center/provider/**'
+rg -n "ProxmoxSession|_poll_task" virtdeck/ --glob '!virtdeck/provider/**'
 ```

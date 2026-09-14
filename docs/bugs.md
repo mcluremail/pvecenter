@@ -1,4 +1,4 @@
-# История изменений — PVE Center
+# История изменений — VirtDeck
 
 ## 2026-06-08 — Производительность загрузки
 
@@ -33,7 +33,7 @@
 | Спиннер кластера гаснет — кластер исчезает в середине загрузки | Исправлен (incremental tree: `final=False` не трогает спиннеры, `_build_tree` подмешивает заглушки из `nodes_cfg`) |
 | Панель задач не грузит standalone — поиск конфига по `pve_node` вместо `host_name` | Исправлен |
 | Производительность: панель задач медленно появлялась — `singleShot(1000)`, новый TLS handshake, блокировка QThreadPool | Исправлен (убрал `singleShot(1000)`, кэш, `threading.Thread` вместо QThreadPool, стартует с первым воркером) |
-| Кэш задач в памяти не переживал перезапуск | Исправлен (SQLite в `~/.config/pve-center/tasks_cache.sqlite`) |
+| Кэш задач в памяти не переживал перезапуск | Исправлен (SQLite в `~/.config/virtdeck/tasks_cache.sqlite`) |
 | Долгая загрузка дерева, статусбара и сводки кластера | Исправлен (параллельный FetchWorker, ранний статусбар, селект до _build_tree) |
 
 ---
@@ -99,7 +99,7 @@ if cfg is None:
 
 ### Решение
 
-SQLite в `~/.config/pve-center/tasks_cache.sqlite`:
+SQLite в `~/.config/virtdeck/tasks_cache.sqlite`:
 - `config.py`: `save_tasks_cache()` / `load_tasks_cache()` с `threading.Lock`
 - `mainwindow.py`: загружает при старте, сохраняет при каждом обновлении
 - `ClusterTasksWidget.set_placeholder()`: строка-заглушка пока кэша нет

@@ -3,7 +3,7 @@
 set_value() must accept an optional ``subtitle`` keyword — the cluster
 quorum card calls it as ``set_value("2/4", subtitle=...)``.
 """
-from pve_center.ui.widgets.metric_card import MetricCard
+from virtdeck.ui.widgets.metric_card import MetricCard
 
 
 class TestSetValueSubtitle:

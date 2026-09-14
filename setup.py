@@ -6,4 +6,4 @@ pyproject.toml is authoritative. This exists only because Fedora's
 """
 from setuptools import find_packages, setup
 
-setup(packages=find_packages(include=["pve_center*"]))
+setup(packages=find_packages(include=["virtdeck*"]))

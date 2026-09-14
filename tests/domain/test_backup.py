@@ -1,8 +1,8 @@
-"""Tests for pve_center.domain.backup — PBS volid parsing and snapshots."""
+"""Tests for virtdeck.domain.backup — PBS volid parsing and snapshots."""
 
 from datetime import datetime, timezone
 
-from pve_center.domain.backup import BackupSnapshot, parse_pbs_volid, verify_state
+from virtdeck.domain.backup import BackupSnapshot, parse_pbs_volid, verify_state
 
 
 class TestParsePbsVolid:

@@ -2,13 +2,13 @@
 servers live in the dedicated 'pbs' tree view only)."""
 import pytest
 
-from pve_center.ui.tree_panel import TreePanel
 from tests.ui.test_tree_panel import _collect_items
+from virtdeck.ui.tree_panel import TreePanel
 
 
 @pytest.fixture(autouse=True)
 def _isolated_tree_state(monkeypatch):
-    import pve_center.ui.tree_panel as tp_mod
+    import virtdeck.ui.tree_panel as tp_mod
 
     state = {}
     monkeypatch.setattr(tp_mod, "load_ui_state", lambda key: state.get(key))

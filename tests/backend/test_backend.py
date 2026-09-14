@@ -1,4 +1,4 @@
-"""Tests for pve_center/backend.py — pure helpers and token-creation flow."""
+"""Tests for virtdeck/backend.py — pure helpers and token-creation flow."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from pve_center import backend
+from virtdeck import backend
 
 
 class FakeProvider:
@@ -190,7 +190,7 @@ class TestCreateAdminToken:
         assert "error" not in result
         assert result["token_value"] == "UUID-123"
         assert result["user"] == "root@pam"
-        assert result["token_name"].startswith("pvecenter-")
+        assert result["token_name"].startswith("virtdeck-")
         assert fake.closed
 
     def test_post_and_put_both_fail(self, ticket_ok, monkeypatch):
@@ -246,9 +246,9 @@ class TestDeleteHostToken:
     def test_success(self, monkeypatch):
         fake = FakeProvider()
         monkeypatch.setattr(backend.tokens, "create_provider", lambda cfg, timeout=10: fake)
-        cfg = {"host": "10.0.0.1", "user": "root@pam", "token_name": "pvecenter-x"}
+        cfg = {"host": "10.0.0.1", "user": "root@pam", "token_name": "virtdeck-x"}
         assert backend.delete_host_token(cfg) is True
-        fake.access.delete_token.assert_called_once_with("root@pam", "pvecenter-x")
+        fake.access.delete_token.assert_called_once_with("root@pam", "virtdeck-x")
         assert fake.closed
 
     def test_failure_returns_false(self, monkeypatch):

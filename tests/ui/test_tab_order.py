@@ -6,8 +6,8 @@ drifts from the enum, the UI shows the wrong widget under each label.
 """
 import pytest
 
-from pve_center.ui.detail_panel import DetailPanel
-from pve_center.ui.detail_panel._constants import TabIndex
+from virtdeck.ui.detail_panel import DetailPanel
+from virtdeck.ui.detail_panel._constants import TabIndex
 
 EXPECTED_LABELS = {
     TabIndex.MONITOR: "Monitoring",

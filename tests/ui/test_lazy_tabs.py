@@ -7,8 +7,8 @@ event-loop tick right after the window appears, and _ensure_tabs()
 synchronously drains whatever is left on the first selection.
 """
 
-from pve_center.ui.detail_panel import DetailPanel
-from pve_center.ui.detail_panel._constants import TabIndex
+from virtdeck.ui.detail_panel import DetailPanel
+from virtdeck.ui.detail_panel._constants import TabIndex
 
 
 def test_tabs_not_built_at_construction(qtbot):
@@ -88,9 +88,9 @@ def test_do_first_selection_deferred_until_tabs_built(qtbot, monkeypatch, tmp_pa
     """Первый выбор при недостроенных табах откладывается (pending), а не
     достраивает все табы синхронно; _on_all_tabs_built выполняет его."""
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    from pve_center.domain.node import Node as DomainNode
-    from pve_center.domain.repositories import NodeRepository
-    from pve_center.ui.mainwindow import MainWindow
+    from virtdeck.domain.node import Node as DomainNode
+    from virtdeck.domain.repositories import NodeRepository
+    from virtdeck.ui.mainwindow import MainWindow
 
     mw = MainWindow()
     qtbot.addWidget(mw)

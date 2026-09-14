@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pvecenter"
+name = "virtdeck"
 version = "2.13.0"
 description = "Desktop client for Proxmox VE clusters"
 readme = "README.md"
@@ -45,18 +45,18 @@ novnc = ["websockets>=14.0"]
 dev = ["pytest>=8.0", "pytest-qt>=4.4"]
 
 [project.urls]
-"Homepage" = "https://github.com/mcluremail/pvecenter"
-"Bug Tracker" = "https://github.com/mcluremail/pvecenter/issues"
+"Homepage" = "https://github.com/mcluremail/virtdeck"
+"Bug Tracker" = "https://github.com/mcluremail/virtdeck/issues"
 
 [project.scripts]
-pvecenter = "pve_center.main:main"
+virtdeck = "virtdeck.main:main"
 
 [tool.setuptools.packages.find]
-include = ["pve_center*"]
+include = ["virtdeck*"]
 
 [tool.setuptools.package-data]
-"pve_center.ui.i18n" = ["*.json"]
-"pve_center.ui.console" = ["novnc/**/*.js", "novnc/LICENSE.txt"]
+"virtdeck.ui.i18n" = ["*.json"]
+"virtdeck.ui.console" = ["novnc/**/*.js", "novnc/LICENSE.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

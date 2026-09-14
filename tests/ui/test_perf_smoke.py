@@ -9,11 +9,11 @@ import time
 
 import pytest
 
-from pve_center.domain.enums import NodeStatus, VmStatus, VmType
-from pve_center.domain.node import Node
-from pve_center.domain.repositories import NodeRepository, VmRepository
-from pve_center.domain.vm import Vm
-from pve_center.ui.tree_panel import TreePanel
+from virtdeck.domain.enums import NodeStatus, VmStatus, VmType
+from virtdeck.domain.node import Node
+from virtdeck.domain.repositories import NodeRepository, VmRepository
+from virtdeck.domain.vm import Vm
+from virtdeck.ui.tree_panel import TreePanel
 
 
 def _make_data(hosts, vms_per_host):

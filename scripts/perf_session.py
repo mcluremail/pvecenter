@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M0.4: perf-бейслайн типовой сессии PVE Center.
+"""M0.4: perf-бейслайн типовой сессии VirtDeck.
 
 Замеряет в offscreen-режиме (без сети):
   1. startup  — конструирование MainWindow (show() в offscreen, сеть
@@ -68,7 +68,7 @@ def _median_ms(fn, repeats=3):
 
 def section_startup(mp):
     """Время конструирования MainWindow (сеть исключена)."""
-    from pve_center.ui.mainwindow import MainWindow
+    from virtdeck.ui.mainwindow import MainWindow
 
     violations = install_guard(mp)
     install_fake_pool(mp)
@@ -86,10 +86,10 @@ def section_startup(mp):
 
 
 def _make_data(hosts, vms_per_host):
-    from pve_center.domain.enums import NodeStatus, VmStatus, VmType
-    from pve_center.domain.node import Node
-    from pve_center.domain.repositories import NodeRepository, VmRepository
-    from pve_center.domain.vm import Vm
+    from virtdeck.domain.enums import NodeStatus, VmStatus, VmType
+    from virtdeck.domain.node import Node
+    from virtdeck.domain.repositories import NodeRepository, VmRepository
+    from virtdeck.domain.vm import Vm
 
     node_repo = NodeRepository()
     vm_repo = VmRepository()
@@ -121,7 +121,7 @@ def _make_data(hosts, vms_per_host):
 
 def section_tree(ladder):
     """TreePanel rebuild (update_data final=True) на лестнице объёмов."""
-    from pve_center.ui.tree_panel import TreePanel
+    from virtdeck.ui.tree_panel import TreePanel
 
     rows = []
     for hosts, vms_per_host in ladder:
@@ -199,7 +199,7 @@ def section_ceiling(sizes, batch=500):
 
 def section_detail(cfgs):
     """DetailPanel.show_details('vm', ...) — первое и повторное открытие."""
-    from pve_center.ui.detail_panel import DetailPanel
+    from virtdeck.ui.detail_panel import DetailPanel
 
     cfgs_, node_repo, vm_repo = _make_data(1, 50)
     dp = DetailPanel(cfgs_)

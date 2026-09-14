@@ -1,6 +1,6 @@
 """Тесты RefreshCoordinator: поколения, pending, guard-и, тайм-ауты."""
 
-from pve_center.backend.refresh import RefreshCoordinator
+from virtdeck.backend.refresh import RefreshCoordinator
 
 
 class TestHard:

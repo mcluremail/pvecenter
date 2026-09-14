@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pve_center.domain import HaGroup, HaResource, NetworkInterface, Snapshot, Task
+from virtdeck.domain import HaGroup, HaResource, NetworkInterface, Snapshot, Task
 
 # --- HaGroup ---
 

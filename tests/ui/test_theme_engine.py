@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from pve_center.plugins import PluginError
-from pve_center.ui import theme
-from pve_center.ui.theme import (
+from virtdeck.plugins import PluginError
+from virtdeck.ui import theme
+from virtdeck.ui.theme import (
     FONT_TOKENS,
     LIGHT_TOKENS,
     TOKENS,
@@ -47,7 +47,7 @@ class FakeDark:
 
 @pytest.fixture()
 def dark_registry():
-    from pve_center.plugins import default_registry
+    from virtdeck.plugins import default_registry
 
     reg = default_registry()
     reg.register_theme(FakeDark())
@@ -59,7 +59,7 @@ def dark_registry():
 
 class TestTokenContract:
     def test_builtin_light_covers_full_set(self):
-        from pve_center.plugins import default_registry
+        from virtdeck.plugins import default_registry
 
         reg = default_registry()
         assert "light" in reg.theme_ids()
@@ -83,7 +83,7 @@ class TestTokenContract:
         """Плагины тем не тянут сеть/Qt — AST-скан импортов."""
         import ast
 
-        src = Path(theme.__file__).parent.parent.parent / ("pve_center/plugins/_themes.py")
+        src = Path(theme.__file__).parent.parent.parent / ("virtdeck/plugins/_themes.py")
         tree = ast.parse(src.read_text(encoding="utf-8"))
         roots = set()
         for node in ast.walk(tree):
@@ -142,7 +142,7 @@ class TestLoadTheme:
 
             from PySide6.QtCore import QSize
 
-            from pve_center.ui import icons
+            from virtdeck.ui import icons
 
             assert icons._BASE_SIZE == 24
             icon = icons.get_icon("vm")  # кэш пересобран под 24px
@@ -186,13 +186,13 @@ class TestMainWindowSwitcher:
 
     def test_switch_via_combo_recolors_tree(self, qtbot, monkeypatch, tmp_path, offline):
         """Тема регистрируется ДО MainWindow — комбо её уже содержит."""
-        from pve_center.plugins import get_registry
+        from virtdeck.plugins import get_registry
 
         reg = get_registry()
         reg.register_theme(FakeDark())
         try:
             monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-            from pve_center.ui.mainwindow import MainWindow
+            from virtdeck.ui.mainwindow import MainWindow
 
             mw = MainWindow()
             qtbot.addWidget(mw)
@@ -214,7 +214,7 @@ class TestMainWindowSwitcher:
             load_theme("light", persist=False)
 
     def test_default_registry_has_no_fake_leftovers(self):
-        from pve_center.plugins import get_registry
+        from virtdeck.plugins import get_registry
 
         assert "fake_dark" not in get_registry().theme_ids()
         assert "light" in get_registry().theme_ids()
@@ -227,7 +227,7 @@ class TestBuiltinThemePlugins:
     @pytest.mark.parametrize(
         "tid", ["breeze", "breeze_dark", "oxygen", "graphite", "system"])
     def test_full_token_coverage(self, tid):
-        from pve_center.plugins import get_registry
+        from virtdeck.plugins import get_registry
 
         tokens = get_registry().get_theme(tid).tokens()
         assert set(tokens) == set(TOKENS)
@@ -235,7 +235,7 @@ class TestBuiltinThemePlugins:
 
     def test_breeze_palettes_exact(self):
         """Точные значения из схем KDE breeze (не derived)."""
-        from pve_center.plugins import get_registry
+        from virtdeck.plugins import get_registry
 
         light = get_registry().get_theme("breeze").tokens()
         assert light["BG"] == "#eff0f1"
@@ -248,7 +248,7 @@ class TestBuiltinThemePlugins:
         assert dark["TEXT"] == "#fcfcfc"
 
     def test_oxygen_palette_exact(self):
-        from pve_center.plugins import get_registry
+        from virtdeck.plugins import get_registry
 
         tokens = get_registry().get_theme("oxygen").tokens()
         assert tokens["ACCENT"] == "#3aa7dd"
@@ -260,7 +260,7 @@ class TestBuiltinThemePlugins:
     def test_breeze_activates_24px_with_overrides(self, qtbot):
         from PySide6.QtCore import QSize
 
-        from pve_center.ui import icons
+        from virtdeck.ui import icons
 
         try:
             load_theme("breeze", persist=False)
@@ -276,7 +276,7 @@ class TestBuiltinThemePlugins:
         assert QSize(16, 16) in icons.get_icon("vm").availableSizes()
 
     def test_system_follows_resolver(self, monkeypatch):
-        from pve_center.plugins import _themes as bt
+        from virtdeck.plugins import _themes as bt
 
         monkeypatch.setattr(bt, "_scheme_resolver", lambda: "dark")
         load_theme("system", persist=False)
@@ -288,7 +288,7 @@ class TestBuiltinThemePlugins:
 
     def test_system_reacts_to_scheme_change_event(self, monkeypatch):
         """Сигнал colorSchemeChanged перезагружает активную system-тему."""
-        from pve_center.plugins import _themes as bt
+        from virtdeck.plugins import _themes as bt
 
         load_theme("system", persist=False)
         monkeypatch.setattr(bt, "_scheme_resolver", lambda: "dark")
@@ -316,7 +316,7 @@ class TestBuiltinThemePlugins:
         dark_registry.register_theme(BadIcons())
         try:
             load_theme("bad_icons", registry=dark_registry, persist=False)
-            from pve_center.ui import icons
+            from virtdeck.ui import icons
 
             assert not icons._THEME_ICONS
         finally:
@@ -324,7 +324,7 @@ class TestBuiltinThemePlugins:
             load_theme("light", persist=False)
 
     def test_dot_geometry_scales_with_viewbox(self):
-        from pve_center.ui.icons import _dot_geometry
+        from virtdeck.ui.icons import _dot_geometry
 
         cx, r = _dot_geometry('<svg viewBox="0 0 16 16">')
         assert (cx, r) == (12.5, 3.5)

@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QDialogButtonBox
 
-from pve_center.ui.cluster_create_dialog import ClusterCreateDialog
+from virtdeck.ui.cluster_create_dialog import ClusterCreateDialog
 
 
 def make_dialog(qtbot):

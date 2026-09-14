@@ -5,9 +5,9 @@ import pytest
 from PySide6.QtCore import QMimeData, QPointF
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from pve_center.domain.enums import VmStatus
-from pve_center.domain.repositories import NodeRepository, VmRepository
-from pve_center.ui.tree_panel import (
+from virtdeck.domain.enums import VmStatus
+from virtdeck.domain.repositories import NodeRepository, VmRepository
+from virtdeck.ui.tree_panel import (
     GROUP_MIME,
     ITEM_KEY_ROLE,
     VM_KEY_ROLE,
@@ -19,7 +19,7 @@ from pve_center.ui.tree_panel import (
 @pytest.fixture(autouse=True)
 def _isolated_tree_state(monkeypatch):
     """B20: keep treeMode ui_state out of the real config DB."""
-    import pve_center.ui.tree_panel as tp_mod
+    import virtdeck.ui.tree_panel as tp_mod
 
     state = {}
     monkeypatch.setattr(tp_mod, "load_ui_state", lambda key: state.get(key))
@@ -158,7 +158,7 @@ class TestTreePanelBuild:
             "_display_name": "h1",
             "_is_cluster": False,
         }
-        from pve_center.domain.node import Node
+        from virtdeck.domain.node import Node
         node = Node.from_pve(err_node_dict, "h1", "", False)
         node_repo = NodeRepository()
         node_repo.add(node)
@@ -175,11 +175,11 @@ class TestTreePanelBuild:
 
 class TestTreePanelVmCountStr:
     def test_empty(self):
-        from pve_center.ui.tree_panel import _vm_count_str
+        from virtdeck.ui.tree_panel import _vm_count_str
         assert _vm_count_str([]) == "[0/0]"
 
     def test_mixed(self, make_vm):
-        from pve_center.ui.tree_panel import _vm_count_str
+        from virtdeck.ui.tree_panel import _vm_count_str
         vms = [
             make_vm(vmid=1, status=VmStatus.RUNNING),
             make_vm(vmid=2, status=VmStatus.STOPPED),
@@ -188,7 +188,7 @@ class TestTreePanelVmCountStr:
         assert _vm_count_str(vms) == "[2/3]"
 
     def test_with_domain_objects(self, make_vm):
-        from pve_center.ui.tree_panel import _vm_count_str
+        from virtdeck.ui.tree_panel import _vm_count_str
         vms = [
             make_vm(vmid=1, status=VmStatus.RUNNING),
             make_vm(vmid=2, status=VmStatus.RUNNING),
@@ -652,7 +652,7 @@ class TestTreeModes:
         "cluster": false (JSON bool). The worker used to pass it through
         raw, so Storage.cluster was False and the storages view dropped
         all local storages (False == "" is False)."""
-        from pve_center.domain.storage import Storage as DomainStorage
+        from virtdeck.domain.storage import Storage as DomainStorage
 
         cfg = [{"name": "h1", "cluster": False, "skip": False}]
         tp = TreePanel(cfg)
@@ -737,7 +737,7 @@ class TestTreeModes:
         assert n2.text(1) == "50%"
 
     def test_mode_persisted_and_restored(self, qtbot, make_node, monkeypatch):
-        import pve_center.ui.tree_panel as tp_mod
+        import virtdeck.ui.tree_panel as tp_mod
 
         saved = {}
         monkeypatch.setattr(tp_mod, "save_ui_state", lambda k, v: saved.__setitem__(k, v))
@@ -758,7 +758,7 @@ class TestTreeModes:
         assert tp2._tree_mode == "storages"
 
     def test_set_mode_same_value_noop(self, qtbot, monkeypatch):
-        import pve_center.ui.tree_panel as tp_mod
+        import virtdeck.ui.tree_panel as tp_mod
 
         calls = []
         monkeypatch.setattr(tp_mod, "save_ui_state", lambda k, v: calls.append((k, v)))
@@ -854,7 +854,7 @@ class TestPbsView:
         assert keys == [("pbs", "pbs1")]
 
     def test_pbs_datastore_children(self, qtbot):
-        from pve_center.domain.pbs import PbsDatastore
+        from virtdeck.domain.pbs import PbsDatastore
 
         tp = TreePanel(self._cfg())
         qtbot.addWidget(tp)
@@ -870,7 +870,7 @@ class TestPbsView:
         assert ds.text(1) == "25%"
 
     def test_pbs_mode_persisted_and_restored(self, qtbot, monkeypatch):
-        import pve_center.ui.tree_panel as tp_mod
+        import virtdeck.ui.tree_panel as tp_mod
 
         saved = {}
         monkeypatch.setattr(tp_mod, "save_ui_state",
@@ -887,7 +887,7 @@ class TestPbsView:
         assert tp2._tree_mode == "pbs"
 
     def test_invalid_saved_mode_falls_back(self, qtbot, monkeypatch):
-        import pve_center.ui.tree_panel as tp_mod
+        import virtdeck.ui.tree_panel as tp_mod
 
         monkeypatch.setattr(tp_mod, "load_ui_state", lambda k: "bogus")
         tp = TreePanel(self._cfg())
@@ -939,7 +939,7 @@ class _FakeMenu:
 
 def _open_menu(qtbot, tp, item, monkeypatch):
     """Open the context menu for an item (QMenu swapped for a fake)."""
-    import pve_center.ui.tree_panel as tp_mod
+    import virtdeck.ui.tree_panel as tp_mod
 
     created = []
 

@@ -25,7 +25,7 @@ class TestGuard:
 
     def test_main_thread_call_is_recorded(self, monkeypatch):
         violations = install_guard(monkeypatch)
-        import pve_center.plugins as plugins_mod
+        import virtdeck.plugins as plugins_mod
 
         provider = plugins_mod.create_provider({"name": "h1", "type": "pve"})
         provider.cluster.get("nodes")
@@ -36,7 +36,7 @@ class TestGuard:
 
     def test_raise_mode_raises_base_exception(self, monkeypatch):
         install_guard(monkeypatch, raise_in_main=True)
-        import pve_center.plugins as plugins_mod
+        import virtdeck.plugins as plugins_mod
 
         provider = plugins_mod.create_provider({"name": "h1", "type": "pve"})
         with pytest.raises(RuntimeContractViolation):
@@ -44,7 +44,7 @@ class TestGuard:
 
     def test_background_thread_is_not_a_violation(self, monkeypatch):
         violations = install_guard(monkeypatch)
-        import pve_center.plugins as plugins_mod
+        import virtdeck.plugins as plugins_mod
 
         provider = plugins_mod.create_provider({"name": "h1", "type": "pve"})
 
@@ -96,9 +96,9 @@ def test_toolbar_actions_make_no_sync_calls(main_window, offline):
 def test_tree_context_menus_make_no_sync_calls(qtbot, offline, make_node, make_vm):
     """Контекст-меню дерева (VM и host) — действия не тянут сеть."""
     violations, _ = offline
-    from pve_center.domain.enums import VmStatus
-    from pve_center.domain.repositories import NodeRepository, VmRepository
-    from pve_center.ui.tree_panel import ITEM_KEY_ROLE, VM_KEY_ROLE, TreePanel
+    from virtdeck.domain.enums import VmStatus
+    from virtdeck.domain.repositories import NodeRepository, VmRepository
+    from virtdeck.ui.tree_panel import ITEM_KEY_ROLE, VM_KEY_ROLE, TreePanel
 
     cfg = [{"name": "h1", "cluster": "", "skip": False}]
     tp = TreePanel(cfg)

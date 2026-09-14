@@ -7,7 +7,7 @@
 debian/.debhelper/
 debian/debhelper-build-stamp
 debian/files
-debian/pve-center/
+debian/virtdeck/
 debian/tmp/
 .DS_Store
 nodes.enc
@@ -25,5 +25,5 @@ venv/
 # build / tooling caches
 .pytest_cache/
 .ruff_cache/
-pvecenter.egg-info/
+virtdeck.egg-info/
 build/

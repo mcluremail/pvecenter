@@ -28,7 +28,7 @@ def offline(monkeypatch):
 def main_window(qtbot, monkeypatch, tmp_path, offline):
     """MainWindow как в tests/ui/test_refresh_tracking.py + офлайн."""
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    from pve_center.ui.mainwindow import MainWindow
+    from virtdeck.ui.mainwindow import MainWindow
 
     mw = MainWindow()
     qtbot.addWidget(mw)

@@ -3,8 +3,8 @@
 import asyncio
 from unittest.mock import MagicMock
 
-from pve_center.backend import NoVncWorker
-from pve_center.ui.console.page import build_console_html
+from virtdeck.backend import NoVncWorker
+from virtdeck.ui.console.page import build_console_html
 
 
 class TestBuildWsUrl:
@@ -67,14 +67,14 @@ class TestBuildConsoleHtml:
 
 class TestStickyKeyJs:
     def test_press_and_release(self):
-        from pve_center.ui.console.page import sticky_key_js
+        from virtdeck.ui.console.page import sticky_key_js
         assert sticky_key_js(0xFFE3, "ControlLeft", True) == (
             'if (window.rfb) rfb.sendKey(65507, "ControlLeft", true);')
         assert sticky_key_js(0xFFE1, "ShiftLeft", False) == (
             'if (window.rfb) rfb.sendKey(65505, "ShiftLeft", false);')
 
     def test_guard_when_rfb_missing(self):
-        from pve_center.ui.console.page import sticky_key_js
+        from virtdeck.ui.console.page import sticky_key_js
         assert sticky_key_js(0xFFEB, "MetaLeft", True).startswith(
             "if (window.rfb) ")
 
@@ -82,7 +82,7 @@ class TestStickyKeyJs:
 class TestProviderVncWebsocket:
     @staticmethod
     def _api():
-        from pve_center.provider import VmAPI
+        from virtdeck.provider import VmAPI
         mock_session = MagicMock()
         mock_session.call = MagicMock(
             side_effect=lambda fn, *a, **kw: fn(*a, **kw))
@@ -114,7 +114,7 @@ class TestProviderVncWebsocket:
         """noVNC-путь не шлёт proxy (опционален, некоторыми версиями PVE
         отклоняется), но шлёт websocket=1 — без него PVE не поднимает
         websocket-подготовленный листенер."""
-        from pve_center.provider import VmAPI
+        from virtdeck.provider import VmAPI
         mock_session = MagicMock()
         mock_session.call = MagicMock(
             side_effect=lambda fn, *a, **kw: fn(*a, **kw))
@@ -134,7 +134,7 @@ class TestNoVncWorkerErrorMapping:
 
     @staticmethod
     def _worker_with(exc, monkeypatch):
-        import pve_center.backend.console as console_mod
+        import virtdeck.backend.console as console_mod
 
         class _Api:
             def get_vnc_proxy(self, *a, **kw):
@@ -181,7 +181,7 @@ class TestNoVncWindowToolbar:
     def test_sticky_modifiers_toggle(self, qtbot, monkeypatch):
         from PySide6.QtWidgets import QToolBar, QWidget
 
-        from pve_center.ui.console import window as win_mod
+        from virtdeck.ui.console import window as win_mod
 
         class _FakeView(QWidget):
             def __init__(self):
@@ -227,7 +227,7 @@ class TestNoVncWindowToolbar:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QWidget
 
-        from pve_center.ui.console import window as win_mod
+        from virtdeck.ui.console import window as win_mod
 
         class _FakeView(QWidget):
             def __init__(self):
@@ -273,7 +273,7 @@ class TestWsBridgeShutdown:
     ДО wait_closed — иначе дедлок (handler ждёт апстрим)."""
 
     def test_teardown_completes_before_loop_stop(self):
-        from pve_center.ui.console.bridge import WsBridge
+        from virtdeck.ui.console.bridge import WsBridge
 
         bridge = WsBridge("ws://upstream.test", "hdr", False)
         loop = asyncio.new_event_loop()
@@ -293,7 +293,7 @@ class TestWsBridgeShutdown:
         loop.close()
 
     def test_shutdown_without_server_is_safe(self):
-        from pve_center.ui.console.bridge import WsBridge
+        from virtdeck.ui.console.bridge import WsBridge
 
         bridge = WsBridge("ws://upstream.test", "hdr", False)
         loop = asyncio.new_event_loop()
@@ -309,7 +309,7 @@ class TestWsBridgeStopRace:
     необработанных исключений и утёкших потоков."""
 
     def test_stop_before_loop_assigned_no_leak(self):
-        from pve_center.ui.console.bridge import WsBridge
+        from virtdeck.ui.console.bridge import WsBridge
 
         bridge = WsBridge("wss://upstream.test", "hdr", False)
         bridge.stop()   # _loop ещё нет — раньше был no-op, поток утекал
@@ -321,8 +321,8 @@ class TestWsBridgeStopRace:
         import threading
         import time
 
-        import pve_center.ui.console.bridge as bridge_mod
-        from pve_center.ui.console.bridge import WsBridge
+        import virtdeck.ui.console.bridge as bridge_mod
+        from virtdeck.ui.console.bridge import WsBridge
 
         async def fake_serve(*args, **kwargs):
             # имитируем «бинд ещё не завершился»: _serve висит до stop()

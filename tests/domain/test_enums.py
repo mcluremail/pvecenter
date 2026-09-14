@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pve_center.domain import QuorumState, VmStatus, VmType
+from virtdeck.domain import QuorumState, VmStatus, VmType
 
 
 class TestVmStatusFromPve:

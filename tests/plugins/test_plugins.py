@@ -1,10 +1,10 @@
-"""Tests for pve_center/plugins — registry, dispatch, built-in PVE plugin."""
+"""Tests for virtdeck/plugins — registry, dispatch, built-in PVE plugin."""
 
 from __future__ import annotations
 
 import pytest
 
-from pve_center.plugins import (
+from virtdeck.plugins import (
     PluginError,
     PluginRegistry,
     ProviderPlugin,
@@ -13,7 +13,7 @@ from pve_center.plugins import (
     default_registry,
     get_registry,
 )
-from pve_center.provider import DataProvider, ProxmoxProvider
+from virtdeck.provider import DataProvider, ProxmoxProvider
 
 _CFG = {"host": "h", "user": "u", "token_name": "t", "token_value": "v"}
 
@@ -94,8 +94,8 @@ class TestCustomPlugin:
         assert isinstance(PvePlugin(), ProviderPlugin)
 
     def test_pbs_plugin_dispatch(self):
-        from pve_center.pbs.provider import PbsProvider
-        from pve_center.plugins import PbsPlugin
+        from virtdeck.pbs.provider import PbsProvider
+        from virtdeck.plugins import PbsPlugin
 
         provider = create_provider({**_CFG, "type": "pbs"})
         assert isinstance(provider, PbsProvider)

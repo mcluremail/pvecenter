@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent, QPointingDevice
 from PySide6.QtWidgets import QApplication, QHeaderView, QTableWidgetItem
 
-from pve_center.ui.detail_panel._table_utils import make_table
+from virtdeck.ui.detail_panel._table_utils import make_table
 
 
 class TestMakeTable:
@@ -97,15 +97,15 @@ class TestDirectTables:
     @pytest.mark.parametrize(
         "factory",
         [
-            lambda: _mk("pve_center.ui.widgets.vm_options_widget",
+            lambda: _mk("virtdeck.ui.widgets.vm_options_widget",
                         "VmOptionsWidget"),
-            lambda: _mk("pve_center.ui.widgets.vm_hardware_widget",
+            lambda: _mk("virtdeck.ui.widgets.vm_hardware_widget",
                         "VmHardwareWidget"),
-            lambda: _mk("pve_center.ui.widgets.vm_pool_widget",
+            lambda: _mk("virtdeck.ui.widgets.vm_pool_widget",
                         "VmPoolWidget"),
-            lambda: _mk("pve_center.ui.widgets.vm_task_history_widget",
+            lambda: _mk("virtdeck.ui.widgets.vm_task_history_widget",
                         "VmTaskHistoryWidget"),
-            lambda: _mk("pve_center.ui.widgets.cluster_tasks_widget",
+            lambda: _mk("virtdeck.ui.widgets.cluster_tasks_widget",
                         "ClusterTasksWidget"),
         ],
         ids=["options", "hardware", "pool", "task_history", "cluster_tasks"],
@@ -118,15 +118,15 @@ class TestDirectTables:
     @pytest.mark.parametrize(
         "factory, resizable_cols",
         [
-            (lambda: _mk("pve_center.ui.widgets.vm_options_widget",
+            (lambda: _mk("virtdeck.ui.widgets.vm_options_widget",
                          "VmOptionsWidget"), [0]),
-            (lambda: _mk("pve_center.ui.widgets.vm_hardware_widget",
+            (lambda: _mk("virtdeck.ui.widgets.vm_hardware_widget",
                          "VmHardwareWidget"), [0]),
-            (lambda: _mk("pve_center.ui.widgets.vm_pool_widget",
+            (lambda: _mk("virtdeck.ui.widgets.vm_pool_widget",
                          "VmPoolWidget"), [1, 2, 3, 4, 5]),
-            (lambda: _mk("pve_center.ui.widgets.vm_task_history_widget",
+            (lambda: _mk("virtdeck.ui.widgets.vm_task_history_widget",
                          "VmTaskHistoryWidget"), [0, 1, 2, 3]),
-            (lambda: _mk("pve_center.ui.widgets.cluster_tasks_widget",
+            (lambda: _mk("virtdeck.ui.widgets.cluster_tasks_widget",
                          "ClusterTasksWidget"), [2, 3]),
         ],
         ids=["options", "hardware", "pool", "task_history", "cluster_tasks"],
@@ -147,7 +147,7 @@ class TestDirectTables:
         assert header.stretchLastSection()
 
     def test_pbs_panel_tables_movable(self, qtbot):
-        from pve_center.ui.pbs_panel import PbsPanel
+        from virtdeck.ui.pbs_panel import PbsPanel
         panel = PbsPanel()
         qtbot.addWidget(panel)
         for name in ("_ds_table", "_snap_table", "_jobs_table"):
@@ -160,7 +160,7 @@ class TestDirectTables:
                     col) != QHeaderView.Stretch, (name, col)
 
     def test_search_dialog_tree_movable(self, qtbot):
-        from pve_center.ui.search_dialog import GlobalSearchDialog
+        from virtdeck.ui.search_dialog import GlobalSearchDialog
         dlg = GlobalSearchDialog(lambda: (object(), object(), object(), object()))
         qtbot.addWidget(dlg)
         assert dlg._tree.header().sectionsMovable()
@@ -168,7 +168,7 @@ class TestDirectTables:
 
 class TestTreePanelHeader:
     def test_header_visible_and_movable(self, qtbot):
-        from pve_center.ui.tree_panel import TreePanel
+        from virtdeck.ui.tree_panel import TreePanel
         tp = TreePanel([])
         qtbot.addWidget(tp)
         assert not tp.tree.isHeaderHidden()
@@ -177,8 +177,8 @@ class TestTreePanelHeader:
         assert tp.tree.headerItem().text(1)
 
     def test_column_order_persisted(self, qtbot, monkeypatch):
-        import pve_center.ui.tree_panel as tp_mod
-        from pve_center.ui.tree_panel import TreePanel
+        import virtdeck.ui.tree_panel as tp_mod
+        from virtdeck.ui.tree_panel import TreePanel
 
         state = {}
         monkeypatch.setattr(tp_mod, "load_ui_state", lambda k: state.get(k))
@@ -200,8 +200,8 @@ class TestTreePanelHeader:
     def test_early_layout_save_skipped(self, qtbot, monkeypatch):
         """sectionResized при раскладке не должен затирать сохранённое
         состояние дефолтными ширинами (в конфиг попадало 100/100)."""
-        import pve_center.ui.tree_panel as tp_mod
-        from pve_center.ui.tree_panel import TreePanel
+        import virtdeck.ui.tree_panel as tp_mod
+        from virtdeck.ui.tree_panel import TreePanel
 
         writes = []
         monkeypatch.setattr(tp_mod, "load_ui_state", lambda key: None)

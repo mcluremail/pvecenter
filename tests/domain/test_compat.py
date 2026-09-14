@@ -2,8 +2,8 @@
 
 import pytest
 
-from pve_center.domain import compat
-from pve_center.domain.compat import (
+from virtdeck.domain import compat
+from virtdeck.domain.compat import (
     PVE_FEATURES,
     PveVersion,
     parse_pve_version,

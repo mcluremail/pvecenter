@@ -1,22 +1,22 @@
-# PVE Center
+# VirtDeck
 
 Desktop client for Proxmox VE management. Written in Python with PySide6.
 
 Monitor clusters and hosts, manage virtual machines and containers, browse Proxmox Backup Server backups — all in one window, no browser needed.
 
-![PVE Center](Screenshots/main.png)
+![VirtDeck](Screenshots/main.png)
 
 ## Download
 
 | Platform | Format | Link |
 |----------|--------|------|
-| Windows | .zip / .exe installer | [Releases](https://github.com/mcluremail/pvecenter/releases) |
-| Linux (any) | pip | `pip install pvecenter` |
-| Debian / Ubuntu | .deb | [Releases](https://github.com/mcluremail/pvecenter/releases) |
-| Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/pvecenter/releases) |
-| Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/pvecenter/releases) |
+| Windows | .zip / .exe installer | [Releases](https://github.com/mcluremail/virtdeck/releases) |
+| Linux (any) | pip | `pip install virtdeck` |
+| Debian / Ubuntu | .deb | [Releases](https://github.com/mcluremail/virtdeck/releases) |
+| Fedora / RHEL | .rpm | [Releases](https://github.com/mcluremail/virtdeck/releases) |
+| Any | .tar.gz / .whl | [Releases](https://github.com/mcluremail/virtdeck/releases) |
 
-Latest release: [v2.13.0](https://github.com/mcluremail/pvecenter/releases/tag/v2.13.0)
+Latest release: [v2.13.0](https://github.com/mcluremail/virtdeck/releases/tag/v2.13.0)
 
 ## Changelog
 
@@ -100,7 +100,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - keyring — system keyring access (KWallet / GNOME Keyring / Windows Credential Manager)
 - cryptography (export/import encrypted config bundle)
 - websockets — **optional on Linux**: required only for the built-in noVNC
-  console (`pip install pvecenter[novnc]`); the app runs fine without it.
+  console (`pip install virtdeck[novnc]`); the app runs fine without it.
   On **Windows** it is a hard dependency — Windows builds (zip/installer)
   bundle everything, no system Python needed.
 - Proxmox VE (cluster or standalone host)
@@ -112,21 +112,21 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ### Windows
 
-Download `pvecenter-windows.zip` or `pvecenter-*-setup.exe` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases).
+Download `virtdeck-windows.zip` or `virtdeck-*-setup.exe` from [GitHub Releases](https://github.com/mcluremail/virtdeck/releases).
 
-**Portable:** Extract `.zip` to any folder, run `pvecenter.exe`.
+**Portable:** Extract `.zip` to any folder, run `virtdeck.exe`.
 
-**Installer:** Run `pvecenter-*-setup.exe` — multilingual NSIS installer (English, Russian, Arabic, French, Spanish, Chinese). Creates Start Menu and Desktop shortcuts, registers uninstaller.
+**Installer:** Run `virtdeck-*-setup.exe` — multilingual NSIS installer (English, Russian, Arabic, French, Spanish, Chinese). Creates Start Menu and Desktop shortcuts, registers uninstaller.
 
 For SPICE console, install [virt-viewer for Windows](https://virt-manager.org/download/).
 
 ### Via pip (PyPI)
 
 ```bash
-pip install pvecenter
+pip install virtdeck
 # optional: built-in noVNC console
-pip install "pvecenter[novnc]"
-pvecenter
+pip install "virtdeck[novnc]"
+virtdeck
 ```
 
 ### Linux system packages (system Python, no venv)
@@ -151,13 +151,13 @@ sudo dnf install python3-pyside6 python3-proxmoxer python3-requests \
 sudo dnf install python3-websockets virt-viewer
 ```
 
-Then run from the repo: `./run` (или `python -m pve_center`).
+Then run from the repo: `./run` (или `python -m virtdeck`).
 
 ### Isolated environment
 
 ```bash
-git clone https://github.com/mcluremail/pvecenter.git
-cd pvecenter
+git clone https://github.com/mcluremail/virtdeck.git
+cd virtdeck
 python -m venv venv
 source venv/bin/activate
 pip install PySide6 proxmoxer requests urllib3 pyqtgraph cryptography keyring
@@ -167,26 +167,26 @@ pip install websockets
 
 ### .deb package (Debian / Ubuntu)
 
-Download `.deb` from [GitHub Releases](https://github.com/mcluremail/pvecenter/releases):
+Download `.deb` from [GitHub Releases](https://github.com/mcluremail/virtdeck/releases):
 
 ```bash
 # download .deb from release page
-sudo dpkg -i pve-center_*.deb
+sudo dpkg -i virtdeck_*.deb
 # virt-viewer (if SPICE/VNC console via remote-viewer needed)
 sudo apt install virt-viewer
 # optional: built-in noVNC console
 sudo apt install python3-websockets
 ```
 
-After installing the `.deb` package, launch from the menu or via `pvecenter`.
+After installing the `.deb` package, launch from the menu or via `virtdeck`.
 
 Build from source (for custom versions):
 
 ```bash
 sudo apt install devscripts debhelper dh-python python3-all python3-setuptools
-cd pvecenter
+cd virtdeck
 dpkg-buildpackage -b
-sudo dpkg -i ../pve-center_*.deb
+sudo dpkg -i ../virtdeck_*.deb
 ```
 
 ### virt-viewer (for SPICE console)
@@ -212,16 +212,16 @@ brew install virt-viewer
 
 ```bash
 # Windows
-# Portable: Extract .zip, run pvecenter.exe
-# Installer: Run pvecenter-*-setup.exe
+# Portable: Extract .zip, run virtdeck.exe
+# Installer: Run virtdeck-*-setup.exe
 
 # If installed via pip or .deb:
-pvecenter
+virtdeck
 
 # From local repository:
 ./run
 # or
-python -m pve_center
+python -m virtdeck
 ```
 
 ### First run
@@ -255,42 +255,42 @@ are available from Debian/Ubuntu repos. `python3-websockets` (noVNC console)
 and `virt-viewer` (remote-viewer console) are Recommends.
 
 The application is designed to run on the **system Python** and system
-packages (no venv required): `./run` uses plain `python -m pve_center`.
+packages (no venv required): `./run` uses plain `python -m virtdeck`.
 
 ### Project structure
 
 | File | Purpose |
 |------|---------|
-| `pve_center/__main__.py` | Module entry (`python -m pve_center`) |
-| `pve_center/main.py` | Application entry point |
-| `pve_center/backend/` | API client package: workers, `RefreshCoordinator` (hard/soft refresh), event bus seed, unified PVE error parsing |
-| `pve_center/pbs/` | Proxmox Backup Server API client (ticket auth) and workers |
-| `pve_center/plugins/_pbs.py` | PBS plugin (dispatch by `cfg["type"] = "pbs"`) |
-| `pve_center/domain/pbs.py` | PBS domain models (datastores, snapshots, jobs) |
-| `pve_center/config.py` | Keyring, SQLite config storage, export/import |
-| `pve_center/ui/mainwindow.py` | Main window |
-| `pve_center/ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
-| `pve_center/ui/detail_panel/` | VM/host detail panel (package) |
-| `pve_center/ui/add_server_dialog.py` | Add server dialog (with SSL trust toggle) |
-| `pve_center/ui/create_vm_dialog.py` | Create VM dialog |
-| `pve_center/ui/migrate_vm_dialog.py` | VM migration dialog |
-| `pve_center/ui/clone_vm_dialog.py` | VM cloning dialog |
-| `pve_center/ui/vm_config_editor_dialog.py` | VM config editor dialog |
-| `pve_center/ui/vm_device_editors.py` | Specialized device editors |
-| `pve_center/ui/vm_config_display.py` | VM config display widget |
-| `pve_center/ui/vm_actions.py` | VM power action labels and confirmation |
-| `pve_center/ui/pbs_panel.py` | PBS panel: datastores, snapshots, jobs |
-| `pve_center/ui/about_dialog.py` | About dialog |
-| `pve_center/ui/theme.py` | Color constants, fonts, QSS theme |
-| `pve_center/ui/icons.py` | SVG icon registry |
-| `pve_center/ui/notification.py` | Toast notifications |
-| `pve_center/ui/i18n/` | Translation module (tr()), JSON translation files |
-| `pve_center/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options, card_list) |
-| `pve_center/ui/api/` | API workers (RRD data, storage content) |
-| `pve_center/ui/console/` | Built-in noVNC console: window, WebSocket bridge (vendored noVNC assets) |
-| `pve_center/provider/` | Data provider seam: `ProxmoxProvider` facade, session with per-host proxy |
-| `packaging/pve-center-win.spec` | PyInstaller spec for Windows build |
-| `packaging/pve-center-installer.nsi` | NSIS multilingual installer script |
+| `virtdeck/__main__.py` | Module entry (`python -m virtdeck`) |
+| `virtdeck/main.py` | Application entry point |
+| `virtdeck/backend/` | API client package: workers, `RefreshCoordinator` (hard/soft refresh), event bus seed, unified PVE error parsing |
+| `virtdeck/pbs/` | Proxmox Backup Server API client (ticket auth) and workers |
+| `virtdeck/plugins/_pbs.py` | PBS plugin (dispatch by `cfg["type"] = "pbs"`) |
+| `virtdeck/domain/pbs.py` | PBS domain models (datastores, snapshots, jobs) |
+| `virtdeck/config.py` | Keyring, SQLite config storage, export/import |
+| `virtdeck/ui/mainwindow.py` | Main window |
+| `virtdeck/ui/tree_panel.py` | Tree panel for clusters, hosts, and VMs |
+| `virtdeck/ui/detail_panel/` | VM/host detail panel (package) |
+| `virtdeck/ui/add_server_dialog.py` | Add server dialog (with SSL trust toggle) |
+| `virtdeck/ui/create_vm_dialog.py` | Create VM dialog |
+| `virtdeck/ui/migrate_vm_dialog.py` | VM migration dialog |
+| `virtdeck/ui/clone_vm_dialog.py` | VM cloning dialog |
+| `virtdeck/ui/vm_config_editor_dialog.py` | VM config editor dialog |
+| `virtdeck/ui/vm_device_editors.py` | Specialized device editors |
+| `virtdeck/ui/vm_config_display.py` | VM config display widget |
+| `virtdeck/ui/vm_actions.py` | VM power action labels and confirmation |
+| `virtdeck/ui/pbs_panel.py` | PBS panel: datastores, snapshots, jobs |
+| `virtdeck/ui/about_dialog.py` | About dialog |
+| `virtdeck/ui/theme.py` | Color constants, fonts, QSS theme |
+| `virtdeck/ui/icons.py` | SVG icon registry |
+| `virtdeck/ui/notification.py` | Toast notifications |
+| `virtdeck/ui/i18n/` | Translation module (tr()), JSON translation files |
+| `virtdeck/ui/widgets/` | Widget modules (metrics, pool, tasks, hardware, options, card_list) |
+| `virtdeck/ui/api/` | API workers (RRD data, storage content) |
+| `virtdeck/ui/console/` | Built-in noVNC console: window, WebSocket bridge (vendored noVNC assets) |
+| `virtdeck/provider/` | Data provider seam: `ProxmoxProvider` facade, session with per-host proxy |
+| `packaging/virtdeck-win.spec` | PyInstaller spec for Windows build |
+| `packaging/virtdeck-installer.nsi` | NSIS multilingual installer script |
 | `.github/workflows/ci.yml` | CI: ruff lint on PR/push (Python 3.10/3.11/3.12) |
 | `.github/workflows/release.yml` | Release: build deb/rpm/zip/installer, create GitHub release |
 | `docs/DEV_PROCESS.md` | Development methodology (workflow, gates, coding rules) |
@@ -299,9 +299,9 @@ packages (no venv required): `./run` uses plain `python -m pve_center`.
 ## Language switching
 
 The interface language is stored in the app config database (`ui_state` table, key `language`):
-- Linux: `~/.config/pve-center/config.sqlite`
-- Windows: `%APPDATA%/pve-center/config.sqlite`
-- macOS: `~/Library/Application Support/pve-center/config.sqlite`
+- Linux: `~/.config/virtdeck/config.sqlite`
+- Windows: `%APPDATA%/virtdeck/config.sqlite`
+- macOS: `~/Library/Application Support/virtdeck/config.sqlite`
 
 Supported languages:
 - English (en)
@@ -316,7 +316,7 @@ Translations are stored in the `translations` table. To add a new language, inse
 ## Third-party software
 
 This project bundles noVNC (vendored, MPL-2.0, unmodified — see
-`pve_center/ui/console/novnc/LICENSE.txt`) and uses several third-party
+`virtdeck/ui/console/novnc/LICENSE.txt`) and uses several third-party
 Python packages (PySide6/LGPL-3.0, proxmoxer/MIT, requests/Apache-2.0,
 etc.). Full list with licenses and sources:
 [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md).

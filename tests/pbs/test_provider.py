@@ -1,10 +1,10 @@
-"""Tests for pve_center.pbs.provider — typed facade over PbsClient."""
+"""Tests for virtdeck.pbs.provider — typed facade over PbsClient."""
 from __future__ import annotations
 
 import pytest
 
-from pve_center.pbs.client import PbsError
-from pve_center.pbs.provider import PbsProvider
+from virtdeck.pbs.client import PbsError
+from virtdeck.pbs.provider import PbsProvider
 
 
 class FakeClient:
@@ -107,7 +107,7 @@ class TestJobs:
 
     def test_forget_snapshot(self):
 
-        from pve_center.domain.pbs import PbsSnapshot
+        from virtdeck.domain.pbs import PbsSnapshot
 
         p = make_provider()
         snap = PbsSnapshot.from_api("main", {
@@ -118,7 +118,7 @@ class TestJobs:
         assert p._client.calls == ["forget:main:vm/100:t1"]
 
     def test_forget_snapshot_without_time_raises(self):
-        from pve_center.domain.pbs import PbsSnapshot
+        from virtdeck.domain.pbs import PbsSnapshot
 
         p = make_provider()
         snap = PbsSnapshot(store="main", backup_type="vm", backup_id="1")

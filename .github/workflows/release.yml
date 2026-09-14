@@ -34,7 +34,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version="${GITHUB_REF_NAME#v}"
-          sed -i "1s/.*/pve-center (${version}-1) unstable; urgency=medium/" debian/changelog
+          sed -i "1s/.*/virtdeck (${version}-1) unstable; urgency=medium/" debian/changelog
       - name: Install build deps
         run: |
           apt-get update -qq
@@ -71,18 +71,18 @@ jobs:
         run: |
           mkdir -p /tmp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           version="${GITHUB_REF_NAME#v}"
-          sed -i "s/Version:.*/Version: ${version}/" pve-center.spec
+          sed -i "s/Version:.*/Version: ${version}/" virtdeck.spec
           # create source tarball from checkout
-          tar czf /tmp/rpmbuild/SOURCES/pvecenter-${version}.tar.gz \
-            --transform="s,^,pvecenter-${version}/," \
+          tar czf /tmp/rpmbuild/SOURCES/virtdeck-${version}.tar.gz \
+            --transform="s,^,virtdeck-${version}/," \
             --exclude=.git \
             --exclude=venv \
             --exclude=__pycache__ \
             --exclude='*.pyc' \
             --exclude='nodes.*' \
             .
-          cp pve-center.spec /tmp/rpmbuild/SPECS/
-          rpmbuild -bb --define "_topdir /tmp/rpmbuild" /tmp/rpmbuild/SPECS/pve-center.spec
+          cp virtdeck.spec /tmp/rpmbuild/SPECS/
+          rpmbuild -bb --define "_topdir /tmp/rpmbuild" /tmp/rpmbuild/SPECS/virtdeck.spec
       - name: Copy .rpm
         run: |
           mkdir -p artifacts
@@ -105,14 +105,14 @@ jobs:
           pip install -e .
           pip install pyinstaller
       - name: Build with PyInstaller
-        run: pyinstaller packaging/pve-center-win.spec --noconfirm
+        run: pyinstaller packaging/virtdeck-win.spec --noconfirm
       - name: Zip dist folder
         shell: pwsh
-        run: Compress-Archive -Path dist/pvecenter/* -DestinationPath pvecenter-windows.zip
+        run: Compress-Archive -Path dist/virtdeck/* -DestinationPath virtdeck-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: windows-zip
-          path: pvecenter-windows.zip
+          path: virtdeck-windows.zip
 
   build-windows-installer:
     name: Build Windows .exe installer
@@ -127,7 +127,7 @@ jobs:
           pip install -e .
           pip install pyinstaller
       - name: Build with PyInstaller
-        run: pyinstaller packaging/pve-center-win.spec --noconfirm
+        run: pyinstaller packaging/virtdeck-win.spec --noconfirm
       - name: Install NSIS via Chocolatey
         shell: pwsh
         run: |
@@ -136,23 +136,23 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          $distDir = Resolve-Path "dist/pvecenter"
+          $distDir = Resolve-Path "dist/virtdeck"
           $nsisPath = "C:\Program Files (x86)\NSIS"
           if (Test-Path "$nsisPath\makensis.exe") {
-            & "$nsisPath\makensis.exe" /DVERSION=$version /DDISTDIR="$distDir" packaging/pve-center-installer.nsi
+            & "$nsisPath\makensis.exe" /DVERSION=$version /DDISTDIR="$distDir" packaging/virtdeck-installer.nsi
           } else {
             $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
-            makensis /DVERSION=$version /DDISTDIR="$distDir" packaging/pve-center-installer.nsi
+            makensis /DVERSION=$version /DDISTDIR="$distDir" packaging/virtdeck-installer.nsi
           }
       - name: Rename installer
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          Move-Item packaging/pvecenter-setup.exe "pvecenter-${version}-setup.exe" -Force
+          Move-Item packaging/virtdeck-setup.exe "virtdeck-${version}-setup.exe" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: pvecenter-*-setup.exe
+          path: virtdeck-*-setup.exe
 
   create-release:
     name: Create GitHub Release
@@ -173,35 +173,35 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: PVE Center ${{ github.ref_name }}
+          name: VirtDeck ${{ github.ref_name }}
           body: |
-            ## PVE Center ${{ github.ref_name }}
+            ## VirtDeck ${{ github.ref_name }}
 
             Скачать: `.deb` для Debian/Ubuntu, `.rpm` для Fedora/RHEL, `.zip` для Windows, `.tar.gz` / `.whl` для pip.
 
             Установка .deb:
             ```
-            sudo dpkg -i pve-center_*.deb
+            sudo dpkg -i virtdeck_*.deb
             pip install proxmoxer
             sudo apt install virt-viewer
             ```
 
             Установка .rpm:
             ```
-            sudo dnf install pve-center-*.rpm
+            sudo dnf install virtdeck-*.rpm
             pip install proxmoxer
             sudo dnf install virt-viewer
             ```
 
             Установка Windows:
             ```
-            Распакуйте .zip в любую папку, запустите pvecenter.exe.
+            Распакуйте .zip в любую папку, запустите virtdeck.exe.
             Для консоли VM установите virt-viewer:
             https://virt-manager.org/download/
             ```
 
             Установка через pip:
             ```
-            pip install pvecenter
+            pip install virtdeck
             ```
           files: artifacts/*

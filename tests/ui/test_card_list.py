@@ -1,5 +1,5 @@
 """Tests for CardList/CardRow with domain objects."""
-from pve_center.ui.widgets.card_list import CardList, CardRow, _get_field, _status_dot
+from virtdeck.ui.widgets.card_list import CardList, CardRow, _get_field, _status_dot
 
 
 class TestGetField:
@@ -47,7 +47,7 @@ class TestStatusDot:
         assert _status_dot("") is None
 
     def test_domain_enum(self, make_vm):
-        from pve_center.domain.enums import VmStatus
+        from virtdeck.domain.enums import VmStatus
         vm = make_vm(status=VmStatus.RUNNING)
         assert _status_dot(vm.status_value) == "ok"
 
@@ -74,14 +74,14 @@ class TestCardRowDomain:
         assert row._field_labels[0][1].text() == "50.0%"
 
     def test_dot_from_node(self, qtbot, make_node):
-        from pve_center.domain.enums import NodeStatus
+        from virtdeck.domain.enums import NodeStatus
         n = make_node(status=NodeStatus.ONLINE)
         row = CardRow(n, {"dot": "status_value"})
         qtbot.addWidget(row)
         assert row._dot_label is not None
 
     def test_update_fields_domain(self, qtbot, make_vm):
-        from pve_center.domain.enums import VmStatus
+        from virtdeck.domain.enums import VmStatus
         vm1 = make_vm(vmid=100, name="old", status=VmStatus.STOPPED)
         row = CardRow(vm1, {"title": "display_name", "fields": [("cpu_text", 60)]})
         qtbot.addWidget(row)

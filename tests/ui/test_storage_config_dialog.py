@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.ui.storage_config_dialog import StorageConfigDialog
+from virtdeck.ui.storage_config_dialog import StorageConfigDialog
 
 
 @pytest.fixture

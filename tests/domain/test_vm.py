@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.domain import Vm, VmStatus, VmType
+from virtdeck.domain import Vm, VmStatus, VmType
 
 VM_DICT = {
     "vmid": 100,

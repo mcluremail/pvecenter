@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: PVE Center
+Upstream-Name: VirtDeck
 Upstream-Contact: Taurus McLure <taurus@mclure.ru>
-Source: https://github.com/mcluremail/pvecenter
+Source: https://github.com/mcluremail/virtdeck
 
 Files: *
 Copyright: 2026 Taurus McLure <taurus@mclure.ru>

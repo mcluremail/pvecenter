@@ -1,10 +1,10 @@
 """Tests for domain object serialization round-trip (cache compat)."""
 import json
 
-from pve_center.domain.enums import NodeStatus, VmStatus
-from pve_center.domain.node import Node
-from pve_center.domain.storage import Storage
-from pve_center.domain.vm import Vm
+from virtdeck.domain.enums import NodeStatus, VmStatus
+from virtdeck.domain.node import Node
+from virtdeck.domain.storage import Storage
+from virtdeck.domain.vm import Vm
 
 
 class TestNodeRoundTrip:
@@ -86,7 +86,7 @@ class TestSaveLoadCache:
     def test_round_trip_through_config(self, tmp_path, monkeypatch, make_node, make_vm, make_storage):
         # Redirect SQLite DB to temp dir
         monkeypatch.setenv("HOME", str(tmp_path))
-        from pve_center.config import _init_db, load_resources_cache, save_resources_cache
+        from virtdeck.config import _init_db, load_resources_cache, save_resources_cache
         _init_db()  # initialize in temp location
 
         nodes = [make_node(node="n1", host_name="h1"), make_node(node="n2", host_name="h2")]

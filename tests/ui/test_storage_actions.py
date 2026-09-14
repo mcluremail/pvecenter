@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.domain.storage import Storage
-from pve_center.ui.storage_actions import StorageMoveDialog
+from virtdeck.domain.storage import Storage
+from virtdeck.ui.storage_actions import StorageMoveDialog
 
 
 def _mk_storage(name):

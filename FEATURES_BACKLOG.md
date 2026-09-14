@@ -141,7 +141,7 @@ poolid) + `ui/search_dialog.py` (дебаунс 200 мс, колонки Type/Na
 - Удаление отдельных бэкапов из UI (prune по одному)
 - Restore PBS-бэкапа в новую ВМ/контейнер (`/qemu` create с archive=pbs volid)
 Этап 2 — прямое подключение к PBS API (порт 8007), как отдельный плагин — ГОТОВО:
-- регистрируется через Plugin API (`pve_center/plugins/`, dispatch по `cfg["type"]="pbs"`)
+- регистрируется через Plugin API (`virtdeck/plugins/`, dispatch по `cfg["type"]="pbs"`)
 - Datastores: список, использование, заполненность
 - Sync / prune / verify jobs: просмотр, запуск, расписание
 - Снапшоты: namespace-переключатель, verify/владелец/размер, удаление

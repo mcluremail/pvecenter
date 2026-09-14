@@ -4,9 +4,9 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import Qt
 
-from pve_center.domain.pbs import PbsDatastore, PbsJob, PbsSnapshot
-from pve_center.ui import pbs_panel as pbs_panel_mod
-from pve_center.ui.pbs_panel import PbsPanel
+from virtdeck.domain.pbs import PbsDatastore, PbsJob, PbsSnapshot
+from virtdeck.ui import pbs_panel as pbs_panel_mod
+from virtdeck.ui.pbs_panel import PbsPanel
 
 _CFG = {
     "name": "pbs1", "type": "pbs", "host": "pbs.local",

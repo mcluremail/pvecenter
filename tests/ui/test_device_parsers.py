@@ -1,5 +1,5 @@
 """Tests for device string parsers in vm_device_editors / vm_config_display."""
-from pve_center.ui.vm_device_editors import _build_net, _parse_disk, _parse_net
+from virtdeck.ui.vm_device_editors import _build_net, _parse_disk, _parse_net
 
 
 class TestParseNet:
@@ -54,7 +54,7 @@ class TestParseDisk:
 
 class TestFmtDisk:
     def test_shows_real_size(self):
-        from pve_center.ui.vm_config_display import _fmt_disk
+        from virtdeck.ui.vm_config_display import _fmt_disk
         out = _fmt_disk("local-lvm:vm-100-disk-0,size=32G,format=qcow2")
         assert "local-lvm" in out
         assert "vm-100-disk-0" in out

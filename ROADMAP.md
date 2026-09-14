@@ -82,7 +82,7 @@
 sync-вызовы на путях конфига/редких действий.
 
 - ✅ **M0.1. Статический контракт-тест** (`tests/ui/test_sync_contract.py`).
-  pytest-тест, сканирующий AST модулей `pve_center/ui/**`: запрет
+  pytest-тест, сканирующий AST модулей `virtdeck/ui/**`: запрет
   импорта/вызова sync-клиента (proxmoxer, provider-фасад, `create_provider`,
   requests) в UI — весь сетевой I/O только через QRunnable-воркеры.
   Явный allowlist швов: QRunnable-воркеры `ui/api/**` (вызовы только

@@ -1,12 +1,12 @@
 """M0.1: статический контракт «sync-клиент не живёт в UI» (ROADMAP v3.0).
 
-AST-скан pve_center/ui/**: UI-модули не импортируют и не вызывают
+AST-скан virtdeck/ui/**: UI-модули не импортируют и не вызывают
 sync-клиент (proxmoxer, provider-фасад, create_provider, requests) —
 весь сетевой I/O идёт через QRunnable-воркеры backend/ и ui/api/.
 Регресс «sync-вызов в UI» = падение этого теста.
 
 Allowlist швов:
-- pve_center/ui/api/** — QRunnable-воркеры (metrics): вызовы
+- virtdeck/ui/api/** — QRunnable-воркеры (metrics): вызовы
   create_provider легитимны только внутри run() в потоке пула;
 - старт воркеров через QThreadPool.start (mainwindow, WorkerManager) —
   не sync-клиент и правилами не запрещается.
@@ -20,25 +20,25 @@ from textwrap import dedent
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-UI_DIR = REPO / "pve_center" / "ui"
+UI_DIR = REPO / "virtdeck" / "ui"
 
 # QRunnable-воркеры слоя ui/api — единственный шов, где provider-фасад
 # легитимен (использование только внутри run() в потоке пула).
-ALLOWLIST_PREFIXES = ("pve_center.ui.api",)
+ALLOWLIST_PREFIXES = ("virtdeck.ui.api",)
 
 # Импорт sync-клиента/транспорта в UI запрещён вне allowlist:
 # - proxmoxer — sync-клиент напрямую;
 # - requests — HTTP-транспорт вне воркеров;
-# - (pve_center.)backend.pve — legacy-путь sync-клиента (защита от
+# - (virtdeck.)backend.pve — legacy-путь sync-клиента (защита от
 #   рецидивов после возможных рефакторингов);
-# - (pve_center.)provider — фасад PVE API (ProxmoxProvider, VmAPI, ...).
+# - (virtdeck.)provider — фасад PVE API (ProxmoxProvider, VmAPI, ...).
 FORBIDDEN_IMPORT_PREFIXES = (
     "proxmoxer",
     "requests",
     "backend.pve",
-    "pve_center.backend.pve",
+    "virtdeck.backend.pve",
     "provider",
-    "pve_center.provider",
+    "virtdeck.provider",
 )
 
 # Прямые вызовы sync-клиента по имени (вне allowlist).
@@ -86,7 +86,7 @@ def _scan_source(source, modpath):
                 if not allowed and (
                     hit
                     or (
-                        (resolved == "pve_center.plugins" or resolved == "plugins")
+                        (resolved == "virtdeck.plugins" or resolved == "plugins")
                         and alias.name == "create_provider"
                     )
                 ):
@@ -116,7 +116,7 @@ def _iter_ui_modules():
         yield path, modpath, source
 
 
-def _scan_engine(code, modpath="pve_center.ui.tabs"):
+def _scan_engine(code, modpath="virtdeck.ui.tabs"):
     return _scan_source(dedent(code), modpath)
 
 
@@ -132,30 +132,30 @@ class TestScannerEngine:
         assert _scan_engine("from proxmoxer import ProxmoxAPI")
 
     def test_provider_import_detected(self):
-        issues = _scan_engine("from pve_center.provider import ProxmoxProvider")
+        issues = _scan_engine("from virtdeck.provider import ProxmoxProvider")
         assert len(issues) == 1
-        assert "pve_center.provider" in issues[0][1]
+        assert "virtdeck.provider" in issues[0][1]
 
     def test_relative_provider_import_detected(self):
         issues = _scan_engine(
             "from ...provider._session import build_requests_session",
-            modpath="pve_center.ui.detail_panel.vm_tab",
+            modpath="virtdeck.ui.detail_panel.vm_tab",
         )
         assert len(issues) == 1
 
     def test_backend_pve_legacy_import_detected(self):
-        assert _scan_engine("from pve_center.backend.pve import PVE")
+        assert _scan_engine("from virtdeck.backend.pve import PVE")
         assert _scan_engine("from backend.pve import PVE")
 
     def test_create_provider_import_detected(self):
-        issues = _scan_engine("from pve_center.plugins import create_provider")
+        issues = _scan_engine("from virtdeck.plugins import create_provider")
         assert len(issues) == 1
         assert "create_provider" in issues[0][1]
 
     def test_relative_create_provider_import_detected(self):
         issues = _scan_engine(
             "from ...plugins import create_provider",
-            modpath="pve_center.ui.detail_panel.vm_tab",
+            modpath="virtdeck.ui.detail_panel.vm_tab",
         )
         assert len(issues) == 1
 
@@ -199,18 +199,18 @@ class TestScannerEngine:
             def provider(cfg):
                 return create_provider(cfg, timeout=10)
         """
-        assert _scan_engine(code, modpath="pve_center.ui.api.metrics") == []
+        assert _scan_engine(code, modpath="virtdeck.ui.api.metrics") == []
 
     def test_from_import_nonmodule_alias_passes(self):
         code = """
-            from pve_center.ui.i18n import tr
-            from pve_center.domain.models import VmRow
+            from virtdeck.ui.i18n import tr
+            from virtdeck.domain.models import VmRow
         """
         assert _scan_engine(code) == []
 
 
 class TestUITree:
-    """Реальное дерево pve_center/ui/** чисто."""
+    """Реальное дерево virtdeck/ui/** чисто."""
 
     def test_ui_tree_has_no_sync_client(self):
         issues = []
@@ -245,13 +245,13 @@ class TestUITree:
 
 @pytest.mark.parametrize(
     "modpath",
-    ["pve_center.ui.api", "pve_center.ui.api.metrics", "pve_center.ui.api.future_worker"],
+    ["virtdeck.ui.api", "virtdeck.ui.api.metrics", "virtdeck.ui.api.future_worker"],
 )
 def test_allowlist_matches_submodules(modpath):
     assert _is_allowed(modpath)
 
 
 def test_non_allowlist_modules_are_checked():
-    assert not _is_allowed("pve_center.ui.mainwindow")
-    assert not _is_allowed("pve_center.ui.tree_panel")
-    assert not _is_allowed("pve_center.ui.detail_panel")
+    assert not _is_allowed("virtdeck.ui.mainwindow")
+    assert not _is_allowed("virtdeck.ui.tree_panel")
+    assert not _is_allowed("virtdeck.ui.detail_panel")

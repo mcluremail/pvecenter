@@ -3,8 +3,8 @@ from datetime import datetime
 
 import pytest
 
-from pve_center.ui.widgets import vm_metrics_widget as vmw
-from pve_center.ui.widgets.time_range import (
+from virtdeck.ui.widgets import vm_metrics_widget as vmw
+from virtdeck.ui.widgets.time_range import (
     RangeDialog,
     covering_preset,
     filter_series,

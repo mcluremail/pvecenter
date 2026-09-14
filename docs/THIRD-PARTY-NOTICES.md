@@ -9,9 +9,9 @@ software listed below. Each component remains under its own license.
 ### noVNC (vendored)
 
 - Source: https://github.com/novnc/noVNC
-- Files: `pve_center/ui/console/novnc/`
+- Files: `virtdeck/ui/console/novnc/`
 - License: Mozilla Public License 2.0 (MPL-2.0) for the core library
-  (`novnc/core/**/*.js`); see `pve_center/ui/console/novnc/LICENSE.txt`
+  (`novnc/core/**/*.js`); see `virtdeck/ui/console/novnc/LICENSE.txt`
   for the full text and per-file exceptions.
 - Modifications: none — the vendored files are used as-is.
 - Note: MPL-2.0 is compatible with GPL-3.0. The MPL-2.0 files remain
@@ -20,8 +20,32 @@ software listed below. Each component remains under its own license.
 ### pako (vendored inside noVNC)
 
 - Source: https://github.com/nodeca/pako
-- Files: `pve_center/ui/console/novnc/vendor/pako/`
+- Files: `virtdeck/ui/console/novnc/vendor/pako/`
 - License: MIT.
+
+## Design references
+
+### KDE color schemes (Breeze, Oxygen)
+
+- Sources:
+  https://invent.kde.org/plasma/breeze (colors/BreezeLight.colors,
+  colors/BreezeDark.colors, LGPL-2.0-or-later) and
+  https://invent.kde.org/plasma/oxygen (color-schemes/Oxygen.colors).
+- What is used: individual color values (hex constants) as reference
+  data for the built-in theme plugins in `virtdeck/plugins/_themes.py`.
+  No KDE files are vendored or redistributed with this project.
+- The SVG icons shipped with VirtDeck (including the Breeze-style
+  24px set) are original works drawn for this project; no icon path
+  data from breeze-icons (LGPL-2.1) or any other icon set is copied.
+
+## Trademark notice
+
+VirtDeck is an unofficial third-party client. It is not affiliated
+with, endorsed by, or sponsored by Proxmox Server Solutions GmbH
+("Proxmox" and "Proxmox VE" are trademarks of Proxmox Server Solutions
+GmbH) or KDE e.V. The Proxmox name is used solely to describe
+compatibility ("desktop client for Proxmox VE"); no Proxmox or KDE
+artwork is used in this project.
 
 ## Python runtime dependencies
 

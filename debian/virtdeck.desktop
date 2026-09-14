@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=VirtDeck
+Comment=Панель управления Proxmox VE
+Exec=virtdeck
+Icon=virtdeck
+Categories=System;Administration;Monitorization;
+Terminal=false

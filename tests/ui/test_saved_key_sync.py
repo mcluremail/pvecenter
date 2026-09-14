@@ -4,13 +4,13 @@ sync, otherwise a later hard refresh restores the stale startup selection
 
 import pytest
 
-from pve_center.domain.node import Node as DomainNode
-from pve_center.domain.repositories import (
+from virtdeck.domain.node import Node as DomainNode
+from virtdeck.domain.repositories import (
     NodeRepository,
     StorageRepository,
     VmRepository,
 )
-from pve_center.domain.vm import Vm as DomainVm
+from virtdeck.domain.vm import Vm as DomainVm
 
 CFGS = [
     {"name": "pve1", "host": "h1", "port": 8006, "user": "u",
@@ -23,7 +23,7 @@ CFGS = [
 @pytest.fixture
 def main_window(qtbot, monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    from pve_center.ui.mainwindow import MainWindow
+    from virtdeck.ui.mainwindow import MainWindow
 
     mw = MainWindow()
     qtbot.addWidget(mw)

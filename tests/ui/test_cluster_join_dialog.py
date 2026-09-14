@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QDialogButtonBox
 
-from pve_center.ui.cluster_join_dialog import ClusterJoinDialog
+from virtdeck.ui.cluster_join_dialog import ClusterJoinDialog
 
 CANDIDATES = [
     {"name": "pve2", "node": "n2", "host": "10.0.1.2",

@@ -631,7 +631,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pvecenter"
+name = "virtdeck"
 version = "2.13.0"
 source = { editable = "." }
 dependencies = [

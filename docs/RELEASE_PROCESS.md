@@ -1,4 +1,4 @@
-# Процедура релиза pve_center
+# Процедура релиза virtdeck
 
 Принцип: релиз — это не только бамп версий. Документация (
 [CHANGELOG.md](../CHANGELOG.md), [README.md](../README.md),
@@ -21,9 +21,9 @@
 Версия живёт в трёх местах — меняем все:
 
 - `pyproject.toml` (`[project] version`);
-- `pve_center/__init__.py` (`__version__`);
+- `virtdeck/__init__.py` (`__version__`);
 - `uv.lock` — перегенерация `uv lock` (меняется строка `version` пакета
-  `pvecenter`). **Закоммитить обновление**, не откатывать (в отличие от
+  `virtdeck`). **Закоммитить обновление**, не откатывать (в отличие от
   рутинных прогонов, где дрейф uv.lock откатывается).
 
 ## Процедура (порядок шагов)
@@ -43,7 +43,7 @@
      попадает в Interface, фича с API-действиями — в Monitoring/Management/...);
    - переименованные/переформулированные фичи — синхронно с CHANGELOG.
 5. **Бамп версий** (три места, см. выше) + `uv lock`.
-6. **Гейты**: `.venv/bin/ruff check pve_center tests &&
+6. **Гейты**: `.venv/bin/ruff check virtdeck tests &&
    .venv/bin/pytest -q` — зелёные. Smoke: `grep -rn "2\.1[0-9]\." README.md`
    — не осталось старых упоминаний версии.
 7. **Коммит** `release: vX.Y.Z — <заголовок>` (по явной команде, как всегда).

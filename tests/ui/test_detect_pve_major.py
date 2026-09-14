@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from pve_center.ui.detail_panel._host_tabs import HostTabs
+from virtdeck.ui.detail_panel._host_tabs import HostTabs
 
 
 def make(major_raw):

@@ -1,9 +1,9 @@
-"""Tests for pve_center.pbs.client — ticket auth, endpoints, error paths."""
+"""Tests for virtdeck.pbs.client — ticket auth, endpoints, error paths."""
 from __future__ import annotations
 
 import pytest
 
-from pve_center.pbs.client import PBS_PORT, PbsClient, PbsError
+from virtdeck.pbs.client import PBS_PORT, PbsClient, PbsError
 
 _CFG = {
     "name": "pbs1", "type": "pbs", "host": "pbs.local",

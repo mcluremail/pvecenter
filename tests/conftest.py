@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 @pytest.fixture(autouse=True)
 def _isolate_xdg(tmp_path, monkeypatch):
     """Изолировать пользовательские каталоги: тесты не должны трогать
-    реальный ~/.config/pve-center (config.sqlite, кэш i18n и т.п.).
+    реальный ~/.config/virtdeck (config.sqlite, кэш i18n и т.п.).
     Регресс аудита 2026-09-09."""
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
@@ -19,8 +19,8 @@ def _isolate_xdg(tmp_path, monkeypatch):
 @pytest.fixture
 def make_node():
     """Factory fixture for building Node domain objects."""
-    from pve_center.domain.enums import NodeStatus
-    from pve_center.domain.node import Node
+    from virtdeck.domain.enums import NodeStatus
+    from virtdeck.domain.node import Node
 
     def _make(
         host_name="h1",
@@ -62,8 +62,8 @@ def make_node():
 @pytest.fixture
 def make_vm():
     """Factory fixture for building Vm domain objects."""
-    from pve_center.domain.enums import VmStatus, VmType
-    from pve_center.domain.vm import Vm
+    from virtdeck.domain.enums import VmStatus, VmType
+    from virtdeck.domain.vm import Vm
 
     def _make(
         vmid=100,
@@ -113,7 +113,7 @@ def make_vm():
 @pytest.fixture
 def make_storage():
     """Factory fixture for building Storage domain objects."""
-    from pve_center.domain.storage import Storage
+    from virtdeck.domain.storage import Storage
 
     def _make(
         storage="local",

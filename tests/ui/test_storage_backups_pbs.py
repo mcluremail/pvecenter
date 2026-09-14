@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 from PySide6.QtCore import Qt
 
-from pve_center.ui.detail_panel import DetailPanel
-from pve_center.ui.detail_panel._constants import TabIndex
-from pve_center.ui.detail_panel._storage_tabs import StorageTabs
-from pve_center.ui.i18n import tr
+from virtdeck.ui.detail_panel import DetailPanel
+from virtdeck.ui.detail_panel._constants import TabIndex
+from virtdeck.ui.detail_panel._storage_tabs import StorageTabs
+from virtdeck.ui.i18n import tr
 
 PBS_ITEM = {
     "volid": "pbs1:backup/vm/100/2024-05-06T07:08:09Z",

@@ -1,4 +1,4 @@
-# PVE Center — Устранение проблем с подключением хостов
+# VirtDeck — Устранение проблем с подключением хостов
 
 ## Типовые ошибки и их причины
 
@@ -66,11 +66,11 @@ sudo systemctl restart pveproxy
 **Решение**:
 ```bash
 # Проверить отключение изоляции привилегий
-pveum user token list pvecenter@pve
+pveum user token list virtdeck@pve
 
 # Если privsep=1 — пересоздать
-pveum user token remove pvecenter@pve pvecenter-main
-pveum user token add pvecenter@pve pvecenter-main --privsep 0 --comment "PVE Center"
+pveum user token remove virtdeck@pve virtdeck-main
+pveum user token add virtdeck@pve virtdeck-main --privsep 0 --comment "VirtDeck"
 ```
 
 **Или пересоздать через диалог "+" в приложении** — он создаёт токен с `privsep=0`.
@@ -162,6 +162,6 @@ PVE технически не различает standalone и кластер. �
 
 ### Токены
 
-- При добавлении через диалог создаётся пользователь `pvecenter@pve` с ролью **Administrator** на `/`
+- При добавлении через диалог создаётся пользователь `virtdeck@pve` с ролью **Administrator** на `/`
 - Токен создаётся с `privsep=0` (полные права пользователя)
 - Root-пароль **не хранится** — только токен

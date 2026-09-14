@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pve_center.domain import (
+from virtdeck.domain import (
     Node,
     NodeRepository,
     NodeStatus,

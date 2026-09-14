@@ -2,15 +2,15 @@
 structure changes (e.g. a storage removed on the PVE side), otherwise
 stale items linger until the next hard refresh."""
 
-from pve_center.domain.node import Node as DomainNode
-from pve_center.domain.repositories import (
+from virtdeck.domain.node import Node as DomainNode
+from virtdeck.domain.repositories import (
     NodeRepository,
     StorageRepository,
     VmRepository,
 )
-from pve_center.domain.storage import Storage as DomainStorage
-from pve_center.domain.vm import Vm as DomainVm
-from pve_center.ui.mainwindow import _repo_signature
+from virtdeck.domain.storage import Storage as DomainStorage
+from virtdeck.domain.vm import Vm as DomainVm
+from virtdeck.ui.mainwindow import _repo_signature
 
 
 def _populate(node_repo, vm_repo, storage_repo):

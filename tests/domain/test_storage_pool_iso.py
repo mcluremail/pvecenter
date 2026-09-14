@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pve_center.domain import IsoImage, Pool, Storage
+from virtdeck.domain import IsoImage, Pool, Storage
 
 STORAGE_DICT = {
     "storage": "local-lvm",
