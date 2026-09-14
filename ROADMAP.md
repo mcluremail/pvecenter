@@ -141,10 +141,20 @@ sync-вызовы на путях конфига/редких действий.
   вставки — сколько объектов тянет до фриза. Если потолок низкий —
   миграция на QAbstractItemModel поднимается из M7 раньше (иначе метрика
   принципа 0 не выполнится).
-- **M0.5. Feature detection / PVE compat matrix.** Версии нод при
+- **M0.5. Feature detection / PVE compat matrix. ✅** Версии нод при
   подключении + capabilities-таблица (7.x/8.x/9.x), `supports(feature)`
   в провайдере. Дёшево на M0, окупается на M4 (rrddata/version
   расхождения) и M5 (migrate/HA nuances); вместо хардкода версий.
+  Реализовано: `domain/compat.py` — `PveVersion`, `parse_pve_version`
+  (форматы 8.x `8.2.4` и 7.x `7.4-3`, хэши/мусор → None),
+  `PVE_FEATURES` (version ≥6.2, rrddata ≥6.0, guest_tags ≥8.0) +
+  `register_feature` для расширения; `ProxmoxProvider.report_version/
+  node_version/supports(feature, node=None)` (node=None → все известные
+  ноды; неизвестное → консервативно False); версии заполняются из
+  `fetch.py` (pveversion из node status, кластер и standalone).
+  Хардкод-парсинг `_detect_pve_major` в `_host_tabs.py` переведён на
+  `parse_pve_version`. Тесты: `tests/domain/test_compat.py` +
+  `tests/provider/test_compat.py` (23).
 
 #### M1. Движок тем ⏳ — ЛИЧНЫЙ ПРИОРИТЕТ
 - Архитектура: ядро знает **только цветовые токены**; все темы —

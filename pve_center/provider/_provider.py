@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from ..domain.compat import PveVersion, parse_pve_version, supports
 from ._access import AccessAPI
 from ._cluster import ClusterAPI
 from ._nodes import NodeAPI
@@ -50,6 +51,13 @@ class DataProvider(Protocol):
     @property
     def rrd(self) -> RrdAPI: ...
 
+    # M0.5: feature detection / PVE compat matrix
+    def report_version(self, node: str, raw: str | None) -> None: ...
+
+    def node_version(self, node: str) -> PveVersion | None: ...
+
+    def supports(self, feature: str, node: str | None = None) -> bool: ...
+
     def close(self) -> None: ...
 
 
@@ -70,6 +78,29 @@ class ProxmoxProvider:
         self._pools: PoolAPI | None = None
         self._access: AccessAPI | None = None
         self._rrd: RrdAPI | None = None
+        self._node_versions: dict[str, PveVersion] = {}
+
+    # -- M0.5: feature detection / PVE compat matrix ----------------
+
+    def report_version(self, node: str, raw: str | None) -> None:
+        """Запомнить версию ноды (вызывается из фетч-воркера при
+        подключении; raw — pveversion из node status)."""
+        version = parse_pve_version(raw)
+        if version is not None:
+            self._node_versions[node] = version
+
+    def node_version(self, node: str) -> PveVersion | None:
+        return self._node_versions.get(node)
+
+    def supports(self, feature: str, node: str | None = None) -> bool:
+        """Поддерживает ли нода (или все известные, если node=None)
+        фичу из compat-матрицы. Неизвестное → False (консервативно)."""
+        if node is not None:
+            return supports(self._node_versions.get(node), feature)
+        known = list(self._node_versions.values())
+        if not known:
+            return False
+        return all(supports(v, feature) for v in known)
 
     @property
     def nodes(self) -> NodeAPI:

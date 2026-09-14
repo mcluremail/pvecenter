@@ -1794,17 +1794,18 @@ class HostTabs:
     # --- backup jobs fetch / populate ---
 
     def _detect_pve_major(self, cfg_or_host):
+        """M0.5: major из pve_version_raw через compat-матрицу.
+
+        Неизвестная версия → 7 (самый совместимый маршрут backup API).
+        """
+        from ...domain.compat import parse_pve_version
+
         if isinstance(cfg_or_host, dict):
             for node in self.panel.all_nodes:
                 if node.host_name == cfg_or_host.get("name", ""):
-                    pvever = node.pve_version_raw or ""
-                    if pvever:
-                        v = pvever.split("/")[1] if "/" in pvever else pvever
-                        major = v.split(".")[0]
-                        try:
-                            return int(major)
-                        except ValueError:
-                            pass
+                    version = parse_pve_version(node.pve_version_raw)
+                    if version is not None:
+                        return version.major
         return 7
 
     def _fetch_backup_jobs(self, cfg, context_name):

@@ -200,6 +200,8 @@ class FetchWorker(QRunnable):
                             pve = st.get("pveversion")
                             if pve:
                                 n["pveversion"] = pve
+                                # M0.5: версии нод для compat-матрицы
+                                provider.report_version(node_name, pve)
                             n["kernel"] = st.get("kversion", "")
                     except Exception:
                         pass
@@ -236,6 +238,9 @@ class FetchWorker(QRunnable):
                     node_name = nn
                     try:
                         node_status = node_api.get_status(node_name)
+                        # M0.5: версия ноды для compat-матрицы
+                        provider.report_version(node_name,
+                                                node_status.get("pveversion"))
                     except Exception as e:
                         # Surface the failure as an error node instead of
                         # silently emitting an empty "ok" result.
