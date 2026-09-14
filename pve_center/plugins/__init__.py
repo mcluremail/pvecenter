@@ -9,11 +9,25 @@ from __future__ import annotations
 from ..provider import DataProvider
 from ._pbs import PbsPlugin
 from ._pve import PvePlugin
-from ._themes import LightTheme
+from ._themes import (
+    BreezeDarkTheme,
+    BreezeTheme,
+    GraphiteTheme,
+    LightTheme,
+    OxygenTheme,
+    SystemTheme,
+)
 from .base import Plugin, PluginError, PluginRegistry, ProviderPlugin, ThemePlugin
 
 _BUILTINS = (PvePlugin(), PbsPlugin())
-_BUILTIN_THEMES = (LightTheme(),)
+_BUILTIN_THEMES = (
+    LightTheme(),
+    BreezeTheme(),
+    BreezeDarkTheme(),
+    OxygenTheme(),
+    GraphiteTheme(),
+    SystemTheme(),
+)
 
 
 def default_registry() -> PluginRegistry:
@@ -51,6 +65,11 @@ __all__ = [
     "PbsPlugin",
     "PvePlugin",
     "LightTheme",
+    "BreezeTheme",
+    "BreezeDarkTheme",
+    "OxygenTheme",
+    "GraphiteTheme",
+    "SystemTheme",
     "create_provider",
     "default_registry",
     "get_registry",

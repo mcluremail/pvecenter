@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 import threading
 import time
@@ -71,7 +72,7 @@ from ..domain import (
     Vm as DomainVm,
 )
 from ..domain.bulk import plan_bulk_action
-from . import theme
+from . import brand, theme
 from .detail_panel import DetailPanel
 from .i18n import get_language, supported_languages, tr
 from .icons import get_icon
@@ -105,7 +106,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PVE Center")
         from .icons import init_icons
         init_icons()
-        self.setWindowIcon(get_icon("app"))
+        self.setWindowIcon(brand.make_logo_icon(256))
         self.resize(1600, 900)
 
         theme.load()
@@ -282,7 +283,10 @@ class MainWindow(QMainWindow):
 
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
-        self._toolbar.setIconSize(QSize(18, 18))
+        from .icons import _BASE_SIZE
+
+        _tb = max(18, round(_BASE_SIZE * 1.125))
+        self._toolbar.setIconSize(QSize(_tb, _tb))
         self._toolbar.setToolButtonStyle(Qt.ToolButtonIconOnly)
 
         add_action = QAction(get_icon("add"), tr("Add server"), self)
@@ -328,9 +332,8 @@ class MainWindow(QMainWindow):
         spacer.setSizePolicy(spacer.sizePolicy().Policy.Expanding, spacer.sizePolicy().Policy.Fixed)
         self._toolbar.addWidget(spacer)
 
-        brand = QLabel("PVE Center")
-        brand.setStyleSheet("font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding-right: 8px;")
-        self._toolbar.addWidget(brand)
+        self._brand = brand.make_brand_widget(self)
+        self._toolbar.addWidget(self._brand)
 
         self.addToolBar(self._toolbar)
 
@@ -356,9 +359,14 @@ class MainWindow(QMainWindow):
         self._heartbeat_timer.setInterval(500)
         self._heartbeat_timer.timeout.connect(self._heartbeat)
         self._heartbeat_timer.start()
-        self._freeze_detector = threading.Thread(target=self._detect_freeze, daemon=True, name="freeze-detector")
         self._closing = False
-        self._freeze_detector.start()
+        # В offscreen/pytest событийный цикл стоит — детектор шумит и
+        # штормом traceback-логов роняет производительность тестов.
+        if (os.environ.get("QT_QPA_PLATFORM") != "offscreen"
+                and "PYTEST_CURRENT_TEST" not in os.environ):
+            self._freeze_detector = threading.Thread(
+                target=self._detect_freeze, daemon=True, name="freeze-detector")
+            self._freeze_detector.start()
 
         # Таймер обновления задач кластера
         self.tasks_timer = QTimer(self)
@@ -2074,7 +2082,7 @@ class MainWindow(QMainWindow):
         self._theme_combo.setStyleSheet(self._status_combo_style())
         reg = get_registry()
         saved = load_ui_state("theme") or "light"
-        ids = reg.theme_ids()
+        ids = theme_mod.ordered_theme_ids(reg)
         if saved not in ids:
             saved = "light" if "light" in ids else (ids[0] if ids else None)
         self._theme_combo.blockSignals(True)
@@ -2109,12 +2117,14 @@ class MainWindow(QMainWindow):
 
     def _on_theme_applied(self):
         """Реакция UI на применённую тему: инлайн-стили + дерево + тулбар."""
-        from .icons import init_icons
+        from .icons import _BASE_SIZE, init_icons
 
         for combo in (self._lang_combo, self._theme_combo):
             combo.setStyleSheet(self._status_combo_style())
         init_icons()
-        self._toolbar.setIconSize(QSize(18, 18))
+        size = max(18, round(_BASE_SIZE * 1.125))
+        self._toolbar.setIconSize(QSize(size, size))
+        self._brand.restyle()
         self.tree_panel.reapply_theme()
 
     def _on_language_changed(self, idx):

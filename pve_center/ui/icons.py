@@ -20,6 +20,40 @@ def reset_icons():
     _icons = None
 
 
+_THEME_ICONS: dict = {}
+
+
+def set_theme_icons(overrides):
+    """SVG-оверрайды активной темы (частичные; фоллбэк — встроенные)."""
+    global _THEME_ICONS
+    _THEME_ICONS = overrides or {}
+
+
+# Относительные размеры мелких/крупных иконок от базового размера.
+_SCALES = {
+    "app": 1.5,
+    "refresh": 0.875, "upload": 0.875, "download": 0.875,
+    "export": 0.875, "import": 0.875, "about": 0.875,
+    "lock": 0.875, "unlock": 0.875, "migrate": 0.875, "clone": 0.875,
+    "search": 0.875,
+    "expand": 0.75, "collapse": 0.75, "add": 0.75, "remove": 0.75,
+}
+
+
+def _sized(scale):
+    return max(10, round(_BASE_SIZE * scale))
+
+
+def _fmt(tmpl):
+    """Форматирование шаблона токенами; чужой SVG без плейсхолдеров — as-is."""
+    try:
+        return tmpl.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM,
+                           ok=Color.STATUS_OK, err=Color.STATUS_ERR,
+                           b=Color.BORDER)
+    except (KeyError, IndexError):
+        return tmpl
+
+
 def _status_color(status):
     if status in ("online", "running", "OK"):
         return Color.STATUS_OK
@@ -276,14 +310,27 @@ _LOADING = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-
 </svg>"""
 
 
+def _dot_geometry(tmpl):
+    """Геометрия статус-точки из viewBox шаблона (16 → r3.5 @ 12.5)."""
+    import re as _re
+
+    m = _re.search(r'viewBox="0 0 (\d+)[\d. ]*"', tmpl)
+    vb = float(m.group(1)) if m else 16.0
+    k = vb / 16.0
+    return vb - 3.5 * k, 3.5 * k
+
+
 def _make_icon_with_dot(template, status):
     dot_color = _status_color(status)
+    fmt = _fmt(template)
     if dot_color is None:
-        return _make_icon(template.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR))
-    svg = template.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR).replace(
+        return _make_icon(fmt)
+    cx, r = _dot_geometry(template)
+    svg = fmt.replace(
         "</svg>",
-        f'<circle cx="12.5" cy="12.5" r="3.5" fill="{dot_color}" '
-        f'stroke="{Color.ON_ACCENT}" stroke-width="1.5" stroke-opacity="0.9"/></svg>'
+        f'<circle cx="{cx:.1f}" cy="{cx:.1f}" r="{r:.1f}" fill="{dot_color}" '
+        f'stroke="{Color.ON_ACCENT}" stroke-width="{1.5 * r / 3.5:.2f}" '
+        f'stroke-opacity="0.9"/></svg>'
     )
     return _make_icon(svg)
 
@@ -431,66 +478,69 @@ _SEARCH = """<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-r
 </svg>"""
 
 def get_icon(name, status=None):
-    if status and name in _SVG_TEMPLATES:
-        return _make_icon_with_dot(_SVG_TEMPLATES[name], status)
+    tmpl = _THEME_ICONS.get(name) or _SVG_TEMPLATES.get(name)
+    if status and tmpl is not None:
+        return _make_icon_with_dot(tmpl, status)
     if _icons is None:
         init_icons()
     return _icons.get(name)
+
 
 def init_icons():
     global _icons
     if _icons is not None:
         return
-    _icons = {
-        "cluster": _make_icon(_CLUSTER.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "host": _make_icon(_HOST.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "vm": _make_icon(_VM.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "pool": _make_icon(_POOL.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "folder": _make_icon(_FOLDER.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "storage": _make_icon(_STORAGE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "app": _make_icon(_APP.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 24),
-        "refresh": _make_icon(_REFRESH.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "monitor": _make_icon(_MONITOR.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "hardware": _make_icon(_HARDWARE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "options": _make_icon(_OPTIONS.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "history": _make_icon(_HISTORY.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "disk": _make_icon(_DISK.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "backup": _make_icon(_BACKUP.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "restore": _make_icon(_RESTORE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "iso": _make_icon(_ISO.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "template": _make_icon(_TEMPLATE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "tpm": _make_icon(_TPM.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "network": _make_icon(_NETWORK.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "services": _make_icon(_SERVICES.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "snapshot": _make_icon(_SNAPSHOT.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "expand": _make_icon(_EXPAND.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 12),
-        "collapse": _make_icon(_COLLAPSE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 12),
-        "add": _make_icon(_ADD.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 12),
-        "remove": _make_icon(_REMOVE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 12),
-        "upload": _make_icon(_UPLOAD.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "download": _make_icon(_DOWNLOAD.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "ha": _make_icon(_HA.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "usb": _make_icon(_USB.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "pci": _make_icon(_PCI.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "serial": _make_icon(_SERIAL.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "start": _make_icon(_START.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "shutdown": _make_icon(_SHUTDOWN.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "reboot": _make_icon(_REBOOT.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "reset": _make_icon(_RESET.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "stop": _make_icon(_STOP.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "console": _make_icon(_CONSOLE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "resume": _make_icon(_RESUME.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "export": _make_icon(_EXPORT.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "import": _make_icon(_IMPORT.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "about": _make_icon(_ABOUT.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "lock": _make_icon(_LOCK.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "unlock": _make_icon(_UNLOCK.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "migrate": _make_icon(_MIGRATE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "clone": _make_icon(_CLONE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-        "user": _make_icon(_USER.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "token": _make_icon(_TOKEN.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "group": _make_icon(_GROUP.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "role": _make_icon(_ROLE.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "acl": _make_icon(_ACL.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR)),
-        "search": _make_icon(_SEARCH.format(c=Color.ICON_FG, c2=Color.ICON_FG_DIM, ok=Color.STATUS_OK, err=Color.STATUS_ERR), 14),
-    }
+    _icons = {}
+    for name, tmpl in _SVG_TEMPLATES.items():
+        svg = _THEME_ICONS.get(name) or tmpl
+        _icons[name] = _make_icon(_fmt(svg), _sized(_SCALES.get(name, 1.0)))
+    _icons.update({
+        "folder": _make_icon(_fmt(_FOLDER)),
+        "storage": _make_icon(_fmt(_THEME_ICONS.get("storage") or _STORAGE)),
+        "backup": _make_icon(_fmt(_THEME_ICONS.get("backup") or _BACKUP)),
+        "restore": _make_icon(_fmt(_RESTORE)),
+        "iso": _make_icon(_fmt(_ISO)),
+        "template": _make_icon(_fmt(_TEMPLATE)),
+        "tpm": _make_icon(_fmt(_TPM)),
+        "network": _make_icon(_fmt(_NETWORK)),
+        "services": _make_icon(_fmt(_SERVICES)),
+        "snapshot": _make_icon(_fmt(_SNAPSHOT)),
+        "monitor": _make_icon(_fmt(_MONITOR)),
+        "hardware": _make_icon(_fmt(_HARDWARE)),
+        "options": _make_icon(_fmt(_OPTIONS)),
+        "history": _make_icon(_fmt(_HISTORY)),
+        "disk": _make_icon(_fmt(_DISK)),
+        "start": _make_icon(_fmt(_START)),
+        "shutdown": _make_icon(_fmt(_SHUTDOWN)),
+        "reboot": _make_icon(_fmt(_REBOOT)),
+        "reset": _make_icon(_fmt(_RESET)),
+        "stop": _make_icon(_fmt(_STOP)),
+        "console": _make_icon(_fmt(_CONSOLE)),
+        "resume": _make_icon(_fmt(_RESUME)),
+        "ha": _make_icon(_fmt(_HA)),
+        "usb": _make_icon(_fmt(_USB)),
+        "pci": _make_icon(_fmt(_PCI)),
+        "serial": _make_icon(_fmt(_SERIAL)),
+        "user": _make_icon(_fmt(_USER)),
+        "token": _make_icon(_fmt(_TOKEN)),
+        "group": _make_icon(_fmt(_GROUP)),
+        "role": _make_icon(_fmt(_ROLE)),
+        "acl": _make_icon(_fmt(_ACL)),
+        "search": _make_icon(_fmt(_SEARCH), _sized(_SCALES["search"])),
+        "refresh": _make_icon(_fmt(_THEME_ICONS.get("refresh") or _REFRESH),
+                              _sized(_SCALES["refresh"])),
+        "expand": _make_icon(_fmt(_EXPAND), _sized(0.75)),
+        "collapse": _make_icon(_fmt(_COLLAPSE), _sized(0.75)),
+        "add": _make_icon(_fmt(_ADD), _sized(0.75)),
+        "remove": _make_icon(_fmt(_REMOVE), _sized(0.75)),
+        "upload": _make_icon(_fmt(_UPLOAD), _sized(0.875)),
+        "download": _make_icon(_fmt(_DOWNLOAD), _sized(0.875)),
+        "export": _make_icon(_fmt(_EXPORT), _sized(0.875)),
+        "import": _make_icon(_fmt(_IMPORT), _sized(0.875)),
+        "about": _make_icon(_fmt(_ABOUT), _sized(0.875)),
+        "lock": _make_icon(_fmt(_LOCK), _sized(0.875)),
+        "unlock": _make_icon(_fmt(_UNLOCK), _sized(0.875)),
+        "migrate": _make_icon(_fmt(_MIGRATE), _sized(0.875)),
+        "clone": _make_icon(_fmt(_CLONE), _sized(0.875)),
+        "app": _make_icon(_fmt(_APP), _sized(1.5)),
+    })

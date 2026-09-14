@@ -871,6 +871,60 @@ def _apply_qss() -> None:
     _app().setStyleSheet(QSS)
 
 
+_ACTIVE_THEME_ID = "light"
+
+
+def active_theme_id() -> str:
+    """id последней активированной темы (для системы — 'system')."""
+    return _ACTIVE_THEME_ID
+
+
+_THEME_ORDER = ("light", "breeze", "breeze_dark", "oxygen", "graphite", "system")
+
+
+def ordered_theme_ids(registry) -> list[str]:
+    """id тем в UX-порядке; сторонние — по алфавиту в конце."""
+    ids = set(registry.theme_ids())
+    known = [t for t in _THEME_ORDER if t in ids]
+    return known + sorted(t for t in ids if t not in _THEME_ORDER)
+
+
+def _qt_scheme_name() -> str:
+    """Схема ОС: 'dark' | 'light' (ошибка/неизвестно → light)."""
+    try:
+        from PySide6.QtGui import QGuiApplication
+
+        scheme = QGuiApplication.styleHints().colorScheme()
+        name = getattr(scheme, "name", None) or str(scheme)
+        if "Dark" in name:
+            return "dark"
+    except Exception:
+        pass
+    return "light"
+
+
+_scheme_listener_installed = False
+
+
+def _on_scheme_changed(_scheme) -> None:
+    if _ACTIVE_THEME_ID == "system":
+        load_theme("system", persist=False)
+
+
+def _install_scheme_listener() -> None:
+    global _scheme_listener_installed
+    if _scheme_listener_installed:
+        return
+    try:
+        from PySide6.QtGui import QGuiApplication
+
+        QGuiApplication.styleHints().colorSchemeChanged.connect(
+            _on_scheme_changed)
+        _scheme_listener_installed = True
+    except Exception:
+        logger.debug("colorScheme listener unavailable", exc_info=True)
+
+
 def load_theme(theme_id: str, registry=None, persist: bool = True) -> str:
     """Активация темы-плагина: токены → QSS → иконки → графики.
 
@@ -878,16 +932,28 @@ def load_theme(theme_id: str, registry=None, persist: bool = True) -> str:
     обновляются при ближайшей перестройке виджетов — слушатели
     subscribe_theme_changed() отвечают за перерисовку.
     """
+    global _ACTIVE_THEME_ID, _EXTRA_QSS
+
     from ..config import save_ui_state
+    from ..plugins import _themes as _builtin_themes
     from ..plugins import get_registry
     from .detail_panel._constants import apply_chart_colors, pg_loaded
-    from .icons import reset_icons, set_base_size
+    from .icons import reset_icons, set_base_size, set_theme_icons
 
     reg = registry if registry is not None else get_registry()
     plugin = reg.get_theme(theme_id)
     apply_tokens(validate_tokens(plugin.tokens()))
 
-    global _EXTRA_QSS
+    _builtin_themes.set_scheme_resolver(_qt_scheme_name)
+    _ACTIVE_THEME_ID = getattr(plugin, "id", theme_id)
+
+    try:
+        overrides = plugin.icons()
+    except Exception:
+        logger.warning("theme %r: icons() failed", theme_id, exc_info=True)
+        overrides = None
+    set_theme_icons(overrides or None)
+
     try:
         _EXTRA_QSS = plugin.extra_qss() or ""
     except Exception:
@@ -899,6 +965,7 @@ def load_theme(theme_id: str, registry=None, persist: bool = True) -> str:
     pg = pg_loaded()
     if pg is not None:
         apply_chart_colors(pg)
+    _install_scheme_listener()
     if persist:
         save_ui_state("theme", theme_id)
     for fn in list(_theme_listeners):

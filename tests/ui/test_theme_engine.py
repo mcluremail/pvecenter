@@ -218,3 +218,122 @@ class TestMainWindowSwitcher:
 
         assert "fake_dark" not in get_registry().theme_ids()
         assert "light" in get_registry().theme_ids()
+
+
+# ── M1.2: встроенные темы KDE / Graphite / System ──────────────────
+
+
+class TestBuiltinThemePlugins:
+    @pytest.mark.parametrize(
+        "tid", ["breeze", "breeze_dark", "oxygen", "graphite", "system"])
+    def test_full_token_coverage(self, tid):
+        from pve_center.plugins import get_registry
+
+        tokens = get_registry().get_theme(tid).tokens()
+        assert set(tokens) == set(TOKENS)
+        assert all(re.fullmatch(r"#[0-9a-fA-F]{6}", v) for v in tokens.values())
+
+    def test_breeze_palettes_exact(self):
+        """Точные значения из схем KDE breeze (не derived)."""
+        from pve_center.plugins import get_registry
+
+        light = get_registry().get_theme("breeze").tokens()
+        assert light["BG"] == "#eff0f1"
+        assert light["ACCENT"] == "#3daee9"
+        assert light["ACCENT_LIGHT"] == "#a3d4fa"
+        assert light["DANGER_SOLID_PRESSED"] == "#b03745"
+        dark = get_registry().get_theme("breeze_dark").tokens()
+        assert dark["BG"] == "#202326"
+        assert dark["ACCENT_LIGHT"] == "#1e5774"
+        assert dark["TEXT"] == "#fcfcfc"
+
+    def test_oxygen_palette_exact(self):
+        from pve_center.plugins import get_registry
+
+        tokens = get_registry().get_theme("oxygen").tokens()
+        assert tokens["ACCENT"] == "#3aa7dd"
+        assert tokens["ACCENT_HOVER"] == "#6ed6ff"
+        assert tokens["TOAST_BG"] == "#181513"
+        assert tokens["DANGER_SOLID_PRESSED"] == "#9c0e0e"
+        assert tokens["WARNING"] == "#b08000"
+
+    def test_breeze_activates_24px_with_overrides(self, qtbot):
+        from PySide6.QtCore import QSize
+
+        from pve_center.ui import icons
+
+        try:
+            load_theme("breeze", persist=False)
+            assert icons._BASE_SIZE == 24
+            assert {"vm", "host", "cluster", "pool", "storage",
+                    "backup", "refresh", "search"} <= set(icons._THEME_ICONS)
+            assert QSize(24, 24) in icons.get_icon("vm").availableSizes()
+            assert QSize(21, 21) in icons.get_icon("refresh").availableSizes()
+        finally:
+            load_theme("light", persist=False)
+        assert icons._BASE_SIZE == 16
+        assert not icons._THEME_ICONS
+        assert QSize(16, 16) in icons.get_icon("vm").availableSizes()
+
+    def test_system_follows_resolver(self, monkeypatch):
+        from pve_center.plugins import _themes as bt
+
+        monkeypatch.setattr(bt, "_scheme_resolver", lambda: "dark")
+        load_theme("system", persist=False)
+        assert Color.BG == "#202326"
+        monkeypatch.setattr(bt, "_scheme_resolver", lambda: "light")
+        load_theme("system", persist=False)
+        assert Color.BG == "#eff0f1"
+        load_theme("light", persist=False)
+
+    def test_system_reacts_to_scheme_change_event(self, monkeypatch):
+        """Сигнал colorSchemeChanged перезагружает активную system-тему."""
+        from pve_center.plugins import _themes as bt
+
+        load_theme("system", persist=False)
+        monkeypatch.setattr(bt, "_scheme_resolver", lambda: "dark")
+        theme._on_scheme_changed(None)
+        assert Color.BG == "#202326"
+        # не-system тема: событие игнорируется
+        monkeypatch.setattr(bt, "_scheme_resolver", lambda: "light")
+        load_theme("light", persist=False)
+        theme._on_scheme_changed(None)
+        assert Color.ACCENT == LIGHT_TOKENS["ACCENT"]
+
+    def test_active_theme_id_tracked(self):
+        load_theme("breeze", persist=False)
+        assert theme.active_theme_id() == "breeze"
+        load_theme("light", persist=False)
+        assert theme.active_theme_id() == "light"
+
+    def test_icons_override_failure_degrades_gracefully(self, dark_registry):
+        class BadIcons(FakeDark):
+            id = "bad_icons"
+
+            def icons(self):
+                raise RuntimeError("boom")
+
+        dark_registry.register_theme(BadIcons())
+        try:
+            load_theme("bad_icons", registry=dark_registry, persist=False)
+            from pve_center.ui import icons
+
+            assert not icons._THEME_ICONS
+        finally:
+            dark_registry.unregister("bad_icons")
+            load_theme("light", persist=False)
+
+    def test_dot_geometry_scales_with_viewbox(self):
+        from pve_center.ui.icons import _dot_geometry
+
+        cx, r = _dot_geometry('<svg viewBox="0 0 16 16">')
+        assert (cx, r) == (12.5, 3.5)
+        cx, r = _dot_geometry('<svg viewBox="0 0 24 24">')
+        assert r == pytest.approx(5.25)
+        assert cx == pytest.approx(18.75)
+
+    def test_combo_lists_all_builtin_themes(self, main_window):
+        combo = main_window._theme_combo
+        ids = [combo.itemData(i) for i in range(combo.count())]
+        assert ids[:2] == ["light", "breeze"]  # UX-порядок
+        assert ids[-1] == "system"
