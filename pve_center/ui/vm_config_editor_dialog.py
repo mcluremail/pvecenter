@@ -81,11 +81,11 @@ class VmConfigEditorDialog(QDialog):
             if key.rstrip("0123456789") in ("net", "ide", "sata", "scsi", "virtio"):
                 if key.rstrip("0123456789") not in ("ide",) or key != "ide2":
                     hint = QLabel(tr("Format: model=MAC,bridge=vmbr0,tag=10"))
-                    hint.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+                    hint.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 11px;")
                     form.addRow("", hint)
             elif key.rstrip("0123456789") == "efidisk":
                 hint = QLabel(tr("Format: storage:size,format=qcow2"))
-                hint.setStyleSheet(f"color: {Color.GRAY_500}; font-size: 11px;")
+                hint.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 11px;")
                 form.addRow("", hint)
 
         elif field_type == "readonly":

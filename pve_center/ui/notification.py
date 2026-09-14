@@ -18,7 +18,7 @@ from .theme import Color
 class FadeToast(QWidget):
     """Fading notification in the top-right corner of the parent."""
 
-    def __init__(self, parent, text, color=Color.SLATE_800, offset_y=12):
+    def __init__(self, parent, text, color=Color.TOAST_BG, offset_y=12):
         super().__init__(parent)
         self._text = text
         self._bg_color = color
@@ -78,14 +78,14 @@ class FadeToast(QWidget):
         except RuntimeError:
             return
         try:
-            self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.OK_ROW_BG};"))
+            self.label.setStyleSheet(self.label.styleSheet().replace("color: white;", f"color: {Color.SUCCESS_LIGHT};"))
         except RuntimeError:
             return
         QTimer.singleShot(400, self._restore_color)
 
     def _restore_color(self):
         try:
-            self.label.setStyleSheet(self.label.styleSheet().replace(f"color: {Color.OK_ROW_BG};", "color: white;"))
+            self.label.setStyleSheet(self.label.styleSheet().replace(f"color: {Color.SUCCESS_LIGHT};", "color: white;"))
         except RuntimeError:
             pass
 
@@ -167,5 +167,5 @@ class NotificationManager:
         self._active[key] = weakref.ref(toast)
 
     def show(self, text, error=False):
-        color = Color.DANGER if error else Color.SLATE_800
+        color = Color.DANGER if error else Color.TOAST_BG
         self._show(text, text, color)

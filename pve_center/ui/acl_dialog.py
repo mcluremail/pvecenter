@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
+from .theme import Color
 
 
 class AclDialog(QDialog):
@@ -42,7 +43,7 @@ class AclDialog(QDialog):
         form.addRow(tr("Path:"), self._path_edit)
 
         path_hint = QLabel(tr("e.g. /, /vms, /storage/local, /nodes/pve01"))
-        path_hint.setStyleSheet("color: #6b7280; font-size: 11px;")
+        path_hint.setStyleSheet(f"color: {Color.TEXT_SEC}; font-size: 11px;")
         form.addRow("", path_hint)
 
         self._type_combo = QComboBox()

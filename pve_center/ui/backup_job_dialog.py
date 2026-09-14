@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
+from .theme import Color
 
 
 def _weekdays():
@@ -75,7 +76,7 @@ class BackupJobDialog(QDialog):
         form.addRow(tr("Storage:"), self._storage_combo)
 
         self._storage_warn = QLabel(tr("No backup storage available"))
-        self._storage_warn.setStyleSheet("color: #dc2626;")
+        self._storage_warn.setStyleSheet(f"color: {Color.DANGER};")
         self._storage_warn.setVisible(False)
         form.addRow("", self._storage_warn)
 

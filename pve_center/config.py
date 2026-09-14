@@ -289,7 +289,7 @@ def _ask_password(mode="enter"):
     if mode == "set":
         layout.addWidget(QLabel(tr("Set password to encrypt configuration:")))
         min_len_label = QLabel(tr("Minimum 8 characters"))
-        min_len_label.setStyleSheet(f"color: {Color.GRAY_400}; font-size: 11px;")
+        min_len_label.setStyleSheet(f"color: {Color.TEXT_DIM}; font-size: 11px;")
         layout.addWidget(min_len_label)
     else:
         layout.addWidget(QLabel(tr("Enter password:")))
@@ -307,7 +307,7 @@ def _ask_password(mode="enter"):
         confirm_input = None
 
     error_label = QLabel("")
-    error_label.setStyleSheet(f"color: {Color.GRAY_400};")
+    error_label.setStyleSheet(f"color: {Color.TEXT_DIM};")
     layout.addWidget(error_label)
 
     btn_layout = QHBoxLayout()

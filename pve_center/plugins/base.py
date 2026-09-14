@@ -45,17 +45,54 @@ class ProviderPlugin(Plugin, Protocol):
     def create_provider(self, cfg: dict, timeout: float = 15) -> DataProvider: ...
 
 
+@runtime_checkable
+class ThemePlugin(Plugin, Protocol):
+    """Theme plugin: supplies color tokens for the QSS engine (v1).
+
+    The core owns the QSS template and the canonical token set
+    (ui/theme.TOKENS); a theme only supplies colors. ``tokens()`` must
+    cover the whole canonical set — the activation engine validates it.
+    Optional extension points: ``extra_qss()`` (appended verbatim after
+    the built-in template — density tweaks, extra selectors) and
+    ``icons()`` (partial override: icon name -> SVG source; missing
+    names fall back to the built-in set recolored with theme tokens)
+    plus ``icon_size`` (base icon size in px, default 16).
+    """
+
+    def tokens(self) -> dict[str, str]: ...
+
+    def extra_qss(self) -> str:
+        return ""
+
+    def icons(self) -> dict[str, str] | None:
+        return None
+
+    @property
+    def icon_size(self) -> int:
+        return 16
+
+
 class PluginRegistry:
-    """Id → plugin map with data-source dispatch."""
+    """Id → plugin map with data-source dispatch and theme lookup."""
 
     def __init__(self) -> None:
         self._plugins: dict[str, Plugin] = {}
+        self._themes: dict[str, ThemePlugin] = {}
 
     def register(self, plugin: Plugin) -> None:
         pid = plugin.id
         if pid in self._plugins:
             raise PluginError(f"plugin already registered: {pid!r}")
         self._plugins[pid] = plugin
+
+    def unregister(self, plugin_id: str) -> None:
+        """Снятие плагина (импорт сторонних тем с заменой и т.п.)."""
+        if plugin_id in self._themes:
+            del self._themes[plugin_id]
+            return
+        if plugin_id not in self._plugins:
+            raise PluginError(f"unknown plugin: {plugin_id!r}")
+        del self._plugins[plugin_id]
 
     def get(self, plugin_id: str) -> Plugin:
         try:
@@ -65,6 +102,30 @@ class PluginRegistry:
 
     def ids(self) -> list[str]:
         return sorted(self._plugins)
+
+    # ── Темы ──
+
+    def register_theme(self, plugin: ThemePlugin) -> None:
+        """Регистрация темы с валидацией контрактных методов."""
+        for attr in ("tokens", "extra_qss", "icons"):
+            if not callable(getattr(plugin, attr, None)):
+                raise PluginError(
+                    f"theme {plugin.id!r} is missing {attr}()")
+        tid = plugin.id
+        if tid in self._plugins or tid in self._themes:
+            raise PluginError(f"plugin already registered: {tid!r}")
+        self._themes[tid] = plugin
+
+    def theme_ids(self) -> list[str]:
+        """Id всех зарегистрированных тем."""
+        return sorted(self._themes)
+
+    def get_theme(self, theme_id: str) -> ThemePlugin:
+        try:
+            plugin = self._themes[theme_id]
+        except KeyError:
+            raise PluginError(f"unknown theme: {theme_id!r}") from None
+        return plugin
 
     def create_provider(self, cfg: dict, timeout: float = 15) -> DataProvider:
         plugin_id = cfg.get("type", "pve")

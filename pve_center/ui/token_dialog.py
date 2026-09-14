@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
+from .theme import Color
 
 
 class TokenDialog(QDialog):
@@ -172,7 +173,7 @@ class TokenValueDialog(QDialog):
         warn = QLabel(
             "<b>" + tr("Save this value — it cannot be retrieved later!") + "</b>"
         )
-        warn.setStyleSheet("color: #dc2626;")
+        warn.setStyleSheet(f"color: {Color.DANGER};")
         warn.setWordWrap(True)
         layout.addWidget(warn)
 

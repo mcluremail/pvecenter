@@ -236,7 +236,7 @@ class TreePanel(QWidget):
         self._empty_label = QLabel(tr("No servers added.\nPress + to add"))
         self._empty_label.setAlignment(Qt.AlignCenter)
         self._empty_label.setWordWrap(True)
-        self._empty_label.setStyleSheet(f"color: {Color.GRAY_400}; font-size: 13px; padding: 40px 20px;")
+        self._empty_label.setStyleSheet(f"color: {Color.TEXT_DIM}; font-size: 13px; padding: 40px 20px;")
         layout.addWidget(self._empty_label)
 
         self.tree = GroupTreeWidget(self)
@@ -250,7 +250,7 @@ class TreePanel(QWidget):
         header.setSectionsMovable(True)
         header.setStyleSheet(
             "QHeaderView::section { padding: 3px 6px; border: none;"
-            " border-bottom: 1px solid #f0f1f4; font-size: 11px; }")
+            f" border-bottom: 1px solid {Color.BORDER_LIGHT}; font-size: 11px; }}")
         self.tree.setColumnWidth(0, 170)
         self._last_saved_header_state = None
         self._restore_tree_columns()
@@ -435,7 +435,7 @@ class TreePanel(QWidget):
             menu.setStyleSheet(
                 "QMenu { font-size: 12px; padding: 2px; }"
                 "QMenu::item { padding: 4px 12px; }"
-                f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
+                f"QMenu::item:selected {{ background: {Color.BORDER}; }}"
             )
             vm_status = vm.status_value if vm else ""
             is_template = bool(vm and vm.template)
@@ -561,7 +561,7 @@ class TreePanel(QWidget):
         menu.setStyleSheet(
             "QMenu { font-size: 12px; padding: 2px; }"
             "QMenu::item { padding: 4px 12px; }"
-            f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
+            f"QMenu::item:selected {{ background: {Color.BORDER}; }}"
         )
 
         if item_type == "host":
@@ -802,6 +802,12 @@ class TreePanel(QWidget):
         self._sync_toggle_button()
         self._update_empty_visibility()
 
+    def reapply_theme(self):
+        """Перестройка дерева новыми цветами (движок тем, смена темы)."""
+        if getattr(self, "all_nodes", None) is None:
+            return
+        self._do_rebuild()
+
     def start_loading(self):
         self.tree.clear()
         self._empty_label.setVisible(False)
@@ -905,7 +911,7 @@ class TreePanel(QWidget):
         note = self._tree_notes.get(key_str, "") or default
         if note:
             item.setText(1, note if len(note) <= 60 else note[:59] + "…")
-            item.setForeground(1, QBrush(QColor(Color.GRAY_400)))
+            item.setForeground(1, QBrush(QColor(Color.TEXT_DIM)))
             item.setToolTip(1, note)
         else:
             item.setText(1, "")

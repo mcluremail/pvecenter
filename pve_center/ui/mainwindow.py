@@ -228,7 +228,7 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.status_label)
 
         self._refresh_spinner = QLabel("")
-        self._refresh_spinner.setStyleSheet(f"color: {Color.GRAY_500}; padding-right: 8px;")
+        self._refresh_spinner.setStyleSheet(f"color: {Color.TEXT_SEC}; padding-right: 8px;")
         self._refresh_spinner.setAccessibleName(tr("Refreshing data"))
         self._refresh_spinner.setToolTip(tr("Data refresh in progress"))
         self.status_bar.insertPermanentWidget(0, self._refresh_spinner)
@@ -236,9 +236,9 @@ class MainWindow(QMainWindow):
         self._lang_combo = QComboBox()
         self._lang_combo.setFixedWidth(110)
         self._lang_combo.setStyleSheet(
-            f"QComboBox {{ font-size: 12px; border: 1px solid {Color.SLATE_300}; border-radius: 3px; "
-            f"padding: 1px 4px; background: {Color.SLATE_100}; color: {Color.SLATE_700}; }}"
-            f"QComboBox:hover {{ border-color: {Color.SLATE_400}; background: {Color.SLATE_200}; }}"
+            f"QComboBox {{ font-size: 12px; border: 1px solid {Color.BORDER_STRONG}; border-radius: 3px; "
+            f"padding: 1px 4px; background: {Color.TRACK}; color: {Color.TEXT}; }}"
+            f"QComboBox:hover {{ border-color: {Color.BORDER_STRONG}; background: {Color.HOVER}; }}"
             f"QComboBox::drop-down {{ border: none; width: 16px; }}"
             f"QComboBox QAbstractItemView {{ font-size: 12px; }}"
         )
@@ -251,6 +251,7 @@ class MainWindow(QMainWindow):
         self._lang_combo.blockSignals(False)
         self._lang_combo.currentIndexChanged.connect(self._on_language_changed)
         self.status_bar.insertPermanentWidget(1, self._lang_combo)
+        self._build_theme_switcher()
         self._spin_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self._spin_idx = 0
         self._spin_timer = QTimer(self)
@@ -764,7 +765,7 @@ class MainWindow(QMainWindow):
         warning = QLabel(
             f"<b>{tr('VM')} «{vm_name}» (VMID: {vmid})</b> {tr('on node')} <b>{node}</b>"
             "<br><br>"
-            f"<span style='color:{Color.ERROR_RED};'>{tr('This action is irreversible.')} "
+            f"<span style='color:{Color.DANGER_SOLID};'>{tr('This action is irreversible.')} "
             f"{tr('All VM disks will be deleted.')}</span>"
         )
         warning.setWordWrap(True)
@@ -772,7 +773,7 @@ class MainWindow(QMainWindow):
 
         if is_running:
             run_warning = QLabel(
-                f"<span style='color:{Color.ERROR_RED}; font-weight:bold;'>{tr('VM is running!')}</span>"
+                f"<span style='color:{Color.DANGER_SOLID}; font-weight:bold;'>{tr('VM is running!')}</span>"
                 f"<br>{tr('It will be forcibly stopped and deleted.')}"
             )
             run_warning.setWordWrap(True)
@@ -783,7 +784,7 @@ class MainWindow(QMainWindow):
 
         if is_running:
             force_check = QCheckBox(tr("Force stop and delete"))
-            force_check.setStyleSheet(f"color: {Color.ERROR_RED};")
+            force_check.setStyleSheet(f"color: {Color.DANGER_SOLID};")
             layout.addWidget(force_check)
 
         layout.addStretch()
@@ -2048,6 +2049,73 @@ class MainWindow(QMainWindow):
                 except Exception as exc:
                     logger.error("Failed to dump stack: %s", exc, exc_info=True)
                 logger.error("=== END FREEZE REPORT ===")
+
+    def _status_combo_style(self):
+        return (f"QComboBox {{ font-size: 12px; border: 1px solid {Color.BORDER_STRONG}; border-radius: 3px; "
+                f"padding: 1px 4px; background: {Color.TRACK}; color: {Color.TEXT}; }}"
+                f"QComboBox:hover {{ border-color: {Color.BORDER_STRONG}; background: {Color.HOVER}; }}"
+                f"QComboBox::drop-down {{ border: none; width: 16px; }}"
+                f"QComboBox QAbstractItemView {{ font-size: 12px; }}")
+
+    def _build_theme_switcher(self):
+        """Переключатель темы — постоянный виджет статус-бара, рядом с языком."""
+        from ..plugins import get_registry
+        from . import theme as theme_mod
+        from .theme import load_theme
+
+        saved = load_ui_state("theme") or "light"
+        if saved != "light":
+            try:
+                load_theme(saved, persist=False)
+            except Exception as exc:
+                logger.error("saved theme %r failed: %s", saved, exc)
+        self._theme_combo = QComboBox()
+        self._theme_combo.setFixedWidth(110)
+        self._theme_combo.setStyleSheet(self._status_combo_style())
+        reg = get_registry()
+        saved = load_ui_state("theme") or "light"
+        ids = reg.theme_ids()
+        if saved not in ids:
+            saved = "light" if "light" in ids else (ids[0] if ids else None)
+        self._theme_combo.blockSignals(True)
+        for tid in ids:
+            try:
+                label = reg.get_theme(tid).name
+            except Exception:
+                label = tid
+            self._theme_combo.addItem(label, tid)
+            if tid == saved:
+                self._theme_combo.setCurrentIndex(self._theme_combo.count() - 1)
+        self._theme_combo.blockSignals(False)
+        self._theme_combo.currentIndexChanged.connect(self._on_theme_changed)
+        self.status_bar.insertPermanentWidget(2, self._theme_combo)
+        # Перерисовка дерева при смене темы (кэшированные QColor в ячейках).
+        self._theme_listener = lambda _tid: self._on_theme_applied()
+        theme_mod.subscribe_theme_changed(self._theme_listener)
+        self.destroyed.connect(
+            lambda: theme_mod.unsubscribe_theme_changed(self._theme_listener))
+
+    def _on_theme_changed(self, idx):
+        from .theme import load_theme
+
+        tid = self._theme_combo.itemData(idx)
+        if not tid:
+            return
+        try:
+            load_theme(tid)
+        except Exception as exc:
+            logger.error("theme switch failed (%s): %s", tid, exc, exc_info=True)
+            self.status_label.setText(tr("Theme failed to load"))
+
+    def _on_theme_applied(self):
+        """Реакция UI на применённую тему: инлайн-стили + дерево + тулбар."""
+        from .icons import init_icons
+
+        for combo in (self._lang_combo, self._theme_combo):
+            combo.setStyleSheet(self._status_combo_style())
+        init_icons()
+        self._toolbar.setIconSize(QSize(18, 18))
+        self.tree_panel.reapply_theme()
 
     def _on_language_changed(self, idx):
         code = self._lang_combo.itemData(idx)

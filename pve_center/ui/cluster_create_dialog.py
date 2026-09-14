@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
+from .theme import Color
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$")
 
@@ -32,7 +33,7 @@ class ClusterCreateDialog(QDialog):
             "A new cluster will be created on this node. It becomes the "
             "first member; add other nodes from their context menu."))
         info.setWordWrap(True)
-        info.setStyleSheet("color: #b45309;")
+        info.setStyleSheet(f"color: {Color.WARNING_TEXT};")
         layout.addWidget(info)
 
         form = QFormLayout()

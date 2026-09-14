@@ -3,7 +3,8 @@ from importlib.util import find_spec
 
 from ..theme import Color
 
-_HEADER_STYLE = "QHeaderView::section { padding: 6px 8px; border: none; border-bottom: 1px solid #f0f1f4; }"
+_HEADER_STYLE = (f"QHeaderView::section {{ padding: 6px 8px; border: none;"
+                 f" border-bottom: 1px solid {Color.BORDER_LIGHT}; }}")
 
 _MAX_WORKERS_DP = 12
 
@@ -16,6 +17,12 @@ def pg_loaded():
     return _pg_module
 
 
+def apply_chart_colors(pg_mod):
+    """Ре-применение цветовой темы к графикам (load + каждая смена темы)."""
+    pg_mod.setConfigOption('background', Color.BG)
+    pg_mod.setConfigOption('foreground', Color.TEXT_SEC)
+
+
 def ensure_pg():
     """Import pyqtgraph on first use and apply chart styling.
 
@@ -25,8 +32,7 @@ def ensure_pg():
     global _pg_module
     if _pg_module is None and _HAS_PG:
         import pyqtgraph as pg
-        pg.setConfigOption('background', '#fafafa')
-        pg.setConfigOption('foreground', '#6b7280')
+        apply_chart_colors(pg)
         _pg_module = pg
     return _pg_module
 
@@ -79,5 +85,5 @@ def _progress_style(value, max_val=100):
     return (
         f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
         f"QProgressBar {{ border: none; border-radius: 3px;"
-        f" text-align: center; font-size: 11px; background: {Color.GRAY_100}; }}"
+        f" text-align: center; font-size: 11px; background: {Color.TRACK}; }}"
     )

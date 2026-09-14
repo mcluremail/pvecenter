@@ -921,7 +921,7 @@ class VMTabs:
         menu.setStyleSheet(
             "QMenu { font-size: 12px; padding: 2px; }"
             "QMenu::item { padding: 4px 12px; }"
-            f"QMenu::item:selected {{ background: {Color.GRAY_200}; }}"
+            f"QMenu::item:selected {{ background: {Color.BORDER}; }}"
         )
         if snap_name == "current":
             delete_act = QAction(tr("Delete snapshot"), tree)

@@ -1851,7 +1851,7 @@ class HostTabs:
             enabled = int(job.get("enabled", 1) or 0)
             en_text = tr("Yes") if enabled else tr("No")
             en_item = QTableWidgetItem(en_text)
-            en_item.setForeground(QColor(Color.STATUS_OK if enabled else Color.GRAY_400))
+            en_item.setForeground(QColor(Color.STATUS_OK if enabled else Color.TEXT_DIM))
             table.setItem(i, 1, en_item)
             table.setItem(i, 2, QTableWidgetItem(job.get("schedule", "")))
             table.setItem(i, 3, QTableWidgetItem(job.get("storage", "")))
@@ -2638,7 +2638,7 @@ class HostTabs:
             en_text = tr("Yes") if enable_val else tr("No")
             en_item = QTableWidgetItem(en_text)
             en_item.setForeground(QColor(
-                Color.STATUS_OK if enable_val else Color.GRAY_400
+                Color.STATUS_OK if enable_val else Color.TEXT_DIM
             ))
             table.setItem(i, 1, en_item)
 
@@ -2873,7 +2873,7 @@ class HostTabs:
             sp_text = tr("Yes") if special else ""
             sp_item = QTableWidgetItem(sp_text)
             if special:
-                sp_item.setForeground(QColor(Color.GRAY_400))
+                sp_item.setForeground(QColor(Color.TEXT_DIM))
             table.setItem(i, 2, sp_item)
         table.setSortingEnabled(True)
         if data:

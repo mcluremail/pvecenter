@@ -23,7 +23,7 @@ from ._constants import _HEADER_STYLE
 
 _FILTER_TEXT_ROLE = Qt.UserRole + 42
 
-_LOADING_STYLE = f"color: {Color.GRAY_400}; font-size: 14px;"
+_LOADING_STYLE = f"color: {Color.TEXT_DIM}; font-size: 14px;"
 
 
 class LoadingPage(QWidget):
@@ -168,7 +168,7 @@ def make_filterable_table(table):
     search = QLineEdit()
     search.setPlaceholderText(tr("Filter"))
     search.setStyleSheet(
-        f"QLineEdit {{ font-size: 12px; padding: 4px 8px; border: 1px solid {Color.D1_D5_DB}; "
+        f"QLineEdit {{ font-size: 12px; padding: 4px 8px; border: 1px solid {Color.BORDER_STRONG}; "
         f"border-radius: 3px; margin: 4px 4px 0 4px; }}"
     )
     debounce = QTimer(container)
@@ -191,5 +191,5 @@ def set_empty_placeholder(table, col_count, text=None):
         item.setFlags(Qt.NoItemFlags)
         item.setTextAlignment(Qt.AlignCenter)
         if c == col_count // 2:
-            item.setForeground(QBrush(QColor(Color.GRAY_400)))
+            item.setForeground(QBrush(QColor(Color.TEXT_DIM)))
         table.setItem(0, c, item)

@@ -59,7 +59,7 @@ class MetricCard(QFrame):
             self._bar.setFixedHeight(6)
             self._bar.setTextVisible(False)
             self._bar.setStyleSheet(
-                f"QProgressBar {{ background: {Color.GRAY_100}; border: none; border-radius: 3px; }}"
+                f"QProgressBar {{ background: {Color.TRACK}; border: none; border-radius: 3px; }}"
                 f"QProgressBar::chunk {{ background: {Color.ACCENT}; border-radius: 3px; }}"
             )
             layout.addSpacing(8)
@@ -99,7 +99,7 @@ class MetricCard(QFrame):
         self._bar.setValue(self._progress)
         if color:
             self._bar.setStyleSheet(
-                f"QProgressBar {{ background: {Color.GRAY_100}; border: none; border-radius: 3px; }}"
+                f"QProgressBar {{ background: {Color.TRACK}; border: none; border-radius: 3px; }}"
                 f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
             )
         else:
@@ -111,7 +111,7 @@ class MetricCard(QFrame):
             else:
                 bar_color = Color.ACCENT
             self._bar.setStyleSheet(
-                f"QProgressBar {{ background: {Color.GRAY_100}; border: none; border-radius: 3px; }}"
+                f"QProgressBar {{ background: {Color.TRACK}; border: none; border-radius: 3px; }}"
                 f"QProgressBar::chunk {{ background: {bar_color}; border-radius: 3px; }}"
             )
 

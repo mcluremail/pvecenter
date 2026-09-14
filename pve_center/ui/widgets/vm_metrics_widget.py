@@ -26,8 +26,8 @@ def _get_pg():
     global pg
     if pg is None and _HAS_PG:
         import pyqtgraph as pg_mod
-        pg_mod.setConfigOption('background', '#fafafa')
-        pg_mod.setConfigOption('foreground', '#6b7280')
+        pg_mod.setConfigOption('background', Color.BG)
+        pg_mod.setConfigOption('foreground', Color.TEXT_SEC)
         pg = pg_mod
     return pg
 
@@ -294,6 +294,6 @@ class VmMetricsWidget(QWidget):
                        pen=pg.mkPen(Color.ACCENT, width=2), name=label_in,
                        fillLevel=0, fillBrush=pg.mkBrush(Color.ACCENT + "33"))
         self.plot.plot([d['time'] for d in data2], [d['value'] / div for d in data2],
-                       pen=pg.mkPen(Color.GRAY_400, width=2), name=label_out,
-                       fillLevel=0, fillBrush=pg.mkBrush(Color.GRAY_400 + "33"))
+                       pen=pg.mkPen(Color.TEXT_DIM, width=2), name=label_out,
+                       fillLevel=0, fillBrush=pg.mkBrush(Color.TEXT_DIM + "33"))
         self.plot.setLabel('left', unit)

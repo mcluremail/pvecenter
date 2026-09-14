@@ -43,7 +43,7 @@ class _RowHoverFilter(QObject):
                 item = self.table.item(row, c)
                 if item:
                     if item.data(WARN_ROLE):
-                        item.setBackground(QBrush(QColor(Color.WARN_BG)))
+                        item.setBackground(QBrush(QColor(Color.ROW_WARN)))
                     elif row % 2 == 1:
                         item.setBackground(QBrush(QColor(Color.ALT_ROW)))
                     else:

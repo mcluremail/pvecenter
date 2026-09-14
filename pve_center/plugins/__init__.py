@@ -9,9 +9,11 @@ from __future__ import annotations
 from ..provider import DataProvider
 from ._pbs import PbsPlugin
 from ._pve import PvePlugin
-from .base import Plugin, PluginError, PluginRegistry, ProviderPlugin
+from ._themes import LightTheme
+from .base import Plugin, PluginError, PluginRegistry, ProviderPlugin, ThemePlugin
 
 _BUILTINS = (PvePlugin(), PbsPlugin())
+_BUILTIN_THEMES = (LightTheme(),)
 
 
 def default_registry() -> PluginRegistry:
@@ -19,6 +21,8 @@ def default_registry() -> PluginRegistry:
     reg = PluginRegistry()
     for plugin in _BUILTINS:
         reg.register(plugin)
+    for theme in _BUILTIN_THEMES:
+        reg.register_theme(theme)
     return reg
 
 
@@ -43,8 +47,10 @@ __all__ = [
     "PluginError",
     "PluginRegistry",
     "ProviderPlugin",
+    "ThemePlugin",
     "PbsPlugin",
     "PvePlugin",
+    "LightTheme",
     "create_provider",
     "default_registry",
     "get_registry",

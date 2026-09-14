@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from ..domain.search import SearchResult, global_search
 from .i18n import tr
 from .icons import get_icon
-from .theme import enable_column_reorder, enable_table_autofit
+from .theme import Color, enable_column_reorder, enable_table_autofit
 
 KEY_ROLE = Qt.UserRole + 1
 _DEBOUNCE_MS = 200
@@ -73,7 +73,7 @@ class GlobalSearchDialog(QDialog):
         layout.addWidget(self._tree, 1)
 
         self._count_label = QLabel("")
-        self._count_label.setStyleSheet("color: #6b7280;")
+        self._count_label.setStyleSheet(f"color: {Color.TEXT_SEC};")
         layout.addWidget(self._count_label)
 
         self._debounce = QTimer(self)

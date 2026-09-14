@@ -55,7 +55,7 @@ def _usage_color(usage: float) -> str:
         return Color.DANGER
     if usage >= 0.75:
         return Color.WARNING
-    return Color.ACCENT_GREEN
+    return Color.SUCCESS
 
 
 class PbsPanel(QWidget):

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
+from .theme import Color
 
 _PVE_PRIVILEGES = [
     "Datastore.Allocate", "Datastore.AllocateSpace", "Datastore.AllocateTemplate",
@@ -76,7 +77,7 @@ class RoleDialog(QDialog):
 
         if self._is_special:
             special_label = QLabel(tr("Built-in role (read-only)"))
-            special_label.setStyleSheet("color: #6b7280;")
+            special_label.setStyleSheet(f"color: {Color.TEXT_SEC};")
             form.addRow("", special_label)
 
         layout.addLayout(form)

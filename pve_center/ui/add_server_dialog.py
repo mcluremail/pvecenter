@@ -253,7 +253,7 @@ class AddServerDialog(QDialog):
             self._set_status(tr("Enter host and password"), Color.STATUS_ERR)
             return
         self.add_btn.setEnabled(False)
-        self._set_status(tr("Checking connection..."), Color.GRAY_500)
+        self._set_status(tr("Checking connection..."), Color.TEXT_SEC)
         cfg = self.get_config()
         self._validate_worker = PbsApiWorker(cfg, "datastores", tag="validate")
         self._validate_worker.signals.done.connect(self._on_validate_done)
@@ -289,7 +289,7 @@ class AddServerDialog(QDialog):
 
         self.auth_btn.setEnabled(False)
         self.auth_btn.setText(tr("Connecting..."))
-        self._set_status(tr("Connecting and creating token..."), Color.GRAY_500)
+        self._set_status(tr("Connecting and creating token..."), Color.TEXT_SEC)
 
         worker = TokenCreationWorker(host, user, password,
                                      trust_ssl=self.trust_ssl_cb.isChecked(),
@@ -333,7 +333,7 @@ class AddServerDialog(QDialog):
         self._token_data = None
         self.add_btn.setEnabled(False)
 
-    def _set_status(self, text, color=Color.GRAY_500):
+    def _set_status(self, text, color=Color.TEXT_SEC):
         self.status_label.setText(text)
         self.status_label.setStyleSheet(f"color: {color};")
 

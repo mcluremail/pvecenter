@@ -6,6 +6,7 @@
 
 import logging
 import os
+import re
 
 from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtGui import QFont, QFontDatabase
@@ -22,71 +23,67 @@ def _app() -> QApplication:
     return app
 
 
-# ── Цветовая палитра ──────────────────────────────────────────────
+# ── Цветовые токены ────────────────────────────────────────────────
+# Канонический семантический набор (контракт ThemePlugin v1, см.
+# docs/THEMES.md). Color — фасад: движок тем подменяет значения через
+# setattr при активации темы. Прямые ссылки на токены во всём UI остаются
+# валидными и переключаются на лету.
 
 class Color:
-    """Цвета темы — светлая."""
+    """Активная тема — цвета-токены (светлая по умолчанию)."""
 
     # Фоны
-    BG          = "#fafafa"
-    PANEL       = "#ffffff"
-    RAISED      = "#f4f5f7"
-    ALT_ROW     = "#f8f9fb"
+    BG          = "#fafafa"   # окно
+    PANEL       = "#ffffff"   # панели/карточки/контролы
+    RAISED      = "#f4f5f7"   # приподнятый hover-фон
+    TRACK       = "#f3f4f6"   # утопленный фон: дорожка прогресса, сегменты
+    ALT_ROW     = "#f8f9fb"   # чередование строк таблиц
 
     # Границы
-    BORDER      = "#e5e7eb"
-    BORDER_LIGHT = "#f0f1f4"
+    BORDER          = "#e5e7eb"
+    BORDER_LIGHT    = "#f0f1f4"
+    BORDER_STRONG   = "#cbd5e1"   # акцентированная рамка контролов
 
     # Текст
     TEXT        = "#181c26"
     TEXT_SEC    = "#6b7280"
     TEXT_DIM    = "#9ca3af"
     DISABLED    = "#b0b8c4"
+    ON_ACCENT   = "#ffffff"   # текст/штрих поверх насыщенного цвета
 
     # Акцент
-    ACCENT      = "#0a6ed1"
-    ACCENT_HOVER = "#005bbf"
-    ACCENT_LIGHT = "#e8f0fe"
-    ACCENT_GREEN = "#16a34a"
+    ACCENT          = "#0a6ed1"
+    ACCENT_HOVER    = "#005bbf"
+    ACCENT_LIGHT    = "#e8f0fe"
+    ACCENT_PRESSED  = "#c6dafc"   # зажатый контрол (spin-стрелки)
 
+    # Статусы
     SUCCESS     = "#16a34a"
+    SUCCESS_LIGHT = "#bbf7d0"  # светлый зелёный на тёмных поверхностях (тост)
     WARNING     = "#d97706"
-    DANGER      = "#dc2626"
+    WARNING_TEXT = "#b45309"  # тёмный янтарный текст-подсказка
+    DANGER      = "#dc2626"   # error-акцент в тексте/рамках
+    DANGER_SOLID         = "#c0392b"   # насыщенный красный: строгий текст, кнопка
+    DANGER_SOLID_HOVER   = "#e74c3c"
+    DANGER_SOLID_PRESSED = "#a93226"
 
-    STATUS_OK    = "#22c55e"
+    STATUS_OK    = "#22c55e"   # индикаторы (иконки/точки)
     STATUS_WARN  = "#f59e0b"
     STATUS_ERR   = "#ef4444"
 
-    GRAY_400    = "#9ca3af"
-    GRAY_500    = "#6b7280"
-    GRAY_200    = "#e5e7eb"
-    GRAY_100    = "#f3f4f6"
-    SLATE_100   = "#f1f5f9"
-    SLATE_200   = "#e2e8f0"
-    SLATE_300   = "#cbd5e1"
-    SLATE_400   = "#94a3b8"
-    SLATE_500   = "#475569"
-    SLATE_700   = "#334155"
-    SLATE_800   = "#1f2937"
-    SLATE_900   = "#374151"
-    D1_D5_DB    = "#d1d5db"
-
-    WARN_ROW_BG = "#fef3c7"
-    OK_ROW_BG   = "#bbf7d0"
-    ERROR_RED   = "#c0392b"
-
-    # Hover / selection
-    HOVER       = "#e8edf4"
-    SELECTED    = "#dbe4f0"
-
-    # Специальные
-    WARN_BG     = "#fff3cd"   # жёлтый фон для warning-строк
-    WARN_BORDER = "#ffc107"
+    # Ряды и поверхности
+    HOVER       = "#e8edf4"   # подсветка строки/ячейки
+    ROW_WARN    = "#fff3cd"   # фон строки-предупреждения
+    TOAST_BG    = "#1f2937"   # тёмная подложка всплывающих уведомлений
 
     # Скроллбар
-    SCROLLBAR_BG    = "#eef1f5"
+    SCROLLBAR_BG     = "#eef1f5"
     SCROLLBAR_HANDLE = "#c0c6d0"
     SCROLLBAR_HOVER  = "#a4abb8"
+
+    # Иконки
+    ICON_FG     = "#4b5563"   # основной штрих SVG-иконок
+    ICON_FG_DIM = "#374151"   # вторичный штрих
 
     # Шрифты — резолвятся из установленных в системе (см. _resolve_fonts ниже).
     UI_FONT   = "Noto Sans"
@@ -349,7 +346,7 @@ def _build_qss() -> str:
         border-radius: 3px;
         text-align: center;
         height: 6px;
-        background: {Color.GRAY_100};
+        background: {Color.TRACK};
         font-size: 11px;
         color: transparent;
     }}
@@ -408,7 +405,7 @@ def _build_qss() -> str:
     /* Акцентные кнопки (Создать ВМ) */
     QPushButton#accentBtn {{
         background: {Color.ACCENT};
-        color: white;
+        color: {Color.ON_ACCENT};
         border: 1px solid {Color.ACCENT};
         font-weight: 600;
     }}
@@ -421,7 +418,7 @@ def _build_qss() -> str:
     QPushButton#accentBtn:disabled {{
         background: {Color.DISABLED};
         border-color: {Color.BORDER};
-        color: white;
+        color: {Color.ON_ACCENT};
     }}
     QToolButton#neutralBtn {{
         background: {Color.PANEL};
@@ -445,7 +442,7 @@ def _build_qss() -> str:
     QToolButton#neutralBtn:disabled {{
         background: {Color.DISABLED};
         border-color: {Color.BORDER};
-        color: white;
+        color: {Color.ON_ACCENT};
     }}
 
     /* ── Сегментированные кнопки (Clusters/Nodes toggle) ── */
@@ -453,42 +450,42 @@ def _build_qss() -> str:
         font-size: 12px;
         padding: 5px 14px;
         color: {Color.TEXT_SEC};
-        background: {Color.SLATE_100};
+        background: {Color.TRACK};
     }}
     QPushButton#segBtnLeft {{
-        border: 1px solid {Color.SLATE_300};
+        border: 1px solid {Color.BORDER_STRONG};
         border-right: none;
         border-top-left-radius: 4px;
         border-bottom-left-radius: 4px;
     }}
     QPushButton#segBtnRight {{
-        border: 1px solid {Color.SLATE_300};
+        border: 1px solid {Color.BORDER_STRONG};
         border-top-right-radius: 4px;
         border-bottom-right-radius: 4px;
     }}
     QPushButton#segBtnLeft:checked, QPushButton#segBtnRight:checked {{
         background: {Color.ACCENT};
-        color: white;
+        color: {Color.ON_ACCENT};
         border-color: {Color.ACCENT};
     }}
 
     /* Опасные кнопки (Удаление) */
     QPushButton#dangerBtn {{
-        background: #c0392b;
-        color: white;
-        border: 1px solid #c0392b;
+        background: {Color.DANGER_SOLID};
+        color: {Color.ON_ACCENT};
+        border: 1px solid {Color.DANGER_SOLID};
         font-weight: 600;
     }}
     QPushButton#dangerBtn:hover {{
-        background: #e74c3c;
+        background: {Color.DANGER_SOLID_HOVER};
     }}
     QPushButton#dangerBtn:pressed {{
-        background: #a93226;
+        background: {Color.DANGER_SOLID_PRESSED};
     }}
     QPushButton#dangerBtn:disabled {{
         background: {Color.DISABLED};
         border-color: {Color.BORDER};
-        color: white;
+        color: {Color.ON_ACCENT};
     }}
 
     /* ── Сплиттер ── */
@@ -663,7 +660,7 @@ def _build_qss() -> str:
         background: {Color.ACCENT_LIGHT};
     }}
     QSpinBox::up-button:pressed, QSpinBox::down-button:pressed {{
-        background: #c6dafc;
+        background: {Color.ACCENT_PRESSED};
     }}
     QSpinBox::up-arrow {{
         image: url({_CHECK_DIR}/arrow-up.svg);
@@ -780,15 +777,149 @@ def _build_qss() -> str:
 """
 
 
+# ── Движок тем (ThemePlugin v1) ────────────────────────────────────
+# Ядро знает только канонические токены; темы — плагины через
+# plugins.ThemePlugin. QSS собирается из токенов активной темы, Color —
+# живой фасад (значения подменяются setattr'ом).
+
+TOKENS = (
+    # Фоны
+    "BG", "PANEL", "RAISED", "TRACK", "ALT_ROW",
+    # Границы
+    "BORDER", "BORDER_LIGHT", "BORDER_STRONG",
+    # Текст
+    "TEXT", "TEXT_SEC", "TEXT_DIM", "DISABLED", "ON_ACCENT",
+    # Акцент
+    "ACCENT", "ACCENT_HOVER", "ACCENT_LIGHT", "ACCENT_PRESSED",
+    # Статусы
+    "SUCCESS", "SUCCESS_LIGHT", "WARNING", "WARNING_TEXT",
+    "DANGER", "DANGER_SOLID", "DANGER_SOLID_HOVER", "DANGER_SOLID_PRESSED",
+    "STATUS_OK", "STATUS_WARN", "STATUS_ERR",
+    # Ряды и поверхности
+    "HOVER", "ROW_WARN", "TOAST_BG",
+    # Скроллбар
+    "SCROLLBAR_BG", "SCROLLBAR_HANDLE", "SCROLLBAR_HOVER",
+    # Иконки
+    "ICON_FG", "ICON_FG_DIM",
+)
+
+FONT_TOKENS = ("UI_FONT", "MONO_FONT")   # не часть контракта тем v1
+
+# Устаревшие имена (шкалы) → канонические токены. Принимаются только на
+# входе от сторонних тем; в ядре и встроенных темах не используются.
+ALIASES = {
+    "GRAY_400": "TEXT_DIM", "GRAY_500": "TEXT_SEC",
+    "GRAY_200": "BORDER", "GRAY_100": "TRACK",
+    "SLATE_100": "TRACK", "SLATE_200": "HOVER", "SLATE_300": "BORDER_STRONG",
+    "SLATE_400": "BORDER_STRONG", "SLATE_500": "TEXT_SEC",
+    "SLATE_700": "TEXT", "SLATE_800": "TOAST_BG", "SLATE_900": "ICON_FG_DIM",
+    "D1_D5_DB": "BORDER_STRONG", "ERROR_RED": "DANGER_SOLID",
+    "ACCENT_GREEN": "SUCCESS", "OK_ROW_BG": "SUCCESS_LIGHT",
+    "WARN_BG": "ROW_WARN", "WARN_ROW_BG": "ROW_WARN", "WARN_BORDER": "WARNING",
+    "SELECTED": "HOVER",
+}
+
+# Снимок светлой палитры при импорте модуля — до любых подмен фасада.
+LIGHT_TOKENS = {name: getattr(Color, name) for name in TOKENS}
+
+_HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\Z")
+
+_theme_listeners: list = []
+_EXTRA_QSS = ""
+
+
+def subscribe_theme_changed(fn):
+    """Колбэк fn(theme_id) после применения темы (UI перерисовка)."""
+    _theme_listeners.append(fn)
+
+
+def unsubscribe_theme_changed(fn):
+    """Снятие подписки (закрытые окна обязаны отписываться)."""
+    while fn in _theme_listeners:
+        _theme_listeners.remove(fn)
+
+
+def validate_tokens(tokens) -> dict:
+    """Проверка набора темы: алиасы → канон, полное покрытие, hex-формат."""
+    from ..plugins import PluginError
+
+    if not isinstance(tokens, dict):
+        raise PluginError("theme tokens() must return a dict")
+    mapped: dict[str, str] = {}
+    for key, value in tokens.items():
+        name = ALIASES.get(key, key)
+        if name not in TOKENS:
+            raise PluginError(f"unknown theme token: {key!r}")
+        if not isinstance(value, str) or not _HEX_RE.fullmatch(value):
+            raise PluginError(f"token {name}: invalid color {value!r}")
+        mapped[name] = value
+    missing = [t for t in TOKENS if t not in mapped]
+    if missing:
+        raise PluginError(f"theme is missing tokens: {', '.join(missing)}")
+    return mapped
+
+
+def apply_tokens(tokens: dict) -> None:
+    """Подмена значений фасада Color токенами темы."""
+    for name, value in tokens.items():
+        setattr(Color, name, value)
+
+
+def _apply_qss() -> None:
+    global QSS
+    QSS = _build_qss() + _EXTRA_QSS
+    _app().setStyleSheet(QSS)
+
+
+def load_theme(theme_id: str, registry=None, persist: bool = True) -> str:
+    """Активация темы-плагина: токены → QSS → иконки → графики.
+
+    Возвращает фактический id темы. Python-кэши QColor (brush в ячейках)
+    обновляются при ближайшей перестройке виджетов — слушатели
+    subscribe_theme_changed() отвечают за перерисовку.
+    """
+    from ..config import save_ui_state
+    from ..plugins import get_registry
+    from .detail_panel._constants import apply_chart_colors, pg_loaded
+    from .icons import reset_icons, set_base_size
+
+    reg = registry if registry is not None else get_registry()
+    plugin = reg.get_theme(theme_id)
+    apply_tokens(validate_tokens(plugin.tokens()))
+
+    global _EXTRA_QSS
+    try:
+        _EXTRA_QSS = plugin.extra_qss() or ""
+    except Exception:
+        logger.warning("theme %r: extra_qss() failed", theme_id, exc_info=True)
+        _EXTRA_QSS = ""
+    _apply_qss()
+    set_base_size(getattr(plugin, "icon_size", 16))
+    reset_icons()
+    pg = pg_loaded()
+    if pg is not None:
+        apply_chart_colors(pg)
+    if persist:
+        save_ui_state("theme", theme_id)
+    for fn in list(_theme_listeners):
+        try:
+            fn(theme_id)
+        except Exception:
+            logger.exception("theme listener failed after %r", theme_id)
+    return theme_id
+
+
 # ── Публичный API ──────────────────────────────────────────────────
 
 def load():
-    """Устанавливает шрифты и таблицу стилей для приложения."""
+    """Стартовая инициализация: шрифты + тема (по умолчанию светлая)."""
     app = _app()
     _resolve_fonts()
-    global QSS
-    QSS = _build_qss()
-    app.setStyleSheet(QSS)
+    try:
+        load_theme("light", persist=False)
+    except Exception:
+        apply_tokens(dict(LIGHT_TOKENS))
+        _apply_qss()
 
     ui_font = QFont(Color.UI_FONT, 14)
     ui_font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)

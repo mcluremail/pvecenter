@@ -336,7 +336,7 @@ class ClusterTasksWidget(QWidget):
         self.table.setRowCount(0)
         self.table.setRowCount(1)
         item = QTableWidgetItem(text)
-        item.setForeground(QColor(Color.GRAY_500))
+        item.setForeground(QColor(Color.TEXT_SEC))
         self.table.setItem(0, 4, item)
         self.table.model().blockSignals(False)
         self.table.setUpdatesEnabled(True)
