@@ -13,7 +13,7 @@
 - Репо — прямой push в `main`; PR-правила обходятся намеренно (соло).
 
 ```bash
-.venv/bin/python -m pytest tests/ -q          # все тесты (~730, <2 мин)
+.venv/bin/python -m pytest tests/ -q          # все тесты (~908, ~15 мин)
 .venv/bin/ruff check virtdeck/ tests/       # линт (gate до и после правок)
 uv lock                                       # только при изменении зависимостей
 ```

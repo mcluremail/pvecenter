@@ -15,6 +15,7 @@ _OLD_SALT = "nodes.salt"
 _OLD_JSON = "nodes.json"
 
 _KEYRING_SERVICE = "virtdeck"
+_KEYRING_SERVICE_LEGACY = "pvecenter"  # pre-3.0 name (PVECenter era)
 _DB_LOCK = threading.RLock()
 
 # ── paths ──────────────────────────────────────────────────────
@@ -98,7 +99,15 @@ def _load_token(name: str) -> str | None:
     if kr is None:
         return None
     try:
-        return kr.get_password(_KEYRING_SERVICE, _keyring_key(name))
+        value = kr.get_password(_KEYRING_SERVICE, _keyring_key(name))
+        if value is None:
+            # Migration: tokens saved before the VirtDeck rename live under
+            # the legacy service name — read them and re-store under the
+            # current service so the legacy entry can be retired.
+            value = kr.get_password(_KEYRING_SERVICE_LEGACY, _keyring_key(name))
+            if value is not None:
+                _save_token(name, value)
+        return value
     except Exception as e:
         logger.error("keyring get_password failed for %s: %s", name, e)
         return None
@@ -110,6 +119,10 @@ def _delete_token(name: str):
         return
     try:
         kr.delete_password(_KEYRING_SERVICE, _keyring_key(name))
+    except Exception:
+        pass
+    try:
+        kr.delete_password(_KEYRING_SERVICE_LEGACY, _keyring_key(name))
     except Exception:
         pass
 

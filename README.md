@@ -83,6 +83,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 - System tray icon: minimize to tray, quick quit, context menu
 - Offline mode: cached resources shown on startup before first network response
 - Multi-language UI (English, Russian, Arabic, Chinese, French, Spanish)
+- Theme switcher in the status bar: Light, KDE Breeze / Breeze Dark (24px icon set, exact KDE palettes), Oxygen, Graphite, and System (follows the OS color scheme); toolbar icons and brand recolor to match
 - Background auto-refresh every 20 seconds without losing selection or tabs
 - Toast notifications on host/VM status changes
 - Diagnostics for unreachable hosts (DNS error, timeout, auth failure, SSL errors)
@@ -151,7 +152,7 @@ sudo dnf install python3-pyside6 python3-proxmoxer python3-requests \
 sudo dnf install python3-websockets virt-viewer
 ```
 
-Then run from the repo: `./run` (или `python -m virtdeck`).
+Then run from the repo: `./run` (or `python -m virtdeck`).
 
 ### Isolated environment
 
@@ -324,3 +325,7 @@ etc.). Full list with licenses and sources:
 ## License
 
 GNU General Public License v3.0. See `LICENSE` file.
+
+VirtDeck is an unofficial third-party client. It is not affiliated with,
+endorsed by, or sponsored by Proxmox Server Solutions GmbH or KDE e.V.
+See [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md).

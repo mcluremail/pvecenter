@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased (v3.0 dev)
+
+**New features**
+- Theme engine (M1.1): 36 canonical color tokens, `Color` facade, theme plugin API v1, `load_theme()` pipeline (validation → facade → QSS + extra_qss → icons → persist), theme switcher in the status bar, built-in LightTheme
+- KDE themes (M1.2): Breeze and Breeze Dark with exact KDE palettes (LGPL-2.0-or-later scheme files used as reference data), Oxygen, custom Graphite, and System theme that follows the OS color scheme live (colorSchemeChanged listener); theme plugins may override icons — Breeze/Breeze Dark ship an original 24px SVG icon set (vm, host, cluster, pool, storage, backup, refresh, search) with density QSS
+- App branding: original mark (orange X + stand) as the app icon and a toolbar lockup whose "Deck" part recolors with the active theme
+
+**Breaking / rename**
+- PVECenter renamed to **VirtDeck**: Python module `pve_center` → `virtdeck`, console script, deb/rpm/NSI package names, GitHub repo (`mcluremail/virtdeck`), config directory (`~/.config/pve-center` → `~/.config/virtdeck`), keyring service (`pvecenter` → `virtdeck`); tokens stored under the legacy keyring service are migrated transparently on first read
+- PVE API tokens created on servers by new host additions are named `virtdeck-*` (previously `pvecenter-*`); tokens of existing hosts keep working unchanged
+
+**Internal**
+- 908 tests (+18: theme plugins, brand widget, keyring legacy migration), ruff clean
+
 ## v2.13.0 — cluster create/join via UI, storage management, stabilization (last 2.x)
 
 **New features**

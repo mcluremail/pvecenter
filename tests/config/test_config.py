@@ -376,3 +376,53 @@ class TestTreeNotes:
         config.save_tree_note("host:h2", "keep")
         config.save_tree_note("host:h2", "   ")
         assert config.load_tree_notes() == {}
+
+
+# --- keyring legacy service migration (VirtDeck rename) ---
+
+
+class _FakeKeyring:
+    """Minimal keyring module double: per-(service, key) in-memory store."""
+
+    def __init__(self):
+        self.store: dict[tuple[str, str], str] = {}
+
+    def set_password(self, service, key, value):
+        self.store[(service, key)] = value
+
+    def get_password(self, service, key):
+        return self.store.get((service, key))
+
+    def delete_password(self, service, key):
+        self.store.pop((service, key), None)
+
+
+@pytest.fixture
+def live_keyring(monkeypatch):
+    """Inject a real (fake) keyring module so _load/_delete run their logic."""
+    kr = _FakeKeyring()
+    monkeypatch.setattr(config, "_keyring_available", True)
+    monkeypatch.setattr(config, "_keyring_module", kr)
+    return kr
+
+
+class TestKeyringLegacyMigration:
+    def test_load_migrates_legacy_token(self, live_keyring):
+        live_keyring.set_password("pvecenter", "node:h1", "tok-legacy")
+        assert config._load_token("h1") == "tok-legacy"
+        assert live_keyring.get_password("virtdeck", "node:h1") == "tok-legacy"
+
+    def test_current_service_takes_precedence(self, live_keyring):
+        live_keyring.set_password("pvecenter", "node:h1", "tok-old")
+        live_keyring.set_password("virtdeck", "node:h1", "tok-new")
+        assert config._load_token("h1") == "tok-new"
+
+    def test_missing_token_returns_none(self, live_keyring):
+        assert config._load_token("nope") is None
+
+    def test_delete_cleans_both_services(self, live_keyring):
+        live_keyring.set_password("pvecenter", "node:h1", "tok-old")
+        live_keyring.set_password("virtdeck", "node:h1", "tok-new")
+        config._delete_token("h1")
+        assert live_keyring.get_password("virtdeck", "node:h1") is None
+        assert live_keyring.get_password("pvecenter", "node:h1") is None
