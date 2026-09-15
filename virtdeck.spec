@@ -39,12 +39,17 @@ VirtDeck — desktop client for Proxmox VE cluster monitoring and management.
 %py3_install
 install -m 644 -D debian/virtdeck.desktop \
   %{buildroot}%{_datadir}/applications/virtdeck.desktop
+for s in 16 24 32 48 64 128 256 512; do
+  install -m 644 -D "packaging/icons/hicolor/${s}x${s}/apps/virtdeck.png" \
+    "%{buildroot}%{_datadir}/icons/hicolor/${s}x${s}/apps/virtdeck.png"
+done
 
 %files
 %{python3_sitelib}/virtdeck/
 %{python3_sitelib}/virtdeck-*.egg-info/
 %{_bindir}/virtdeck
 %{_datadir}/applications/virtdeck.desktop
+%{_datadir}/icons/hicolor/*/apps/virtdeck.png
 
 %changelog
 * Tue Sep 08 2026 Taurus McLure <taurus@mclure.ru> - 2.11.3-1

@@ -190,6 +190,7 @@ class MainWindow(QMainWindow):
         self._notifications = NotificationManager(self)
 
         self._tray = None
+        self._tray_state = "ok"
         self._tray_minimize_to_tray = True
         if QSystemTrayIcon.isSystemTrayAvailable():
             self._init_tray()
@@ -1781,6 +1782,7 @@ class MainWindow(QMainWindow):
             self._soft_storage_repo.clear()
             self._refresh.finish_soft()
             self._soft_refresh_active = False
+            self._update_tray_state()
 
     # ------------------------------------------------------------
     # Обновление задач кластера
@@ -2125,6 +2127,7 @@ class MainWindow(QMainWindow):
         size = max(18, round(_BASE_SIZE * 1.125))
         self._toolbar.setIconSize(QSize(size, size))
         self._brand.restyle()
+        self._update_tray_state()
         self.tree_panel.reapply_theme()
 
     def _on_language_changed(self, idx):
@@ -2175,6 +2178,22 @@ class MainWindow(QMainWindow):
         self._tray.setContextMenu(menu)
         self._tray.activated.connect(self._on_tray_activated)
         self._tray.show()
+        self._update_tray_state()
+
+    def _update_tray_state(self):
+        """Трей-иконка состояния бренда: offline / error / ok."""
+        if self._tray is None:
+            return
+        if not self.nodes_cfg or self._offline_mode:
+            state = "offline"
+        elif self._soft_had_errors:
+            state = "error"
+        else:
+            state = "ok"
+        self._tray_state = state
+        icon = brand.tray_icon(state)
+        if not icon.isNull():
+            self._tray.setIcon(icon)
 
     def _tray_show(self):
         self.showNormal()

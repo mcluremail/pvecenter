@@ -14,3 +14,9 @@ override_dh_install:
 	# install desktop file
 	install -D -m 644 debian/virtdeck.desktop \
 		$(CURDIR)/debian/virtdeck/usr/share/applications/virtdeck.desktop
+	# install hicolor app icons (branding kit)
+	set -e; for s in 16 24 32 48 64 128 256 512; do \
+		install -D -m 644 \
+			packaging/icons/hicolor/$${s}x$${s}/apps/virtdeck.png \
+			$(CURDIR)/debian/virtdeck/usr/share/icons/hicolor/$${s}x$${s}/apps/virtdeck.png; \
+	done

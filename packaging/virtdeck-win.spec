@@ -16,6 +16,7 @@ a = Analysis(
     datas=[
         (os.path.join(_root, 'virtdeck', 'ui', 'i18n', '*.json'), 'virtdeck/ui/i18n'),
         (os.path.join(_root, 'virtdeck', 'ui', '*.svg'), 'virtdeck/ui'),
+        (os.path.join(_root, 'virtdeck', 'ui', 'brand_assets', '*.svg'), 'virtdeck/ui/brand_assets'),
     ],
     hiddenimports=[
         'PySide6.QtCore',
@@ -68,7 +69,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=None,
+    icon=os.path.join(_root, 'packaging', 'virtdeck.ico'),
 )
 
 coll = COLLECT(
