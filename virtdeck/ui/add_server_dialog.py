@@ -42,9 +42,11 @@ class AddServerDialog(QDialog):
         self.setWindowTitle(tr("Add Server") + title_suffix)
         self.setMinimumSize(520, 660)
         self._token_data = None
+        self._cluster_info = None
         self._active_workers = set()
         self._build_ui()
         self._apply_context()
+        self._on_type_changed()
 
     def closeEvent(self, event):
         for w in list(self._active_workers):
@@ -88,7 +90,7 @@ class AddServerDialog(QDialog):
         port_lbl = QLabel(tr("Port:"))
         port_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         conn_grid.addWidget(port_lbl, 2, 0)
-        self.port_input = QLineEdit("8007")
+        self.port_input = QLineEdit("8006")
         self.port_input.setValidator(QRegularExpressionValidator(r"\d{1,5}"))
         conn_grid.addWidget(self.port_input, 2, 1)
 
@@ -155,7 +157,6 @@ class AddServerDialog(QDialog):
         token_grid.addWidget(self.token_value_label, 1, 1)
 
         self._token_show_btn = QPushButton(tr("Show"))
-        self._token_show_btn.setFixedWidth(60)
         self._token_show_btn.setCheckable(True)
         self._token_show_btn.clicked.connect(self._toggle_token_visibility)
         self._token_show_btn.setVisible(False)
@@ -187,11 +188,8 @@ class AddServerDialog(QDialog):
         cl_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         node_grid.addWidget(cl_lbl, 1, 0)
         self.cluster_input = QLineEdit()
-        self.cluster_input.setPlaceholderText(tr("cluster name (if applicable)"))
+        self.cluster_input.setPlaceholderText(tr("auto (detected from server)"))
         node_grid.addWidget(self.cluster_input, 1, 1)
-
-        self.cluster_rep_cb = QCheckBox(tr("This is a cluster representative"))
-        node_grid.addWidget(self.cluster_rep_cb, 2, 0, 1, 2)
 
         node_grid.setColumnStretch(1, 1)
         layout.addLayout(node_grid)
@@ -199,7 +197,7 @@ class AddServerDialog(QDialog):
         # PVE-only widgets hidden in PBS mode (token flow + cluster row)
         self._pve_only_labels = [info_label, tn_lbl, tv_lbl, cl_lbl]
         self._pve_only_widgets = [self.token_name_label, self.token_value_label,
-                                  self._token_show_btn, self.cluster_rep_cb]
+                                  self._token_show_btn]
 
         layout.addStretch()
 
@@ -219,10 +217,8 @@ class AddServerDialog(QDialog):
         ctx = self._context
         if ctx == "cluster":
             self.cluster_input.setPlaceholderText(tr("cluster name (required for clusters)"))
-            self.cluster_rep_cb.setChecked(True)
         elif ctx == "standalone":
             self.cluster_input.setPlaceholderText(tr("leave empty — standalone host"))
-            self.cluster_rep_cb.setChecked(False)
 
     # ── PBS mode ─────────────────────────────────────────────────
 
@@ -231,7 +227,11 @@ class AddServerDialog(QDialog):
 
     def _on_type_changed(self):
         pbs = self._is_pbs()
-        self.port_input.setVisible(pbs)
+        # Порт виден всегда: дефолт 8006 (PVE) ↔ 8007 (PBS). Пользовательский
+        # порт (не один из дефолтов) не перетирается при смене типа.
+        current = self.port_input.text().strip()
+        if current in ("", "8006", "8007"):
+            self.port_input.setText("8007" if pbs else "8006")
         # PVE-only widgets: token flow + cluster assignment
         self._token_title.setVisible(not pbs)
         for w in (self.auth_btn, *self._pve_only_labels, *self._pve_only_widgets):
@@ -304,12 +304,21 @@ class AddServerDialog(QDialog):
 
     def _on_token_ready(self, result):
         self._token_data = result
+        self._cluster_info = result.get("cluster")
         self.token_name_label.setText(result["token_name"])
         self._token_value_real = result["token_value"]
         self.token_value_label.setText("•" * 8)
         self._token_show_btn.setVisible(True)
         self._token_show_btn.setChecked(False)
-        self._set_status(tr("Token created"), Color.STATUS_OK)
+        status = tr("Token created")
+        cluster = self._cluster_info or {}
+        if cluster.get("nodes", 0) > 1:
+            name = cluster.get("name") or self.host_input.text().strip()
+            status += " · " + tr("Cluster detected: {name} ({count} nodes)").format(
+                name=name, count=cluster["nodes"])
+            if not self.cluster_input.text().strip():
+                self.cluster_input.setText(name)
+        self._set_status(status, Color.STATUS_OK)
         self.auth_btn.setEnabled(True)
         self.auth_btn.setText(tr("Update token"))
         self.add_btn.setEnabled(True)
@@ -369,9 +378,11 @@ class AddServerDialog(QDialog):
         if proxy:
             cfg["proxy"] = proxy
 
-        if self.cluster_rep_cb.isChecked():
+        cluster = self._cluster_info or {}
+        if cluster.get("nodes", 0) > 1:
+            # Кластер распознан автоматически по /cluster/status.
             cfg["cluster_rep"] = True
-            cfg["cluster"] = cluster_text or name
+            cfg["cluster"] = cluster_text or cluster.get("name") or name
         else:
             cfg["cluster"] = cluster_text if cluster_text else False
 

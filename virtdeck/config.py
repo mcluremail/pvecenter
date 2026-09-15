@@ -35,6 +35,7 @@ def _config_dir():
         base = xdg
     if not os.path.isabs(base):
         base = os.path.join(os.path.expanduser("~"), base)
+    _migrate_legacy_dir(base)
     d = os.path.join(base, "virtdeck")
     os.makedirs(d, exist_ok=True)
     try:
@@ -42,6 +43,23 @@ def _config_dir():
     except OSError:
         pass
     return d
+
+
+_LEGACY_DIRNAME = "pve-center"  # pre-3.0 config directory (PVECenter era)
+
+
+def _migrate_legacy_dir(base):
+    """Rename the pre-3.0 config directory (pve-center → virtdeck) on
+    first start, so hosts/tokens/UI state survive the rename."""
+    old = os.path.join(base, _LEGACY_DIRNAME)
+    new = os.path.join(base, "virtdeck")
+    if not os.path.isdir(old) or os.path.exists(new):
+        return
+    try:
+        os.rename(old, new)
+        logger.info("migrated config dir %s → %s", old, new)
+    except OSError as e:
+        logger.warning("config dir migration failed: %s", e)
 
 
 def _migrate_file(name):

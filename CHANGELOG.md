@@ -3,16 +3,20 @@
 ## Unreleased (v3.0 dev)
 
 **New features**
+- Performance foundation (M0): static sync-contract test (AST scanner — no sync client calls in UI), runtime contract guard on `PluginRegistry.create_provider` (caught and fixed a real DetailPanel timer bug), optimistic UI helper with tree spinners (pilot: VM power actions), perf baseline (`scripts/perf_session.py`, `docs/PERF_BASELINE.md`, CI smoke thresholds), PVE feature detection (`domain/compat.py`: `PveVersion`, `PVE_FEATURES`, `provider.supports()`)
 - Theme engine (M1.1): 36 canonical color tokens, `Color` facade, theme plugin API v1, `load_theme()` pipeline (validation → facade → QSS + extra_qss → icons → persist), theme switcher in the status bar, built-in LightTheme
 - KDE themes (M1.2): Breeze and Breeze Dark with exact KDE palettes (LGPL-2.0-or-later scheme files used as reference data), Oxygen, custom Graphite, and System theme that follows the OS color scheme live (colorSchemeChanged listener); theme plugins may override icons — Breeze/Breeze Dark ship an original 24px SVG icon set (vm, host, cluster, pool, storage, backup, refresh, search) with density QSS
-- App branding: original mark (orange X + stand) as the app icon and a toolbar lockup whose "Deck" part recolors with the active theme
+- App branding (designer kit, 2026-09-15): original V+D monogram replaces the programmatic mark — vector SVG assets in `virtdeck/ui/brand_assets/` (light/dark app tiles, toolbar lockup with fixed designer colors, mono marks, 16 tray state icons: ok/error/offline per theme, light/dark and compact); tray icon now reflects connection state (offline/error/ok); installer icons shipped — hicolor PNGs for deb/rpm, `.ico` for NSI, PyInstaller window icon
+
+**Bug fixes**
+- First-run fixes (zero-start pass): the pre-3.0 config directory (`~/.config/pve-center` etc.) is renamed to `virtdeck` on first start so hosts/UI state survive the rename; Add Server dialog defaults to port 8006 for PVE (was 8007), auto-swaps 8006↔8007 on type change (custom ports kept) and the port field stays visible for both types; the token Show button sizes to its label (was clipped in ru locale); clusters are now detected automatically via `/cluster/status` after token creation (cluster name auto-filled, `cluster_rep` set without the manual checkbox, which was removed)
 
 **Breaking / rename**
 - PVECenter renamed to **VirtDeck**: Python module `pve_center` → `virtdeck`, console script, deb/rpm/NSI package names, GitHub repo (`mcluremail/virtdeck`), config directory (`~/.config/pve-center` → `~/.config/virtdeck`), keyring service (`pvecenter` → `virtdeck`); tokens stored under the legacy keyring service are migrated transparently on first read
 - PVE API tokens created on servers by new host additions are named `virtdeck-*` (previously `pvecenter-*`); tokens of existing hosts keep working unchanged
 
 **Internal**
-- 908 tests (+18: theme plugins, brand widget, keyring legacy migration), ruff clean
+- 936 tests (M0 contracts, optimistic UI, perf smoke, compat matrix, theme plugins, brand assets/tray states, add-server dialog, keyring and config-dir legacy migration), ruff clean
 
 ## v2.13.0 — cluster create/join via UI, storage management, stabilization (last 2.x)
 

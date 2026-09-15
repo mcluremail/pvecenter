@@ -105,7 +105,35 @@ def create_admin_token(host, user, password, trust_ssl=False, proxy=None):
         except Exception as ve:
             logger.warning("verify exception: %s", ve)
 
-        return {"token_name": token_id, "token_value": token_value, "user": user}
+        # Автоопределение кластера: /cluster/status на участнике кластера
+        # возвращает запись type=cluster (имя) и список нод; на standalone —
+        # только одну ноду. Ошибка запроса не фейлит создание токена.
+        cluster_info = None
+        try:
+            cr = rq.get(
+                f"https://{host}:{PVE_PORT}/api2/json/cluster/status",
+                headers={"Authorization": auth_header},
+                verify=verify, timeout=10, allow_redirects=False,
+                proxies=_proxies(proxy),
+            )
+            if cr.status_code == 200:
+                entries = cr.json().get("data") or []
+                cl_entry = next(
+                    (e for e in entries if isinstance(e, dict) and e.get("type") == "cluster"),
+                    None,
+                )
+                if cl_entry:
+                    nodes = [e for e in entries
+                             if isinstance(e, dict) and e.get("type") == "node"]
+                    cluster_info = {
+                        "name": cl_entry.get("name", ""),
+                        "nodes": len(nodes),
+                    }
+        except Exception as ce:
+            logger.warning("cluster/status detect failed: %s", ce)
+
+        return {"token_name": token_id, "token_value": token_value,
+                "user": user, "cluster": cluster_info}
 
     except Exception as e:
         msg = str(e)

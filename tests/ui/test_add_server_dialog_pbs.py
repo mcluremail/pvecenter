@@ -29,7 +29,6 @@ class TestTypeSwitch:
         assert dialog.port_input.isVisible()
         assert not dialog.auth_btn.isVisible()
         assert not dialog.token_name_label.isVisible()
-        assert not dialog.cluster_rep_cb.isVisible()
         assert dialog.add_btn.isEnabled()
 
     def test_switch_back_to_pve_disables_add_without_token(self, dialog):

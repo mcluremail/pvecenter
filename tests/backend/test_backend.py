@@ -214,6 +214,49 @@ class TestCreateAdminToken:
         assert "error" in result
         assert "not working" in result["error"]
 
+    def test_cluster_detected(self, ticket_ok, monkeypatch):
+        """cluster/status с записью type=cluster — cluster_info в результате."""
+        fake = FakeSession([_resp(200, {"data": {"value": "UUID"}})])
+        monkeypatch.setattr(requests, "Session", lambda: fake)
+
+        def fake_get(url, **kw):
+            if "/cluster/status" in url:
+                return _resp(200, {"data": [
+                    {"type": "cluster", "name": "ros", "quorate": 1},
+                    {"type": "node", "name": "pve01"},
+                    {"type": "node", "name": "pve02"},
+                    {"type": "node", "name": "pve03"},
+                ]})
+            return _resp(200, {})
+        monkeypatch.setattr(requests, "get", fake_get)
+        result = backend.create_admin_token("pve.local", "root@pam", "pass")
+        assert result["cluster"] == {"name": "ros", "nodes": 3}
+
+    def test_standalone_no_cluster_entry(self, ticket_ok, monkeypatch):
+        fake = FakeSession([_resp(200, {"data": {"value": "UUID"}})])
+        monkeypatch.setattr(requests, "Session", lambda: fake)
+
+        def fake_get(url, **kw):
+            if "/cluster/status" in url:
+                return _resp(200, {"data": [{"type": "node", "name": "pve01"}]})
+            return _resp(200, {})
+        monkeypatch.setattr(requests, "get", fake_get)
+        result = backend.create_admin_token("pve.local", "root@pam", "pass")
+        assert result["cluster"] is None
+
+    def test_cluster_status_error_is_tolerated(self, ticket_ok, monkeypatch):
+        fake = FakeSession([_resp(200, {"data": {"value": "UUID"}})])
+        monkeypatch.setattr(requests, "Session", lambda: fake)
+
+        def fake_get(url, **kw):
+            if "/cluster/status" in url:
+                return _resp(500)
+            return _resp(200, {})
+        monkeypatch.setattr(requests, "get", fake_get)
+        result = backend.create_admin_token("pve.local", "root@pam", "pass")
+        assert "error" not in result
+        assert result["cluster"] is None
+
     def test_bad_credentials(self, monkeypatch):
         monkeypatch.setattr(
             requests, "post",

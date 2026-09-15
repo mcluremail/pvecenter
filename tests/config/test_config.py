@@ -233,6 +233,36 @@ class TestMigration:
         assert (cfg_dir / "config.sqlite").exists()
 
 
+class TestLegacyDirMigration:
+    def test_legacy_dir_renamed_on_config_dir(self, tmp_path, monkeypatch):
+        base = tmp_path / "xdg"
+        legacy = base / "pve-center"
+        legacy.mkdir(parents=True)
+        (legacy / "config.sqlite").write_bytes(b"old-db")
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(base))
+
+        d = config._config_dir()
+        assert d == str(base / "virtdeck")
+        assert (base / "virtdeck" / "config.sqlite").read_bytes() == b"old-db"
+        assert not legacy.exists()
+
+    def test_no_migration_when_new_dir_exists(self, tmp_path, monkeypatch):
+        base = tmp_path / "xdg"
+        (base / "pve-center").mkdir(parents=True)
+        (base / "virtdeck").mkdir(parents=True)
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(base))
+
+        config._config_dir()
+        assert (base / "pve-center").exists()  # left untouched
+
+    def test_noop_without_legacy_dir(self, tmp_path, monkeypatch):
+        base = tmp_path / "xdg"
+        base.mkdir(parents=True)
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(base))
+        config._config_dir()
+        assert (base / "virtdeck").exists()
+
+
 # --- encrypted bundle ---
 
 
